@@ -1,5 +1,6 @@
 name = "moltbot-frontend"
 compatibility_date = "2024-04-03"
+compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "./dist"
 
 [observability]
@@ -11,4 +12,4 @@ binding = "AI"
 [[d1_databases]]
 binding = "DB"
 database_name = "moltbot-db"
-database_id = "xxxx-xxxx-xxxx-xxxx" # Should match backend ID
+database_id = "97634677-4bac-44d1-bd02-6c733328a137" # Should match backend ID

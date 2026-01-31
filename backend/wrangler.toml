@@ -1,11 +1,13 @@
 name = "moltbot"
-compatibility_date = "2024-04-03"
 main = "src/index.ts"
+compatibility_date = "2024-12-30"  # Updated to a more recent date
+compatibility_flags = ["nodejs_compat"]
 
 [observability]
 enabled = true
 
-
+[browser]
+binding = "MYBROWSER"
 
 [ai]
 binding = "AI"
@@ -13,7 +15,9 @@ binding = "AI"
 [[d1_databases]]
 binding = "DB"
 database_name = "moltbot-db"
-database_id = "xxxx-xxxx-xxxx-xxxx" # Placeholder, needs actual ID for remote
+database_id = "97634677-4bac-44d1-bd02-6c733328a137" # Used only for remote deploy
 
-[triggers]
-crons = ["0 0 * * *"] # Run once a day at midnight UTC
+[dev]
+# This helps ensure local development behaves with persistence
+local_protocol = "http"
+port = 8787
