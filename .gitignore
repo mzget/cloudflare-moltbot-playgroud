@@ -1,0 +1,48 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Build outputs
+dist/
+.astro/
+.wrangler/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+.dev.vars
+
+# Local D1 database
+.d1-data/
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.log
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# IDE configurations
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Wrangler logs
+.wrangler/logs/
+
+# Test coverage
+coverage/
+.nyc_output/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/

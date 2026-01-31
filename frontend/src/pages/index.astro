@@ -1,0 +1,170 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="Moltbot - Stock Watch">
+	<div class="max-w-6xl mx-auto p-6">
+        <header class="mb-10 flex items-center justify-between">
+            <div>
+                <h1 class="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-600">Moltbot</h1>
+                <p class="text-gray-400 mt-2">AI-Powered Stock News Crawler</p>
+            </div>
+            <div class="glass px-4 py-2 rounded-full flex items-center space-x-2">
+                <div class="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                <span class="text-xs font-mono">SYSTEM ONLINE</span>
+            </div>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Sidebar: Watchlist -->
+            <aside class="glass rounded-2xl p-6 lg:col-span-1 h-fit transform transition hover:scale-[1.01] duration-300">
+                <h2 class="text-xl font-semibold mb-4 flex items-center">
+                    <i data-lucide="list" class="mr-2 w-5 h-5"></i> Watchlist
+                </h2>
+                
+                <form id="addStockForm" class="flex gap-2 mb-6">
+                    <input type="text" id="symbolInput" placeholder="AAPL" class="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 focus:outline-none focus:border-purple-500 transition-colors uppercase" required>
+                    <button type="submit" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center">
+                        <i data-lucide="plus" class="w-5 h-5"></i>
+                    </button>
+                </form>
+
+                <div id="watchlist" class="space-y-3">
+                    <!-- Loading state -->
+                    <div class="animate-pulse bg-gray-800 h-10 rounded-lg"></div>
+                </div>
+            </aside>
+
+            <!-- Main: News Feed -->
+            <section class="lg:col-span-2">
+                <h2 class="text-xl font-semibold mb-4 flex items-center">
+                    <i data-lucide="newspaper" class="mr-2 w-5 h-5"></i> Latest Intel
+                </h2>
+                
+                <div id="newsFeed" class="grid gap-4">
+                    <!-- Loading state -->
+                    <div class="animate-pulse glass h-32 rounded-2xl"></div>
+                    <div class="animate-pulse glass h-32 rounded-2xl"></div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script>
+        // Client-side logic will go here or in components
+        // For now, porting the vanilla JS logic
+        
+        // Ensure Lucide icons load
+        // @ts-ignore
+        if (typeof lucide !== 'undefined') lucide.createIcons();
+
+        const fetchWatchlist = async () => {
+            try {
+                const res = await fetch('/api/watchlist');
+                const data = await res.json();
+                const container = document.getElementById('watchlist');
+                if (!container) return;
+                container.innerHTML = '';
+                
+                data.forEach((item: any) => {
+                    const el = document.createElement('div');
+                    el.className = 'flex items-center justify-between p-3 bg-gray-800/50 rounded-lg border border-gray-700 hover:border-gray-600 transition-colors group';
+                    el.innerHTML = `
+                        <div class="flex items-center">
+                            <span class="font-bold text-lg text-purple-400">${item.symbol}</span>
+                            ${item.is_auto_suggested ? '<span class="ml-2 text-xs bg-cyan-900/50 text-cyan-400 px-2 py-0.5 rounded-full border border-cyan-800">AI</span>' : ''}
+                        </div>
+                        <button onclick="window.removeStock('${item.symbol}')" class="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                    `;
+                    container.appendChild(el);
+                });
+                // @ts-ignore
+                lucide.createIcons();
+            } catch (e) {
+                console.error("Failed to fetch watchlist", e);
+            }
+        };
+
+        const fetchNews = async () => {
+             try {
+                const res = await fetch('/api/news');
+                const data = await res.json();
+                const container = document.getElementById('newsFeed');
+                if (!container) return;
+                container.innerHTML = '';
+
+                if (data.length === 0) {
+                    container.innerHTML = '<div class="text-center text-gray-500 py-10">No news found yet. Wait for the crawler to run.</div>';
+                    return;
+                }
+
+                data.forEach((item: any) => {
+                    const sentimentColor = item.sentiment?.toLowerCase().includes('positive') ? 'text-green-400' : 
+                                        item.sentiment?.toLowerCase().includes('negative') ? 'text-red-400' : 'text-gray-400';
+                    
+                    const el = document.createElement('div');
+                    el.className = 'glass p-6 rounded-2xl hover:bg-gray-800/80 transition-colors';
+                    el.innerHTML = `
+                        <div class="flex items-start justify-between mb-2">
+                            <div class="flex items-center space-x-2">
+                                <span class="bg-gray-700 text-xs px-2 py-1 rounded text-gray-300 font-bold">${item.symbol}</span>
+                                <span class="text-xs text-gray-500">${new Date(item.created_at * 1000).toLocaleDateString()}</span>
+                            </div>
+                            <span class="text-xs uppercase font-bold tracking-wider ${sentimentColor}">${item.sentiment || 'NEUTRAL'}</span>
+                        </div>
+                        <h3 class="text-lg font-bold mb-2 leading-tight">${item.title}</h3>
+                        <p class="text-gray-400 text-sm mb-4 line-clamp-2">${item.summary}</p>
+                        <a href="${item.url}" target="_blank" class="inline-flex items-center text-sm text-purple-400 hover:text-purple-300 transition-colors">
+                            Read Source <i data-lucide="external-link" class="ml-1 w-3 h-3"></i>
+                        </a>
+                    `;
+                    container.appendChild(el);
+                });
+                // @ts-ignore
+                lucide.createIcons();
+            } catch (e) {
+                console.error("Failed to fetch news", e);
+            }
+        };
+
+        const addStock = async (e: Event) => {
+            e.preventDefault();
+            const input = document.getElementById('symbolInput') as HTMLInputElement;
+            const symbol = input.value.toUpperCase();
+            if(!symbol) return;
+            
+            const btn = document.querySelector('#addStockForm button');
+            if(btn) btn.innerHTML = '<div class="w-5 h-5 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>';
+            
+            try {
+                await fetch('/api/watchlist', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ symbol })
+                });
+                input.value = '';
+                await fetchWatchlist();
+            } finally {
+                if(btn) btn.innerHTML = '<i data-lucide="plus" class="w-5 h-5"></i>';
+                // @ts-ignore
+                lucide.createIcons();
+            }
+        };
+
+        // Expose removeStock to window for onclick handler (simplest port)
+        // @ts-ignore
+        window.removeStock = async (symbol: string) => {
+            if(!confirm(`Stop tracking ${symbol}?`)) return;
+            await fetch(`/api/watchlist/${symbol}`, { method: 'DELETE' });
+            await fetchWatchlist();
+        };
+
+        const form = document.getElementById('addStockForm');
+        if (form) form.addEventListener('submit', addStock);
+        
+        fetchWatchlist();
+        fetchNews();
+    </script>
+</Layout>

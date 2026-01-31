@@ -1,0 +1,19 @@
+name = "moltbot"
+compatibility_date = "2024-04-03"
+main = "src/index.ts"
+
+[observability]
+enabled = true
+
+
+
+[ai]
+binding = "AI"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "moltbot-db"
+database_id = "xxxx-xxxx-xxxx-xxxx" # Placeholder, needs actual ID for remote
+
+[triggers]
+crons = ["0 0 * * *"] # Run once a day at midnight UTC
