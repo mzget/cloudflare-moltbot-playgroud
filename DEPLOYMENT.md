@@ -71,7 +71,7 @@ Add the following **Repository Secrets**:
 | Secret Name | Value | Description |
 |-------------|-------|-------------|
 | `CLOUDFLARE_API_TOKEN` | Your API token from step 1 | API token with Workers/Pages permissions |
-| `CLOUDFLARE_ACCOUNT_ID` | `b66e3465f1453412df32adf063fc8388` | Your Cloudflare account ID |
+| `CLOUDFLARE_ACCOUNT_ID` | `xxx` | Your Cloudflare account ID |
 
 ### 2. Configure GitHub Variables (Optional)
 
@@ -249,6 +249,50 @@ npx wrangler tail moltbot
 # View frontend logs
 npx wrangler pages deployment tail
 ```
+
+## Git Flow Workflow
+
+This project follows a simplified Git Flow branching strategy:
+
+### Branch Structure
+
+-   **`main`**: Production code. Only stable, tested code should be merged here.
+-   **`develop`**: Integration branch. Feature branches are merged here first.
+-   **`feature/*`**: New features or refactors. Created from `develop` and merged back to `develop`.
+-   **`hotfix/*`**: Emergency fixes for production. Created from `main` and merged to both `main` and `develop`.
+
+### Working with Git Flow
+
+1.  **Start a new feature**:
+    ```bash
+    git checkout develop
+    git pull origin develop
+    git checkout -b feature/your-feature-name
+    ```
+
+2.  **Commit changes**:
+    ```bash
+    git add .
+    git commit -m "feat: your description"
+    ```
+
+3.  **Finish a feature**:
+    ```bash
+    # Push to GitHub and create a Pull Request to 'develop'
+    git push origin feature/your-feature-name
+    ```
+
+4.  **Merge to production**:
+    ```bash
+    # Once 'develop' is stable, create a Pull Request from 'develop' to 'main'
+    ```
+
+### CI/CD Integration
+
+-   **CI Workflow**: Runs on both `main` and `develop` branches (and all PRs targeting them).
+-   **Deployments**:
+    -   **Push to `develop`**: Triggers a deployment (can be configured as a staging/preview deployment).
+    -   **Push to `main`**: Triggers a production deployment.
 
 ## Rollback Procedures
 
