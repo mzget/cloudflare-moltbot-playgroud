@@ -11,16 +11,19 @@ export default defineConfig({
   vite: {
     plugins: [tailwindcss()],
     resolve: {
-      alias: {
+      alias: process.env.NODE_ENV === 'production' ? {
         'react-dom/server': 'react-dom/server.edge'
-      }
+      } : {}
     }
   },
 
   output: 'server',
   adapter: cloudflare({
     platformProxy: {
-      enabled: true
+      enabled: true,
+      persist: {
+        path: '../.d1-data/v3'
+      }
     }
   })
 });

@@ -18,7 +18,7 @@ const NewsFeed: React.FC = () => {
     const fetchNews = async () => {
         try {
             const res = await fetch('/api/news');
-            const data = await res.json();
+            const data = await res.json() as NewsItem[];
             setNews(data);
         } catch (e) {
             console.error("Failed to fetch news", e);
@@ -60,7 +60,7 @@ const NewsFeed: React.FC = () => {
                     item.sentiment?.toLowerCase().includes('negative') ? 'text-red-400' : 'text-gray-400';
 
                 return (
-                    <div key={item.id} className="glass p-6 rounded-2xl hover:bg-gray-800/80 transition-colors group">
+                    <div key={item.id} className="glass p-6 rounded-2xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors group">
                         <div className="flex items-start justify-between mb-4">
                             <div className="flex items-center space-x-2">
                                 <span className="bg-purple-900/40 text-purple-300 text-xs px-2 py-1 rounded-md font-bold border border-purple-800/50">
@@ -70,12 +70,12 @@ const NewsFeed: React.FC = () => {
                                     {new Date(item.created_at * 1000).toLocaleDateString()}
                                 </span>
                             </div>
-                            <span className={`text-[10px] uppercase font-bold tracking-widest px-2 py-1 rounded-full border ${sentimentColor.replace('text', 'border')}/30 bg-gray-900/50 ${sentimentColor}`}>
+                            <span className={`text-[10px] uppercase font-bold tracking-widest px-2 py-1 rounded-full border ${sentimentColor.replace('text', 'border')}/30 bg-black/5 dark:bg-white/5 ${sentimentColor}`}>
                                 {item.sentiment || 'NEUTRAL'}
                             </span>
                         </div>
 
-                        <h3 className="text-lg font-bold mb-2 leading-tight group-hover:text-purple-400 transition-colors">
+                        <h3 className="text-lg font-bold mb-2 leading-tight group-hover:text-purple-400 transition-colors text-black dark:text-white">
                             {item.title}
                         </h3>
 

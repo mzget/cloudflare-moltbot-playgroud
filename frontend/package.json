@@ -7,7 +7,8 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "dev:local": "npm run build && wrangler pages dev dist --persist-to=../.d1-data"
+    "dev:local": "npm run build && wrangler pages dev dist --persist-to=../.d1-data",
+    "dev:remote": "wrangler pages dev --proxy 4321 --remote"
   },
   "dependencies": {
     "@astrojs/cloudflare": "^12.6.12",

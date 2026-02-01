@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "deploy": "wrangler deploy",
-    "dev": "wrangler dev",
-    "start": "wrangler dev"
+    "dev": "wrangler dev --persist-to=../.d1-data",
+    "start": "wrangler dev --persist-to=../.d1-data"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20240403.0",

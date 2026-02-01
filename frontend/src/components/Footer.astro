@@ -1,0 +1,26 @@
+---
+const year = new Date().getFullYear();
+---
+
+<footer class="mt-12 py-8 border-t border-gray-800">
+    <div class="flex flex-col md:flex-row justify-between items-center text-sm text-gray-500">
+        <div class="flex items-center space-x-4 mb-4 md:mb-0">
+            <span class="font-mono text-purple-500/50">MOLTBOT_V1.0</span>
+            <span>&copy; {year} Moltbot Intel Systems</span>
+        </div>
+        
+        <div class="flex space-x-8">
+            <a href="#" class="hover:text-purple-400 transition-colors">Documentation</a>
+            <a href="#" class="hover:text-purple-400 transition-colors">API Access</a>
+            <a href="#" class="hover:text-purple-400 transition-colors">Neural Mesh</a>
+            <a href="#" class="hover:text-purple-400 transition-colors">Protocol Status</a>
+        </div>
+
+        <div class="mt-4 md:mt-0 glass px-3 py-1 rounded-full border border-gray-700/50">
+            <span class="flex items-center">
+                <span class="w-1.5 h-1.5 bg-cyan-400 rounded-full mr-2"></span>
+                <span class="text-[10px] font-mono tracking-tighter">ALL SYSTEMS OPERATIONAL</span>
+            </span>
+        </div>
+    </div>
+</footer>
