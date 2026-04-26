@@ -13,6 +13,7 @@ binding = "AI"
 binding = "DB"
 database_name = "oaktree-db"
 database_id = "97634677-4bac-44d1-bd02-6c733328a137"
+remote = true
 
 [[send_email]]
 name = "EMAIL"

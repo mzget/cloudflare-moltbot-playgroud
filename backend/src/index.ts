@@ -34,11 +34,15 @@ export default {
 			return new Response('Email trigger started', { headers: corsHeaders });
 		}
 
-		// API: Get Latest Reports
+		// API: Get Latest Reports (One per symbol)
 		if (url.pathname === '/api/reports') {
-			const { results } = await env.DB.prepare(
-				'SELECT * FROM daily_reports ORDER BY created_at DESC LIMIT 20'
-			).all();
+			const { results } = await env.DB.prepare(`
+				SELECT * FROM (
+					SELECT *, ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY created_at DESC) as rn
+					FROM daily_reports
+				) WHERE rn = 1
+				ORDER BY created_at DESC
+			`).all();
 			return Response.json(results, { headers: corsHeaders });
 		}
 
@@ -93,24 +97,35 @@ export default {
 			}
 		}
 
-		// API: Trigger Crawler Manually
+		// API: Trigger Crawler (Chains to Summarizer)
 		if (url.pathname === '/api/crawl') {
-			ctx.waitUntil(runCrawler(env));
-			return new Response('Crawler started', { headers: corsHeaders });
-		}
-
-		// API: Trigger Full Daily Sequence Manually
-		if (url.pathname === '/api/run-all') {
 			ctx.waitUntil((async () => {
 				await runCrawler(env);
-				const { results } = await env.DB.prepare('SELECT symbol FROM watchlist').all();
-				for (const row of results) {
-					await generateDailySummary(env, row.symbol as string);
-				}
-				// Skip email for now as requested
-				console.log("Manual full run completed.");
+				console.log("Crawl finished. Triggering summarizer...");
+				// Trigger summarizer as a separate request to reset time budget
+				await fetch(`${url.origin}/api/summarize-all`).catch(e => console.error("Chain fail:", e));
 			})());
-			return new Response('Full sequence started', { headers: corsHeaders });
+			return new Response('Crawler sequence started', { headers: corsHeaders });
+		}
+
+		// API: Summarize All Symbols
+		if (url.pathname === '/api/summarize-all') {
+			ctx.waitUntil((async () => {
+				const { results } = await env.DB.prepare('SELECT symbol FROM watchlist').all();
+				console.log(`Summarizing ${results.length} symbols...`);
+				await Promise.all(results.map(row => 
+					generateDailySummary(env, row.symbol as string)
+						.catch(e => console.error(`Summary failed for ${row.symbol}:`, e))
+				));
+				console.log("All summaries completed.");
+			})());
+			return new Response('Summarization started', { headers: corsHeaders });
+		}
+
+		// API: Trigger Full Daily Sequence Manually (Legacy/Combined)
+		if (url.pathname === '/api/run-all') {
+			// Now just a shortcut to crawl which chains
+			return Response.redirect(`${url.origin}/api/crawl`, 307);
 		}
 
 		return new Response("Oaktree Agent Backend Running");
@@ -123,11 +138,12 @@ export default {
 			// 1. Run Crawler
 			await runCrawler(env);
 
-			// 2. Generate Summaries for all symbols in watchlist
+			// 2. Generate Summaries for all symbols in parallel
 			const { results } = await env.DB.prepare('SELECT symbol FROM watchlist').all();
-			for (const row of results) {
-				await generateDailySummary(env, row.symbol as string);
-			}
+			await Promise.all(results.map(row => 
+				generateDailySummary(env, row.symbol as string)
+					.catch(e => console.error(`Scheduled summary failed for ${row.symbol}:`, e))
+			));
 
 			// 3. Send Email Report
 			await sendDailyEmailReport(env);

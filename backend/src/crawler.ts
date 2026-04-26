@@ -30,17 +30,28 @@ export async function runCrawler(env: Env) {
 		}
 	}
 
-	for (const source of sources) {
-		console.log(`--- Processing Source: ${source.name} (${source.type}) ---`);
-		
+	const providers = ['Google News', 'Yahoo Finance'];
+
+	for (const provider of providers) {
+		console.log(`--- Processing Provider: ${provider} ---`);
+
+		const rssSource = sources.find(s => s.name === `${provider} RSS`);
+		const webSource = sources.find(s => s.name === `${provider} WEB`);
+
 		for (const symbol of symbols) {
 			try {
 				let articles: { title: string, url: string, date?: string }[] = [];
 
-				if (source.type === 'RSS') {
-					articles = await crawlRSS(source.url_pattern.replace('{symbol}', symbol));
-				} else if (source.type === 'WEB' && browser) {
-					articles = await crawlWeb(browser, source.url_pattern.replace('{symbol}', symbol), source.selector);
+				// 1. Try RSS First
+				if (rssSource) {
+					console.log(`[${symbol}] Trying ${provider} RSS...`);
+					articles = await crawlRSS(rssSource.url_pattern.replace('{symbol}', symbol));
+				}
+
+				// 2. Fallback to WEB if RSS fails or returns nothing
+				if (articles.length === 0 && webSource && browser) {
+					console.log(`[${symbol}] RSS fallback triggered: using ${provider} WEB crawler...`);
+					articles = await crawlWeb(browser, webSource.url_pattern.replace('{symbol}', symbol), webSource.selector);
 				}
 
 				for (const article of articles) {
@@ -50,37 +61,12 @@ export async function runCrawler(env: Env) {
 
 					console.log(`Adding news for ${symbol}: ${article.title}`);
 
-					// Optional: Analyze individual article sentiment/summary
-					let individualSummary = article.title;
-					let individualSentiment = 'Neutral';
-
-					try {
-						const aiRes = await env.AI.run('@cf/meta/llama-3-8b-instruct', {
-							messages: [{
-								role: 'user', 
-								content: `Analyze this news title for stock ${symbol}: "${article.title}". 
-								Summarize in 1 sentence. Sentiment (Positive/Negative/Neutral). 
-								Return JSON: { "summary": "...", "sentiment": "..." }` 
-							}]
-						}) as any;
-
-						const responseText = aiRes.response || "";
-						const jsonStr = responseText.match(/\{.*\}/s)?.[0];
-						if (jsonStr) {
-							const json = JSON.parse(jsonStr);
-							individualSummary = json.summary || individualSummary;
-							individualSentiment = json.sentiment || individualSentiment;
-						}
-					} catch (e) {
-						console.error("Individual AI analysis failed", e);
-					}
-
 					await env.DB.prepare(
 						'INSERT INTO news (symbol, title, summary, sentiment, source_url, published_at) VALUES (?, ?, ?, ?, ?, ?)'
-					).bind(symbol, article.title, individualSummary, individualSentiment, article.url, article.date || new Date().toISOString()).run();
+					).bind(symbol, article.title, null, null, article.url, article.date || new Date().toISOString()).run();
 				}
 			} catch (err) {
-				console.error(`Error crawling ${symbol} on ${source.name}:`, err);
+				console.error(`Error crawling ${symbol} on ${provider}:`, err);
 			}
 		}
 	}
@@ -90,33 +76,66 @@ export async function runCrawler(env: Env) {
 }
 
 async function crawlRSS(url: string) {
-	const response = await fetch(url);
-	const xml = await response.text();
-	const items = xml.match(/<item>([\s\S]*?)<\/item>/g) || [];
-	
-	return items.slice(0, 5).map(item => {
-		const title = item.match(/<title>([\s\S]*?)<\/title>/)?.[1] || 'No Title';
-		const link = item.match(/<link>([\s\S]*?)<\/link>/)?.[1] || '';
-		const pubDate = item.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1] || new Date().toISOString();
-		return { title, url: link, date: pubDate };
-	});
+	console.log(`Fetching RSS from: ${url}`);
+	try {
+		const response = await fetch(url, {
+			headers: {
+				'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+			}
+		});
+
+		if (!response.ok) {
+			console.error(`RSS fetch failed: ${response.status} ${response.statusText}`);
+			return [];
+		}
+
+		const xml = await response.text();
+		console.debug(`RSS response length: ${xml.length}`);
+
+		const items = xml.match(/<item>([\s\S]*?)<\/item>/g) || [];
+		console.debug(`Found ${items.length} items in RSS`);
+
+		return items.slice(0, 10).map(item => {
+			const title = item.match(/<title>([\s\S]*?)<\/title>/)?.[1] ||
+				item.match(/<title><!\[CDATA\[([\s\S]*?)\]\]><\/title>/)?.[1] || 'No Title';
+			const link = item.match(/<link>([\s\S]*?)<\/link>/)?.[1] || '';
+			const pubDate = item.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1] || new Date().toISOString();
+
+			// Clean up CDATA and entities if present
+			const cleanTitle = title.replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').replace(/&amp;/g, '&');
+
+			return { title: cleanTitle, url: link, date: pubDate };
+		});
+	} catch (e) {
+		console.error("crawlRSS exception:", e);
+		return [];
+	}
 }
 
 async function crawlWeb(browser: any, url: string, selector: string) {
 	if (!selector) return [];
+	console.log(`Launching browser to crawl: ${url}`);
 	const page = await browser.newPage();
 	try {
-		await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+		await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 10000 });
+		console.log(`Page loaded: ${url}`);
+
 		const articles = await page.evaluate((sel: string) => {
 			const links = Array.from(document.querySelectorAll(sel));
-			return links.slice(0, 5).map(link => ({
-				title: (link as HTMLElement).innerText || '',
-				url: (link as HTMLAnchorElement).href || ''
-			})).filter(a => a.title.length > 10 && a.url.startsWith('http'));
+			return links.slice(0, 8).map(link => {
+				const htmlLink = link as HTMLAnchorElement;
+				const titleElement = htmlLink.querySelector('h3') || htmlLink;
+				return {
+					title: titleElement.innerText.trim() || '',
+					url: htmlLink.href || ''
+				};
+			}).filter(a => a.title.length > 5 && a.url.startsWith('http'));
 		}, selector);
+
+		console.log(`Found ${articles.length} articles via WEB crawl`);
 		return articles;
 	} catch (e) {
-		console.error(`Web crawl failed for ${url}`, e);
+		console.error(`Web crawl failed for ${url}:`, e);
 		return [];
 	} finally {
 		await page.close();

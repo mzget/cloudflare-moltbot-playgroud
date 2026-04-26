@@ -11,14 +11,14 @@ export default function ManualTrigger() {
     setMessage('');
 
     try {
-      const endpoint = type === 'crawl' ? '/api/crawl' : '/api/run-all';
+      const endpoint = type === 'crawl' ? '/api/crawl' : '/api/summarize-all';
       const url = `http://localhost:8787${endpoint}`;
       
       const response = await fetch(url);
 
       if (response.ok) {
         setStatus('success');
-        setMessage(type === 'crawl' ? 'Crawler started' : 'Reports generating...');
+        setMessage(type === 'crawl' ? 'Crawler & Reports started' : 'Summaries regenerating...');
         setTimeout(() => setStatus('idle'), 3000);
       } else {
         setStatus('error');

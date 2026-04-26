@@ -14,36 +14,37 @@ import {
   CssBaseline
 } from '@mui/joy';
 import { TrendingUp, TrendingDown, Minus, Quote } from 'lucide-react';
+import {
+  createRootRoute,
+  createRoute,
+  createRouter,
+  RouterProvider,
+  useSearch,
+  useNavigate,
+} from '@tanstack/react-router';
+import { z } from 'zod';
 import Header from './Header';
 import Sidebar from './Sidebar';
 import SourceManager from './SourceManager';
 import Watchlist from './Watchlist';
 
-const theme = extendTheme({
-  colorSchemes: {
-    dark: {
-      palette: {
-        background: {
-          body: 'transparent',
-        },
-      },
-    },
-  },
-  fontFamily: {
-    body: 'Inter, var(--joy-fontFamily-fallback)',
-    display: 'Outfit, var(--joy-fontFamily-fallback)',
-  },
+// 1. Define the Search Schema (Validation)
+const dashboardSearchSchema = z.object({
+  tab: z.enum(['dashboard', 'watchlist', 'sources', 'about']).catch('dashboard'),
 });
 
-const glassStyle = {
-  background: 'rgba(255, 255, 255, 0.05)',
-  backdropFilter: 'blur(12px)',
-  border: '1px solid rgba(255, 255, 255, 0.1)',
-  borderRadius: '24px',
-};
+// Define DashboardContent first so it can be used in the route definition
+function DashboardContent() {
+  const { tab: activeTab } = useSearch({ from: '/' });
+  const navigate = useNavigate();
 
-export default function Dashboard() {
-  const [activeTab, setActiveTab] = React.useState('dashboard');
+  const setActiveTab = (tab: string) => {
+    navigate({
+      to: '/',
+      search: { tab: tab as any },
+    });
+  };
+
   const [reports, setReports] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
 
@@ -68,9 +69,7 @@ export default function Dashboard() {
   }, []);
 
   return (
-    <CssVarsProvider theme={theme} defaultMode="dark">
-      <CssBaseline />
-      <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: '1440px', margin: '0 auto', minHeight: '100vh' }}>
+    <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: '1440px', margin: '0 auto', minHeight: '100vh' }}>
         <Header />
         
         <Grid container spacing={4}>
@@ -131,6 +130,61 @@ export default function Dashboard() {
           </Grid>
         </Grid>
       </Box>
+  );
+}
+
+// 2. Define the Route Tree
+const rootRoute = createRootRoute();
+
+const indexRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/',
+  validateSearch: dashboardSearchSchema,
+  component: DashboardContent,
+});
+
+const routeTree = rootRoute.addChildren([indexRoute]);
+
+const router = createRouter({
+  routeTree,
+  defaultPreload: 'intent',
+});
+
+// Register the router instance for type safety
+declare module '@tanstack/react-router' {
+  interface Register {
+    router: typeof router;
+  }
+}
+
+const theme = extendTheme({
+  colorSchemes: {
+    dark: {
+      palette: {
+        background: {
+          body: 'transparent',
+        },
+      },
+    },
+  },
+  fontFamily: {
+    body: 'Inter, var(--joy-fontFamily-fallback)',
+    display: 'Outfit, var(--joy-fontFamily-fallback)',
+  },
+});
+
+const glassStyle = {
+  background: 'rgba(255, 255, 255, 0.05)',
+  backdropFilter: 'blur(12px)',
+  border: '1px solid rgba(255, 255, 255, 0.1)',
+  borderRadius: '24px',
+};
+
+export default function Dashboard() {
+  return (
+    <CssVarsProvider theme={theme} defaultMode="dark">
+      <CssBaseline />
+      <RouterProvider router={router} />
     </CssVarsProvider>
   );
 }

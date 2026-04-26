@@ -21,11 +21,16 @@ export async function generateDailySummary(env: Env, symbol: string) {
 		News Headlines:
 		${context}
 		
-		Format your response EXACTLY as a JSON object:
+		RESPONSE INSTRUCTIONS:
+		1. Return ONLY a JSON object.
+		2. DO NOT include any introductory text, preamble, or comments.
+		3. Ensure the JSON is valid (double quotes for keys/values).
+		
+		JSON Schema:
 		{
-			"summary": "A cohesive paragraph summarizing the key narrative.",
-			"sentiment_score": 0.5, // A number between -1 (extremely bearish) and 1 (extremely bullish)
-			"key_takeaways": ["Point 1", "Point 2", "Point 3"]
+			"summary": "...",
+			"sentiment_score": 0.5,
+			"key_takeaways": ["Point 1", "Point 2"]
 		}
 	`;
 
@@ -34,24 +39,35 @@ export async function generateDailySummary(env: Env, symbol: string) {
 			prompt,
 		});
 
-		const responseText = response.response || "";
+		let responseText = response.response || "";
+		
+		// 1. Clean up common AI artifacts (like comments)
+		// Remove // comments that models often add
+		responseText = responseText.replace(/\/\/.*$/gm, "");
+		
+		// 2. Extract the JSON object using a more precise regex
 		const jsonMatch = responseText.match(/\{[\s\S]*\}/);
 		
 		if (jsonMatch) {
-			const data = JSON.parse(jsonMatch[0]);
-			
-			await env.DB.prepare(
-				'INSERT INTO daily_reports (symbol, summary, sentiment_score, key_takeaways) VALUES (?, ?, ?, ?)'
-			).bind(
-				symbol, 
-				data.summary, 
-				data.sentiment_score || 0, 
-				JSON.stringify(data.key_takeaways || [])
-			).run();
+			try {
+				const data = JSON.parse(jsonMatch[0]);
+				
+				await env.DB.prepare(
+					'INSERT INTO daily_reports (symbol, summary, sentiment_score, key_takeaways) VALUES (?, ?, ?, ?)'
+				).bind(
+					symbol, 
+					data.summary, 
+					data.sentiment_score || 0, 
+					JSON.stringify(data.key_takeaways || [])
+				).run();
 
-			console.log(`Generated structured summary for ${symbol}.`);
+				console.log(`Generated structured summary for ${symbol}.`);
+			} catch (parseError) {
+				console.error(`JSON Parse Error for ${symbol}:`, parseError);
+				console.debug("Raw cleaned text:", jsonMatch[0]);
+			}
 		} else {
-			console.error("Failed to parse JSON from AI response:", responseText);
+			console.error("No JSON found in AI response for", symbol);
 		}
 	} catch (error) {
 		console.error(`Error generating summary for ${symbol}:`, error);
