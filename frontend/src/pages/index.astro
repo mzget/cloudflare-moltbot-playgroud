@@ -1,0 +1,22 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Dashboard from '../components/Dashboard';
+---
+
+<Layout title="Oaktree Agent - Dashboard">
+	<main>
+		<Dashboard client:load />
+	</main>
+</Layout>
+
+<style>
+	main {
+		margin: 0;
+		width: 100%;
+		color: white;
+		font-size: 20px;
+		line-height: 1.6;
+		background: radial-gradient(circle at 50% 50%, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+		min-height: 100vh;
+	}
+</style>
