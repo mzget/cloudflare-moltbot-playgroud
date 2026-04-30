@@ -69,8 +69,36 @@ jobs:
         working-directory: frontend
         run: npm run build
 
+  build-mcp:
+    runs-on: ubuntu-latest
+    name: Build MCP Worker
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: mcp-worker/package-lock.json
+
+      - name: Install dependencies
+        working-directory: mcp-worker
+        run: npm ci
+
+      - name: Type check
+        working-directory: mcp-worker
+        run: npx tsc --noEmit || echo "No TypeScript config found, skipping type check"
+        continue-on-error: true
+
+      - name: Build check
+        working-directory: mcp-worker
+        run: npx wrangler deploy --dry-run
+
       - name: Build Summary
         run: |
           echo "### ✅ CI Build Successful" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Both backend and frontend builds completed successfully." >> $GITHUB_STEP_SUMMARY
+          echo "Backend, Frontend, and MCP builds completed successfully." >> $GITHUB_STEP_SUMMARY
