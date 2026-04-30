@@ -1,6 +1,6 @@
 import React from 'react';
 import { List, ListItem, ListItemButton, ListItemContent, ListItemDecorator, Typography, Box } from '@mui/joy';
-import { LayoutDashboard, TrendingUp, Search, Info } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, Search, Info, Bot } from 'lucide-react';
 
 interface SidebarProps {
   activeTab: string;
@@ -10,6 +10,7 @@ interface SidebarProps {
 export default function Sidebar({ activeTab, setActiveTab }: SidebarProps) {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
+    { id: 'agent', label: 'Agent Chat', icon: <Bot size={20} /> },
     { id: 'watchlist', label: 'Watchlist', icon: <TrendingUp size={20} /> },
     { id: 'sources', label: 'News Sources', icon: <Search size={20} /> },
     { id: 'about', label: 'About Oaktree', icon: <Info size={20} /> },

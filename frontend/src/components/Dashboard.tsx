@@ -27,10 +27,11 @@ import Header from './Header';
 import Sidebar from './Sidebar';
 import SourceManager from './SourceManager';
 import Watchlist from './Watchlist';
+import KnowledgeChat from './KnowledgeChat';
 
 // 1. Define the Search Schema (Validation)
 const dashboardSearchSchema = z.object({
-  tab: z.enum(['dashboard', 'watchlist', 'sources', 'about']).catch('dashboard'),
+  tab: z.enum(['dashboard', 'agent', 'watchlist', 'sources', 'about']).catch('dashboard'),
 });
 
 // Define DashboardContent first so it can be used in the route definition
@@ -113,6 +114,7 @@ function DashboardContent() {
             )}
 
             {activeTab === 'watchlist' && <Watchlist />}
+            {activeTab === 'agent' && <KnowledgeChat />}
             {activeTab === 'sources' && <SourceManager />}
             {activeTab === 'about' && (
               <Sheet sx={{ ...glassStyle, p: 4 }}>

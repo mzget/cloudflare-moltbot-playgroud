@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@cloudflare/puppeteer": "^0.0.13",
-    "mimetext": "^3.0.24"
+    "mimetext": "^3.0.24",
+    "papaparse": "^5.5.3"
   }
 }
