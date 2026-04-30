@@ -35,18 +35,22 @@ jobs:
         working-directory: frontend
         run: npm run build
 
+      - name: Verify build output
+        working-directory: frontend
+        run: ls -R dist
+
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: frontend
-          command: pages deploy dist --project-name=oaktree-frontend
+          command: pages deploy dist --project-name=oaktree-agent-frontend
 
       - name: Deployment Summary
         run: |
           echo "### ✅ Frontend Deployment Successful" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Project Name:** oaktree-frontend" >> $GITHUB_STEP_SUMMARY
+          echo "**Project Name:** oaktree-agent-frontend" >> $GITHUB_STEP_SUMMARY
           echo "**Deployed at:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
