@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "deploy": "wrangler deploy",
-    "dev": "wrangler dev",
+    "dev": "wrangler dev --remote --persist-to=../.d1-data",
     "start": "wrangler dev",
     "cf-typegen": "wrangler types"
   },

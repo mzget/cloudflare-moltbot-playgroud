@@ -6,7 +6,7 @@ export async function runCrawler(env: Env) {
 
 	// 1. Get enabled sources and watchlist symbols
 	const { results: sources } = await env.DB.prepare('SELECT * FROM news_sources WHERE enabled = 1').all() as { results: any[] };
-	const { results: symbolsRes } = await env.DB.prepare('SELECT symbol FROM watchlist').all() as { results: any[] };
+	const { results: symbolsRes } = await env.DB.prepare('SELECT symbol FROM watchlist WHERE is_active = 1').all() as { results: any[] };
 	const symbols = symbolsRes.map((r: any) => r.symbol);
 
 	if (symbols.length === 0) {
@@ -40,7 +40,7 @@ export async function runCrawler(env: Env) {
 
 		for (const symbol of symbols) {
 			try {
-				let articles: { title: string, url: string, date?: string }[] = [];
+				let articles: { title: string, url: string, date?: string, summary?: string }[] = [];
 
 				// 1. Try RSS First
 				if (rssSource) {
@@ -61,9 +61,40 @@ export async function runCrawler(env: Env) {
 
 					console.log(`Adding news for ${symbol}: ${article.title}`);
 
+					let finalSummary = article.summary || '';
+
+					// Decode basic HTML entities that Google News uses in its RSS descriptions
+					finalSummary = finalSummary
+						.replace(/&lt;/g, '<')
+						.replace(/&gt;/g, '>')
+						.replace(/&quot;/g, '"')
+						.replace(/&amp;/g, '&')
+						.replace(/&nbsp;/g, ' ');
+
+					// If summary is missing, too short, or contains HTML links (like Google News RSS)
+					if (!finalSummary || finalSummary.length < 50 || finalSummary.includes('<a href=')) {
+						try {
+							console.log(`Fetching article content via Jina for: ${article.url}`);
+							const jinaRes = await fetch(`https://r.jina.ai/${article.url}`);
+							if (jinaRes.ok) {
+								const text = await jinaRes.text();
+								finalSummary = text.replace(/\n+/g, '\n').slice(0, 1500); // keep it reasonable
+							} else {
+								console.error(`Jina fetch failed: ${jinaRes.status} ${jinaRes.statusText}`);
+							}
+						} catch (e) {
+							console.error(`Jina fetch exception for ${article.url}`, e);
+						}
+					}
+
+					// Fallback cleanup: strip any remaining HTML tags from the summary
+					finalSummary = finalSummary.replace(/<[^>]*>?/gm, '').trim();
+					// If after stripping it's empty, fallback to title
+					if (!finalSummary) finalSummary = article.title;
+
 					await env.DB.prepare(
 						'INSERT INTO news (symbol, title, summary, sentiment, source_url, published_at) VALUES (?, ?, ?, ?, ?, ?)'
-					).bind(symbol, article.title, null, null, article.url, article.date || new Date().toISOString()).run();
+					).bind(symbol, article.title, finalSummary, null, article.url, article.date || new Date().toISOString()).run();
 				}
 			} catch (err) {
 				console.error(`Error crawling ${symbol} on ${provider}:`, err);
@@ -90,21 +121,22 @@ async function crawlRSS(url: string) {
 		}
 
 		const xml = await response.text();
-		console.debug(`RSS response length: ${xml.length}`);
-
 		const items = xml.match(/<item>([\s\S]*?)<\/item>/g) || [];
-		console.debug(`Found ${items.length} items in RSS`);
+		console.log(`Found ${items.length} items in RSS`);
 
 		return items.slice(0, 10).map(item => {
 			const title = item.match(/<title>([\s\S]*?)<\/title>/)?.[1] ||
 				item.match(/<title><!\[CDATA\[([\s\S]*?)\]\]><\/title>/)?.[1] || 'No Title';
 			const link = item.match(/<link>([\s\S]*?)<\/link>/)?.[1] || '';
 			const pubDate = item.match(/<pubDate>([\s\S]*?)<\/pubDate>/)?.[1] || new Date().toISOString();
+			const description = item.match(/<description>([\s\S]*?)<\/description>/)?.[1] ||
+				item.match(/<description><!\[CDATA\[([\s\S]*?)\]\]><\/description>/)?.[1] || '';
 
 			// Clean up CDATA and entities if present
 			const cleanTitle = title.replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').replace(/&amp;/g, '&');
+			const cleanDesc = description.replace(/<!\[CDATA\[(.*?)\]\]>/g, '$1').replace(/&amp;/g, '&');
 
-			return { title: cleanTitle, url: link, date: pubDate };
+			return { title: cleanTitle, url: link, date: pubDate, summary: cleanDesc };
 		});
 	} catch (e) {
 		console.error("crawlRSS exception:", e);

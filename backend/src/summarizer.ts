@@ -3,15 +3,15 @@ import { Env } from './index';
 export async function generateDailySummary(env: Env, symbol: string) {
 	// Fetch news from the last 24h
 	const { results: news } = await env.DB.prepare(
-		'SELECT title, published_at FROM news WHERE symbol = ? AND created_at > datetime("now", "-1 day")'
-	).bind(symbol).all();
+		'SELECT title, summary, published_at FROM news WHERE symbol = ? AND created_at > datetime("now", "-1 day")'
+	).bind(symbol).all() as { results: any[] };
 
 	if (news.length === 0) {
 		console.log(`No news found for ${symbol} in the last 24h.`);
 		return;
 	}
 
-	const context = news.map(n => `- ${n.title}`).join('\n');
+	const context = news.map(n => `- ${n.title}\n  Summary: ${n.summary || 'No summary available.'}`).join('\n\n');
 	
 	const prompt = `
 		You are the Oaktree Agent, an expert financial analyst. 

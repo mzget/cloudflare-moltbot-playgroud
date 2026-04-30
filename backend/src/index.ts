@@ -20,7 +20,7 @@ export default {
 		// Allow CORS
 		const corsHeaders = {
 			'Access-Control-Allow-Origin': '*',
-			'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+			'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
 			'Access-Control-Allow-Headers': 'Content-Type',
 		};
 
@@ -66,6 +66,12 @@ export default {
 					.bind(symbol, name).run();
 				return new Response('Symbol added', { headers: corsHeaders });
 			}
+			if (request.method === 'PUT') {
+				const { symbol, is_active } = await request.json() as any;
+				await env.DB.prepare('UPDATE watchlist SET is_active = ? WHERE symbol = ?')
+					.bind(is_active ? 1 : 0, symbol).run();
+				return new Response('Symbol updated', { headers: corsHeaders });
+			}
 			if (request.method === 'DELETE') {
 				const symbol = url.searchParams.get('symbol');
 				await env.DB.prepare('DELETE FROM watchlist WHERE symbol = ?').bind(symbol).run();
@@ -101,9 +107,6 @@ export default {
 		if (url.pathname === '/api/crawl') {
 			ctx.waitUntil((async () => {
 				await runCrawler(env);
-				console.log("Crawl finished. Triggering summarizer...");
-				// Trigger summarizer as a separate request to reset time budget
-				await fetch(`${url.origin}/api/summarize-all`).catch(e => console.error("Chain fail:", e));
 			})());
 			return new Response('Crawler sequence started', { headers: corsHeaders });
 		}
@@ -111,9 +114,9 @@ export default {
 		// API: Summarize All Symbols
 		if (url.pathname === '/api/summarize-all') {
 			ctx.waitUntil((async () => {
-				const { results } = await env.DB.prepare('SELECT symbol FROM watchlist').all();
+				const { results } = await env.DB.prepare('SELECT symbol FROM watchlist WHERE is_active = 1').all();
 				console.log(`Summarizing ${results.length} symbols...`);
-				await Promise.all(results.map(row => 
+				await Promise.all(results.map(row =>
 					generateDailySummary(env, row.symbol as string)
 						.catch(e => console.error(`Summary failed for ${row.symbol}:`, e))
 				));
@@ -133,21 +136,21 @@ export default {
 
 	async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
 		console.log("Running scheduled crawl and report...");
-		
+
 		ctx.waitUntil((async () => {
 			// 1. Run Crawler
 			await runCrawler(env);
 
 			// 2. Generate Summaries for all symbols in parallel
-			const { results } = await env.DB.prepare('SELECT symbol FROM watchlist').all();
-			await Promise.all(results.map(row => 
+			const { results } = await env.DB.prepare('SELECT symbol FROM watchlist WHERE is_active = 1').all();
+			await Promise.all(results.map(row =>
 				generateDailySummary(env, row.symbol as string)
 					.catch(e => console.error(`Scheduled summary failed for ${row.symbol}:`, e))
 			));
 
 			// 3. Send Email Report
 			await sendDailyEmailReport(env);
-			
+
 			console.log("Daily sequence completed.");
 		})());
 	},

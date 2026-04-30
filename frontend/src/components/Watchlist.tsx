@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Sheet, IconButton, Button, Input, Stack, Card, CardContent, Divider } from '@mui/joy';
+import { Box, Typography, Sheet, IconButton, Button, Input, Stack, Card, CardContent, Divider, Switch } from '@mui/joy';
 import { Plus, Trash2, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
 interface WatchlistItem {
   symbol: string;
   name: string;
+  is_active: number;
 }
 
 const glassStyle = {
@@ -60,6 +61,19 @@ export default function Watchlist() {
     }
   };
 
+  const handleToggleActive = async (symbol: string, currentStatus: number) => {
+    try {
+      await fetch('http://localhost:8787/api/watchlist', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol, is_active: !currentStatus })
+      });
+      fetchWatchlist();
+    } catch (e) {
+      console.error("Failed to toggle watchlist status", e);
+    }
+  };
+
   return (
     <Box sx={{ p: 2 }}>
       <Typography level="h3" sx={{ color: 'white', mb: 3 }}>Investment Watchlist</Typography>
@@ -101,9 +115,18 @@ export default function Watchlist() {
                   <Typography level="h4" sx={{ color: 'white' }}>{item.symbol}</Typography>
                   <Typography level="body-sm" sx={{ color: 'rgba(255,255,255,0.6)' }}>{item.name}</Typography>
                 </Box>
-                <IconButton color="danger" variant="plain" onClick={() => handleDelete(item.symbol)}>
-                  <Trash2 size={20} />
-                </IconButton>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Switch 
+                    checked={!!item.is_active} 
+                    onChange={() => handleToggleActive(item.symbol, item.is_active)} 
+                    color={item.is_active ? 'success' : 'neutral'}
+                    size="sm"
+                    sx={{ mr: 1 }}
+                  />
+                  <IconButton color="danger" variant="plain" onClick={() => handleDelete(item.symbol)}>
+                    <Trash2 size={20} />
+                  </IconButton>
+                </Stack>
               </Stack>
             </CardContent>
           </Card>
