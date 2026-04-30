@@ -12,7 +12,7 @@
     "@modelcontextprotocol/sdk": "latest",
     "ai": "latest",
     "workers-ai-provider": "latest",
-    "zod": "^3.23.8"
+    "zod": "^4.0.0"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20240405.0",
