@@ -1,23 +1,22 @@
-name = "moltbot"
+name = "oaktree-backend"
 main = "src/index.ts"
-compatibility_date = "2024-12-30"  # Updated to a more recent date
-compatibility_flags = ["nodejs_compat"]
-
-[observability]
-enabled = true
+compatibility_date = "2024-11-18"
+compatibility_flags = [ "nodejs_compat" ]
 
 [browser]
-binding = "MYBROWSER"
+binding = "BROWSER"
 
 [ai]
 binding = "AI"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "moltbot-db"
-database_id = "97634677-4bac-44d1-bd02-6c733328a137" # Used only for remote deploy
+database_name = "oaktree-db"
+database_id = "97634677-4bac-44d1-bd02-6c733328a137"
 
-[dev]
-# This helps ensure local development behaves with persistence
-local_protocol = "http"
-port = 8787
+[[send_email]]
+name = "EMAIL"
+destination_address = "rattajak.n@gmail.com"
+
+[triggers]
+crons = ["0 8 * * *"] # Every day at 8:00 AM

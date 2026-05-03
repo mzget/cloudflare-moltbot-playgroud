@@ -1,17 +1,21 @@
 {
-  "name": "moltbot",
-  "version": "0.0.1",
+  "name": "oaktree-backend",
+  "version": "0.0.0",
   "private": true,
   "scripts": {
     "deploy": "wrangler deploy",
-    "dev": "wrangler dev --persist-to=../.d1-data",
-    "start": "wrangler dev --persist-to=../.d1-data"
+    "dev": "wrangler dev --remote --persist-to=../.d1-data",
+    "start": "wrangler dev",
+    "cf-typegen": "wrangler types"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20240403.0",
-    "wrangler": "^4.61.1"
+    "@cloudflare/workers-types": "^4.20240405.0",
+    "typescript": "^5.0.4",
+    "wrangler": "^4.85.0"
   },
   "dependencies": {
-    "@cloudflare/puppeteer": "^0.0.13"
+    "@cloudflare/puppeteer": "^0.0.13",
+    "mimetext": "^3.0.24",
+    "papaparse": "^5.5.3"
   }
 }

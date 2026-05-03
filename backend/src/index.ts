@@ -1,158 +1,157 @@
-import puppeteer, { BrowserWorker } from '@cloudflare/puppeteer'
-import { ExecutionContext, ScheduledEvent, D1Database } from '@cloudflare/workers-types'
+import puppeteer, { BrowserWorker } from '@cloudflare/puppeteer';
+import { runCrawler } from './crawler';
+import { generateDailySummary } from './summarizer';
+import { sendDailyEmailReport } from './email';
 
-interface Bindings {
-    DB: D1Database
-    AI: any
-    MYBROWSER: BrowserWorker
-}
-
-async function runCrawler(env: Bindings) {
-    console.log("Starting multi-source crawler...");
-
-    // 1. Get enabled sources and watchlist symbols
-    const { results: sources } = await env.DB.prepare('SELECT * FROM news_sources WHERE enabled = 1').all() as { results: any[] };
-    const { results: symbolsRes } = await env.DB.prepare('SELECT symbol FROM watchlist').all() as { results: any[] };
-    const symbols = symbolsRes.map((r: any) => r.symbol);
-
-    if (symbols.length === 0) {
-        console.log("No symbols in watchlist");
-        return { success: true, message: "No symbols in watchlist" };
-    }
-
-    if (sources.length === 0) {
-        console.log("No enabled news sources");
-        return { success: true, message: "No enabled news sources" };
-    }
-
-    console.log(`Processing ${symbols.length} symbols across ${sources.length} sources`);
-
-    // 2. Initialize Browser
-    let browser: any = null;
-    if (env.MYBROWSER) {
-        try {
-            browser = await puppeteer.launch(env.MYBROWSER);
-        } catch (e) {
-            console.error("Failed to launch browser", e);
-        }
-    }
-
-    let addedCount = 0;
-
-    for (const source of sources) {
-        console.log(`--- Source: ${source.name} ---`);
-        for (const symbol of symbols) {
-            try {
-                let articles: { title: string, url: string }[] = [];
-
-                if (browser) {
-                    const searchUrl = source.url_pattern.replace('{symbol}', symbol);
-                    console.log(`Crawling ${source.name} for ${symbol} at ${searchUrl}...`);
-
-                    const page = await browser.newPage();
-                    await page.goto(searchUrl, { waitUntil: 'networkidle2', timeout: 30000 });
-
-                    articles = await page.evaluate((selector: string) => {
-                        const links = Array.from(document.querySelectorAll(selector));
-                        return links.slice(0, 3).map(link => ({
-                            title: (link as HTMLElement).innerText || '',
-                            url: (link as HTMLAnchorElement).href || ''
-                        })).filter(a => a.title.length > 10 && a.url.startsWith('http'));
-                    }, source.selector);
-
-                    await page.close();
-                }
-
-                // Fallback article if nothing found
-                if (articles.length === 0) {
-                    articles = [{
-                        title: `${symbol} Analysis - ${source.name} Update`,
-                        url: `${source.url_pattern.replace('{symbol}', symbol)}?fallback=1`
-                    }];
-                }
-
-                for (const article of articles) {
-                    const existing = await env.DB.prepare('SELECT id FROM news WHERE url = ?').bind(article.url).first();
-                    if (existing) continue;
-
-                    console.log(`Analyzing [${source.name}] news for ${symbol}...`);
-                    const aiRes = await env.AI.run('@cf/meta/llama-3-8b-instruct', {
-                        messages: [{
-                            role: 'user', content: `Analyze this news title for stock ${symbol}: "${article.title}". 
-                    1. Summarize it in 1 sentence. 
-                    2. Sentiment (Positive/Negative/Neutral). 
-                    Return JSON: { "summary": "...", "sentiment": "..." }` }]
-                    }) as any;
-
-                    let summary = article.title;
-                    let sentiment = 'Neutral';
-
-                    try {
-                        const responseText = aiRes.response || "";
-                        const jsonStr = responseText.match(/\{.*\}/s)?.[0];
-                        if (jsonStr) {
-                            const json = JSON.parse(jsonStr);
-                            summary = json.summary || summary;
-                            sentiment = json.sentiment || sentiment;
-                        }
-                    } catch (e) {
-                        console.error("AI parsing error:", e);
-                    }
-
-                    await env.DB.prepare('INSERT INTO news (symbol, title, summary, sentiment, url) VALUES (?, ?, ?, ?, ?)')
-                        .bind(symbol, article.title, summary, sentiment, article.url).run();
-
-                    console.log(`✅ Added from ${source.name}: ${article.title.substring(0, 40)}...`);
-                    addedCount++;
-                }
-            } catch (e) {
-                console.error(`Error processing ${symbol} on ${source.name}:`, e);
-            }
-        }
-    }
-
-    if (browser) await browser.close();
-    console.log("Crawler finished successfully.");
-    return { success: true, addedCount };
+export interface Env {
+	DB: D1Database;
+	AI: any;
+	BROWSER: BrowserWorker;
+	EMAIL: {
+		send: (raw: string) => Promise<void>;
+		destination_address: string;
+	};
 }
 
 export default {
-    async fetch(request: Request, env: Bindings, ctx: ExecutionContext) {
-        const url = new URL(request.url);
+	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+		const url = new URL(request.url);
 
-        // CORS Headers
-        const corsHeaders = {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type',
-        };
+		// Allow CORS
+		const corsHeaders = {
+			'Access-Control-Allow-Origin': '*',
+			'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+			'Access-Control-Allow-Headers': 'Content-Type',
+		};
 
-        if (request.method === 'OPTIONS') {
-            return new Response(null, { headers: corsHeaders });
-        }
+		if (request.method === 'OPTIONS') {
+			return new Response(null, { headers: corsHeaders });
+		}
 
-        if (url.pathname === '/crawl' && request.method === 'POST') {
-            try {
-                const result = await runCrawler(env);
-                return new Response(JSON.stringify(result), {
-                    status: 200,
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-                });
-            } catch (err: any) {
-                return new Response(JSON.stringify({ error: err.message }), {
-                    status: 500,
-                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-                });
-            }
-        }
+		// API: Trigger Email Manually (Test)
+		if (url.pathname === '/api/email-test') {
+			ctx.waitUntil(sendDailyEmailReport(env));
+			return new Response('Email trigger started', { headers: corsHeaders });
+		}
 
-        return new Response("Moltbot Backend (System Online)", {
-            status: 200,
-            headers: corsHeaders
-        });
-    },
+		// API: Get Latest Reports (One per symbol)
+		if (url.pathname === '/api/reports') {
+			const { results } = await env.DB.prepare(`
+				SELECT * FROM (
+					SELECT *, ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY created_at DESC) as rn
+					FROM daily_reports
+				) WHERE rn = 1
+				ORDER BY created_at DESC
+			`).all();
+			return Response.json(results, { headers: corsHeaders });
+		}
 
-    async scheduled(event: ScheduledEvent, env: Bindings, ctx: ExecutionContext) {
-        await runCrawler(env);
-    }
-}
+		// API: Get Latest News
+		if (url.pathname === '/api/news') {
+			const { results } = await env.DB.prepare(
+				'SELECT * FROM news ORDER BY created_at DESC LIMIT 50'
+			).all();
+			return Response.json(results, { headers: corsHeaders });
+		}
+
+		// API: Watchlist Operations
+		if (url.pathname === '/api/watchlist') {
+			if (request.method === 'GET') {
+				const { results } = await env.DB.prepare('SELECT * FROM watchlist').all();
+				return Response.json(results, { headers: corsHeaders });
+			}
+			if (request.method === 'POST') {
+				const { symbol, name } = await request.json() as any;
+				await env.DB.prepare('INSERT OR IGNORE INTO watchlist (symbol, name) VALUES (?, ?)')
+					.bind(symbol, name).run();
+				return new Response('Symbol added', { headers: corsHeaders });
+			}
+			if (request.method === 'PUT') {
+				const { symbol, is_active } = await request.json() as any;
+				await env.DB.prepare('UPDATE watchlist SET is_active = ? WHERE symbol = ?')
+					.bind(is_active ? 1 : 0, symbol).run();
+				return new Response('Symbol updated', { headers: corsHeaders });
+			}
+			if (request.method === 'DELETE') {
+				const symbol = url.searchParams.get('symbol');
+				await env.DB.prepare('DELETE FROM watchlist WHERE symbol = ?').bind(symbol).run();
+				return new Response('Symbol removed', { headers: corsHeaders });
+			}
+		}
+
+		// API: Source Operations
+		if (url.pathname === '/api/sources') {
+			if (request.method === 'GET') {
+				const { results } = await env.DB.prepare('SELECT * FROM news_sources').all();
+				return Response.json(results, { headers: corsHeaders });
+			}
+			if (request.method === 'POST' || request.method === 'PUT') {
+				const source = await request.json() as any;
+				if (request.method === 'POST') {
+					await env.DB.prepare('INSERT INTO news_sources (name, url_pattern, selector, type, enabled) VALUES (?, ?, ?, ?, ?)')
+						.bind(source.name, source.url_pattern, source.selector, source.type, source.enabled ? 1 : 0).run();
+				} else {
+					await env.DB.prepare('UPDATE news_sources SET name=?, url_pattern=?, selector=?, type=?, enabled=? WHERE id=?')
+						.bind(source.name, source.url_pattern, source.selector, source.type, source.enabled ? 1 : 0, source.id).run();
+				}
+				return new Response('Source updated', { headers: corsHeaders });
+			}
+			if (request.method === 'DELETE') {
+				const id = url.searchParams.get('id');
+				await env.DB.prepare('DELETE FROM news_sources WHERE id = ?').bind(id).run();
+				return new Response('Source removed', { headers: corsHeaders });
+			}
+		}
+
+		// API: Trigger Crawler (Chains to Summarizer)
+		if (url.pathname === '/api/crawl') {
+			ctx.waitUntil((async () => {
+				await runCrawler(env);
+			})());
+			return new Response('Crawler sequence started', { headers: corsHeaders });
+		}
+
+		// API: Summarize All Symbols
+		if (url.pathname === '/api/summarize-all') {
+			ctx.waitUntil((async () => {
+				const { results } = await env.DB.prepare('SELECT symbol FROM watchlist WHERE is_active = 1').all();
+				console.log(`Summarizing ${results.length} symbols...`);
+				await Promise.all(results.map(row =>
+					generateDailySummary(env, row.symbol as string)
+						.catch(e => console.error(`Summary failed for ${row.symbol}:`, e))
+				));
+				console.log("All summaries completed.");
+			})());
+			return new Response('Summarization started', { headers: corsHeaders });
+		}
+
+		// API: Trigger Full Daily Sequence Manually (Legacy/Combined)
+		if (url.pathname === '/api/run-all') {
+			// Now just a shortcut to crawl which chains
+			return Response.redirect(`${url.origin}/api/crawl`, 307);
+		}
+
+		return new Response("Oaktree Agent Backend Running");
+	},
+
+	async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+		console.log("Running scheduled crawl and report...");
+
+		ctx.waitUntil((async () => {
+			// 1. Run Crawler
+			await runCrawler(env);
+
+			// 2. Generate Summaries for all symbols in parallel
+			const { results } = await env.DB.prepare('SELECT symbol FROM watchlist WHERE is_active = 1').all();
+			await Promise.all(results.map(row =>
+				generateDailySummary(env, row.symbol as string)
+					.catch(e => console.error(`Scheduled summary failed for ${row.symbol}:`, e))
+			));
+
+			// 3. Send Email Report
+			await sendDailyEmailReport(env);
+
+			console.log("Daily sequence completed.");
+		})());
+	},
+};

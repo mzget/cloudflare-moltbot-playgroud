@@ -1,4 +1,4 @@
-name: Deploy Backend to Cloudflare Workers
+name: Deploy MCP to Cloudflare Workers
 
 on:
   push:
@@ -6,14 +6,14 @@ on:
       - main
       - develop
     paths:
-      - 'backend/**'
-      - '.github/workflows/deploy-backend.yml'
+      - 'mcp-worker/**'
+      - '.github/workflows/deploy-mcp.yml'
   workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    name: Deploy Backend Worker
+    name: Deploy MCP Worker
     
     steps:
       - name: Checkout code
@@ -24,10 +24,10 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: backend/package-lock.json
+          cache-dependency-path: mcp-worker/package-lock.json
 
       - name: Install dependencies
-        working-directory: backend
+        working-directory: mcp-worker
         run: npm ci
 
       - name: Deploy to Cloudflare Workers
@@ -35,13 +35,13 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          workingDirectory: backend
+          workingDirectory: mcp-worker
           command: deploy
 
       - name: Deployment Summary
         run: |
-          echo "### ✅ Backend Deployment Successful" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ MCP Worker Deployment Successful" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Worker Name:** oaktree-backend" >> $GITHUB_STEP_SUMMARY
+          echo "**Worker Name:** oaktree-mcp" >> $GITHUB_STEP_SUMMARY
           echo "**Deployed at:** $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY

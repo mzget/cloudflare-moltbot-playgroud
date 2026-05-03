@@ -1,0 +1,21 @@
+name = "oaktree-mcp"
+main = "src/index.ts"
+compatibility_date = "2024-11-18"
+compatibility_flags = ["nodejs_compat"]
+
+[ai]
+binding = "AI"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "oaktree-db"
+database_id = "97634677-4bac-44d1-bd02-6c733328a137"
+
+[durable_objects]
+bindings = [
+  { name = "OAKTREE_MCP", class_name = "OaktreeMCP" }
+]
+
+[[migrations]]
+tag = "v1"
+new_classes = ["OaktreeMCP"]

@@ -1,112 +1,137 @@
 import React, { useState, useEffect } from 'react';
-import { List, Plus, Trash2, Loader2 } from 'lucide-react';
+import { Box, Typography, Sheet, IconButton, Button, Input, Stack, Card, CardContent, Divider, Switch } from '@mui/joy';
+import { Plus, Trash2, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
 interface WatchlistItem {
-    symbol: string;
-    is_auto_suggested?: boolean;
+  symbol: string;
+  name: string;
+  is_active: number;
 }
 
+const glassStyle = {
+  background: 'rgba(255, 255, 255, 0.05)',
+  backdropFilter: 'blur(12px)',
+  border: '1px solid rgba(255, 255, 255, 0.1)',
+  borderRadius: '16px',
+};
+
 export default function Watchlist() {
-    const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [adding, setAdding] = useState(false);
-    const [inputValue, setInputValue] = useState('');
+  const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
+  const [newSymbol, setNewSymbol] = useState('');
+  const [newName, setNewName] = useState('');
 
-    const fetchWatchlist = async () => {
-        try {
-            const res = await fetch('/api/watchlist');
-            if (res.ok) {
-                const data = await res.json() as WatchlistItem[];
-                setWatchlist(data);
-            }
-        } catch (e) {
-            console.error("Failed to fetch watchlist", e);
-        } finally {
-            setLoading(false);
-        }
-    };
+  const fetchWatchlist = async () => {
+    try {
+      const res = await fetch('http://localhost:8787/api/watchlist');
+      if (res.ok) {
+        const data = await res.json();
+        setWatchlist(data);
+      }
+    } catch (e) {
+      console.error("Failed to fetch watchlist", e);
+    }
+  };
 
-    useEffect(() => {
-        fetchWatchlist();
-    }, []);
+  useEffect(() => {
+    fetchWatchlist();
+  }, []);
 
-    const handleAddStock = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!inputValue) return;
+  const handleAdd = async () => {
+    if (!newSymbol) return;
+    try {
+      await fetch('http://localhost:8787/api/watchlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol: newSymbol.toUpperCase(), name: newName })
+      });
+      setNewSymbol('');
+      setNewName('');
+      fetchWatchlist();
+    } catch (e) {
+      console.error("Failed to add to watchlist", e);
+    }
+  };
 
-        setAdding(true);
-        try {
-            const symbol = inputValue.toUpperCase();
-            await fetch('/api/watchlist', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ symbol })
-            });
-            setInputValue('');
-            await fetchWatchlist();
-        } catch (e) {
-            console.error("Failed to add stock", e);
-        } finally {
-            setAdding(false);
-        }
-    };
+  const handleDelete = async (symbol: string) => {
+    try {
+      await fetch(`http://localhost:8787/api/watchlist?symbol=${symbol}`, { method: 'DELETE' });
+      fetchWatchlist();
+    } catch (e) {
+      console.error("Failed to delete from watchlist", e);
+    }
+  };
 
-    const removeStock = async (symbol: string) => {
-        if (!confirm(`Stop tracking ${symbol}?`)) return;
-        try {
-            await fetch(`/api/watchlist/${symbol}`, { method: 'DELETE' });
-            await fetchWatchlist();
-        } catch (e) {
-            console.error("Failed to remove stock", e);
-        }
-    };
+  const handleToggleActive = async (symbol: string, currentStatus: number) => {
+    try {
+      await fetch('http://localhost:8787/api/watchlist', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol, is_active: !currentStatus })
+      });
+      fetchWatchlist();
+    } catch (e) {
+      console.error("Failed to toggle watchlist status", e);
+    }
+  };
 
-    return (
-        <div className="glass rounded-2xl p-6 h-fit transform transition hover:scale-[1.01] duration-300">
-            <h2 className="text-xl font-semibold mb-4 flex items-center">
-                <List className="mr-2 w-5 h-5 text-purple-400" /> Watchlist
-            </h2>
+  return (
+    <Box sx={{ p: 2 }}>
+      <Typography level="h3" sx={{ color: 'white', mb: 3 }}>Investment Watchlist</Typography>
 
-            <form onSubmit={handleAddStock} className="flex gap-2 mb-6">
-                <input
-                    type="text"
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
-                    placeholder="AAPL"
-                    className="w-full bg-black/5 dark:bg-white/5 border border-black/10 dark:border-white/10 rounded-lg px-4 py-2 focus:outline-none focus:border-purple-500 transition-colors uppercase text-black dark:text-white"
-                    required
-                />
-                <button
-                    type="submit"
-                    disabled={adding}
-                    className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center disabled:opacity-50"
-                >
-                    {adding ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
-                </button>
-            </form>
+      <Sheet sx={{ ...glassStyle, p: 2, mb: 4 }}>
+        <Stack spacing={2}>
+          <Typography level="title-sm" sx={{ color: 'rgba(255,255,255,0.6)' }}>Add New Security</Typography>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+            <Input 
+              placeholder="Symbol (e.g. AAPL)" 
+              value={newSymbol} 
+              onChange={e => setNewSymbol(e.target.value)}
+              sx={{ flex: 1, bgcolor: 'rgba(255,255,255,0.05)', color: 'white' }}
+            />
+            <Input 
+              placeholder="Company Name" 
+              value={newName} 
+              onChange={e => setNewName(e.target.value)}
+              sx={{ flex: 2, bgcolor: 'rgba(255,255,255,0.05)', color: 'white' }}
+            />
+            <Button 
+              variant="solid" 
+              color="success" 
+              onClick={handleAdd}
+              startDecorator={<Plus size={18} />}
+            >
+              Add
+            </Button>
+          </Stack>
+        </Stack>
+      </Sheet>
 
-            <div className="space-y-3">
-                {loading ? (
-                    <div className="animate-pulse bg-black/10 dark:bg-white/10 h-10 rounded-lg"></div>
-                ) : (
-                    watchlist.map((item) => (
-                        <div key={item.symbol} className="flex items-center justify-between p-3 bg-black/5 dark:bg-white/5 rounded-lg border border-black/10 dark:border-white/10 hover:border-purple-500/50 transition-colors group">
-                            <div className="flex items-center">
-                                <span className="font-bold text-lg text-purple-400">{item.symbol}</span>
-                                {item.is_auto_suggested && (
-                                    <span className="ml-2 text-xs bg-cyan-900/50 text-cyan-400 px-2 py-0.5 rounded-full border border-cyan-800">AI</span>
-                                )}
-                            </div>
-                            <button
-                                onClick={() => removeStock(item.symbol)}
-                                className="text-gray-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-                            >
-                                <Trash2 className="w-4 h-4" />
-                            </button>
-                        </div>
-                    ))
-                )}
-            </div>
-        </div>
-    );
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
+        {watchlist.map((item) => (
+          <Card key={item.symbol} sx={{ ...glassStyle }}>
+            <CardContent>
+              <Stack direction="row" justifyContent="space-between" alignItems="center">
+                <Box>
+                  <Typography level="h4" sx={{ color: 'white' }}>{item.symbol}</Typography>
+                  <Typography level="body-sm" sx={{ color: 'rgba(255,255,255,0.6)' }}>{item.name}</Typography>
+                </Box>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Switch 
+                    checked={!!item.is_active} 
+                    onChange={() => handleToggleActive(item.symbol, item.is_active)} 
+                    color={item.is_active ? 'success' : 'neutral'}
+                    size="sm"
+                    sx={{ mr: 1 }}
+                  />
+                  <IconButton color="danger" variant="plain" onClick={() => handleDelete(item.symbol)}>
+                    <Trash2 size={20} />
+                  </IconButton>
+                </Stack>
+              </Stack>
+            </CardContent>
+          </Card>
+        ))}
+      </Box>
+    </Box>
+  );
 }
