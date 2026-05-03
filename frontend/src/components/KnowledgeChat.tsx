@@ -2,16 +2,17 @@ import React from 'react';
 import { Box, Typography, Input, Button, Card, Stack, Sheet } from '@mui/joy';
 import { Send, Bot, User } from 'lucide-react';
 import { useChat } from '@ai-sdk/react';
+import { MCP_WORKER_URL } from '../config';
 
 export default function KnowledgeChat() {
   const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
-    api: 'http://localhost:8789/chat', // Pointing to the mcp-worker
+    api: `${MCP_WORKER_URL}/chat`, // Pointing to the mcp-worker
   });
 
   return (
     <Card variant="outlined" sx={{ height: 'calc(100vh - 120px)', display: 'flex', flexDirection: 'column' }}>
       <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
-        <Typography level="h4">Oaktree Knowledge Agent - FIXED</Typography>
+        <Typography level="h4">Oaktree Knowledge Agent</Typography>
         <Typography level="body-sm">Ask about your portfolio, history, or investment frameworks.</Typography>
       </Box>
 

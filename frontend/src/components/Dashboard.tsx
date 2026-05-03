@@ -14,6 +14,7 @@ import {
   CssBaseline
 } from '@mui/joy';
 import { TrendingUp, TrendingDown, Minus, Quote } from 'lucide-react';
+import { API_BASE_URL } from '../config';
 import {
   createRootRoute,
   createRoute,
@@ -51,7 +52,7 @@ function DashboardContent() {
 
   const fetchReports = async () => {
     try {
-      const res = await fetch('http://localhost:8787/api/reports');
+      const res = await fetch(`${API_BASE_URL}/api/reports`);
       if (res.ok) {
         const data = await res.json();
         setReports(data);

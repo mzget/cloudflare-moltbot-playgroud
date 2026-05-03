@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Button, Tooltip, Stack, Typography } from '@mui/joy';
 import { Play, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
+import { API_BASE_URL } from '../config';
 
 export default function ManualTrigger() {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
@@ -12,7 +13,7 @@ export default function ManualTrigger() {
 
     try {
       const endpoint = type === 'crawl' ? '/api/crawl' : '/api/summarize-all';
-      const url = `http://localhost:8787${endpoint}`;
+      const url = `${API_BASE_URL}${endpoint}`;
       
       const response = await fetch(url);
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, Sheet, IconButton, Button, Input, Stack, Card, CardContent, Divider, Switch } from '@mui/joy';
 import { Plus, Trash2, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { API_BASE_URL } from '../config';
 
 interface WatchlistItem {
   symbol: string;
@@ -22,7 +23,7 @@ export default function Watchlist() {
 
   const fetchWatchlist = async () => {
     try {
-      const res = await fetch('http://localhost:8787/api/watchlist');
+      const res = await fetch(`${API_BASE_URL}/api/watchlist`);
       if (res.ok) {
         const data = await res.json();
         setWatchlist(data);
@@ -39,7 +40,7 @@ export default function Watchlist() {
   const handleAdd = async () => {
     if (!newSymbol) return;
     try {
-      await fetch('http://localhost:8787/api/watchlist', {
+      await fetch(`${API_BASE_URL}/api/watchlist`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ symbol: newSymbol.toUpperCase(), name: newName })
@@ -54,7 +55,7 @@ export default function Watchlist() {
 
   const handleDelete = async (symbol: string) => {
     try {
-      await fetch(`http://localhost:8787/api/watchlist?symbol=${symbol}`, { method: 'DELETE' });
+      await fetch(`${API_BASE_URL}/api/watchlist?symbol=${symbol}`, { method: 'DELETE' });
       fetchWatchlist();
     } catch (e) {
       console.error("Failed to delete from watchlist", e);
@@ -63,7 +64,7 @@ export default function Watchlist() {
 
   const handleToggleActive = async (symbol: string, currentStatus: number) => {
     try {
-      await fetch('http://localhost:8787/api/watchlist', {
+      await fetch(`${API_BASE_URL}/api/watchlist`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ symbol, is_active: !currentStatus })

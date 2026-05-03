@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, Sheet, Table, IconButton, Button, Input, Chip, Stack, Switch, FormControl, FormLabel, Modal, ModalDialog, DialogTitle, DialogContent } from '@mui/joy';
 import { Globe, Plus, Trash2, Edit, Save, X, RefreshCw } from 'lucide-react';
+import { API_BASE_URL } from '../config';
 
 interface NewsSource {
   id: number;
@@ -26,7 +27,7 @@ export default function SourceManager() {
 
   const fetchSources = async () => {
     try {
-      const res = await fetch('http://localhost:8787/api/sources');
+      const res = await fetch(`${API_BASE_URL}/api/sources`);
       if (res.ok) {
         const data = await res.json();
         setSources(data);
@@ -45,7 +46,7 @@ export default function SourceManager() {
   const handleSave = async (source: any) => {
     try {
       const method = source.id ? 'PUT' : 'POST';
-      await fetch('http://localhost:8787/api/sources', {
+      await fetch(`${API_BASE_URL}/api/sources`, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(source)
@@ -61,7 +62,7 @@ export default function SourceManager() {
   const handleDelete = async (id: number) => {
     if (!confirm('Delete this source?')) return;
     try {
-      await fetch(`http://localhost:8787/api/sources?id=${id}`, { method: 'DELETE' });
+      await fetch(`${API_BASE_URL}/api/sources?id=${id}`, { method: 'DELETE' });
       fetchSources();
     } catch (e) {
       console.error("Failed to delete source", e);
