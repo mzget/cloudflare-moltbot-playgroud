@@ -3,7 +3,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { getPortfolio, getPortfolioHistory, getKnowledgeByCategory, searchKnowledge } from "./knowledge";
 import { createWorkersAI } from "workers-ai-provider";
-import { streamText, tool } from "ai";
+import { streamText, tool, convertToModelMessages, UIMessage } from "ai";
 
 export class OaktreeMCP extends McpAgent {
   server = new McpServer({ name: "oaktree-mcp", version: "1.0.0" });
@@ -90,13 +90,13 @@ export default {
     }
 
     if (url.pathname === "/chat" && request.method === "POST") {
-      const { messages } = await request.json() as any;
+      const { messages }: { messages: UIMessage[] } = await request.json() as any;
       const workersai = createWorkersAI({ binding: env.AI });
       const model = workersai('@cf/meta/llama-3-8b-instruct');
 
       const result = streamText({
         model,
-        messages,
+        messages: await convertToModelMessages(messages),
         system: "You are Oaktree AI, an investment portfolio manager. You have tools to read the user's portfolio and knowledge base. Answer briefly and directly using the tools available.",
         tools: {
           getPortfolio: tool({
@@ -120,9 +120,10 @@ export default {
             execute: async ({ query }) => searchKnowledge(env, query),
           }),
         },
+        maxSteps: 5,
       });
 
-      return result.toDataStreamResponse({
+      return result.toUIMessageStreamResponse({
         headers: {
           "Access-Control-Allow-Origin": "*",
         }

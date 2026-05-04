@@ -1,13 +1,27 @@
-import React from 'react';
-import { Box, Typography, Input, Button, Card, Stack, Sheet } from '@mui/joy';
-import { Send, Bot, User } from 'lucide-react';
+import React, { useState } from 'react';
+import { Box, Typography, Input, Button, Card, Stack, Sheet, CircularProgress } from '@mui/joy';
+import { Send, Bot } from 'lucide-react';
 import { useChat } from '@ai-sdk/react';
+import { DefaultChatTransport } from 'ai';
 import { MCP_WORKER_URL } from '../config';
 
 export default function KnowledgeChat() {
-  const { messages, input, handleInputChange, handleSubmit, isLoading } = useChat({
-    api: `${MCP_WORKER_URL}/chat`, // Pointing to the mcp-worker
+  const [input, setInput] = useState('');
+
+  const { messages, sendMessage, status } = useChat({
+    transport: new DefaultChatTransport({
+      api: `${MCP_WORKER_URL}/chat`,
+    }),
   });
+
+  const isLoading = status === 'submitted' || status === 'streaming';
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
+    sendMessage({ text: input });
+    setInput('');
+  };
 
   return (
     <Card variant="outlined" sx={{ height: 'calc(100vh - 120px)', display: 'flex', flexDirection: 'column' }}>
@@ -25,6 +39,7 @@ export default function KnowledgeChat() {
             <Typography level="body-sm">"Tell me about the Five Forces framework."</Typography>
           </Sheet>
         )}
+
         {messages.map((m) => (
           <Box
             key={m.id}
@@ -42,20 +57,33 @@ export default function KnowledgeChat() {
                 p: 1.5,
                 borderRadius: 'lg',
                 maxWidth: '80%',
-                whiteSpace: 'pre-wrap'
+                whiteSpace: 'pre-wrap',
               }}
             >
               <Typography textColor={m.role === 'user' ? 'common.white' : 'text.primary'}>
-                {m.content}
-                {m.toolInvocations?.map(tool => (
-                  <Box key={tool.toolCallId} sx={{ mt: 1, p: 1, bgcolor: 'background.surface', borderRadius: 'sm', opacity: 0.8 }}>
-                    <Typography level="body-xs" color="primary">Calling: {tool.toolName}</Typography>
-                  </Box>
-                ))}
+                {m.parts.map((part, i) =>
+                  part.type === 'text' ? <span key={i}>{part.text}</span> : null
+                )}
+                {m.parts.map((part, i) =>
+                  part.type === 'tool-invocation' ? (
+                    <Box key={i} sx={{ mt: 1, p: 1, bgcolor: 'background.surface', borderRadius: 'sm', opacity: 0.8 }}>
+                      <Typography level="body-xs" color="primary">
+                        Calling: {part.toolInvocation.toolName}
+                      </Typography>
+                    </Box>
+                  ) : null
+                )}
               </Typography>
             </Sheet>
           </Box>
         ))}
+
+        {isLoading && (
+          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            <CircularProgress size="sm" />
+            <Typography level="body-sm" color="neutral">Thinking...</Typography>
+          </Box>
+        )}
       </Box>
 
       <Box component="form" onSubmit={handleSubmit} sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider' }}>
@@ -64,10 +92,16 @@ export default function KnowledgeChat() {
             fullWidth
             placeholder="Ask a question..."
             value={input}
-            onChange={handleInputChange}
+            onChange={(e) => setInput(e.target.value)}
             disabled={isLoading}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit(e as any);
+              }
+            }}
           />
-          <Button type="submit" disabled={isLoading || !input || input.length === 0}>
+          <Button type="submit" disabled={isLoading || !input.trim()}>
             <Send size={18} />
           </Button>
         </Stack>
