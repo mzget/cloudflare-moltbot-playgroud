@@ -18,4 +18,4 @@ bindings = [
 
 [[migrations]]
 tag = "v1"
-new_classes = ["OaktreeMCP"]
+new_sqlite_classes = ["OaktreeMCP"]
