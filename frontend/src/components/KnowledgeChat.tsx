@@ -58,7 +58,7 @@ export default function KnowledgeChat() {
         ))}
       </Box>
 
-      {/* <Box component="form" onSubmit={handleSubmit} sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+      <Box component="form" onSubmit={handleSubmit} sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider' }}>
         <Stack direction="row" spacing={1}>
           <Input
             fullWidth
@@ -71,7 +71,7 @@ export default function KnowledgeChat() {
             <Send size={18} />
           </Button>
         </Stack>
-      </Box> */}
+      </Box>
     </Card>
   );
 }

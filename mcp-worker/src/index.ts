@@ -72,7 +72,7 @@ export class OaktreeMCP extends McpAgent {
   }
 }
 
-const mcpFetch = OaktreeMCP.serve("/mcp").fetch;
+const mcpFetch = OaktreeMCP.serve("/mcp", { binding: "OAKTREE_MCP" }).fetch;
 
 export default {
   async fetch(request: Request, env: any, ctx: ExecutionContext) {
