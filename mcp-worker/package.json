@@ -8,8 +8,10 @@
     "cf-typegen": "wrangler types"
   },
   "dependencies": {
-    "agents": "0.12.0",
+    "@emnapi/core": "^1.10.0",
+    "@emnapi/runtime": "^1.10.0",
     "@modelcontextprotocol/sdk": "1.29.0",
+    "agents": "0.12.0",
     "ai": "6.0.170",
     "workers-ai-provider": "3.1.13",
     "zod": "4.4.1"
