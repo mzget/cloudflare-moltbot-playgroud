@@ -19,3 +19,8 @@ bindings = [
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["OaktreeMCP"]
+
+# NotebookLM bridge — set this to your Cloudflare Tunnel URL
+# Override with: npx wrangler secret put NOTEBOOKLM_BRIDGE_URL
+[vars]
+NOTEBOOKLM_BRIDGE_URL = ""  # e.g. "https://xxxx.trycloudflare.com"

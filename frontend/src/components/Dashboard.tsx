@@ -32,7 +32,7 @@ import KnowledgeChat from './KnowledgeChat';
 
 // 1. Define the Search Schema (Validation)
 const dashboardSearchSchema = z.object({
-  tab: z.enum(['dashboard', 'agent', 'watchlist', 'sources', 'about']).catch('dashboard'),
+  tab: z.enum(['market', 'agent', 'watchlist', 'sources', 'about']).catch('market'),
 });
 
 // Define DashboardContent first so it can be used in the route definition
@@ -84,7 +84,7 @@ function DashboardContent() {
 
           {/* Main Content */}
           <Grid xs={12} md={9} lg={9.5}>
-            {activeTab === 'dashboard' && (
+            {activeTab === 'market' && (
               <Box>
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 4 }}>
                   <Box>

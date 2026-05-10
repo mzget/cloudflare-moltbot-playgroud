@@ -11,8 +11,9 @@ binding = "AI"
 
 [[d1_databases]]
 binding = "DB"
-database_name = "oaktree-db"
+database_name = "moltbot-db"
 database_id = "97634677-4bac-44d1-bd02-6c733328a137"
+remote = true
 
 [[send_email]]
 name = "EMAIL"
@@ -20,3 +21,8 @@ destination_address = "rattajak.n@gmail.com"
 
 [triggers]
 crons = ["0 8 * * *"] # Every day at 8:00 AM
+
+[dev]
+ip = "0.0.0.0"
+port = 8787
+local_protocol = "http"

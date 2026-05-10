@@ -115,9 +115,46 @@ export default {
             execute: async ({ category }) => getKnowledgeByCategory(env, category),
           }),
           searchKnowledge: tool({
-            description: "Search knowledge base",
+            description: "Search knowledge base stored in D1",
             parameters: z.object({ query: z.string() }),
             execute: async ({ query }) => searchKnowledge(env, query),
+          }),
+          queryNotebookLM: tool({
+            description: "Query the user's NotebookLM notebooks for deep research context — use this for earnings calls, 10-K/10-Q filings, company analysis, and detailed investment research that goes beyond the local knowledge base.",
+            parameters: z.object({
+              question: z.string().describe("The research question to ask NotebookLM"),
+              notebookId: z.string().optional().describe("Optional specific notebook ID to query"),
+            }),
+            execute: async ({ question, notebookId }) => {
+              const bridgeUrl = env.NOTEBOOKLM_BRIDGE_URL;
+              if (!bridgeUrl) {
+                return { error: "NotebookLM bridge not configured. NOTEBOOKLM_BRIDGE_URL is not set." };
+              }
+              try {
+                const body: Record<string, string> = { question };
+                if (notebookId) body.notebookId = notebookId;
+
+                const response = await fetch(`${bridgeUrl}/ask`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    ...(env.BRIDGE_SECRET ? { Authorization: `Bearer ${env.BRIDGE_SECRET}` } : {}),
+                  },
+                  body: JSON.stringify(body),
+                  signal: AbortSignal.timeout(30000), // 30s timeout
+                });
+
+                if (!response.ok) {
+                  const err = await response.text();
+                  return { error: `Bridge error ${response.status}: ${err}` };
+                }
+
+                const data = await response.json() as { answer?: string; error?: string };
+                return data.answer ? { answer: data.answer } : { error: data.error || "No answer returned" };
+              } catch (err: any) {
+                return { error: `Failed to reach NotebookLM bridge: ${err.message}` };
+              }
+            },
           }),
         },
         maxSteps: 5,
