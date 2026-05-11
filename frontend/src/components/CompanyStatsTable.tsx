@@ -33,6 +33,11 @@ export const ALL_COLUMNS: ColumnDef[] = [
   { id: 'capex_to_ocf',     label: 'CapEx/OCF',        format: 'ratio'    },
   { id: 'rd_to_revenue',    label: 'R&D/Rev',          format: 'pct'      },
   { id: 'debt_equity',      label: 'Debt/Equity',      format: 'ratio'    },
+  { id: 'p_e',              label: 'P/E',              format: 'ratio'    },
+  { id: 'fcf_margin',       label: 'FCF Margin',       format: 'pct'      },
+  { id: 'total_cash',       label: 'Total Cash',       format: 'currency' },
+  { id: 'net_debt',         label: 'Net Debt',         format: 'currency' },
+  { id: 'dividend_yield',   label: 'Div Yield',        format: 'pct'      },
 ];
 
 // ─── Formatters ──────────────────────────────────────────────────────────────

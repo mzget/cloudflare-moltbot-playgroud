@@ -16,4 +16,9 @@ export interface CompanyStats {
   capex_to_ocf?: number;
   rd_to_revenue?: number;      // decimal
   debt_equity?: number;
+  p_e?: number;
+  fcf_margin?: number;         // decimal
+  total_cash?: number;         // in USD
+  net_debt?: number;           // in USD
+  dividend_yield?: number;     // decimal
 }

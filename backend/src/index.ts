@@ -2,6 +2,7 @@ import puppeteer, { BrowserWorker } from '@cloudflare/puppeteer';
 import { runCrawler } from './crawler';
 import { generateDailySummary } from './summarizer';
 import { sendDailyEmailReport } from './email';
+import { fetchAndStoreMarketStats } from './marketData';
 
 export interface Env {
 	DB: D1Database;
@@ -11,6 +12,7 @@ export interface Env {
 		send: (raw: string) => Promise<void>;
 		destination_address: string;
 	};
+	FMP_API_KEY?: string;
 }
 
 export default {
@@ -131,31 +133,29 @@ export default {
 			return Response.redirect(`${url.origin}/api/crawl`, 307);
 		}
 
+		// API: Trigger Market Stats Update Manually (Test)
+		if (url.pathname === '/api/test-market-stats') {
+			ctx.waitUntil(fetchAndStoreMarketStats(env));
+			return new Response('Market stats update started', { headers: corsHeaders });
+		}
+
 		// API: Market Intelligence (Watchlist + Stats)
 		if (url.pathname === '/api/market-intelligence') {
-			const { results } = await env.DB.prepare('SELECT * FROM watchlist WHERE is_active = 1').all();
-			
-			// Map watchlist items to the CompanyStats structure expected by the frontend
-			const stats = results.map(row => ({
-				symbol: row.symbol,
-				name: row.name || row.symbol,
-				exchange: 'NasdaqGS', // Default, can be updated later
-				market_cap: null,
-				revenues: null,
-				revenue_3y_cagr: null,
-				revenue_1y_growth: null,
-				gross_profit_margin: null,
-				operating_margin: null,
-				ev_ebit: null,
-				ev_sales: null,
-				p_ocf: null,
-				p_fcf: null,
-				capex_to_ocf: null,
-				rd_to_revenue: null,
-				debt_equity: null
-			}));
+			const { results } = await env.DB.prepare(`
+				SELECT 
+					w.symbol, 
+					w.name, 
+					'NasdaqGS' as exchange,
+					m.market_cap, m.revenues, m.revenue_3y_cagr, m.revenue_1y_growth,
+					m.gross_profit_margin, m.operating_margin, m.ev_ebit, m.ev_sales,
+					m.p_ocf, m.p_fcf, m.capex_to_ocf, m.rd_to_revenue, m.debt_equity,
+					m.p_e, m.fcf_margin, m.total_cash, m.net_debt, m.dividend_yield
+				FROM watchlist w
+				LEFT JOIN market_stats m ON w.symbol = m.symbol
+				WHERE w.is_active = 1
+			`).all();
 
-			return Response.json(stats, { headers: corsHeaders });
+			return Response.json(results, { headers: corsHeaders });
 		}
 
 		return new Response("Oaktree Agent Backend Running");
@@ -175,7 +175,10 @@ export default {
 					.catch(e => console.error(`Scheduled summary failed for ${row.symbol}:`, e))
 			));
 
-			// 3. Send Email Report
+			// 3. Fetch and store market stats
+			await fetchAndStoreMarketStats(env);
+
+			// 4. Send Email Report
 			await sendDailyEmailReport(env);
 
 			console.log("Daily sequence completed.");
