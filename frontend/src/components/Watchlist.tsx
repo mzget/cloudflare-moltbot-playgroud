@@ -9,12 +9,7 @@ interface WatchlistItem {
   is_active: number;
 }
 
-const glassStyle = {
-  background: 'rgba(255, 255, 255, 0.05)',
-  backdropFilter: 'blur(12px)',
-  border: '1px solid rgba(255, 255, 255, 0.1)',
-  borderRadius: '16px',
-};
+import { glassStyle } from '../styles/glass';
 
 export default function Watchlist() {
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
@@ -77,23 +72,23 @@ export default function Watchlist() {
 
   return (
     <Box sx={{ p: 2 }}>
-      <Typography level="h3" sx={{ color: 'white', mb: 3 }}>Investment Watchlist</Typography>
+      <Typography level="h3" sx={{ mb: 3 }}>Investment Watchlist</Typography>
 
       <Sheet sx={{ ...glassStyle, p: 2, mb: 4 }}>
         <Stack spacing={2}>
-          <Typography level="title-sm" sx={{ color: 'rgba(255,255,255,0.6)' }}>Add New Security</Typography>
+          <Typography level="title-sm" sx={{ opacity: 0.6 }}>Add New Security</Typography>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             <Input 
               placeholder="Symbol (e.g. AAPL)" 
               value={newSymbol} 
               onChange={e => setNewSymbol(e.target.value)}
-              sx={{ flex: 1, bgcolor: 'rgba(255,255,255,0.05)', color: 'white' }}
+              sx={{ flex: 1 }}
             />
             <Input 
               placeholder="Company Name" 
               value={newName} 
               onChange={e => setNewName(e.target.value)}
-              sx={{ flex: 2, bgcolor: 'rgba(255,255,255,0.05)', color: 'white' }}
+              sx={{ flex: 2 }}
             />
             <Button 
               variant="solid" 
@@ -109,12 +104,12 @@ export default function Watchlist() {
 
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
         {watchlist.map((item) => (
-          <Card key={item.symbol} sx={{ ...glassStyle }}>
+          <Card key={item.symbol} sx={{ ...glassStyle, border: 'none', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
             <CardContent>
               <Stack direction="row" justifyContent="space-between" alignItems="center">
                 <Box>
-                  <Typography level="h4" sx={{ color: 'white' }}>{item.symbol}</Typography>
-                  <Typography level="body-sm" sx={{ color: 'rgba(255,255,255,0.6)' }}>{item.name}</Typography>
+                  <Typography level="title-lg">{item.symbol}</Typography>
+                  <Typography level="body-sm" sx={{ opacity: 0.6 }}>{item.name}</Typography>
                 </Box>
                 <Stack direction="row" spacing={1} alignItems="center">
                   <Switch 

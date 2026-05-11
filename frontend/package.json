@@ -9,7 +9,10 @@
     "dev": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
-    "astro": "astro"
+    "astro": "astro",
+    "type-check": "tsc --noEmit",
+    "lint": "eslint src/**/*.ts src/**/*.tsx --max-warnings=0",
+    "test": "vitest run"
   },
   "dependencies": {
     "@ai-sdk/react": "^3.0.172",
@@ -24,5 +27,12 @@
     "react-dom": "^19.2.5",
     "yaml": "^2.8.3",
     "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.2",
+    "eslint": "^9.9.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "vitest": "^2.0.0"
   }
 }

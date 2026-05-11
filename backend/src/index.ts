@@ -131,6 +131,33 @@ export default {
 			return Response.redirect(`${url.origin}/api/crawl`, 307);
 		}
 
+		// API: Market Intelligence (Watchlist + Stats)
+		if (url.pathname === '/api/market-intelligence') {
+			const { results } = await env.DB.prepare('SELECT * FROM watchlist WHERE is_active = 1').all();
+			
+			// Map watchlist items to the CompanyStats structure expected by the frontend
+			const stats = results.map(row => ({
+				symbol: row.symbol,
+				name: row.name || row.symbol,
+				exchange: 'NasdaqGS', // Default, can be updated later
+				market_cap: null,
+				revenues: null,
+				revenue_3y_cagr: null,
+				revenue_1y_growth: null,
+				gross_profit_margin: null,
+				operating_margin: null,
+				ev_ebit: null,
+				ev_sales: null,
+				p_ocf: null,
+				p_fcf: null,
+				capex_to_ocf: null,
+				rd_to_revenue: null,
+				debt_equity: null
+			}));
+
+			return Response.json(stats, { headers: corsHeaders });
+		}
+
 		return new Response("Oaktree Agent Backend Running");
 	},
 

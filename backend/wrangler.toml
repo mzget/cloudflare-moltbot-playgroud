@@ -22,7 +22,3 @@ destination_address = "rattajak.n@gmail.com"
 [triggers]
 crons = ["0 8 * * *"] # Every day at 8:00 AM
 
-[dev]
-ip = "0.0.0.0"
-port = 8787
-local_protocol = "http"

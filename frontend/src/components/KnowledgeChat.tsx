@@ -4,6 +4,7 @@ import { Send, Bot } from 'lucide-react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { MCP_WORKER_URL } from '../config';
+import { glassStyle } from '../styles/glass';
 
 export default function KnowledgeChat() {
   const [input, setInput] = useState('');
@@ -24,10 +25,10 @@ export default function KnowledgeChat() {
   };
 
   return (
-    <Card variant="outlined" sx={{ height: 'calc(100vh - 120px)', display: 'flex', flexDirection: 'column' }}>
-      <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+    <Card sx={{ ...glassStyle, height: 'calc(100vh - 120px)', display: 'flex', flexDirection: 'column', p: 0, overflow: 'hidden', border: 'none' }}>
+      <Box sx={{ p: 2, borderBottom: '1px solid', borderColor: 'rgba(0,0,0,0.05)' }}>
         <Typography level="h4">Oaktree Knowledge Agent</Typography>
-        <Typography level="body-sm">Ask about your portfolio, history, or investment frameworks.</Typography>
+        <Typography level="body-sm" sx={{ opacity: 0.7 }}>Ask about your portfolio, history, or investment frameworks.</Typography>
       </Box>
 
       <Box sx={{ flex: 1, overflowY: 'auto', p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>

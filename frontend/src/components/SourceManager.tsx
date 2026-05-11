@@ -12,12 +12,7 @@ interface NewsSource {
   enabled: boolean;
 }
 
-const glassStyle = {
-  background: 'rgba(255, 255, 255, 0.05)',
-  backdropFilter: 'blur(12px)',
-  border: '1px solid rgba(255, 255, 255, 0.1)',
-  borderRadius: '16px',
-};
+import { glassStyle } from '../styles/glass';
 
 export default function SourceManager() {
   const [sources, setSources] = useState<NewsSource[]>([]);
@@ -72,7 +67,7 @@ export default function SourceManager() {
   return (
     <Box sx={{ p: 2 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-        <Typography level="h3" sx={{ color: 'white' }}>Intelligence Sources</Typography>
+        <Typography level="h3">Intelligence Sources</Typography>
         <Button 
           variant="soft" 
           startDecorator={<Plus size={18} />}
@@ -84,7 +79,7 @@ export default function SourceManager() {
       </Stack>
 
       <Sheet sx={{ ...glassStyle, overflow: 'hidden' }}>
-        <Table sx={{ '& tr > *': { color: 'rgba(255,255,255,0.8)', borderBottom: '1px solid rgba(255,255,255,0.05)' } }}>
+        <Table sx={{ '& tr > *': { borderBottom: '1px solid var(--joy-palette-divider)' } }}>
           <thead>
             <tr>
               <th style={{ background: 'transparent' }}>Name</th>
@@ -97,8 +92,8 @@ export default function SourceManager() {
             {sources.map((source) => (
               <tr key={source.id}>
                 <td>
-                  <Typography level="title-sm" sx={{ color: 'white' }}>{source.name}</Typography>
-                  <Typography level="body-xs" sx={{ color: 'rgba(255,255,255,0.4)' }} noWrap>{source.url_pattern}</Typography>
+                  <Typography level="title-sm">{source.name}</Typography>
+                  <Typography level="body-xs" sx={{ opacity: 0.5 }} noWrap>{source.url_pattern}</Typography>
                 </td>
                 <td>
                   <Chip size="sm" variant="soft" color={source.type === 'RSS' ? 'primary' : 'warning'}>
@@ -111,7 +106,7 @@ export default function SourceManager() {
                   </Chip>
                 </td>
                 <td style={{ textAlign: 'right' }}>
-                  <IconButton size="sm" variant="plain" onClick={() => setEditingSource(source)} sx={{ color: 'rgba(255,255,255,0.6)' }}>
+                  <IconButton size="sm" variant="plain" color="neutral" onClick={() => setEditingSource(source)}>
                     <Edit size={16} />
                   </IconButton>
                   <IconButton size="sm" variant="plain" color="danger" onClick={() => handleDelete(source.id)}>
@@ -144,32 +139,32 @@ function SourceModal({ open, onClose, source, onSave }: any) {
 
   return (
     <Modal open={open} onClose={onClose}>
-      <ModalDialog sx={{ ...glassStyle, minWidth: 400, bgcolor: '#1a1a2e' }}>
-        <DialogTitle sx={{ color: 'white' }}>{source ? 'Edit Source' : 'Add Source'}</DialogTitle>
+      <ModalDialog sx={{ ...glassStyle, minWidth: 400 }}>
+        <DialogTitle>{source ? 'Edit Source' : 'Add Source'}</DialogTitle>
         <Stack spacing={2} sx={{ mt: 2 }}>
           <FormControl>
-            <FormLabel sx={{ color: 'rgba(255,255,255,0.6)' }}>Name</FormLabel>
-            <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} sx={{ bgcolor: 'rgba(255,255,255,0.05)', color: 'white', border: '1px solid rgba(255,255,255,0.1)' }} />
+            <FormLabel>Name</FormLabel>
+            <Input value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} />
           </FormControl>
           <FormControl>
-            <FormLabel sx={{ color: 'rgba(255,255,255,0.6)' }}>Type</FormLabel>
+            <FormLabel>Type</FormLabel>
             <Stack direction="row" spacing={2}>
               <Button size="sm" variant={formData.type === 'RSS' ? 'solid' : 'soft'} onClick={() => setFormData({...formData, type: 'RSS'})}>RSS</Button>
               <Button size="sm" variant={formData.type === 'WEB' ? 'solid' : 'soft'} onClick={() => setFormData({...formData, type: 'WEB'})}>WEB (Puppeteer)</Button>
             </Stack>
           </FormControl>
           <FormControl>
-            <FormLabel sx={{ color: 'rgba(255,255,255,0.6)' }}>URL Pattern (use {'{symbol}'})</FormLabel>
-            <Input value={formData.url_pattern} onChange={e => setFormData({...formData, url_pattern: e.target.value})} sx={{ bgcolor: 'rgba(255,255,255,0.05)', color: 'white' }} />
+            <FormLabel>URL Pattern (use {'{symbol}'})</FormLabel>
+            <Input value={formData.url_pattern} onChange={e => setFormData({...formData, url_pattern: e.target.value})} />
           </FormControl>
           {formData.type === 'WEB' && (
             <FormControl>
-              <FormLabel sx={{ color: 'rgba(255,255,255,0.6)' }}>CSS Selector</FormLabel>
-              <Input value={formData.selector} onChange={e => setFormData({...formData, selector: e.target.value})} sx={{ bgcolor: 'rgba(255,255,255,0.05)', color: 'white' }} />
+              <FormLabel>CSS Selector</FormLabel>
+              <Input value={formData.selector} onChange={e => setFormData({...formData, selector: e.target.value})} />
             </FormControl>
           )}
           <FormControl orientation="horizontal" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
-            <FormLabel sx={{ color: 'rgba(255,255,255,0.6)' }}>Enabled</FormLabel>
+            <FormLabel>Enabled</FormLabel>
             <Switch checked={formData.enabled} onChange={e => setFormData({...formData, enabled: e.target.checked})} />
           </FormControl>
           <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ mt: 2 }}>
