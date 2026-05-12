@@ -39,90 +39,73 @@ export async function fetchAndStoreMarketStats(env: Env): Promise<void> {
 		let p_e = null, fcf_margin = null, total_cash = null, net_debt = null, dividend_yield = null;
 
 		try {
-			// 1. Key Metrics TTM
-			const km = await fetchFMP(`/api/v3/key-metrics-ttm/${symbol}`);
-			if (km && km.length > 0) {
+			// 1. Key Metrics (Stable uses ?symbol=)
+			const km = await fetchFMP(`/stable/key-metrics?symbol=${symbol}`);
+			if (Array.isArray(km) && km.length > 0) {
 				const d = km[0];
-				market_cap = d.marketCapTTM;
-				ev_sales = d.enterpriseValueOverRevenueTTM;
-				ev_ebit = d.enterpriseValueOverEBITTTM;
-				p_ocf = d.pocfratioTTM;
-				p_fcf = d.pfcfRatioTTM;
-				debt_equity = d.debtToEquityTTM;
-				p_e = d.peRatioTTM;
-				dividend_yield = d.dividendYieldPercentageTTM ? d.dividendYieldPercentageTTM / 100 : (d.dividendYieldTTM || null);
-			} else {
-				// Fallback to mock data if FMP fails (due to legacy endpoint errors on free tier)
-				market_cap = Math.random() * 2000000000000 + 10000000000; // 10B to 2T
-				ev_sales = Math.random() * 15 + 2;
-				ev_ebit = Math.random() * 30 + 10;
-				p_ocf = Math.random() * 25 + 5;
-				p_fcf = Math.random() * 30 + 10;
-				debt_equity = Math.random() * 2;
-				p_e = Math.random() * 40 + 10;
-				dividend_yield = Math.random() * 0.05;
+				market_cap = d.marketCap ?? null;
+				ev_sales = (d.evToSales || d.enterpriseValueOverRevenue) ?? null;
+				ev_ebit = (d.evToEBIT || d.enterpriseValueOverEBIT) ?? null;
+				p_ocf = (d.pocfratio || d.priceToOperatingCashFlowsRatio) ?? null;
+				p_fcf = (d.pfcfRatio || d.priceToFreeCashFlowsRatio) ?? null;
+				debt_equity = d.debtToEquity ?? null;
+				p_e = (d.peRatio || d.priceEarningsRatio) ?? null;
+				dividend_yield = d.dividendYieldPercentage ? d.dividendYieldPercentage / 100 : (d.dividendYield ?? null);
 			}
 
-			// 2. Ratios TTM
-			const ratios = await fetchFMP(`/api/v3/ratios-ttm/${symbol}`);
-			if (ratios && ratios.length > 0) {
+			// 2. Ratios
+			const ratios = await fetchFMP(`/stable/ratios?symbol=${symbol}`);
+			if (Array.isArray(ratios) && ratios.length > 0) {
 				const d = ratios[0];
-				gross_profit_margin = d.grossProfitMarginTTM;
-				operating_margin = d.operatingProfitMarginTTM;
-			} else {
-				gross_profit_margin = Math.random() * 0.5 + 0.2;
-				operating_margin = Math.random() * 0.3 + 0.05;
+				gross_profit_margin = d.grossProfitMargin ?? null;
+				operating_margin = d.operatingProfitMargin ?? null;
 			}
 
 			// 3. Financial Growth
-			const growth = await fetchFMP(`/api/v3/financial-growth/${symbol}?limit=1`);
-			if (growth && growth.length > 0) {
+			const growth = await fetchFMP(`/stable/financial-growth?symbol=${symbol}&limit=1`);
+			if (Array.isArray(growth) && growth.length > 0) {
 				const d = growth[0];
-				revenue_1y_growth = d.revenueGrowth;
-				revenue_3y_cagr = d.threeYRevenueGrowthPerShare; 
-			} else {
-				revenue_1y_growth = Math.random() * 0.4 - 0.1;
-				revenue_3y_cagr = Math.random() * 0.3 - 0.05;
+				revenue_1y_growth = d.revenueGrowth ?? null;
+				revenue_3y_cagr = (d.threeYRevenueGrowthPerShare || d.revenueGrowth3Y) ?? null;
 			}
 
 			// 4. Income Statement
-			const income = await fetchFMP(`/api/v3/income-statement/${symbol}?limit=1`);
-			if (income && income.length > 0) {
+			const income = await fetchFMP(`/stable/income-statement?symbol=${symbol}&limit=1`);
+			if (Array.isArray(income) && income.length > 0) {
 				const d = income[0];
-				revenues = d.revenue;
-				if (d.revenue > 0) {
+				revenues = d.revenue ?? null;
+				if (d.revenue && d.revenue > 0) {
 					rd_to_revenue = d.researchAndDevelopmentExpenses / d.revenue;
 				}
-			} else {
-				revenues = Math.random() * 100000000000 + 5000000000;
-				rd_to_revenue = Math.random() * 0.2;
 			}
 
 			// 5. Cash Flow
-			const cf = await fetchFMP(`/api/v3/cash-flow-statement/${symbol}?limit=1`);
-			if (cf && cf.length > 0) {
+			const cf = await fetchFMP(`/stable/cash-flow-statement?symbol=${symbol}&limit=1`);
+			if (Array.isArray(cf) && cf.length > 0) {
 				const d = cf[0];
-				if (d.operatingCashFlow > 0) {
+				if (d.operatingCashFlow && d.operatingCashFlow > 0) {
 					capex_to_ocf = Math.abs(d.capitalExpenditure) / d.operatingCashFlow;
 				}
 				if (revenues && revenues > 0) {
 					fcf_margin = d.freeCashFlow / revenues;
 				}
-			} else {
-				capex_to_ocf = Math.random() * 0.5 + 0.1;
-				fcf_margin = Math.random() * 0.3 + 0.05;
 			}
 
 			// 6. Balance Sheet for cash and debt
-			const bs = await fetchFMP(`/api/v3/balance-sheet-statement/${symbol}?limit=1`);
-			if (bs && bs.length > 0) {
+			const bs = await fetchFMP(`/stable/balance-sheet-statement?symbol=${symbol}&limit=1`);
+			if (Array.isArray(bs) && bs.length > 0) {
 				const d = bs[0];
-				total_cash = d.cashAndCashEquivalents;
-				net_debt = d.netDebt;
-			} else {
-				total_cash = Math.random() * 50000000000 + 1000000000;
-				net_debt = Math.random() * 50000000000 - 10000000000; // Can be negative
+				total_cash = d.cashAndCashEquivalents ?? null;
+				net_debt = d.netDebt ?? null;
 			}
+
+			// Log the data for debugging
+			console.log(`Final stats for ${symbol}:`, {
+				market_cap, revenues, revenue_3y_cagr, revenue_1y_growth,
+				gross_profit_margin, operating_margin, ev_ebit, ev_sales,
+				p_ocf, p_fcf, capex_to_ocf, rd_to_revenue, debt_equity,
+				p_e, fcf_margin, total_cash, net_debt, dividend_yield
+			});
 
 			// Upsert to database
 			await env.DB.prepare(`

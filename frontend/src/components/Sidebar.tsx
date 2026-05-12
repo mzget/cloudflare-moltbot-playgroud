@@ -6,9 +6,10 @@ interface SidebarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   reportsCount?: number;
+  collapsed?: boolean;
 }
 
-export default function Sidebar({ activeTab, setActiveTab, reportsCount }: SidebarProps) {
+export default function Sidebar({ activeTab, setActiveTab, reportsCount, collapsed }: SidebarProps) {
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
     { id: 'market', label: 'Market Intelligence', icon: <BarChart3 size={20} /> },
@@ -24,12 +25,15 @@ export default function Sidebar({ activeTab, setActiveTab, reportsCount }: Sideb
         <Typography
           level="body-xs"
           sx={{
-            opacity: 0.5,
+            opacity: collapsed ? 0 : 0.5,
+            height: collapsed ? 0 : 'auto',
+            overflow: 'hidden',
             textTransform: 'uppercase',
             letterSpacing: '0.1em',
             fontWeight: 700,
-            mb: 2,
-            px: 2
+            mb: collapsed ? 0 : 2,
+            px: 2,
+            transition: 'all 0.3s ease'
           }}
         >
           Command Center
@@ -41,31 +45,42 @@ export default function Sidebar({ activeTab, setActiveTab, reportsCount }: Sideb
                 selected={activeTab === item.id}
                 onClick={() => setActiveTab(item.id)}
                 sx={{
+                  justifyContent: collapsed ? 'center' : 'flex-start',
+                  px: collapsed ? 1 : 2,
                   color: activeTab === item.id ? 'primary.plainColor' : 'text.secondary',
                   bgcolor: activeTab === item.id ? 'rgba(46, 204, 113, 0.1)' : 'transparent',
+                  transition: 'all 0.2s ease',
                   '&:hover': {
                     bgcolor: 'rgba(0,0,0,0.04)',
                     color: 'text.primary',
                   },
                   '&.Mui-selected': {
-                    borderRight: '3px solid #2ecc71',
+                    borderRight: collapsed ? 'none' : '3px solid #2ecc71',
+                    borderLeft: collapsed ? '3px solid #2ecc71' : 'none',
                     '&:hover': {
                       bgcolor: 'rgba(46, 204, 113, 0.2)',
                     }
                   }
                 }}
               >
-                <ListItemDecorator sx={{ color: activeTab === item.id ? '#2ecc71' : 'inherit' }}>
+                <ListItemDecorator sx={{ 
+                  color: activeTab === item.id ? '#2ecc71' : 'inherit',
+                  minInlineSize: collapsed ? 0 : '2.5rem',
+                }}>
                   {item.icon}
                 </ListItemDecorator>
-                <ListItemContent>
-                  <Typography level="title-sm">{item.label}</Typography>
-                  {item.id === 'market' && reportsCount !== undefined && (
-                    <Chip variant="soft" size="sm" sx={{ ml: 1 }}>
-                      {reportsCount}
-                    </Chip>
-                  )}
+                <ListItemContent sx={{ 
+                  opacity: collapsed ? 0 : 1, 
+                  width: collapsed ? 0 : 'auto',
+                  transition: 'opacity 0.2s ease' 
+                }}>
+                  <Typography level="title-sm" sx={{ whiteSpace: 'nowrap' }}>{item.label}</Typography>
                 </ListItemContent>
+                {!collapsed && item.id === 'market' && reportsCount !== undefined && (
+                  <Chip variant="soft" size="sm" sx={{ ml: 1 }}>
+                    {reportsCount}
+                  </Chip>
+                )}
               </ListItemButton>
             </ListItem>
           ))}

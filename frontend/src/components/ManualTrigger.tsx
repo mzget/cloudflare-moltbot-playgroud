@@ -31,7 +31,7 @@ export default function ManualTrigger() {
   };
 
   return (
-    <Stack direction="row" spacing={1}>
+    <Stack direction="row" spacing={1.5}>
       <Tooltip title="Trigger manual news crawl" variant="soft">
         <Button
           variant="soft"
@@ -40,9 +40,17 @@ export default function ManualTrigger() {
           startDecorator={<RefreshCw size={16} />}
           size="sm"
           sx={{ 
-            bgcolor: 'rgba(255,255,255,0.05)', 
-            color: 'white',
-            '&:hover': { bgcolor: 'rgba(255,255,255,0.1)' }
+            borderRadius: '12px',
+            bgcolor: 'rgba(16, 185, 129, 0.1)', 
+            color: '#059669',
+            fontWeight: 600,
+            border: '1px solid rgba(16, 185, 129, 0.2)',
+            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+            '&:hover': { 
+              bgcolor: 'rgba(16, 185, 129, 0.2)',
+              transform: 'translateY(-1px)',
+              boxShadow: '0 4px 12px rgba(16, 185, 129, 0.15)'
+            }
           }}
         >
           {status === 'loading' ? 'Syncing...' : 'Sync News'}
@@ -52,15 +60,22 @@ export default function ManualTrigger() {
       <Tooltip title="Generate AI Summaries for Watchlist" variant="soft">
         <Button
           variant="soft"
-          color="primary"
           onClick={() => handleTrigger('run-all')}
           loading={status === 'loading'}
           startDecorator={<Play size={16} />}
           size="sm"
           sx={{ 
-            bgcolor: 'rgba(25, 118, 210, 0.2)', 
-            color: '#90caf9',
-            '&:hover': { bgcolor: 'rgba(25, 118, 210, 0.3)' }
+            borderRadius: '12px',
+            bgcolor: 'rgba(99, 102, 241, 0.1)', 
+            color: '#4f46e5',
+            fontWeight: 600,
+            border: '1px solid rgba(99, 102, 241, 0.2)',
+            transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+            '&:hover': { 
+              bgcolor: 'rgba(99, 102, 241, 0.2)',
+              transform: 'translateY(-1px)',
+              boxShadow: '0 4px 12px rgba(99, 102, 241, 0.15)'
+            }
           }}
         >
           Generate Reports

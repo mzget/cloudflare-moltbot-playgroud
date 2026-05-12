@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Box, Grid, Sheet, Typography, Divider } from '@mui/joy';
 import { useSearch, useNavigate } from '@tanstack/react-router';
+import gsap from 'gsap';
 import Header from './Header';
 import Sidebar from './Sidebar';
 import SourceManager from './SourceManager';
@@ -14,6 +15,7 @@ import { API_BASE_URL } from '../config';
 export default function DashboardLayout() {
   const { tab: activeTab } = useSearch({ from: '/' });
   const navigate = useNavigate();
+  const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
 
   const setActiveTab = (tab: string) => {
     navigate({
@@ -46,19 +48,41 @@ export default function DashboardLayout() {
   }, []);
 
   return (
-    <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: '1440px', margin: '0 auto', minHeight: '100vh' }}>
-      <Header />
+    <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: '1600px', margin: '0 auto', minHeight: '100vh' }}>
+      <Header 
+        onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)} 
+        sidebarCollapsed={sidebarCollapsed} 
+      />
 
-      <Grid container spacing={4}>
-        {/* Sidebar */}
-        <Grid xs={12} md={3} lg={2.5}>
-          <Sheet sx={{ ...glassStyle, p: 2, position: 'sticky', top: 24 }}>
-            <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} reportsCount={reports.length} />
+      <Box sx={{ display: 'flex', gap: 4 }}>
+        {/* Sidebar Container */}
+        <Box 
+          sx={{ 
+            width: sidebarCollapsed ? '80px' : { md: '280px', lg: '320px' },
+            transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+            flexShrink: 0,
+            display: { xs: 'none', md: 'block' }
+          }}
+        >
+          <Sheet sx={{ 
+            ...glassStyle, 
+            p: 2, 
+            position: 'sticky', 
+            top: 24, 
+            height: 'fit-content',
+            overflow: 'hidden'
+          }}>
+            <Sidebar 
+              activeTab={activeTab} 
+              setActiveTab={setActiveTab} 
+              reportsCount={reports.length} 
+              collapsed={sidebarCollapsed}
+            />
           </Sheet>
-        </Grid>
+        </Box>
 
-        {/* Main Content */}
-        <Grid xs={12} md={9} lg={9.5}>
+        {/* Main Content Container */}
+        <Box sx={{ flexGrow: 1, minWidth: 0 }}>
           {activeTab === 'dashboard' && <MarketIntelligenceTable />}
           {activeTab === 'market' && <IntelligenceFeed reports={reports} loading={loading} />}
 
@@ -78,8 +102,8 @@ export default function DashboardLayout() {
               </Typography>
             </Sheet>
           )}
-        </Grid>
-      </Grid>
+        </Box>
+      </Box>
     </Box>
   );
 }
