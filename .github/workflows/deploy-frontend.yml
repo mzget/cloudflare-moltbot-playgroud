@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - develop
+      - oaktree
     paths:
       - 'frontend/**'
       - '.github/workflows/deploy-frontend.yml'

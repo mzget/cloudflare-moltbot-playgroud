@@ -24,7 +24,7 @@ export async function sendDailyEmailReport(env: Env) {
   for (const report of reports) {
     const takeaways = JSON.parse(report.key_takeaways || '[]');
     const sentiment = report.sentiment_score > 0.3 ? 'Bullish' : report.sentiment_score < -0.3 ? 'Bearish' : 'Neutral';
-    
+
     emailHtml += `
       <div style="margin-bottom: 40px;">
         <h2 style="margin: 0; color: #000;">${report.symbol} <span style="font-size: 14px; font-weight: normal; color: ${report.sentiment_score > 0 ? '#27ae60' : '#e74c3c'}">(${sentiment})</span></h2>

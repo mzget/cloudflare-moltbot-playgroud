@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - develop
+      - oaktree
     paths:
       - 'mcp-worker/**'
       - '.github/workflows/deploy-mcp.yml'

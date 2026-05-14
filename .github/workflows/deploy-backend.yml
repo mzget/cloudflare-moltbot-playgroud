@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - develop
+      - oaktree
     paths:
       - 'backend/**'
       - '.github/workflows/deploy-backend.yml'
