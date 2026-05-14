@@ -30,7 +30,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: backend
-        run: npm ci
+        run: npm install
 
       - name: Type check
         working-directory: backend
@@ -58,7 +58,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: frontend
-        run: npm ci
+        run: npm install
 
       - name: Type check
         working-directory: frontend
@@ -86,7 +86,7 @@ jobs:
 
       - name: Install dependencies
         working-directory: mcp-worker
-        run: npm ci
+        run: npm install
 
       - name: Type check
         working-directory: mcp-worker
