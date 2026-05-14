@@ -39,7 +39,7 @@ jobs:
         working-directory: frontend
         run: ls -R dist
 
-      - name: Create Pages project (if not exists)
+      - name: Create or Update Pages project
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -53,7 +53,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: frontend
-          command: pages deploy dist --project-name=oaktree-agent-frontend --commit-dirty=true
+          command: pages deploy dist --project-name=oaktree-agent-frontend --branch=${{ github.ref_name }} --commit-dirty=true
 
       - name: Deployment Summary
         run: |
