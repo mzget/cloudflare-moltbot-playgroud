@@ -44,7 +44,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages project create oaktree-agent-frontend --production-branch=main
+          command: pages project create oaktree-agent-frontend --production-branch=oaktree
         continue-on-error: true
 
       - name: Deploy to Cloudflare Pages
