@@ -10,14 +10,7 @@ import { glassStyle } from '../styles/glass';
 
 // ─── Default visible columns (spec: 6 on first load) ─────────────────────────
 
-const DEFAULT_VISIBLE: Array<keyof CompanyStats> = [
-  'market_cap',
-  'revenues',
-  'revenue_3y_cagr',
-  'revenue_1y_growth',
-  'gross_profit_margin',
-  'operating_margin',
-];
+const DEFAULT_VISIBLE: Array<keyof CompanyStats> = ALL_COLUMNS.map(c => c.id);
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -25,8 +18,20 @@ export default function MarketIntelligenceTable() {
   const [data, setData] = React.useState<CompanyStats[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [visibleColumnIds, setVisibleColumnIds] =
-    React.useState<Array<keyof CompanyStats>>(DEFAULT_VISIBLE);
-  const [scale, setScale] = React.useState<ScaleUnit>('B');
+    React.useState<Array<keyof CompanyStats>>(() => {
+      if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('visible_columns');
+        if (saved) return JSON.parse(saved);
+      }
+      return DEFAULT_VISIBLE;
+    });
+  const [scale, setScale] = React.useState<ScaleUnit>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('table_scale');
+      if (saved) return saved as ScaleUnit;
+    }
+    return 'B';
+  });
 
   React.useEffect(() => {
     const fetchData = async () => {
@@ -50,6 +55,14 @@ export default function MarketIntelligenceTable() {
     };
     fetchData();
   }, []);
+
+  React.useEffect(() => {
+    localStorage.setItem('visible_columns', JSON.stringify(visibleColumnIds));
+  }, [visibleColumnIds]);
+
+  React.useEffect(() => {
+    localStorage.setItem('table_scale', scale);
+  }, [scale]);
 
   // Toggle a column on / off while preserving original column order
   const handleToggleColumn = (id: keyof CompanyStats) => {

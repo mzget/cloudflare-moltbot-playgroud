@@ -15,7 +15,7 @@ import { API_BASE_URL } from '../config';
 export default function DashboardLayout() {
   const { tab: activeTab } = useSearch({ from: '/' });
   const navigate = useNavigate();
-  const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = React.useState(true);
 
   const setActiveTab = (tab: string) => {
     navigate({

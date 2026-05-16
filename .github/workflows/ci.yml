@@ -5,12 +5,10 @@ on:
     branches:
       - main
       - develop
-      - oaktree
   push:
     branches:
       - main
       - develop
-      - oaktree
 
 jobs:
   build-backend:

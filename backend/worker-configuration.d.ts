@@ -11,7 +11,6 @@ declare namespace Cloudflare {
 		EMAIL: SendEmail;
 		BROWSER: Fetcher;
 		AI: Ai;
-		FMP_API_KEY: string;
 		DevOpsAgent: DurableObjectNamespace<import("./src/index").DevOpsAgent>;
 	}
 }

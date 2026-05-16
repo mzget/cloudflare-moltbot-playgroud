@@ -41,6 +41,7 @@ export default function CompanyStatsToolbar({
     color: '#27ae60',
     fontWeight: 600,
     fontSize: '0.72rem',
+    cursor: 'pointer',
     '--Chip-decoratorChildHeight': '16px',
     '&:hover': { bgcolor: 'rgba(46, 204, 113, 0.18)' },
   };
@@ -73,6 +74,7 @@ export default function CompanyStatsToolbar({
             key={col.id}
             size="sm"
             sx={chipSx}
+            onClick={() => onToggleColumn(col.id)}
             endDecorator={
               <Box
                 component="span"

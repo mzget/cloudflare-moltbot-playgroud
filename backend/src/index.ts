@@ -12,7 +12,7 @@ export interface Env {
 		send: (raw: string) => Promise<void>;
 		destination_address: string;
 	};
-	FMP_API_KEY?: string;
+	FINNHUB_API_KEY?: string;
 }
 
 export default {
