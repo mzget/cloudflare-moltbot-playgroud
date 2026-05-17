@@ -16,28 +16,30 @@ export type SortDir = 'asc' | 'desc' | 'none';
 export interface ColumnDef {
   id: keyof CompanyStats;
   label: string;
-  format: 'currency' | 'pct' | 'ratio';
+  format: 'currency' | 'pct' | 'ratio' | 'pct2' | 'ratio2';
 }
 
 export const ALL_COLUMNS: ColumnDef[] = [
-  { id: 'market_cap',       label: 'Market Cap',       format: 'currency' },
-  { id: 'revenues',         label: 'Revenues',         format: 'currency' },
-  { id: 'revenue_3y_cagr',  label: 'Rev 3Y CAGR',      format: 'pct'      },
-  { id: 'revenue_1y_growth',label: 'Rev 1Y Growth',    format: 'pct'      },
-  { id: 'gross_profit_margin', label: 'Gross Profit',  format: 'pct'      },
-  { id: 'operating_margin', label: 'Op. Margin',       format: 'pct'      },
-  { id: 'ev_ebit',          label: 'EV/EBIT',          format: 'ratio'    },
-  { id: 'ev_sales',         label: 'EV/Sales',         format: 'ratio'    },
-  { id: 'p_ocf',            label: 'P/OCF',            format: 'ratio'    },
-  { id: 'p_fcf',            label: 'P/FCF',            format: 'ratio'    },
-  { id: 'capex_to_ocf',     label: 'CapEx/OCF',        format: 'ratio'    },
-  { id: 'rd_to_revenue',    label: 'R&D/Rev',          format: 'pct'      },
-  { id: 'debt_equity',      label: 'Debt/Equity',      format: 'ratio'    },
-  { id: 'p_e',              label: 'P/E',              format: 'ratio'    },
-  { id: 'fcf_margin',       label: 'FCF Margin',       format: 'pct'      },
-  { id: 'total_cash',       label: 'Total Cash',       format: 'currency' },
-  { id: 'net_debt',         label: 'Net Debt',         format: 'currency' },
-  { id: 'dividend_yield',   label: 'Div Yield',        format: 'pct'      },
+  { id: 'market_cap', label: 'Market Cap', format: 'currency' },
+  { id: 'revenues', label: 'Revenues', format: 'currency' },
+  { id: 'revenue_3y_cagr', label: 'Rev 3Y CAGR', format: 'pct' },
+  { id: 'revenue_5y_cagr', label: 'Rev 5Y CAGR', format: 'pct' },
+  { id: 'revenue_1y_growth', label: 'Rev 1Y Growth', format: 'pct' },
+  { id: 'gross_profit_margin', label: 'Gross Profit', format: 'pct' },
+  { id: 'operating_margin', label: 'Op. Margin', format: 'pct' },
+  { id: 'fcf_margin', label: 'FCF Margin', format: 'pct' },
+  { id: 'p_e', label: 'P/E', format: 'ratio' },
+  { id: 'ev_ebit', label: 'EV/EBIT', format: 'ratio' },
+  { id: 'ev_sales', label: 'EV/Sales', format: 'ratio' },
+  { id: 'p_ocf', label: 'P/OCF', format: 'ratio' },
+  { id: 'p_fcf', label: 'P/FCF', format: 'ratio' },
+  { id: 'capex_to_ocf', label: 'CapEx/OCF', format: 'ratio' },
+  { id: 'rd_to_revenue', label: 'R&D/Rev', format: 'pct' },
+  { id: 'total_cash', label: 'Total Cash', format: 'currency' },
+  { id: 'net_debt', label: 'Net Debt', format: 'currency' },
+  { id: 'total_debt', label: 'Total Debt', format: 'currency' },
+  { id: 'debt_equity', label: 'Debt/Equity', format: 'ratio2' },
+  { id: 'dividend_yield', label: 'Div Yield', format: 'pct2' },
 ];
 
 // ─── Formatters ──────────────────────────────────────────────────────────────
@@ -47,14 +49,23 @@ const SCALE: Record<ScaleUnit, number> = { K: 1e3, M: 1e6, B: 1e9 };
 function formatValue(val: number | undefined, format: ColumnDef['format'], scale: ScaleUnit): string {
   if (val === undefined || val === null) return '—';
   if (format === 'currency') {
+    // Database stores currency values (like market cap) in millions
+    const trueValue = val * 1e6;
     const divisor = SCALE[scale];
-    return `$${(val / divisor).toFixed(2)}${scale}`;
+    return `$${(trueValue / divisor).toFixed(2)}${scale}`;
   }
   if (format === 'pct') {
     return `${(val * 100).toFixed(1)}%`;
   }
+  if (format === 'pct2') {
+    return `${(val * 100).toFixed(2)}%`;
+  }
   // ratio — large negatives (e.g., -2763) make no sense to show, cap display
   if (Math.abs(val) > 999) return 'N/M';
+
+  if (format === 'ratio2') {
+    return val.toFixed(2);
+  }
   return val.toFixed(1);
 }
 
@@ -70,7 +81,7 @@ function valueColor(val: number | undefined): string {
 // ─── Sub-components ──────────────────────────────────────────────────────────
 
 function SortIcon({ dir }: { dir: SortDir }) {
-  if (dir === 'asc')  return <ArrowUp  size={12} style={{ marginLeft: 4, flexShrink: 0 }} />;
+  if (dir === 'asc') return <ArrowUp size={12} style={{ marginLeft: 4, flexShrink: 0 }} />;
   if (dir === 'desc') return <ArrowDown size={12} style={{ marginLeft: 4, flexShrink: 0 }} />;
   return <ArrowUpDown size={12} style={{ marginLeft: 4, flexShrink: 0, opacity: 0.3 }} />;
 }

@@ -146,7 +146,7 @@ export default {
 					w.symbol, 
 					w.name, 
 					'NasdaqGS' as exchange,
-					m.market_cap, m.revenues, m.revenue_3y_cagr, m.revenue_1y_growth,
+					m.market_cap, m.revenues, m.revenue_3y_cagr, m.revenue_1y_growth, m.revenue_5y_cagr,
 					m.gross_profit_margin, m.operating_margin, m.ev_ebit, m.ev_sales,
 					m.p_ocf, m.p_fcf, m.capex_to_ocf, m.rd_to_revenue, m.debt_equity,
 					m.p_e, m.fcf_margin, m.total_cash, m.net_debt, m.dividend_yield

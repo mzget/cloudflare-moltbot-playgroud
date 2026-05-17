@@ -6,6 +6,7 @@ export interface CompanyStats {
   market_cap?: number;         // in USD
   revenues?: number;           // in USD
   revenue_3y_cagr?: number;    // decimal: 0.054 = 5.4%
+  revenue_5y_cagr?: number;
   revenue_1y_growth?: number;  // decimal
   gross_profit_margin?: number;// decimal
   operating_margin?: number;   // decimal
@@ -20,5 +21,6 @@ export interface CompanyStats {
   fcf_margin?: number;         // decimal
   total_cash?: number;         // in USD
   net_debt?: number;           // in USD
+  total_debt?: number;         // in USD
   dividend_yield?: number;     // decimal
 }

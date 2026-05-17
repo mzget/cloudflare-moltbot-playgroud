@@ -50,10 +50,10 @@ export async function fetchAndStoreMarketStats(env: Env): Promise<void> {
 		const symbol = row.symbol as string;
 
 		// Database fields
-		let market_cap = null, revenues = null, revenue_3y_cagr = null, revenue_1y_growth = null;
+		let market_cap = null, revenues = null, revenue_3y_cagr = null, revenue_1y_growth = null, revenue_5y_cagr = null;
 		let gross_profit_margin = null, operating_margin = null, ev_ebit = null, ev_sales = null;
 		let p_ocf = null, p_fcf = null, capex_to_ocf = null, rd_to_revenue = null, debt_equity = null;
-		let p_e = null, fcf_margin = null, total_cash = null, net_debt = null, dividend_yield = null;
+		let p_e = null, fcf_margin = null, total_cash = null, net_debt = null, total_debt = null, dividend_yield = null;
 
 		try {
 			const data = await fetchFinnhub(symbol) as FinnhubResponse | null;
@@ -71,34 +71,67 @@ export async function fetchAndStoreMarketStats(env: Env): Promise<void> {
 				fcf_margin = m.freeCashFlowMarginTTM ? m.freeCashFlowMarginTTM / 100 : null;
 
 				// Growth
-				revenue_1y_growth = m.revenueGrowthTTM ? m.revenueGrowthTTM / 100 : null;
-				revenue_3y_cagr = m.revenueGrowth3Y ? m.revenueGrowth3Y / 100 : (m.revenueGrowth5Y ? m.revenueGrowth5Y / 100 : null);
+				revenue_1y_growth = m.revenueGrowthTTMYoy ? m.revenueGrowthTTMYoy / 100 : (m.revenueGrowthTTM ? m.revenueGrowthTTM / 100 : null);
+				revenue_3y_cagr = m.revenueGrowth3Y ? m.revenueGrowth3Y / 100 : null;
+				revenue_5y_cagr = m.revenueGrowth5Y ? m.revenueGrowth5Y / 100 : null;
 
 				// Ratios
-				p_ocf = m.pcfRatioTTM || null;
-				p_fcf = m.pfcfRatioTTM || null;
-				debt_equity = m.totalDebtToEquityTTM ? m.totalDebtToEquityTTM / 100 : null;
+				// Note: Finnhub's pcfShareTTM stands for 'Price to Cash Flow per share', where Cash Flow is Operating Cash Flow.
+				p_ocf = m.pcfShareTTM || null;
+				p_fcf = m.pfcfShareTTM || null;
 
-				// Enterprise Value based ratios
-				// Finnhub doesn't always provide EV/Sales directly in metrics, so we calculate if possible
-				const ev = m.enterpriseValue;
-				revenues = m.revenueTTM || null;
-				if (ev && revenues && revenues > 0) {
-					ev_sales = ev / revenues;
-				} else {
-					ev_sales = m.evToSales || null;
+				// Debt / Equity: Provided directly as a ratio (e.g. 0.79 means 79%)
+				debt_equity = m.totalDebtToEquityTTM ? m.totalDebtToEquityTTM : (m['totalDebt/totalEquityQuarterly'] ? m['totalDebt/totalEquityQuarterly'] : null);
+				
+				// Calculate revenues if possible since Finnhub doesn't always provide absolute TTM revenue
+				if (m.marketCapitalization && m.psTTM && m.psTTM > 0) {
+					revenues = m.marketCapitalization / m.psTTM;
 				}
 
-				const ebitda = m.ebitdaTTM;
-				if (ev && ebitda && ebitda > 0) {
-					ev_ebit = ev / ebitda;
+				// Enterprise Value based ratios
+				ev_sales = m.evRevenueTTM || null;
+				
+				// Calculate EV / Operating Income (EBIT) instead of EBITDA
+				if (m.enterpriseValue && revenues && operating_margin && operating_margin !== 0) {
+					ev_ebit = m.enterpriseValue / (revenues * operating_margin);
 				} else {
-					ev_ebit = m.evToEbitda || null;
+					ev_ebit = null;
+				}
+
+				// Free Cash Flow Margin
+				if (m.psTTM && m.pfcfShareTTM && m.pfcfShareTTM > 0) {
+					fcf_margin = m.psTTM / m.pfcfShareTTM;
 				}
 
 				// Financial Health
-				total_cash = m.cashAndCashEquivalents || null;
-				net_debt = m.netDebt || null;
+				// Total Cash = Cash per share * Shares Outstanding
+				// Shares Outstanding = revenues / revenuePerShareTTM
+				if (m.cashPerSharePerShareQuarterly && revenues && m.revenuePerShareTTM && m.revenuePerShareTTM > 0) {
+					const sharesOut = revenues / m.revenuePerShareTTM;
+					total_cash = m.cashPerSharePerShareQuarterly * sharesOut;
+				} else {
+					total_cash = m.cashAndCashEquivalents || null;
+				}
+
+				// Net Debt
+				// Net Debt = Enterprise Value - Market Cap
+				if (m.enterpriseValue && m.marketCapitalization) {
+					net_debt = m.enterpriseValue - m.marketCapitalization;
+				} else {
+					net_debt = m.netDebt || null;
+				}
+
+				// Total Debt
+				// Calculate from Long Term Debt and Short Term Debt if available
+				if (typeof m.longTermDebt === 'number' && typeof m.shortTermDebt === 'number') {
+					total_debt = m.longTermDebt + m.shortTermDebt;
+				} else if (typeof m.totalDebt === 'number') {
+					total_debt = m.totalDebt;
+				} else if (net_debt !== null && total_cash !== null) {
+					total_debt = net_debt + total_cash;
+				} else {
+					total_debt = null;
+				}
 
 				// Specific Metrics
 				rd_to_revenue = m.researchAndDevelopmentToRevenueTTM ? m.researchAndDevelopmentToRevenueTTM / 100 : null;
@@ -115,17 +148,18 @@ export async function fetchAndStoreMarketStats(env: Env): Promise<void> {
 
 			await env.DB.prepare(`
 				INSERT INTO market_stats (
-					symbol, market_cap, revenues, revenue_3y_cagr, revenue_1y_growth,
+					symbol, market_cap, revenues, revenue_3y_cagr, revenue_1y_growth, revenue_5y_cagr,
 					gross_profit_margin, operating_margin, ev_ebit, ev_sales,
 					p_ocf, p_fcf, capex_to_ocf, rd_to_revenue, debt_equity,
-					p_e, fcf_margin, total_cash, net_debt, dividend_yield,
+					p_e, fcf_margin, total_cash, net_debt, total_debt, dividend_yield,
 					updated_at
-				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 				ON CONFLICT(symbol) DO UPDATE SET
 					market_cap=excluded.market_cap,
 					revenues=excluded.revenues,
 					revenue_3y_cagr=excluded.revenue_3y_cagr,
 					revenue_1y_growth=excluded.revenue_1y_growth,
+					revenue_5y_cagr=excluded.revenue_5y_cagr,
 					gross_profit_margin=excluded.gross_profit_margin,
 					operating_margin=excluded.operating_margin,
 					ev_ebit=excluded.ev_ebit,
@@ -139,13 +173,14 @@ export async function fetchAndStoreMarketStats(env: Env): Promise<void> {
 					fcf_margin=excluded.fcf_margin,
 					total_cash=excluded.total_cash,
 					net_debt=excluded.net_debt,
+					total_debt=excluded.total_debt,
 					dividend_yield=excluded.dividend_yield,
 					updated_at=CURRENT_TIMESTAMP
 			`).bind(
-				symbol, market_cap, revenues, revenue_3y_cagr, revenue_1y_growth,
+				symbol, market_cap, revenues, revenue_3y_cagr, revenue_1y_growth, revenue_5y_cagr,
 				gross_profit_margin, operating_margin, ev_ebit, ev_sales,
 				p_ocf, p_fcf, capex_to_ocf, rd_to_revenue, debt_equity,
-				p_e, fcf_margin, total_cash, net_debt, dividend_yield
+				p_e, fcf_margin, total_cash, net_debt, total_debt, dividend_yield
 			).run();
 
 		} catch (error) {
