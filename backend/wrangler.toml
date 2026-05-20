@@ -20,5 +20,5 @@ name = "EMAIL"
 destination_address = "rattajak.n@gmail.com"
 
 [triggers]
-crons = ["0 * * * *"] # Every hour
+crons = ["0 */6 * * *"] # Every 6 hours
 

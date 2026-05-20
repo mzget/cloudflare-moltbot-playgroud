@@ -23,11 +23,11 @@ export function DailyReportCard({ report }: { report: any }) {
                 {report.sentiment_score > 0.3 ? 'Bullish Sentiment' : report.sentiment_score < -0.3 ? 'Bearish Sentiment' : 'Neutral Stance'}
               </Chip>
             </Stack>
-            <Typography level="body-xs" sx={{ opacity: 0.5, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+            <Typography level="body-xs" sx={{ color: 'text.tertiary', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
               Reported on {new Date(report.report_date).toLocaleDateString()}
             </Typography>
           </Box>
-          <Quote size={40} color="rgba(46, 204, 113, 0.1)" />
+          <Quote size={40} color="var(--joy-palette-success-plainColor)" style={{ opacity: 0.15 }} />
         </Stack>
 
         <Typography level="body-lg" sx={{ opacity: 0.9, fontStyle: 'italic', mb: 4, lineHeight: 1.7, borderLeft: '4px solid #2ecc71', pl: 3 }}>

@@ -41,8 +41,6 @@ export default function ManualTrigger() {
           size="sm"
           sx={{ 
             borderRadius: '12px',
-            bgcolor: 'rgba(16, 185, 129, 0.1)', 
-            color: '#059669',
             fontWeight: 600,
             border: '1px solid rgba(16, 185, 129, 0.2)',
             transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -66,8 +64,6 @@ export default function ManualTrigger() {
           size="sm"
           sx={{ 
             borderRadius: '12px',
-            bgcolor: 'rgba(99, 102, 241, 0.1)', 
-            color: '#4f46e5',
             fontWeight: 600,
             border: '1px solid rgba(99, 102, 241, 0.2)',
             transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',

@@ -128,9 +128,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
                 fontSize: '1.5rem',
                 fontWeight: 800, 
                 letterSpacing: '-0.03em',
-                background: 'linear-gradient(to bottom, #111827, #374151)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
+                color: 'text.primary',
               }}
             >
               Oaktree Agent

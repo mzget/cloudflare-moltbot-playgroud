@@ -43,7 +43,7 @@ const theme = extendTheme({
     light: {
       palette: {
         background: {
-          body: 'transparent',
+          body: '#f1f5f9',
           surface: 'rgba(255, 255, 255, 0.7)',
         },
       },
@@ -51,7 +51,8 @@ const theme = extendTheme({
     dark: {
       palette: {
         background: {
-          body: 'transparent',
+          body: '#0f172a',
+          surface: 'rgba(30, 41, 59, 0.7)',
         },
       },
     },
