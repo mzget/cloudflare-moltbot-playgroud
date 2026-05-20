@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
-import { Box, Typography, Stack, Sheet, IconButton } from '@mui/joy';
-import { Newspaper, Bell, Settings, User, Menu } from 'lucide-react';
+import { Box, Typography, Stack, Sheet, IconButton, Tooltip } from '@mui/joy';
+import { Newspaper, Bell, Settings, User, Menu, Moon, Sun } from 'lucide-react';
+import { useColorScheme } from '@mui/joy/styles';
 import gsap from 'gsap';
 import ManualTrigger from './ManualTrigger';
 
@@ -13,9 +14,15 @@ interface HeaderProps {
 }
 
 export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapsed }: HeaderProps) {
+  const { mode, setMode } = useColorScheme();
+  const [mounted, setMounted] = React.useState(false);
   const headerRef = useRef<HTMLDivElement>(null);
   const logoRef = useRef<HTMLDivElement>(null);
   const statusRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -69,31 +76,35 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
     >
       <Stack direction="row" spacing={3} alignItems="center">
         {onOpenSidebar && (
-          <IconButton
-            variant="soft"
-            color="neutral"
-            onClick={onOpenSidebar}
-            sx={{ display: { xs: 'flex', md: 'none' }, borderRadius: '12px' }}
-          >
-            <Menu />
-          </IconButton>
+          <Tooltip title="Menu" placement="bottom">
+            <IconButton
+              variant="soft"
+              color="neutral"
+              onClick={onOpenSidebar}
+              sx={{ display: { xs: 'flex', md: 'none' }, borderRadius: '12px' }}
+            >
+              <Menu />
+            </IconButton>
+          </Tooltip>
         )}
         
         <Stack direction="row" spacing={2.5} alignItems="center">
-          <IconButton
-            variant="plain"
-            color="neutral"
-            onClick={onToggleSidebar}
-            sx={{ 
-              display: { xs: 'none', md: 'flex' },
-              borderRadius: '12px',
-              transition: 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-              transform: sidebarCollapsed ? 'rotate(180deg)' : 'rotate(0deg)',
-              '&:hover': { bgcolor: 'rgba(0,0,0,0.04)' }
-            }}
-          >
-            <Menu size={20} />
-          </IconButton>
+          <Tooltip title={sidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"} placement="bottom">
+            <IconButton
+              variant="plain"
+              color="neutral"
+              onClick={onToggleSidebar}
+              sx={{ 
+                display: { xs: 'none', md: 'flex' },
+                borderRadius: '12px',
+                transition: 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+                transform: sidebarCollapsed ? 'rotate(180deg)' : 'rotate(0deg)',
+                '&:hover': { bgcolor: 'rgba(0,0,0,0.04)' }
+              }}
+            >
+              <Menu size={20} />
+            </IconButton>
+          </Tooltip>
 
           <Box 
             ref={logoRef}
@@ -168,28 +179,46 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
         <ManualTrigger />
         
         <Box sx={{ display: { xs: 'none', md: 'flex' }, gap: 1.5, alignItems: 'center' }}>
-          <IconButton 
-            variant="plain" 
-            color="neutral"
-            sx={{ 
-              borderRadius: '12px',
-              '&:hover': { bgcolor: 'rgba(0,0,0,0.04)', transform: 'scale(1.05)' },
-              transition: 'all 0.2s'
-            }}
-          >
-            <Bell size={22} />
-          </IconButton>
-          <IconButton 
-            variant="plain" 
-            color="neutral"
-            sx={{ 
-              borderRadius: '12px',
-              '&:hover': { bgcolor: 'rgba(0,0,0,0.04)', transform: 'scale(1.05)' },
-              transition: 'all 0.2s'
-            }}
-          >
-            <Settings size={22} />
-          </IconButton>
+          <Tooltip title="Notifications" placement="bottom">
+            <IconButton 
+              variant="plain" 
+              color="neutral"
+              sx={{ 
+                borderRadius: '12px',
+                '&:hover': { bgcolor: 'rgba(0,0,0,0.04)', transform: 'scale(1.05)' },
+                transition: 'all 0.2s'
+              }}
+            >
+              <Bell size={22} />
+            </IconButton>
+          </Tooltip>
+          <Tooltip title={mounted && mode === 'dark' ? "Light Mode" : "Dark Mode"} placement="bottom">
+            <IconButton 
+              variant="plain" 
+              color="neutral"
+              onClick={() => setMode(mode === 'dark' ? 'light' : 'dark')}
+              sx={{ 
+                borderRadius: '12px',
+                '&:hover': { bgcolor: 'rgba(0,0,0,0.04)', transform: 'scale(1.05)' },
+                transition: 'all 0.2s'
+              }}
+            >
+              {mounted && mode === 'dark' ? <Sun size={22} /> : <Moon size={22} />}
+            </IconButton>
+          </Tooltip>
+          <Tooltip title="Settings" placement="bottom">
+            <IconButton 
+              variant="plain" 
+              color="neutral"
+              sx={{ 
+                borderRadius: '12px',
+                '&:hover': { bgcolor: 'rgba(0,0,0,0.04)', transform: 'scale(1.05)' },
+                transition: 'all 0.2s'
+              }}
+            >
+              <Settings size={22} />
+            </IconButton>
+          </Tooltip>
           
           <Box sx={{ width: '1px', height: '28px', bgcolor: 'rgba(0,0,0,0.08)', mx: 1 }} />
           
