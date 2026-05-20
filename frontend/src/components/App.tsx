@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { CssVarsProvider, extendTheme, CssBaseline } from '@mui/joy';
+import { CssVarsProvider, extendTheme, CssBaseline, StyledEngineProvider } from '@mui/joy';
 import {
   createRootRoute,
   createRoute,
@@ -64,9 +64,11 @@ const theme = extendTheme({
 
 export default function Dashboard() {
   return (
-    <CssVarsProvider theme={theme} defaultMode="light">
-      <CssBaseline />
-      <RouterProvider router={router} />
-    </CssVarsProvider>
+    <StyledEngineProvider injectFirst>
+      <CssVarsProvider theme={theme} defaultMode="light">
+        <CssBaseline />
+        <RouterProvider router={router} />
+      </CssVarsProvider>
+    </StyledEngineProvider>
   );
 }
