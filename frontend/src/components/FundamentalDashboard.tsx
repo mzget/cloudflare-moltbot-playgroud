@@ -14,7 +14,7 @@ const DEFAULT_VISIBLE: Array<keyof CompanyStats> = ALL_COLUMNS.map(c => c.id);
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function MarketIntelligenceTable() {
+export default function FundametalDashboard() {
   const [data, setData] = React.useState<CompanyStats[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [visibleColumnIds, setVisibleColumnIds] =
@@ -127,13 +127,15 @@ export default function MarketIntelligenceTable() {
 
       {/* ── Stats table card ──────────────────────────────────── */}
       <Sheet sx={{ ...glassStyle, p: { xs: 2, md: 3 }, overflow: 'hidden' }}>
-        {/* Toolbar */}
-        <CompanyStatsToolbar
-          visibleColumnIds={visibleColumnIds}
-          onToggleColumn={handleToggleColumn}
-          scale={scale}
-          onScaleChange={setScale}
-        />
+        {/* Toolbar with controls and actions */}
+        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+          <CompanyStatsToolbar
+            visibleColumnIds={visibleColumnIds}
+            onToggleColumn={handleToggleColumn}
+            scale={scale}
+            onScaleChange={setScale}
+          />
+        </Stack>
 
         <Divider sx={{ mb: 2, opacity: 0.1 }} />
 

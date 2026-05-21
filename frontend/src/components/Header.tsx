@@ -3,7 +3,6 @@ import { Box, Typography, Stack, Sheet, IconButton, Tooltip } from '@mui/joy';
 import { Newspaper, Bell, Settings, User, Menu, Moon, Sun } from 'lucide-react';
 import { useColorScheme } from '@mui/joy/styles';
 import gsap from 'gsap';
-import ManualTrigger from './ManualTrigger';
 
 import { glassStyle } from '../styles/glass';
 
@@ -174,8 +173,6 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
       </Stack>
 
       <Stack direction="row" spacing={2} alignItems="center">
-        <ManualTrigger />
-        
         <Box sx={{ display: { xs: 'none', md: 'flex' }, gap: 1.5, alignItems: 'center' }}>
           <Tooltip title="Notifications" placement="bottom">
             <IconButton 

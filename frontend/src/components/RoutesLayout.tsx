@@ -7,13 +7,13 @@ import Sidebar from './Sidebar';
 import SourceManager from './SourceManager';
 import Watchlist from './Watchlist';
 import KnowledgeChat from './KnowledgeChat';
-import MarketIntelligenceTable from './MarketIntelligenceTable';
+import FundametalDashboard from './FundamentalDashboard';
 import IntelligenceFeed from './IntelligenceFeed';
 import { glassStyle } from '../styles/glass';
 import { API_BASE_URL } from '../config';
 import MarketEventsTimeline from './MarketEventsTimeline';
 
-export default function DashboardLayout() {
+export default function RoutesLayout() {
   const { tab: activeTab } = useSearch({ from: '/' });
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(true);
@@ -84,7 +84,7 @@ export default function DashboardLayout() {
 
         {/* Main Content Container */}
         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-          {activeTab === 'dashboard' && <MarketIntelligenceTable />}
+          {activeTab === 'dashboard' && <FundametalDashboard />}
           {activeTab === 'market' && <IntelligenceFeed reports={reports} loading={loading} />}
 
           {activeTab === 'watchlist' && <Watchlist />}

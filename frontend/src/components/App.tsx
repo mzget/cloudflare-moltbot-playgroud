@@ -7,7 +7,7 @@ import {
   RouterProvider,
 } from '@tanstack/react-router';
 import { z } from 'zod';
-import DashboardLayout from './DashboardLayout';
+import RoutesLayout from './RoutesLayout';
 
 // 1. Define the Search Schema (Validation)
 const dashboardSearchSchema = z.object({
@@ -21,7 +21,7 @@ const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
   validateSearch: dashboardSearchSchema,
-  component: DashboardLayout,
+  component: RoutesLayout,
 });
 
 const routeTree = rootRoute.addChildren([indexRoute]);
