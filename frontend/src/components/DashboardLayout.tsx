@@ -11,6 +11,7 @@ import MarketIntelligenceTable from './MarketIntelligenceTable';
 import IntelligenceFeed from './IntelligenceFeed';
 import { glassStyle } from '../styles/glass';
 import { API_BASE_URL } from '../config';
+import MarketEventsTimeline from './MarketEventsTimeline';
 
 export default function DashboardLayout() {
   const { tab: activeTab } = useSearch({ from: '/' });
@@ -103,6 +104,21 @@ export default function DashboardLayout() {
             </Sheet>
           )}
         </Box>
+
+        {/* Right Sidebar Container */}
+        {activeTab === 'market' && (
+          <Box 
+            sx={{ 
+              width: { lg: '340px', xl: '380px' },
+              flexShrink: 0,
+              display: { xs: 'none', lg: 'block' }
+            }}
+          >
+            <Box sx={{ position: 'sticky', top: 24 }}>
+              <MarketEventsTimeline inSidebar />
+            </Box>
+          </Box>
+        )}
       </Box>
     </Box>
   );

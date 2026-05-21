@@ -70,9 +70,9 @@ export default function SourceManager() {
         <Typography level="h3">Intelligence Sources</Typography>
         <Button 
           variant="soft" 
+          color="primary"
           startDecorator={<Plus size={18} />}
           onClick={() => setShowForm(true)}
-          sx={{ bgcolor: 'rgba(46, 204, 113, 0.2)', color: '#2ecc71', '&:hover': { bgcolor: 'rgba(46, 204, 113, 0.3)' } }}
         >
           Add Source
         </Button>

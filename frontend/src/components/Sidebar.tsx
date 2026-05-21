@@ -48,23 +48,23 @@ export default function Sidebar({ activeTab, setActiveTab, reportsCount, collaps
                   justifyContent: collapsed ? 'center' : 'flex-start',
                   px: collapsed ? 1 : 2,
                   color: activeTab === item.id ? 'primary.plainColor' : 'text.secondary',
-                  bgcolor: activeTab === item.id ? 'rgba(46, 204, 113, 0.1)' : 'transparent',
+                  bgcolor: activeTab === item.id ? 'var(--joy-palette-primary-softBg)' : 'transparent',
                   transition: 'all 0.2s ease',
                   '&:hover': {
-                    bgcolor: 'rgba(0,0,0,0.04)',
+                    bgcolor: 'background.level1',
                     color: 'text.primary',
                   },
                   '&.Mui-selected': {
-                    borderRight: collapsed ? 'none' : '3px solid #2ecc71',
-                    borderLeft: collapsed ? '3px solid #2ecc71' : 'none',
+                    borderRight: collapsed ? 'none' : '3px solid var(--joy-palette-primary-solidBg)',
+                    borderLeft: collapsed ? '3px solid var(--joy-palette-primary-solidBg)' : 'none',
                     '&:hover': {
-                      bgcolor: 'rgba(46, 204, 113, 0.2)',
+                      bgcolor: 'var(--joy-palette-primary-softHoverBg)',
                     }
                   }
                 }}
               >
                 <ListItemDecorator sx={{ 
-                  color: activeTab === item.id ? '#2ecc71' : 'inherit',
+                  color: activeTab === item.id ? 'var(--joy-palette-primary-solidBg)' : 'inherit',
                   minInlineSize: collapsed ? 0 : '2.5rem',
                 }}>
                   {item.icon}

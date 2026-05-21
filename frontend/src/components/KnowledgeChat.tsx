@@ -69,7 +69,7 @@ export default function KnowledgeChat() {
                   part.type === 'tool-invocation' ? (
                     <Box key={i} sx={{ mt: 1, p: 1, bgcolor: 'background.surface', borderRadius: 'sm', opacity: 0.8 }}>
                       <Typography level="body-xs" color="primary">
-                        Calling: {part.toolInvocation.toolName}
+                        Calling: {(part as any).toolInvocation?.toolName}
                       </Typography>
                     </Box>
                   ) : null

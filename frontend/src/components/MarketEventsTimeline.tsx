@@ -41,7 +41,7 @@ interface MarketEvent {
   created_at: number;
 }
 
-export default function MarketEventsTimeline() {
+export default function MarketEventsTimeline({ inSidebar = false }: { inSidebar?: boolean }) {
   const [events, setEvents] = React.useState<MarketEvent[]>([]);
   const [symbols, setSymbols] = React.useState<string[]>([]);
   const [selectedSymbol, setSelectedSymbol] = React.useState<string>('ALL');
@@ -227,11 +227,13 @@ export default function MarketEventsTimeline() {
   };
 
   return (
-    <Card sx={{ ...glassStyle, p: 3 }}>
+    <Card sx={{ ...glassStyle, p: inSidebar ? 2 : 3 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-        <Stack direction="row" spacing={1.5} alignItems="center">
-          <Briefcase size={20} className="text-emerald-500" />
-          <Typography level="title-lg" sx={{ fontWeight: 700 }}>Watchlist Market Events</Typography>
+        <Stack direction="row" spacing={inSidebar ? 1 : 1.5} alignItems="center">
+          <Briefcase size={inSidebar ? 18 : 20} className="text-emerald-500" />
+          <Typography level={inSidebar ? "title-md" : "title-lg"} sx={{ fontWeight: 700 }}>
+            {inSidebar ? "Market Events" : "Watchlist Market Events"}
+          </Typography>
         </Stack>
         <Stack direction="row" spacing={1} alignItems="center">
           {fetching && (
@@ -251,13 +253,13 @@ export default function MarketEventsTimeline() {
       </Stack>
 
       {/* Filter Row */}
-      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mb: 3 }}>
+      <Stack direction={inSidebar ? 'column' : { xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mb: 3 }}>
         <Select
           placeholder="Filter by Symbol"
           value={selectedSymbol}
           onChange={(_, val) => setSelectedSymbol(val || 'ALL')}
           startDecorator={<Filter size={14} />}
-          sx={{ minWidth: 160 }}
+          sx={{ minWidth: inSidebar ? '100%' : 160, flex: 1 }}
         >
           <Option value="ALL">All Watchlist</Option>
           {symbols.map((sym) => (
@@ -270,7 +272,7 @@ export default function MarketEventsTimeline() {
           value={selectedType}
           onChange={(_, val) => setSelectedType(val || 'ALL')}
           startDecorator={<Filter size={14} />}
-          sx={{ minWidth: 180 }}
+          sx={{ minWidth: inSidebar ? '100%' : 180, flex: 1 }}
         >
           <Option value="ALL">All Events</Option>
           <Option value="news">Press Releases</Option>
@@ -292,7 +294,7 @@ export default function MarketEventsTimeline() {
         <Stack
           spacing={2}
           sx={{
-            maxHeight: 480,
+            maxHeight: inSidebar ? 'calc(100vh - 250px)' : 480,
             overflowY: 'auto',
             pr: 1,
             opacity: fetching ? 0.5 : 1,
@@ -317,14 +319,15 @@ export default function MarketEventsTimeline() {
                 sx={{
                   p: 2,
                   borderRadius: '12px',
-                  bgcolor: 'rgba(255, 255, 255, 0.4)',
-                  border: '1px solid rgba(0, 0, 0, 0.05)',
-                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.01)',
+                  bgcolor: 'background.level1',
+                  border: '1px solid',
+                  borderColor: 'divider',
+                  boxShadow: 'sm',
                   transition: 'transform 0.2s, box-shadow 0.2s',
                   '&:hover': {
                     transform: 'translateY(-2px)',
-                    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.05)',
-                    bgcolor: 'rgba(255, 255, 255, 0.6)'
+                    boxShadow: 'md',
+                    bgcolor: 'background.level2'
                   }
                 }}
               >

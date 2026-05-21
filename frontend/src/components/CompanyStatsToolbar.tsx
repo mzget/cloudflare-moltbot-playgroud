@@ -35,27 +35,6 @@ export default function CompanyStatsToolbar({
   // Hidden columns available to re-add
   const hiddenCols  = ALL_COLUMNS.filter(c => !visibleColumnIds.includes(c.id));
 
-  const chipSx = {
-    bgcolor: 'rgba(46, 204, 113, 0.1)',
-    border: '1px solid rgba(46, 204, 113, 0.25)',
-    color: '#27ae60',
-    fontWeight: 600,
-    fontSize: '0.72rem',
-    cursor: 'pointer',
-    '--Chip-decoratorChildHeight': '16px',
-    '&:hover': { bgcolor: 'rgba(46, 204, 113, 0.18)' },
-  };
-
-  const addChipSx = {
-    bgcolor: 'rgba(0,0,0,0.04)',
-    border: '1px solid rgba(0,0,0,0.1)',
-    color: 'text.secondary',
-    fontWeight: 600,
-    fontSize: '0.72rem',
-    cursor: 'pointer',
-    '&:hover': { bgcolor: 'rgba(0,0,0,0.08)', color: 'text.primary' },
-  };
-
   return (
     <Box
       sx={{
@@ -73,7 +52,8 @@ export default function CompanyStatsToolbar({
           <Chip
             key={col.id}
             size="sm"
-            sx={chipSx}
+            variant="soft"
+            color="primary"
             onClick={() => onToggleColumn(col.id)}
             endDecorator={
               <Box
@@ -84,12 +64,13 @@ export default function CompanyStatsToolbar({
                   alignItems: 'center',
                   cursor: 'pointer',
                   opacity: 0.5,
-                  '&:hover': { color: '#e74c3c', opacity: 1 },
+                  '&:hover': { color: 'danger.plainColor', opacity: 1 },
                 }}
               >
                 <X size={10} />
               </Box>
             }
+            sx={{ fontWeight: 600, fontSize: '0.72rem', cursor: 'pointer' }}
           >
             {col.label}
           </Chip>
@@ -100,8 +81,10 @@ export default function CompanyStatsToolbar({
           <Tooltip key={col.id} title={`Show ${col.label}`} placement="top" size="sm">
             <Chip
               size="sm"
-              sx={addChipSx}
+              variant="outlined"
+              color="neutral"
               onClick={() => onToggleColumn(col.id)}
+              sx={{ fontWeight: 600, fontSize: '0.72rem', cursor: 'pointer' }}
             >
               + {col.label}
             </Chip>
@@ -143,8 +126,8 @@ export default function CompanyStatsToolbar({
                 fontWeight: 700,
                 fontSize: '0.75rem',
                 color: scale === s ? 'primary.plainColor' : 'text.tertiary',
-                bgcolor: scale === s ? 'rgba(46,204,113,0.1)' : 'transparent',
-                '&:hover': { bgcolor: 'rgba(0,0,0,0.04)' },
+                bgcolor: scale === s ? 'var(--joy-palette-primary-softBg)' : 'transparent',
+                '&:hover': { bgcolor: 'background.level1' },
               }}
             >
               {s}

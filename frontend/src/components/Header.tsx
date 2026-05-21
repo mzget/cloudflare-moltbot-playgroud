@@ -218,7 +218,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
             </IconButton>
           </Tooltip>
           
-          <Box sx={{ width: '1px', height: '28px', bgcolor: 'rgba(0,0,0,0.08)', mx: 1 }} />
+          <Box sx={{ width: '1px', height: '28px', bgcolor: 'divider', mx: 1 }} />
           
           <Sheet 
             sx={{ 
@@ -229,11 +229,9 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
               py: 0.75, 
               gap: 2, 
               cursor: 'pointer',
-              border: '1px solid rgba(0,0,0,0.05)',
-              background: 'rgba(255, 255, 255, 0.5)',
               transition: 'all 0.3s ease',
               '&:hover': { 
-                bgcolor: 'rgba(255, 255, 255, 0.8)',
+                bgcolor: 'background.level1',
                 boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
                 transform: 'translateY(-1px)'
               } 
@@ -252,7 +250,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
               <User size={18} color="#10b981" />
             </Box>
             <Box>
-              <Typography level="body-sm" sx={{ fontWeight: 700, color: '#111827' }}>Operator</Typography>
+              <Typography level="body-sm" sx={{ fontWeight: 700, color: 'text.primary' }}>Operator</Typography>
               <Typography level="body-xs" sx={{ opacity: 0.5, fontWeight: 500 }}>Pro Account</Typography>
             </Box>
           </Sheet>

@@ -73,8 +73,8 @@ function formatValue(val: number | undefined, format: ColumnDef['format'], scale
 
 function valueColor(val: number | undefined): string {
   if (val === undefined || val === null) return 'text.tertiary';
-  if (val < 0) return '#e74c3c';
-  if (val > 0.15) return '#27ae60'; // Slightly darker green for light mode readability
+  if (val < 0) return 'danger.plainColor';
+  if (val > 0.15) return 'success.plainColor';
   return 'text.primary';
 }
 
@@ -157,11 +157,22 @@ export default function CompanyStatsTable({
     >
       <Table
         borderAxis="xBetween"
+        hoverRow
+        stripe="odd"
         sx={{
           '--TableCell-paddingX': '14px',
           '--TableCell-paddingY': '10px',
           tableLayout: 'auto',
           minWidth: 900,
+          '& tbody tr .sticky-td': {
+            bgcolor: 'background.surface',
+          },
+          '& tbody tr:nth-of-type(odd) .sticky-td': {
+            bgcolor: 'background.level1',
+          },
+          '& tbody tr:hover .sticky-td': {
+            bgcolor: 'background.hover',
+          },
         }}
       >
         <thead>
@@ -201,24 +212,19 @@ export default function CompanyStatsTable({
         </thead>
         <tbody>
           {sorted.map((company, idx) => (
-            <tr
-              key={company.symbol}
-              style={{
-                background: idx % 2 === 0 ? 'rgba(0,0,0,0.02)' : 'transparent',
-              }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'rgba(0,0,0,0.04)')}
-              onMouseLeave={e => (e.currentTarget.style.background = idx % 2 === 0 ? 'rgba(0,0,0,0.02)' : 'transparent')}
-            >
+            <tr key={company.symbol}>
               {/* Sticky company cell */}
-              <td style={{
-                position: 'sticky',
-                left: 0,
-                background: 'var(--joy-palette-background-surface)',
-                zIndex: 1,
-                padding: '10px 14px',
-                borderRight: '1px solid var(--joy-palette-divider)',
-                minWidth: 140,
-              }}>
+              <td
+                className="sticky-td"
+                style={{
+                  position: 'sticky',
+                  left: 0,
+                  zIndex: 1,
+                  padding: '10px 14px',
+                  borderRight: '1px solid var(--joy-palette-divider)',
+                  minWidth: 140,
+                }}
+              >
                 <Box>
                   <Typography level="title-sm" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
                     {company.symbol}
