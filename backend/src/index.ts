@@ -2,7 +2,7 @@ import puppeteer, { BrowserWorker } from '@cloudflare/puppeteer';
 import { runCrawler } from './crawler';
 import { generateDailySummary } from './summarizer';
 import { sendDailyEmailReport } from './email';
-import { fetchAndStoreMarketStats } from './marketData';
+import { fetchAndStoreMarketStats, fetchAndStoreMarketEvents } from './marketData';
 
 export interface Env {
 	DB: D1Database;
@@ -139,6 +139,81 @@ export default {
 			return new Response('Market stats update started', { headers: corsHeaders });
 		}
 
+		// API: Trigger Market Events Update Manually (Test)
+		if (url.pathname === '/api/crawl-events') {
+			ctx.waitUntil(fetchAndStoreMarketEvents(env));
+			return new Response('Market events fetch started', { headers: corsHeaders });
+		}
+
+		// API: Get Market Events
+		if (url.pathname === '/api/market-events') {
+			// Ensure table is created
+			try {
+				await env.DB.prepare(`
+					CREATE TABLE IF NOT EXISTS market_events (
+						id TEXT PRIMARY KEY,
+						symbol TEXT NOT NULL,
+						event_type TEXT NOT NULL,
+						event_date TEXT NOT NULL,
+						title TEXT NOT NULL,
+						description TEXT,
+						url TEXT,
+						metadata TEXT,
+						created_at INTEGER DEFAULT (strftime('%s', 'now'))
+					)
+				`).run();
+			} catch (e) {
+				console.error("Failed to ensure market_events table exists", e);
+			}
+
+			const symbol = url.searchParams.get('symbol');
+			const eventType = url.searchParams.get('event_type');
+			const params: any[] = [];
+
+			let query: string;
+
+			if (symbol) {
+				// Specific symbol: return up to 100 events
+				const conditions: string[] = ['symbol = ?'];
+				params.push(symbol.toUpperCase());
+				if (eventType) {
+					conditions.push('event_type = ?');
+					params.push(eventType);
+				}
+				query = `SELECT * FROM market_events WHERE ${conditions.join(' AND ')} ORDER BY event_date DESC LIMIT 100`;
+			} else {
+				// Default (all symbols): return latest 5 events per symbol via window function
+				if (eventType) {
+					params.push(eventType);
+					query = `
+						SELECT id, symbol, event_type, event_date, title, description, url, metadata, created_at
+						FROM (
+							SELECT *, ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY event_date DESC) as rn
+							FROM market_events
+							WHERE event_type = ?
+						) WHERE rn <= 5
+						ORDER BY event_date DESC
+					`;
+				} else {
+					query = `
+						SELECT id, symbol, event_type, event_date, title, description, url, metadata, created_at
+						FROM (
+							SELECT *, ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY event_date DESC) as rn
+							FROM market_events
+						) WHERE rn <= 5
+						ORDER BY event_date DESC
+					`;
+				}
+			}
+
+			try {
+				const { results } = await env.DB.prepare(query).bind(...params).all();
+				return Response.json(results, { headers: corsHeaders });
+			} catch (e) {
+				return Response.json({ error: (e as any).message }, { status: 500, headers: corsHeaders });
+			}
+		}
+
 		// API: Market Intelligence (Watchlist + Stats)
 		if (url.pathname === '/api/market-intelligence') {
 			const { results } = await env.DB.prepare(`
@@ -178,7 +253,10 @@ export default {
 			// 3. Fetch and store market stats
 			await fetchAndStoreMarketStats(env);
 
-			// 4. Send Email Report
+			// 4. Fetch and store market events
+			await fetchAndStoreMarketEvents(env).catch(e => console.error("Scheduled events fetch failed:", e));
+
+			// 5. Send Email Report
 			await sendDailyEmailReport(env);
 
 			console.log("Daily sequence completed.");
