@@ -3,6 +3,7 @@ import { Box, Typography, Sheet, Card, CardContent, Chip, Stack } from '@mui/joy
 import { TrendingUp, TrendingDown, Minus, Quote } from 'lucide-react';
 
 import { glassStyle } from '../styles/glass';
+import MarketEventsTimeline from './MarketEventsTimeline';
 
 export function DailyReportCard({ report }: { report: any }) {
   const takeaways = JSON.parse(report.key_takeaways || '[]');
@@ -51,32 +52,37 @@ export function DailyReportCard({ report }: { report: any }) {
 }
 
 export default function IntelligenceFeed({ reports, loading }: { reports: any[], loading: boolean }) {
-  if (loading) return (
-    <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-      <Typography sx={{ opacity: 0.6 }}>Analyzing market signals...</Typography>
-    </Box>
-  );
-
-  if (reports.length === 0) return (
-    <Sheet sx={{ ...glassStyle, p: 4, textAlign: 'center' }}>
-      <Typography level="h3" sx={{ mb: 1 }}>Quiet on the Horizon</Typography>
-      <Typography sx={{ color: 'text.secondary' }}>
-        No intelligence reports generated yet. Add stocks to your watchlist or news sources to start the analysis.
-      </Typography>
-    </Sheet>
-  );
-
   return (
     <Stack spacing={4}>
       <Box sx={{ mb: 2 }}>
-        <Typography level="h2" sx={{ fontWeight: 800, mb: 1 }}>Market Intelligence Dashboard</Typography>
+        <Typography level="h2" sx={{ fontWeight: 800, mb: 1 }}>Market Intelligence</Typography>
         <Typography sx={{ color: 'text.secondary' }}>
           Synthesis of recent market movements and narrative shifts.
         </Typography>
       </Box>
-      {reports.map((report) => (
-        <DailyReportCard key={report.id} report={report} />
-      ))}
+
+      <MarketEventsTimeline />
+
+      <Typography level="h3" sx={{ fontWeight: 800, mt: 2 }}>Howard's Take & Analysis</Typography>
+
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+          <Typography sx={{ opacity: 0.6 }}>Analyzing market signals...</Typography>
+        </Box>
+      ) : reports.length === 0 ? (
+        <Sheet sx={{ ...glassStyle, p: 4, textAlign: 'center' }}>
+          <Typography level="h4" sx={{ mb: 1 }}>Quiet on the Horizon</Typography>
+          <Typography sx={{ color: 'text.secondary' }}>
+            No intelligence reports generated yet. Add stocks to your watchlist or news sources to start the analysis.
+          </Typography>
+        </Sheet>
+      ) : (
+        <Stack spacing={4}>
+          {reports.map((report) => (
+            <DailyReportCard key={report.id} report={report} />
+          ))}
+        </Stack>
+      )}
     </Stack>
   );
 }

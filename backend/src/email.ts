@@ -4,9 +4,10 @@ export async function sendDailyEmailReport(env: Env) {
   console.log("Preparing daily email report...");
 
   // 1. Fetch latest reports (for today)
-  const { results: reports } = await env.DB.prepare(
+  const { results } = await env.DB.prepare(
     'SELECT * FROM daily_reports WHERE report_date = DATE("now")'
   ).all();
+  const reports = (results || []) as any[];
 
   if (reports.length === 0) {
     console.log("No reports generated today. Skipping email.");

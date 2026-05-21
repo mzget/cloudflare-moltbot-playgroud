@@ -93,7 +93,7 @@ export default function MarketIntelligenceTable() {
           <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 0.5 }}>
             <BarChart3 size={28} color="#2ecc71" />
             <Typography level="h2" sx={{ fontWeight: 700 }}>
-              Market Intelligence
+              Fundamental Dashboard
             </Typography>
           </Stack>
           <Typography level="body-md" sx={{ opacity: 0.6, pl: 0.5 }}>

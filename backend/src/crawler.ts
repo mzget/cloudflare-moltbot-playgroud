@@ -153,15 +153,15 @@ async function crawlWeb(browser: any, url: string, selector: string) {
 		console.log(`Page loaded: ${url}`);
 
 		const articles = await page.evaluate((sel: string) => {
-			const links = Array.from(document.querySelectorAll(sel));
+			const links = Array.from((globalThis as any).document.querySelectorAll(sel));
 			return links.slice(0, 8).map(link => {
-				const htmlLink = link as HTMLAnchorElement;
+				const htmlLink = link as any;
 				const titleElement = htmlLink.querySelector('h3') || htmlLink;
 				return {
 					title: titleElement.innerText.trim() || '',
 					url: htmlLink.href || ''
 				};
-			}).filter(a => a.title.length > 5 && a.url.startsWith('http'));
+			}).filter((a: any) => a.title.length > 5 && a.url.startsWith('http'));
 		}, selector);
 
 		console.log(`Found ${articles.length} articles via WEB crawl`);
