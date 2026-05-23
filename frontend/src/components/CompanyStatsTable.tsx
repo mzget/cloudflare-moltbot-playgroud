@@ -92,6 +92,7 @@ interface CompanyStatsTableProps {
   data: CompanyStats[];
   visibleColumnIds: Array<keyof CompanyStats>;
   scale: ScaleUnit;
+  density: 'compact' | 'cozy' | 'comfort';
 }
 
 // ─── Main Component ──────────────────────────────────────────────────────────
@@ -100,6 +101,7 @@ export default function CompanyStatsTable({
   data,
   visibleColumnIds,
   scale,
+  density,
 }: CompanyStatsTableProps) {
   const [sortCol, setSortCol] = React.useState<keyof CompanyStats | null>(null);
   const [sortDir, setSortDir] = React.useState<SortDir>('none');
@@ -131,13 +133,52 @@ export default function CompanyStatsTable({
     });
   }, [data, sortCol, sortDir]);
 
+  // Density-specific spacing, sizes, and layout configurations
+  const densityStyles = React.useMemo(() => {
+    const config = {
+      compact: {
+        paddingX: '8px',
+        paddingY: '5px',
+        fontSize: '0.75rem',
+        tickerTitleSize: 'body-xs' as const,
+        tickerTitleWeight: 700,
+        tickerSubSize: '10px',
+        headerSize: '0.65rem',
+        rowGap: 0.15,
+        minWidth: 120,
+      },
+      cozy: {
+        paddingX: '12px',
+        paddingY: '9px',
+        fontSize: '0.8rem',
+        tickerTitleSize: 'title-sm' as const,
+        tickerTitleWeight: 700,
+        tickerSubSize: '0.72rem',
+        headerSize: '0.7rem',
+        rowGap: 0.25,
+        minWidth: 140,
+      },
+      comfort: {
+        paddingX: '18px',
+        paddingY: '14px',
+        fontSize: '0.88rem',
+        tickerTitleSize: 'title-sm' as const,
+        tickerTitleWeight: 700,
+        tickerSubSize: '0.78rem',
+        headerSize: '0.75rem',
+        rowGap: 0.4,
+        minWidth: 160,
+      },
+    };
+    return config[density];
+  }, [density]);
+
   const thSx = {
     color: 'text.tertiary',
     fontWeight: 600,
-    fontSize: '0.7rem',
+    fontSize: densityStyles.headerSize,
     letterSpacing: '0.05em',
     textTransform: 'uppercase' as const,
-    bgcolor: 'background.surface',
     cursor: 'pointer',
     userSelect: 'none' as const,
     whiteSpace: 'nowrap' as const,
@@ -151,7 +192,7 @@ export default function CompanyStatsTable({
         overflow: 'auto',
         borderRadius: '16px',
         maxHeight: '70vh',
-        // sticky header
+        // sticky header container rules
         '& thead th': { position: 'sticky', top: 0, zIndex: 2 },
       }}
     >
@@ -160,15 +201,29 @@ export default function CompanyStatsTable({
         hoverRow
         stripe="odd"
         sx={{
-          '--TableCell-paddingX': '14px',
-          '--TableCell-paddingY': '10px',
+          '--TableCell-paddingX': densityStyles.paddingX,
+          '--TableCell-paddingY': densityStyles.paddingY,
           tableLayout: 'auto',
           minWidth: 900,
+          '& thead th': {
+            background: '#ffffff',
+            borderBottom: '2px solid var(--joy-palette-neutral-outlinedBorder, var(--joy-palette-divider))',
+            boxShadow: 'inset 0 -1px 0 var(--joy-palette-divider)',
+            '[data-joy-color-scheme="dark"] &': {
+              background: '#131313',
+            },
+          },
           '& tbody tr .sticky-td': {
-            bgcolor: 'background.surface',
+            background: '#ffffff',
+            '[data-joy-color-scheme="dark"] &': {
+              background: '#131313',
+            },
           },
           '& tbody tr:nth-of-type(odd) .sticky-td': {
-            bgcolor: 'background.level1',
+            background: '#f8fafc',
+            '[data-joy-color-scheme="dark"] &': {
+              background: '#1c1c1c',
+            },
           },
           '& tbody tr:hover .sticky-td': {
             bgcolor: 'background.hover',
@@ -181,14 +236,14 @@ export default function CompanyStatsTable({
             <th style={{
               color: 'var(--joy-palette-text-tertiary)',
               fontWeight: 600,
-              fontSize: '0.7rem',
+              fontSize: densityStyles.headerSize,
               letterSpacing: '0.05em',
               textTransform: 'uppercase',
-              background: 'var(--joy-palette-background-surface)',
               position: 'sticky',
               left: 0,
               zIndex: 3,
               whiteSpace: 'nowrap',
+              minWidth: densityStyles.minWidth,
             }}>
               Ticker
             </th>
@@ -199,7 +254,6 @@ export default function CompanyStatsTable({
                 onClick={() => handleSort(col.id)}
                 style={{
                   textAlign: 'right',
-                  background: 'var(--joy-palette-background-surface)',
                 }}
               >
                 <Box sx={{ ...thSx, display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
@@ -220,16 +274,30 @@ export default function CompanyStatsTable({
                   position: 'sticky',
                   left: 0,
                   zIndex: 1,
-                  padding: '10px 14px',
+                  padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`,
                   borderRight: '1px solid var(--joy-palette-divider)',
-                  minWidth: 140,
+                  minWidth: densityStyles.minWidth,
                 }}
               >
                 <Box>
-                  <Typography level="title-sm" sx={{ fontWeight: 700, lineHeight: 1.2 }}>
+                  <Typography
+                    level={densityStyles.tickerTitleSize}
+                    sx={{
+                      fontWeight: densityStyles.tickerTitleWeight,
+                      lineHeight: 1.2,
+                      fontSize: density === 'compact' ? '0.75rem' : undefined
+                    }}
+                  >
                     {company.symbol}
                   </Typography>
-                  <Typography level="body-xs" sx={{ opacity: 0.5, mt: 0.25 }}>
+                  <Typography
+                    level="body-xs"
+                    sx={{
+                      opacity: 0.5,
+                      mt: densityStyles.rowGap,
+                      fontSize: densityStyles.tickerSubSize
+                    }}
+                  >
                     {company.name.split(' ').slice(0, 2).join(' ')}
                   </Typography>
                 </Box>
@@ -239,10 +307,21 @@ export default function CompanyStatsTable({
                 const rawVal = company[col.id] as number | undefined;
                 const color = col.format !== 'ratio' ? valueColor(rawVal) : 'text.primary';
                 return (
-                  <td key={col.id} style={{ textAlign: 'right', padding: '10px 14px' }}>
+                  <td
+                    key={col.id}
+                    style={{
+                      textAlign: 'right',
+                      padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`
+                    }}
+                  >
                     <Typography
-                      level="body-sm"
-                      sx={{ color, fontVariantNumeric: 'tabular-nums', fontWeight: 500 }}
+                      level={density === 'compact' ? 'body-xs' : density === 'comfort' ? 'body-md' : 'body-sm'}
+                      sx={{
+                        color,
+                        fontVariantNumeric: 'tabular-nums',
+                        fontWeight: 500,
+                        fontSize: densityStyles.fontSize,
+                      }}
                     >
                       {formatValue(rawVal, col.format, scale)}
                     </Typography>

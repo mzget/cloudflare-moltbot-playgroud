@@ -3,8 +3,8 @@ import { Box, Sheet, Typography, Stack, Chip, Divider } from '@mui/joy';
 import { BarChart3, TrendingUp } from 'lucide-react';
 import CompanyStatsTable, { ALL_COLUMNS } from './CompanyStatsTable';
 import CompanyStatsToolbar from './CompanyStatsToolbar';
+import type { DensityMode } from './CompanyStatsToolbar';
 import { API_BASE_URL } from '../config';
-import type { ScaleUnit } from './CompanyStatsTable';
 import type { CompanyStats } from '../types/companyStats';
 import { glassStyle } from '../styles/glass';
 
@@ -25,12 +25,14 @@ export default function FundametalDashboard() {
       }
       return DEFAULT_VISIBLE;
     });
-  const [scale, setScale] = React.useState<ScaleUnit>(() => {
+  const [density, setDensity] = React.useState<DensityMode>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('table_scale');
-      if (saved) return saved as ScaleUnit;
+      const saved = localStorage.getItem('table_density');
+      if (saved && ['compact', 'cozy', 'comfort'].includes(saved)) {
+        return saved as DensityMode;
+      }
     }
-    return 'B';
+    return 'cozy';
   });
 
   React.useEffect(() => {
@@ -61,8 +63,8 @@ export default function FundametalDashboard() {
   }, [visibleColumnIds]);
 
   React.useEffect(() => {
-    localStorage.setItem('table_scale', scale);
-  }, [scale]);
+    localStorage.setItem('table_density', density);
+  }, [density]);
 
   // Toggle a column on / off while preserving original column order
   const handleToggleColumn = (id: keyof CompanyStats) => {
@@ -132,8 +134,8 @@ export default function FundametalDashboard() {
           <CompanyStatsToolbar
             visibleColumnIds={visibleColumnIds}
             onToggleColumn={handleToggleColumn}
-            scale={scale}
-            onScaleChange={setScale}
+            density={density}
+            onDensityChange={setDensity}
           />
         </Stack>
 
@@ -156,7 +158,8 @@ export default function FundametalDashboard() {
           <CompanyStatsTable
             data={data}
             visibleColumnIds={visibleColumnIds}
-            scale={scale}
+            scale="B"
+            density={density}
           />
         )}
       </Sheet>
