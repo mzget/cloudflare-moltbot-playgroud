@@ -44,8 +44,29 @@ export default function RoutesLayout() {
 
   React.useEffect(() => {
     fetchReports();
-    const interval = setInterval(fetchReports, 30000); // Poll every 30s
-    return () => clearInterval(interval);
+
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        fetchReports();
+      }
+    }, 180000); // Poll every 3 minutes instead of 30s
+
+    const handleVisibilityChange = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        fetchReports();
+      }
+    };
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+    }
+
+    return () => {
+      clearInterval(interval);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
+    };
   }, []);
 
   return (
