@@ -38,6 +38,14 @@ export default {
 
 		// API: Get Latest Reports (One per symbol)
 		if (url.pathname === '/api/reports') {
+			if (request.method === 'DELETE') {
+				try {
+					await env.DB.prepare("DELETE FROM daily_reports WHERE created_at < datetime('now', '-3 days')").run();
+					return new Response('Purged old daily reports', { headers: corsHeaders });
+				} catch (e) {
+					return new Response(`Failed to purge daily reports: ${(e as any).message}`, { status: 500, headers: corsHeaders });
+				}
+			}
 			const { results } = await env.DB.prepare(`
 				SELECT * FROM (
 					SELECT *, ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY created_at DESC) as rn
@@ -50,6 +58,14 @@ export default {
 
 		// API: Get Latest News
 		if (url.pathname === '/api/news') {
+			if (request.method === 'DELETE') {
+				try {
+					await env.DB.prepare("DELETE FROM news WHERE created_at < strftime('%s', 'now', '-3 days')").run();
+					return new Response('Purged old news items', { headers: corsHeaders });
+				} catch (e) {
+					return new Response(`Failed to purge news: ${(e as any).message}`, { status: 500, headers: corsHeaders });
+				}
+			}
 			const { results } = await env.DB.prepare(
 				'SELECT * FROM news ORDER BY created_at DESC LIMIT 50'
 			).all();
@@ -182,6 +198,15 @@ export default {
 				console.error("Failed to ensure market_events table exists", e);
 			}
 
+			if (request.method === 'DELETE') {
+				try {
+					await env.DB.prepare("DELETE FROM market_events WHERE created_at < strftime('%s', 'now', '-30 days')").run();
+					return new Response('Purged old market events', { headers: corsHeaders });
+				} catch (e) {
+					return new Response(`Failed to purge market events: ${(e as any).message}`, { status: 500, headers: corsHeaders });
+				}
+			}
+
 			const symbol = url.searchParams.get('symbol');
 			const eventType = url.searchParams.get('event_type');
 			const params: any[] = [];
@@ -274,6 +299,21 @@ export default {
 
 			// 5. Send Email Report
 			await sendDailyEmailReport(env);
+
+			// 6. Purge old daily reports (older than 3 days)
+			console.log("Purging daily reports older than 3 days...");
+			await env.DB.prepare("DELETE FROM daily_reports WHERE created_at < datetime('now', '-3 days')").run()
+				.catch(e => console.error("Failed to purge old daily reports:", e));
+
+			// 7. Purge old market events (older than 30 days)
+			console.log("Purging market events older than 30 days...");
+			await env.DB.prepare("DELETE FROM market_events WHERE created_at < strftime('%s', 'now', '-30 days')").run()
+				.catch(e => console.error("Failed to purge old market events:", e));
+
+			// 8. Purge old news items (older than 3 days)
+			console.log("Purging news items older than 3 days...");
+			await env.DB.prepare("DELETE FROM news WHERE created_at < strftime('%s', 'now', '-3 days')").run()
+				.catch(e => console.error("Failed to purge old news:", e));
 
 			console.log("Daily sequence completed.");
 		})());

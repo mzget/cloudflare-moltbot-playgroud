@@ -30,3 +30,14 @@ CREATE TABLE news (
   url TEXT UNIQUE,
   created_at INTEGER DEFAULT (strftime('%s', 'now'))
 );
+
+DROP TABLE IF EXISTS daily_reports;
+CREATE TABLE daily_reports (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  symbol TEXT NOT NULL,
+  summary TEXT NOT NULL,
+  sentiment_score REAL,
+  key_takeaways TEXT,
+  report_date DATE DEFAULT (DATE('now')),
+  created_at DATETIME DEFAULT (CURRENT_TIMESTAMP)
+);
