@@ -59,7 +59,12 @@ export default {
 		// API: Watchlist Operations
 		if (url.pathname === '/api/watchlist') {
 			if (request.method === 'GET') {
-				const { results } = await env.DB.prepare('SELECT * FROM watchlist').all();
+				const { results } = await env.DB.prepare(`
+					SELECT w.*, 
+					       (CASE WHEN p.symbol IS NOT NULL THEN 1 ELSE 0 END) as in_portfolio
+					FROM watchlist w
+					LEFT JOIN portfolio_holdings p ON w.symbol = p.symbol
+				`).all();
 				return Response.json(results, { headers: corsHeaders });
 			}
 			if (request.method === 'POST') {
@@ -69,9 +74,20 @@ export default {
 				return new Response('Symbol added', { headers: corsHeaders });
 			}
 			if (request.method === 'PUT') {
-				const { symbol, is_active } = await request.json() as any;
-				await env.DB.prepare('UPDATE watchlist SET is_active = ? WHERE symbol = ?')
-					.bind(is_active ? 1 : 0, symbol).run();
+				const { symbol, is_active, in_portfolio } = await request.json() as any;
+				if (is_active !== undefined) {
+					await env.DB.prepare('UPDATE watchlist SET is_active = ? WHERE symbol = ?')
+						.bind(is_active ? 1 : 0, symbol).run();
+				}
+				if (in_portfolio !== undefined) {
+					if (in_portfolio) {
+						await env.DB.prepare("INSERT OR IGNORE INTO portfolio_holdings (symbol, weight, thesis, category) VALUES (?, 0.0, 'Added from Watchlist', 'Stock')")
+							.bind(symbol).run();
+					} else {
+						await env.DB.prepare('DELETE FROM portfolio_holdings WHERE symbol = ?')
+							.bind(symbol).run();
+					}
+				}
 				return new Response('Symbol updated', { headers: corsHeaders });
 			}
 			if (request.method === 'DELETE') {
