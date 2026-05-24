@@ -2,7 +2,8 @@ import puppeteer, { BrowserWorker } from '@cloudflare/puppeteer';
 import { runCrawler } from './crawler';
 import { generateDailySummary } from './summarizer';
 import { sendDailyEmailReport } from './email';
-import { fetchAndStoreMarketStats, fetchAndStoreMarketEvents } from './marketData';
+import { fetchAndStoreMarketStats } from './marketData';
+import { fetchAndStoreMarketEvents } from './marketEvents';
 
 export interface Env {
 	DB: D1Database;
