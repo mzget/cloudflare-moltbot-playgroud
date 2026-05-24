@@ -71,10 +71,81 @@ function formatValue(val: number | undefined, format: ColumnDef['format'], scale
 
 // ─── Value coloring ──────────────────────────────────────────────────────────
 
-function valueColor(val: number | undefined): string {
+function getCellColor(val: number | undefined, col: ColumnDef): string {
   if (val === undefined || val === null) return 'text.tertiary';
-  if (val < 0) return 'danger.plainColor';
-  if (val > 0.15) return 'success.plainColor';
+
+  // 1. Leverage & Cash Position Columns
+  if (col.id === 'debt_equity') {
+    if (val < 0 || val >= 1.0) return 'danger.plainColor';
+    if (val < 0.5) return 'success.plainColor';
+    return 'text.primary';
+  }
+  if (col.id === 'net_debt') {
+    if (val < 0) return 'success.plainColor'; // Net cash position is positive
+    return 'text.primary';
+  }
+
+  // 2. Margin Columns
+  if (col.id === 'gross_profit_margin') {
+    if (val < 0.20) return 'danger.plainColor'; // Low gross margin
+    if (val >= 0.40) return 'success.plainColor'; // High gross margin
+    return 'text.primary';
+  }
+  if (col.id === 'operating_margin') {
+    if (val < 0.05) return 'danger.plainColor'; // Weak operational margin
+    if (val >= 0.15) return 'success.plainColor'; // Strong operational margin
+    return 'text.primary';
+  }
+  if (col.id === 'fcf_margin') {
+    if (val < 0) return 'danger.plainColor'; // Cash burning margin
+    if (val >= 0.10) return 'success.plainColor'; // Strong free cash flow margin
+    return 'text.primary';
+  }
+
+  // 3. Growth & CAGR Columns
+  if (col.id === 'revenue_3y_cagr' || col.id === 'revenue_5y_cagr' || col.id === 'revenue_1y_growth') {
+    if (val < 0) return 'danger.plainColor'; // Negative growth
+    if (val >= 0.15) return 'success.plainColor'; // High growth (15%+)
+    return 'text.primary';
+  }
+
+  // 4. R&D & Dividend Columns
+  if (col.id === 'rd_to_revenue') {
+    if (val < 0) return 'danger.plainColor';
+    if (val >= 0.15) return 'success.plainColor'; // Significant R&D investment
+    return 'text.primary';
+  }
+  if (col.id === 'dividend_yield') {
+    if (val < 0 || val >= 0.08) return 'danger.plainColor'; // Yield trap warning (>= 8%) or negative
+    if (val >= 0.01 && val < 0.05) return 'success.plainColor'; // Healthy target yield range
+    return 'text.primary';
+  }
+
+  // 5. CapEx to OCF (ratio format)
+  if (col.id === 'capex_to_ocf') {
+    if (val < 0 || val >= 0.6) return 'danger.plainColor'; // High capital intensity or negative OCF
+    if (val < 0.2) return 'success.plainColor'; // Highly capital efficient / asset-light
+    return 'text.primary';
+  }
+
+  // 6. Absolute Currency Metrics - keep neutral to avoid coloring the whole table green
+  if (col.format === 'currency') {
+    return 'text.primary';
+  }
+
+  // 7. General Ratios (P/E, EV/EBIT, EV/Sales, etc.)
+  if (col.format === 'ratio') {
+    if (val < 0) return 'danger.plainColor';
+    return 'text.primary';
+  }
+
+  // Fallback for any other percentage columns
+  if (col.format === 'pct' || col.format === 'pct2') {
+    if (val < 0) return 'danger.plainColor';
+    if (val > 0.15) return 'success.plainColor';
+    return 'text.primary';
+  }
+
   return 'text.primary';
 }
 
@@ -305,7 +376,7 @@ export default function CompanyStatsTable({
 
               {visibleCols.map(col => {
                 const rawVal = company[col.id] as number | undefined;
-                const color = col.format !== 'ratio' ? valueColor(rawVal) : 'text.primary';
+                const color = getCellColor(rawVal, col);
                 return (
                   <td
                     key={col.id}
