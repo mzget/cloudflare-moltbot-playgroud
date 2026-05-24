@@ -7,11 +7,12 @@ interface FinnhubResponse {
 	series?: Record<string, any>;
 }
 
-export async function fetchAndStoreMarketStats(env: Env): Promise<void> {
+export async function fetchAndStoreMarketStats(env: Env): Promise<{ symbol: string, success: boolean, error?: string }[]> {
 	const apiKey = env.FINNHUB_API_KEY;
+	const runResults: { symbol: string, success: boolean, error?: string }[] = [];
 	if (!apiKey) {
 		console.warn('FINNHUB_API_KEY is not set. Skipping market stats update.');
-		return;
+		return runResults;
 	}
 
 	let results: any[] = [];
@@ -27,9 +28,9 @@ export async function fetchAndStoreMarketStats(env: Env): Promise<void> {
 		results = dbResults.results || [];
 	} catch (e) {
 		console.error("D1 Query failed. Is 'market_stats' table created in remote?", e);
-		return;
+		return runResults;
 	}
-	if (results.length === 0) return;
+	if (results.length === 0) return runResults;
 
 	const fetchFinnhub = async (symbol: string) => {
 		const url = `https://finnhub.io/api/v1/stock/metric?symbol=${symbol}&metric=all&token=${apiKey}`;
@@ -41,6 +42,7 @@ export async function fetchAndStoreMarketStats(env: Env): Promise<void> {
 		} catch (e) {
 			console.error(`Finnhub fetch failed for ${symbol}:`, e);
 		}
+
 		return null;
 	};
 
@@ -135,7 +137,11 @@ export async function fetchAndStoreMarketStats(env: Env): Promise<void> {
 
 				// Specific Metrics
 				rd_to_revenue = m.researchAndDevelopmentToRevenueTTM ? m.researchAndDevelopmentToRevenueTTM / 100 : null;
-				capex_to_ocf = m.capexToOperatingCashFlowTTM ? m.capexToOperatingCashFlowTTM / 100 : null;
+				if (p_ocf !== null && p_fcf !== null && p_fcf !== 0) {
+					capex_to_ocf = 1 - (p_ocf / p_fcf);
+				} else {
+					capex_to_ocf = m.capexToOperatingCashFlowTTM ? m.capexToOperatingCashFlowTTM / 100 : null;
+				}
 			}
 
 			// Log the data for debugging
@@ -183,10 +189,13 @@ export async function fetchAndStoreMarketStats(env: Env): Promise<void> {
 				p_e, fcf_margin, total_cash, net_debt, total_debt, dividend_yield
 			).run();
 
+			runResults.push({ symbol, success: true });
 		} catch (error) {
 			console.error(`Error processing stats for ${symbol}:`, error);
+			runResults.push({ symbol, success: false, error: (error as any).message });
 		}
 	}
+	return runResults;
 }
 
 export async function fetchAndStoreMarketEvents(env: Env): Promise<void> {
