@@ -16,10 +16,11 @@ export type SortDir = 'asc' | 'desc' | 'none';
 export interface ColumnDef {
   id: keyof CompanyStats;
   label: string;
-  format: 'currency' | 'pct' | 'ratio' | 'pct2' | 'ratio2';
+  format: 'currency' | 'pct' | 'ratio' | 'pct2' | 'ratio2' | 'price';
 }
 
 export const ALL_COLUMNS: ColumnDef[] = [
+  { id: 'price', label: 'Price', format: 'price' },
   { id: 'market_cap', label: 'Market Cap', format: 'currency' },
   { id: 'revenues', label: 'Revenues', format: 'currency' },
   { id: 'revenue_3y_cagr', label: 'Rev 3Y CAGR', format: 'pct' },
@@ -48,6 +49,9 @@ const SCALE: Record<ScaleUnit, number> = { K: 1e3, M: 1e6, B: 1e9 };
 
 function formatValue(val: number | undefined, format: ColumnDef['format'], scale: ScaleUnit): string {
   if (val === undefined || val === null) return '—';
+  if (format === 'price') {
+    return `$${val.toFixed(2)}`;
+  }
   if (format === 'currency') {
     // Database stores currency values (like market cap) in millions
     const trueValue = val * 1e6;

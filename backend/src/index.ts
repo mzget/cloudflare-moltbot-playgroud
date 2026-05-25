@@ -4,6 +4,7 @@ import { generateDailySummary } from './summarizer';
 import { sendDailyEmailReport } from './email';
 import { fetchAndStoreMarketStats } from './marketData';
 import { fetchAndStoreMarketEvents } from './marketEvents';
+import { checkAlertRules } from './alerts';
 
 export interface Env {
 	DB: D1Database;
@@ -270,7 +271,8 @@ export default {
 					m.market_cap, m.revenues, m.revenue_3y_cagr, m.revenue_1y_growth, m.revenue_5y_cagr,
 					m.gross_profit_margin, m.operating_margin, m.ev_ebit, m.ev_sales,
 					m.p_ocf, m.p_fcf, m.capex_to_ocf, m.rd_to_revenue, m.debt_equity,
-					m.p_e, m.fcf_margin, m.total_cash, m.net_debt, m.total_debt, m.dividend_yield
+					m.p_e, m.fcf_margin, m.total_cash, m.net_debt, m.total_debt, m.dividend_yield,
+					m.price
 				FROM watchlist w
 				LEFT JOIN market_stats m ON w.symbol = m.symbol
 				WHERE w.is_active = 1
@@ -279,48 +281,128 @@ export default {
 			return Response.json(results, { headers: corsHeaders });
 		}
 
+		// API: Alert Rules Operations
+		if (url.pathname === '/api/alerts') {
+			if (request.method === 'GET') {
+				const symbol = url.searchParams.get('symbol');
+				let results;
+				if (symbol) {
+					results = await env.DB.prepare('SELECT * FROM alert_rules WHERE symbol = ? ORDER BY created_at DESC')
+						.bind(symbol.toUpperCase()).all();
+				} else {
+					results = await env.DB.prepare('SELECT * FROM alert_rules ORDER BY symbol ASC, created_at DESC').all();
+				}
+				return Response.json(results.results || [], { headers: corsHeaders });
+			}
+			if (request.method === 'POST') {
+				const { symbol, metric, condition_type, target_value } = await request.json() as any;
+				if (!symbol || !metric || !condition_type || target_value === undefined) {
+					return new Response('Missing required fields', { status: 400, headers: corsHeaders });
+				}
+				await env.DB.prepare(
+					'INSERT INTO alert_rules (symbol, metric, condition_type, target_value, is_active) VALUES (?, ?, ?, ?, 1)'
+				).bind(symbol.toUpperCase(), metric, condition_type, target_value).run();
+				return new Response('Alert rule created', { headers: corsHeaders });
+			}
+			if (request.method === 'PUT') {
+				const { id, is_active, target_value } = await request.json() as any;
+				if (id === undefined) {
+					return new Response('Missing rule ID', { status: 400, headers: corsHeaders });
+				}
+				if (is_active !== undefined) {
+					await env.DB.prepare('UPDATE alert_rules SET is_active = ?, last_checked_state = NULL WHERE id = ?')
+						.bind(is_active ? 1 : 0, id).run();
+				}
+				if (target_value !== undefined) {
+					await env.DB.prepare('UPDATE alert_rules SET target_value = ?, last_checked_state = NULL WHERE id = ?')
+						.bind(target_value, id).run();
+				}
+				return new Response('Alert rule updated', { headers: corsHeaders });
+			}
+			if (request.method === 'DELETE') {
+				const id = url.searchParams.get('id');
+				if (!id) {
+					return new Response('Missing rule ID', { status: 400, headers: corsHeaders });
+				}
+				await env.DB.prepare('DELETE FROM alert_rules WHERE id = ?').bind(id).run();
+				return new Response('Alert rule deleted', { headers: corsHeaders });
+			}
+		}
+
+		// API: In-App Notifications
+		if (url.pathname === '/api/notifications') {
+			if (request.method === 'GET') {
+				const { results } = await env.DB.prepare(
+					'SELECT * FROM in_app_notifications ORDER BY created_at DESC LIMIT 50'
+				).all();
+				return Response.json(results || [], { headers: corsHeaders });
+			}
+			if (request.method === 'PUT') {
+				// Mark as read
+				const body = await request.json().catch(() => ({})) as any;
+				const id = body?.id;
+				if (id) {
+					await env.DB.prepare('UPDATE in_app_notifications SET is_read = 1 WHERE id = ?').bind(id).run();
+				} else {
+					await env.DB.prepare('UPDATE in_app_notifications SET is_read = 1 WHERE is_read = 0').run();
+				}
+				return new Response('Notifications updated', { headers: corsHeaders });
+			}
+		}
+
+		// API: Trigger Alert Checks Manually (Test)
+		if (url.pathname === '/api/alerts/check-test') {
+			try {
+				const results = await checkAlertRules(env);
+				return Response.json(results, { headers: corsHeaders });
+			} catch (e) {
+				return Response.json({ error: (e as any).message }, { status: 500, headers: corsHeaders });
+			}
+		}
+
 		return new Response("Oaktree Agent Backend Running");
 	},
 
 	async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
-		console.log("Running scheduled crawl and report...");
+		console.log("Running scheduled worker tasks...");
 
 		ctx.waitUntil((async () => {
-			// 1. Run Crawler
-			await runCrawler(env);
-
-			// 2. Generate Summaries for all symbols in parallel
-			const { results } = await env.DB.prepare('SELECT symbol FROM watchlist WHERE is_active = 1').all();
-			await Promise.all(results.map(row =>
-				generateDailySummary(env, row.symbol as string)
-					.catch(e => console.error(`Scheduled summary failed for ${row.symbol}:`, e))
-			));
-
-			// 3. Fetch and store market stats
+			// 1. Hourly tasks: Update prices and stats + check alerts
 			await fetchAndStoreMarketStats(env);
+			await checkAlertRules(env);
 
-			// 4. Fetch and store market events
-			await fetchAndStoreMarketEvents(env).catch(e => console.error("Scheduled events fetch failed:", e));
+			// 2. 6-Hourly tasks: run crawler, summary, events, daily email report, purge old data
+			const hour = new Date().getUTCHours();
+			if (hour % 6 === 0) {
+				console.log("Running 6-hourly crawler and summaries sequence...");
+				
+				// Run Crawler
+				await runCrawler(env);
 
-			// 5. Send Email Report
-			await sendDailyEmailReport(env);
+				// Generate Summaries for all symbols in parallel
+				const { results } = await env.DB.prepare('SELECT symbol FROM watchlist WHERE is_active = 1').all();
+				await Promise.all(results.map(row =>
+					generateDailySummary(env, row.symbol as string)
+						.catch(e => console.error(`Scheduled summary failed for ${row.symbol}:`, e))
+				));
 
-			// 6. Purge old daily reports (older than 3 days)
-			console.log("Purging daily reports older than 3 days...");
-			await env.DB.prepare("DELETE FROM daily_reports WHERE created_at < datetime('now', '-3 days')").run()
-				.catch(e => console.error("Failed to purge old daily reports:", e));
+				// Fetch and store market events
+				await fetchAndStoreMarketEvents(env).catch(e => console.error("Scheduled events fetch failed:", e));
 
-			// 7. Purge old market events (older than 30 days)
-			console.log("Purging market events older than 30 days...");
-			await env.DB.prepare("DELETE FROM market_events WHERE created_at < strftime('%s', 'now', '-30 days')").run()
-				.catch(e => console.error("Failed to purge old market events:", e));
+				// Send Email Report
+				await sendDailyEmailReport(env);
 
-			// 8. Purge old news items (older than 3 days)
-			console.log("Purging news items older than 3 days...");
-			await env.DB.prepare("DELETE FROM news WHERE created_at < strftime('%s', 'now', '-3 days')").run()
-				.catch(e => console.error("Failed to purge old news:", e));
+				// Purges
+				console.log("Purging old data...");
+				await env.DB.prepare("DELETE FROM daily_reports WHERE created_at < datetime('now', '-3 days')").run()
+					.catch(e => console.error("Failed to purge old daily reports:", e));
+				await env.DB.prepare("DELETE FROM market_events WHERE created_at < strftime('%s', 'now', '-30 days')").run()
+					.catch(e => console.error("Failed to purge old market events:", e));
+				await env.DB.prepare("DELETE FROM news WHERE created_at < strftime('%s', 'now', '-3 days')").run()
+					.catch(e => console.error("Failed to purge old news:", e));
+			}
 
-			console.log("Daily sequence completed.");
+			console.log("Scheduled sequence completed.");
 		})());
 	},
 };

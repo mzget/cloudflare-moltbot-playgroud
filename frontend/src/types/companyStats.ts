@@ -3,6 +3,7 @@ export interface CompanyStats {
   name: string;                // "Apple Inc."
   exchange: string;            // "NasdaqGS"
   logo_url?: string;           // optional favicon/logo URL
+  price?: number;              // current share price in USD
   market_cap?: number;         // in USD
   revenues?: number;           // in USD
   revenue_3y_cagr?: number;    // decimal: 0.054 = 5.4%

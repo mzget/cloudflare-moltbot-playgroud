@@ -21,7 +21,17 @@ export default function FundametalDashboard() {
     React.useState<Array<keyof CompanyStats>>(() => {
       if (typeof window !== 'undefined') {
         const saved = localStorage.getItem('visible_columns');
-        if (saved) return JSON.parse(saved);
+        if (saved) {
+          try {
+            const parsed = JSON.parse(saved) as Array<keyof CompanyStats>;
+            if (!parsed.includes('price')) {
+              return ['price', ...parsed];
+            }
+            return parsed;
+          } catch (e) {
+            console.error("Failed to parse visible_columns", e);
+          }
+        }
       }
       return DEFAULT_VISIBLE;
     });

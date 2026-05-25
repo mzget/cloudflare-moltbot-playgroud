@@ -7,9 +7,9 @@ interface FinnhubResponse {
 	series?: Record<string, any>;
 }
 
-export async function fetchAndStoreMarketStats(env: Env): Promise<{ symbol: string, success: boolean, error?: string }[]> {
+export async function fetchAndStoreMarketStats(env: Env): Promise<{ symbol: string, success: boolean, price?: number | null, error?: string }[]> {
 	const apiKey = env.FINNHUB_API_KEY;
-	const runResults: { symbol: string, success: boolean, error?: string }[] = [];
+	const runResults: { symbol: string, success: boolean, price?: number | null, error?: string }[] = [];
 	if (!apiKey) {
 		console.warn('FINNHUB_API_KEY is not set. Skipping market stats update.');
 		return runResults;
@@ -46,6 +46,19 @@ export async function fetchAndStoreMarketStats(env: Env): Promise<{ symbol: stri
 		return null;
 	};
 
+	const fetchQuote = async (symbol: string) => {
+		const url = `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${apiKey}`;
+		try {
+			const response = await fetch(url);
+			if (response.ok) {
+				return await response.json();
+			}
+			return { error: `HTTP ${response.status} ${response.statusText}` };
+		} catch (e) {
+			return { error: (e as any).message || String(e) };
+		}
+	};
+
 	console.log(`Fetching market stats from Finnhub for ${results.length} symbols...`);
 
 	for (const row of results) {
@@ -56,13 +69,26 @@ export async function fetchAndStoreMarketStats(env: Env): Promise<{ symbol: stri
 		let gross_profit_margin = null, operating_margin = null, ev_ebit = null, ev_sales = null;
 		let p_ocf = null, p_fcf = null, capex_to_ocf = null, rd_to_revenue = null, debt_equity = null;
 		let p_e = null, fcf_margin = null, total_cash = null, net_debt = null, total_debt = null, dividend_yield = null;
+		let price = null;
+		let quoteError = null;
 
 		try {
-			const data = await fetchFinnhub(symbol) as FinnhubResponse | null;
+			const [data, quoteDataResult] = await Promise.all([
+				fetchFinnhub(symbol),
+				fetchQuote(symbol)
+			]) as [FinnhubResponse | null, any | null];
+
 			if (!data || !data.metric) {
 				throw new Error(`Failed to fetch stats from Finnhub: No data returned for ${symbol}`);
 			}
 			const m = data.metric;
+			const quoteData = quoteDataResult as any;
+			if (quoteData && quoteData.error) {
+				quoteError = quoteData.error;
+				price = null;
+			} else {
+				price = quoteData?.c ?? null;
+			}
 
 			// Basic Valuation & Stats
 			market_cap = m.marketCapitalization ?? null;
@@ -152,12 +178,7 @@ export async function fetchAndStoreMarketStats(env: Env): Promise<{ symbol: stri
 			}
 
 			// Log the data for debugging
-			// console.log(`Final stats for ${symbol}:`, {
-			// 	market_cap, revenues, revenue_3y_cagr, revenue_1y_growth,
-			// 	gross_profit_margin, operating_margin, ev_ebit, ev_sales,
-			// 	p_ocf, p_fcf, capex_to_ocf, rd_to_revenue, debt_equity,
-			// 	p_e, fcf_margin, total_cash, net_debt, dividend_yield
-			// });
+			console.log(`Final stats for ${symbol}: price=${price}, mc=${market_cap}, p_e=${p_e}`);
 
 			await env.DB.prepare(`
 				INSERT INTO market_stats (
@@ -165,8 +186,8 @@ export async function fetchAndStoreMarketStats(env: Env): Promise<{ symbol: stri
 					gross_profit_margin, operating_margin, ev_ebit, ev_sales,
 					p_ocf, p_fcf, capex_to_ocf, rd_to_revenue, debt_equity,
 					p_e, fcf_margin, total_cash, net_debt, total_debt, dividend_yield,
-					updated_at
-				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+					price, updated_at
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 				ON CONFLICT(symbol) DO UPDATE SET
 					market_cap=excluded.market_cap,
 					revenues=excluded.revenues,
@@ -188,15 +209,17 @@ export async function fetchAndStoreMarketStats(env: Env): Promise<{ symbol: stri
 					net_debt=excluded.net_debt,
 					total_debt=excluded.total_debt,
 					dividend_yield=excluded.dividend_yield,
+					price=excluded.price,
 					updated_at=CURRENT_TIMESTAMP
 			`).bind(
 				symbol, market_cap, revenues, revenue_3y_cagr, revenue_1y_growth, revenue_5y_cagr,
 				gross_profit_margin, operating_margin, ev_ebit, ev_sales,
 				p_ocf, p_fcf, capex_to_ocf, rd_to_revenue, debt_equity,
-				p_e, fcf_margin, total_cash, net_debt, total_debt, dividend_yield
+				p_e, fcf_margin, total_cash, net_debt, total_debt, dividend_yield,
+				price
 			).run();
 
-			runResults.push({ symbol, success: true });
+			runResults.push({ symbol, success: true, price, error: quoteError });
 		} catch (error) {
 			console.error(`Error processing stats for ${symbol}:`, error);
 			runResults.push({ symbol, success: false, error: (error as any).message });

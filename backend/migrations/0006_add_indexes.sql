@@ -2,7 +2,7 @@
 
 -- Indexes for news table to optimize query by symbol/time and duplicate checking
 CREATE INDEX IF NOT EXISTS idx_news_symbol_created ON news (symbol, created_at DESC);
-CREATE INDEX IF NOT EXISTS idx_news_source_url ON news (source_url);
+CREATE INDEX IF NOT EXISTS idx_news_url ON news (url);
 CREATE INDEX IF NOT EXISTS idx_news_created_at ON news (created_at DESC);
 
 -- Indexes for daily_reports table to optimize partitioned window functions

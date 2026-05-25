@@ -56,7 +56,7 @@ export async function runCrawler(env: Env) {
 
 				for (const article of articles) {
 					// Check if exists
-					const existing = await env.DB.prepare('SELECT id FROM news WHERE source_url = ?').bind(article.url).first();
+					const existing = await env.DB.prepare('SELECT id FROM news WHERE url = ?').bind(article.url).first();
 					if (existing) continue;
 
 					console.log(`Adding news for ${symbol}: ${article.title}`);
@@ -93,8 +93,8 @@ export async function runCrawler(env: Env) {
 					if (!finalSummary) finalSummary = article.title;
 
 					await env.DB.prepare(
-						'INSERT INTO news (symbol, title, summary, sentiment, source_url, published_at) VALUES (?, ?, ?, ?, ?, ?)'
-					).bind(symbol, article.title, finalSummary, null, article.url, article.date || new Date().toISOString()).run();
+						'INSERT INTO news (symbol, title, summary, sentiment, url) VALUES (?, ?, ?, ?, ?)'
+					).bind(symbol, article.title, finalSummary, null, article.url).run();
 				}
 			} catch (err) {
 				console.error(`Error crawling ${symbol} on ${provider}:`, err);

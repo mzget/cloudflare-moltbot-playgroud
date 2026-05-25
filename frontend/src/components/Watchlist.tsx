@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Box, Typography, Sheet, IconButton, Button, Input, Stack, Card, CardContent, Divider, Switch, Grid, CardActions, Avatar } from '@mui/joy';
-import { Plus, Trash2 } from 'lucide-react';
+import { Box, Typography, Sheet, IconButton, Button, Input, Stack, Card, CardContent, Divider, Switch, Grid, CardActions, Avatar, Modal, ModalDialog, DialogTitle, DialogContent, ModalClose, FormControl, FormLabel, Select, Option, FormHelperText } from '@mui/joy';
+import { Plus, Trash2, Bell } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
 interface WatchlistItem {
@@ -16,6 +16,27 @@ export default function Watchlist() {
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
   const [newSymbol, setNewSymbol] = useState('');
   const [newName, setNewName] = useState('');
+  const [marketStats, setMarketStats] = useState<any[]>([]);
+
+  // Alert Modal State
+  const [isAlertsModalOpen, setIsAlertsModalOpen] = useState(false);
+  const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
+  const [symbolRules, setSymbolRules] = useState<any[]>([]);
+  const [newRuleMetric, setNewRuleMetric] = useState('price');
+  const [newRuleCondition, setNewRuleCondition] = useState('cross_up');
+  const [newRuleTarget, setNewRuleTarget] = useState('');
+
+  const fetchMarketStats = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/market-intelligence`);
+      if (res.ok) {
+        const data = await res.json();
+        setMarketStats(data);
+      }
+    } catch (e) {
+      console.error("Failed to fetch market stats", e);
+    }
+  };
 
   const fetchWatchlist = async () => {
     try {
@@ -29,8 +50,143 @@ export default function Watchlist() {
     }
   };
 
+  const fetchRulesForSymbol = async (symbol: string) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/alerts?symbol=${symbol}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSymbolRules(data);
+      }
+    } catch (e) {
+      console.error("Failed to fetch alert rules", e);
+    }
+  };
+
+  const handleOpenAlertsModal = (symbol: string) => {
+    setSelectedSymbol(symbol);
+    fetchRulesForSymbol(symbol);
+    setNewRuleMetric('price');
+    setNewRuleCondition('cross_up');
+    setNewRuleTarget('');
+    setIsAlertsModalOpen(true);
+  };
+
+  const handleCreateRule = async () => {
+    if (!selectedSymbol || !newRuleTarget || isNaN(Number(newRuleTarget))) return;
+    
+    let targetVal = Number(newRuleTarget);
+    if (newRuleMetric === 'market_cap') {
+      // User inputs in Billions, DB stores in Millions
+      targetVal = targetVal * 1000;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/alerts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          symbol: selectedSymbol,
+          metric: newRuleMetric,
+          condition_type: newRuleCondition,
+          target_value: targetVal
+        })
+      });
+      if (res.ok) {
+        setNewRuleTarget('');
+        fetchRulesForSymbol(selectedSymbol);
+      }
+    } catch (e) {
+      console.error("Failed to create alert rule", e);
+    }
+  };
+
+  const handleToggleRule = async (ruleId: number, currentStatus: number) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/alerts`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: ruleId,
+          is_active: currentStatus === 1 ? 0 : 1
+        })
+      });
+      if (res.ok && selectedSymbol) {
+        fetchRulesForSymbol(selectedSymbol);
+      }
+    } catch (e) {
+      console.error("Failed to toggle alert rule", e);
+    }
+  };
+
+  const handleDeleteRule = async (ruleId: number) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/alerts?id=${ruleId}`, {
+        method: 'DELETE'
+      });
+      if (res.ok && selectedSymbol) {
+        fetchRulesForSymbol(selectedSymbol);
+      }
+    } catch (e) {
+      console.error("Failed to delete alert rule", e);
+    }
+  };
+
+  const formatMetricLabel = (m: string) => {
+    switch(m) {
+      case 'price': return 'Price';
+      case 'market_cap': return 'Market Cap';
+      case 'p_e': return 'P/E';
+      case 'ev_ebit': return 'EV/EBIT';
+      case 'ev_sales': return 'EV/Sales';
+      default: return m;
+    }
+  };
+
+  const formatTargetValue = (val: number, metric: string) => {
+    if (metric === 'market_cap') {
+      return `$${(val / 1000).toFixed(2)}B`;
+    }
+    if (metric === 'price') {
+      return `$${val.toFixed(2)}`;
+    }
+    return val.toFixed(2);
+  };
+
+  const formatConditionLabel = (cond: string) => {
+    return cond === 'cross_up' ? 'Crosses Up' : 'Crosses Down';
+  };
+
+  const currentSymbolStats = marketStats.find(s => s.symbol === selectedSymbol);
+
+  const getHelperTextForMetric = (metric: string) => {
+    if (!currentSymbolStats) return 'No current data available';
+    let val: number | null = null;
+    if (metric === 'price') {
+      val = currentSymbolStats.price;
+      return val !== null ? `Current Price: $${val.toFixed(2)}` : 'Current Price: N/A';
+    }
+    if (metric === 'market_cap') {
+      val = currentSymbolStats.market_cap;
+      return val !== null ? `Current Market Cap: $${(val / 1000).toFixed(2)}B` : 'Current Market Cap: N/A';
+    }
+    if (metric === 'p_e') {
+      val = currentSymbolStats.p_e;
+      return val !== null ? `Current P/E: ${val.toFixed(2)}` : 'Current P/E: N/A';
+    }
+    if (metric === 'ev_ebit') {
+      val = currentSymbolStats.ev_ebit;
+      return val !== null ? `Current EV/EBIT: ${val.toFixed(2)}` : 'Current EV/EBIT: N/A';
+    }
+    if (metric === 'ev_sales') {
+      val = currentSymbolStats.ev_sales;
+      return val !== null ? `Current EV/Sales: ${val.toFixed(2)}` : 'Current EV/Sales: N/A';
+    }
+    return '';
+  };
+
   useEffect(() => {
     fetchWatchlist();
+    fetchMarketStats();
   }, []);
 
   const handleAdd = async () => {
@@ -155,18 +311,32 @@ export default function Watchlist() {
                       <Typography level="body-sm" sx={{ opacity: 0.7, fontWeight: '500' }}>{item.name}</Typography>
                     </Box>
                   </Stack>
-                  <IconButton 
-                    color="danger" 
-                    variant="plain" 
-                    onClick={() => handleDelete(item.symbol)}
-                    sx={{ 
-                      opacity: 0.6, 
-                      transition: 'opacity 0.2s', 
-                      '&:hover': { opacity: 1, backgroundColor: 'rgba(231, 76, 60, 0.1)' } 
-                    }}
-                  >
-                    <Trash2 size={18} />
-                  </IconButton>
+                  <Stack direction="row" spacing={0.5}>
+                    <IconButton 
+                      color="neutral" 
+                      variant="plain" 
+                      onClick={() => handleOpenAlertsModal(item.symbol)}
+                      sx={{ 
+                        opacity: 0.8,
+                        transition: 'all 0.2s', 
+                        '&:hover': { opacity: 1, backgroundColor: 'rgba(0,0,0,0.05)', color: '#10b981' } 
+                      }}
+                    >
+                      <Bell size={18} />
+                    </IconButton>
+                    <IconButton 
+                      color="danger" 
+                      variant="plain" 
+                      onClick={() => handleDelete(item.symbol)}
+                      sx={{ 
+                        opacity: 0.6, 
+                        transition: 'opacity 0.2s', 
+                        '&:hover': { opacity: 1, backgroundColor: 'rgba(231, 76, 60, 0.1)' } 
+                      }}
+                    >
+                      <Trash2 size={18} />
+                    </IconButton>
+                  </Stack>
                 </Stack>
 
                 <Divider sx={{ my: 1.5, opacity: 0.15 }} />
@@ -196,6 +366,144 @@ export default function Watchlist() {
           </Grid>
         ))}
       </Grid>
+
+      {/* Alert Rules Manager Modal */}
+      <Modal open={isAlertsModalOpen} onClose={() => setIsAlertsModalOpen(false)}>
+        <ModalDialog
+          sx={{
+            ...glassStyle,
+            minWidth: { xs: '90%', sm: 480 },
+            maxWidth: 500,
+            borderRadius: '20px',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.3)',
+            p: 3,
+          }}
+        >
+          <ModalClose />
+          <DialogTitle sx={{ fontWeight: 800, fontSize: '1.4rem', letterSpacing: '-0.02em', mb: 1 }}>
+            Alert Manager: {selectedSymbol}
+          </DialogTitle>
+          <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {/* Create Rule Form */}
+            <Box sx={{ p: 2, borderRadius: '12px', border: '1px solid', borderColor: 'divider', bgcolor: 'rgba(0,0,0,0.02)' }}>
+              <Typography level="title-sm" sx={{ mb: 1.5, fontWeight: 700 }}>Create New Alert</Typography>
+              <Stack spacing={2}>
+                <Stack direction="row" spacing={1.5}>
+                  <FormControl sx={{ flex: 1 }}>
+                    <FormLabel sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Metric</FormLabel>
+                    <Select
+                      value={newRuleMetric}
+                      onChange={(_, val) => setNewRuleMetric(val || 'price')}
+                      size="sm"
+                    >
+                      <Option value="price">Price ($)</Option>
+                      <Option value="market_cap">Market Cap ($B)</Option>
+                      <Option value="p_e">P/E Ratio</Option>
+                      <Option value="ev_ebit">EV/EBIT</Option>
+                      <Option value="ev_sales">EV/Sales</Option>
+                    </Select>
+                  </FormControl>
+
+                  <FormControl sx={{ flex: 1 }}>
+                    <FormLabel sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Condition</FormLabel>
+                    <Select
+                      value={newRuleCondition}
+                      onChange={(_, val) => setNewRuleCondition(val || 'cross_up')}
+                      size="sm"
+                    >
+                      <Option value="cross_up">Crosses Up</Option>
+                      <Option value="cross_down">Crosses Down</Option>
+                    </Select>
+                  </FormControl>
+                </Stack>
+
+                <FormControl>
+                  <FormLabel sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Target Value</FormLabel>
+                  <Stack direction="row" spacing={1}>
+                    <Input
+                      type="number"
+                      placeholder="e.g. 150"
+                      value={newRuleTarget}
+                      onChange={e => setNewRuleTarget(e.target.value)}
+                      size="sm"
+                      sx={{ flex: 1 }}
+                    />
+                    <Button
+                      variant="solid"
+                      color="success"
+                      onClick={handleCreateRule}
+                      size="sm"
+                    >
+                      Add
+                    </Button>
+                  </Stack>
+                  <FormHelperText sx={{ fontSize: '0.72rem', color: 'text.secondary', fontWeight: 500, mt: 0.5 }}>
+                    {getHelperTextForMetric(newRuleMetric)}
+                  </FormHelperText>
+                </FormControl>
+              </Stack>
+            </Box>
+
+            {/* Existing Rules List */}
+            <Box>
+              <Typography level="title-sm" sx={{ mb: 1.5, fontWeight: 700 }}>Active Rules</Typography>
+              {symbolRules.length === 0 ? (
+                <Typography level="body-sm" sx={{ color: 'text.tertiary', fontStyle: 'italic', textAlign: 'center', py: 2 }}>
+                  No alert rules set for this symbol.
+                </Typography>
+              ) : (
+                <Stack spacing={1} sx={{ maxHeight: 200, overflowY: 'auto', pr: 0.5 }}>
+                  {symbolRules.map(rule => (
+                    <Box
+                      key={rule.id}
+                      sx={{
+                        p: 1.5,
+                        borderRadius: '10px',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        bgcolor: rule.is_active ? 'transparent' : 'rgba(0,0,0,0.02)',
+                        opacity: rule.is_active ? 1 : 0.7
+                      }}
+                    >
+                      <Box>
+                        <Typography level="body-sm" sx={{ fontWeight: 600 }}>
+                          {formatMetricLabel(rule.metric)} {formatConditionLabel(rule.condition_type)} {formatTargetValue(rule.target_value, rule.metric)}
+                        </Typography>
+                        {rule.last_checked_value !== null && (
+                          <Typography level="body-xs" sx={{ color: 'text.tertiary', mt: 0.25 }}>
+                            Last Checked: {formatTargetValue(rule.last_checked_value, rule.metric)}
+                          </Typography>
+                        )}
+                      </Box>
+                      <Stack direction="row" spacing={1.5} alignItems="center">
+                        <Switch
+                          size="sm"
+                          checked={rule.is_active === 1}
+                          onChange={() => handleToggleRule(rule.id, rule.is_active)}
+                          color={rule.is_active === 1 ? 'success' : 'neutral'}
+                        />
+                        <IconButton
+                          size="sm"
+                          color="danger"
+                          variant="plain"
+                          onClick={() => handleDeleteRule(rule.id)}
+                          sx={{ '&:hover': { bgcolor: 'rgba(231, 76, 60, 0.1)' } }}
+                        >
+                          <Trash2 size={16} />
+                        </IconButton>
+                      </Stack>
+                    </Box>
+                  ))}
+                </Stack>
+              )}
+            </Box>
+          </DialogContent>
+        </ModalDialog>
+      </Modal>
     </Box>
   );
 }
