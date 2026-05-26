@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Box, Typography, Sheet, IconButton, Button, Input, Stack, Card, CardContent, Divider, Switch, Grid, CardActions, Avatar, Modal, ModalDialog, DialogTitle, DialogContent, ModalClose, FormControl, FormLabel, Select, Option, FormHelperText } from '@mui/joy';
 import { Plus, Trash2, Bell } from 'lucide-react';
 import { API_BASE_URL } from '../config';
@@ -17,6 +17,48 @@ export default function Watchlist() {
   const [newSymbol, setNewSymbol] = useState('');
   const [newName, setNewName] = useState('');
   const [marketStats, setMarketStats] = useState<any[]>([]);
+  const [sortBy, setSortBy] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('watchlist_sort_by');
+      if (saved && ['symbol', 'symbol-desc', 'name', 'in_portfolio', 'is_active'].includes(saved)) {
+        return saved;
+      }
+    }
+    return 'symbol';
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('watchlist_sort_by', sortBy);
+    }
+  }, [sortBy]);
+
+  const sortedWatchlist = useMemo(() => {
+    return [...watchlist].sort((a, b) => {
+      if (sortBy === 'symbol') {
+        return a.symbol.localeCompare(b.symbol);
+      }
+      if (sortBy === 'symbol-desc') {
+        return b.symbol.localeCompare(a.symbol);
+      }
+      if (sortBy === 'name') {
+        return a.name.localeCompare(b.name);
+      }
+      if (sortBy === 'in_portfolio') {
+        if (a.in_portfolio !== b.in_portfolio) {
+          return b.in_portfolio - a.in_portfolio; // In Portfolio (1) first
+        }
+        return a.symbol.localeCompare(b.symbol);
+      }
+      if (sortBy === 'is_active') {
+        if (a.is_active !== b.is_active) {
+          return b.is_active - a.is_active; // Active (1) first
+        }
+        return a.symbol.localeCompare(b.symbol);
+      }
+      return 0;
+    });
+  }, [watchlist, sortBy]);
 
   // Alert Modal State
   const [isAlertsModalOpen, setIsAlertsModalOpen] = useState(false);
@@ -272,8 +314,45 @@ export default function Watchlist() {
         </Stack>
       </Sheet>
 
+      <Stack 
+        direction={{ xs: 'column', sm: 'row' }} 
+        justifyContent="space-between" 
+        alignItems={{ xs: 'flex-start', sm: 'center' }} 
+        spacing={2}
+        sx={{ mb: 3 }}
+      >
+        <Typography level="title-md" sx={{ opacity: 0.6 }}>
+          {watchlist.length} {watchlist.length === 1 ? 'Security' : 'Securities'}
+        </Typography>
+        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ width: { xs: '100%', sm: 'auto' } }}>
+          <Typography level="body-sm" sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>Sort By:</Typography>
+          <Select
+            value={sortBy}
+            onChange={(_, val) => setSortBy(val || 'symbol')}
+            size="sm"
+            sx={{ 
+              minWidth: 180, 
+              flex: { xs: 1, sm: 'none' },
+              ...glassStyle,
+              backgroundColor: 'rgba(255, 255, 255, 0.05)',
+              border: '1px solid rgba(255, 255, 255, 0.1)',
+              '&:hover': {
+                backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                borderColor: 'rgba(255, 255, 255, 0.15)'
+              }
+            }}
+          >
+            <Option value="symbol">Symbol (A-Z)</Option>
+            <Option value="symbol-desc">Symbol (Z-A)</Option>
+            <Option value="name">Company Name (A-Z)</Option>
+            <Option value="in_portfolio">In Portfolio First</Option>
+            <Option value="is_active">Active First</Option>
+          </Select>
+        </Stack>
+      </Stack>
+
       <Grid container spacing={2}>
-        {watchlist.map((item) => (
+        {sortedWatchlist.map((item) => (
           <Grid key={item.symbol} xs={12} sm={12} md={4}>
             <Card 
               sx={{ 

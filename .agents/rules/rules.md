@@ -16,15 +16,22 @@ For all tasks, code changes, and analysis in this repository, you **MUST** load 
    - **Description**: Behavioral guidelines to reduce common AI coding mistakes.
    - **Key Requirement**: Adhere to Simplicity First (minimum code), Surgical Changes (only touch what is necessary), and Goal-Driven Execution.
 
+3. **Antigravity UI & Motion Design Expert**:
+   - **File Path**: [SKILL.md](file:///c:/Users/natta/Documents/oaktree-agent/.agents/skills/@antigravity-design-expert/SKILL.md)
+   - **Description**: Core UI/UX engineering skill for building highly interactive, spatial, weightless, and glassmorphism-based web interfaces.
+   - **Key Requirement**: Apply weightlessness (layered soft drop-shadows), spatial depth, glassmorphism (translucency, background blur), and smooth motion design. Adapt these principles to the project's stack constraints (do not use Tailwind or Next.js).
+
 ---
 
 ## Guidelines for execution
 
 ### 1. Verification of Skills
-- Read the instructions in both skill files above before proposing any changes or modifications to the code.
-- Align code designs with the Cloudflare wrangler specifications and the simplified architecture guidelines from Andrej Karpathy.
+- Read the instructions in all three skill files above before proposing any changes or modifications to the code.
+- Align code designs with Cloudflare Wrangler specifications, the simplified architecture guidelines from Andrej Karpathy, and the Antigravity design principles.
 
-### 2. Stack Constraints
+### 2. Stack Constraints (Precedence Rule)
 - **Backend**: Cloudflare Worker running in Node.js compatibility mode.
-- **Frontend**: Astro framework UI using React.
+- **Frontend**: Astro framework UI using React with **MUI Joy UI** and **`sx` props** (no Tailwind).
+- **Conflict Resolution**: The project stack constraints (Astro + React, MUI Joy UI, `sx` prop, and no Tailwind) **MUST** take precedence over the default stack suggested in the Antigravity UI & Motion Design Expert skill.
 - Avoid introducing unnecessary libraries or frameworks.
+

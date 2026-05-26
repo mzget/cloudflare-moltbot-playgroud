@@ -13,9 +13,9 @@ export default function Sidebar({ activeTab, setActiveTab, reportsCount, collaps
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
     { id: 'market', label: 'Market Intelligence', icon: <BarChart3 size={20} /> },
-    { id: 'agent', label: 'Agent Chat', icon: <Bot size={20} /> },
     { id: 'watchlist', label: 'Watchlist', icon: <TrendingUp size={20} /> },
     { id: 'sources', label: 'News Sources', icon: <Search size={20} /> },
+    { id: 'agent', label: 'Agent Chat', icon: <Bot size={20} /> },
     { id: 'about', label: 'About Oaktree', icon: <Info size={20} /> },
   ];
 
