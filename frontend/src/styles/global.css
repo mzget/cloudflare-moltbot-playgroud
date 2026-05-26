@@ -69,3 +69,35 @@ body {
 .animate-float {
     animation: float 6s ease-in-out infinite;
 }
+
+@keyframes bell-ring {
+    0%, 100% {
+        transform: rotate(0);
+    }
+    5% {
+        transform: rotate(15deg);
+    }
+    10% {
+        transform: rotate(-15deg);
+    }
+    15% {
+        transform: rotate(10deg);
+    }
+    20% {
+        transform: rotate(-10deg);
+    }
+    25% {
+        transform: rotate(5deg);
+    }
+    30% {
+        transform: rotate(-5deg);
+    }
+    35% {
+        transform: rotate(0);
+    }
+}
+
+.animate-bell-ring {
+    animation: bell-ring 4s ease-in-out infinite;
+    transform-origin: top center;
+}

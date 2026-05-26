@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Box, Typography, Sheet, IconButton, Button, Input, Stack, Card, CardContent, Divider, Switch, Grid, CardActions, Avatar, Modal, ModalDialog, DialogTitle, DialogContent, ModalClose, FormControl, FormLabel, Select, Option, FormHelperText } from '@mui/joy';
+import { Box, Typography, Sheet, IconButton, Button, Input, Stack, Card, CardContent, Divider, Switch, Grid, CardActions, Avatar, Modal, ModalDialog, DialogTitle, DialogContent, ModalClose, FormControl, FormLabel, Select, Option, FormHelperText, Badge } from '@mui/joy';
 import { Plus, Trash2, Bell } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 
@@ -8,6 +8,7 @@ interface WatchlistItem {
   name: string;
   is_active: number;
   in_portfolio: number;
+  active_alerts_count?: number;
 }
 
 import { glassStyle } from '../styles/glass';
@@ -136,6 +137,7 @@ export default function Watchlist() {
       if (res.ok) {
         setNewRuleTarget('');
         fetchRulesForSymbol(selectedSymbol);
+        fetchWatchlist();
       }
     } catch (e) {
       console.error("Failed to create alert rule", e);
@@ -154,6 +156,7 @@ export default function Watchlist() {
       });
       if (res.ok && selectedSymbol) {
         fetchRulesForSymbol(selectedSymbol);
+        fetchWatchlist();
       }
     } catch (e) {
       console.error("Failed to toggle alert rule", e);
@@ -167,6 +170,7 @@ export default function Watchlist() {
       });
       if (res.ok && selectedSymbol) {
         fetchRulesForSymbol(selectedSymbol);
+        fetchWatchlist();
       }
     } catch (e) {
       console.error("Failed to delete alert rule", e);
@@ -391,18 +395,37 @@ export default function Watchlist() {
                     </Box>
                   </Stack>
                   <Stack direction="row" spacing={0.5}>
-                    <IconButton 
-                      color="neutral" 
-                      variant="plain" 
-                      onClick={() => handleOpenAlertsModal(item.symbol)}
-                      sx={{ 
-                        opacity: 0.8,
-                        transition: 'all 0.2s', 
-                        '&:hover': { opacity: 1, backgroundColor: 'rgba(0,0,0,0.05)', color: '#10b981' } 
+                    <Badge
+                      badgeContent={item.active_alerts_count}
+                      invisible={!item.active_alerts_count}
+                      color="warning"
+                      size="sm"
+                      variant="solid"
+                      sx={{
+                        '& .MuiBadge-badge': {
+                          right: 2,
+                          top: 2,
+                          boxShadow: '0 0 8px rgba(245, 158, 11, 0.4)',
+                        }
                       }}
                     >
-                      <Bell size={18} />
-                    </IconButton>
+                      <IconButton 
+                        color={item.active_alerts_count ? "warning" : "neutral"} 
+                        variant="plain" 
+                        onClick={() => handleOpenAlertsModal(item.symbol)}
+                        sx={{ 
+                          opacity: item.active_alerts_count ? 1 : 0.8,
+                          transition: 'all 0.2s', 
+                          '&:hover': { opacity: 1, backgroundColor: 'rgba(0,0,0,0.05)', color: '#10b981' } 
+                        }}
+                      >
+                        <Bell 
+                          size={18} 
+                          className={item.active_alerts_count ? "animate-bell-ring" : ""}
+                          fill={item.active_alerts_count ? "currentColor" : "none"}
+                        />
+                      </IconButton>
+                    </Badge>
                     <IconButton 
                       color="danger" 
                       variant="plain" 

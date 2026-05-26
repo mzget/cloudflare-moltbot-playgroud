@@ -79,7 +79,8 @@ export default {
 			if (request.method === 'GET') {
 				const { results } = await env.DB.prepare(`
 					SELECT w.*, 
-					       (CASE WHEN p.symbol IS NOT NULL THEN 1 ELSE 0 END) as in_portfolio
+					       (CASE WHEN p.symbol IS NOT NULL THEN 1 ELSE 0 END) as in_portfolio,
+					       (SELECT COUNT(*) FROM alert_rules ar WHERE ar.symbol = w.symbol AND ar.is_active = 1) as active_alerts_count
 					FROM watchlist w
 					LEFT JOIN portfolio_holdings p ON w.symbol = p.symbol
 				`).all();
