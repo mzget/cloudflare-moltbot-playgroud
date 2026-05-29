@@ -115,11 +115,8 @@ async function crawlRSS(url: string) {
 			}
 		});
 
-		if (!response.ok) {
-			console.error(`RSS fetch failed: ${response.status} ${response.statusText}`);
-			return [];
-		}
-
+		// Skip checking response.ok because some providers (like Yahoo Finance)
+		// return a 404 status code but still deliver the valid RSS XML in the response body.
 		const xml = await response.text();
 		const items = xml.match(/<item>([\s\S]*?)<\/item>/g) || [];
 		console.log(`Found ${items.length} items in RSS`);

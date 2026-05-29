@@ -62,14 +62,14 @@ export default {
 		if (url.pathname === '/api/news') {
 			if (request.method === 'DELETE') {
 				try {
-					await env.DB.prepare("DELETE FROM news WHERE created_at < strftime('%s', 'now', '-3 days')").run();
+					await env.DB.prepare("DELETE FROM news WHERE created_at < datetime('now', '-3 days')").run();
 					return new Response('Purged old news items', { headers: corsHeaders });
 				} catch (e) {
 					return new Response(`Failed to purge news: ${(e as any).message}`, { status: 500, headers: corsHeaders });
 				}
 			}
 			const { results } = await env.DB.prepare(
-				'SELECT * FROM news ORDER BY created_at DESC LIMIT 50'
+				"SELECT id, symbol, title, summary, sentiment, url, CAST(strftime('%s', created_at) as INTEGER) as created_at FROM news ORDER BY created_at DESC LIMIT 50"
 			).all();
 			return Response.json(results, { headers: corsHeaders });
 		}
@@ -111,8 +111,24 @@ export default {
 			}
 			if (request.method === 'DELETE') {
 				const symbol = url.searchParams.get('symbol');
-				await env.DB.prepare('DELETE FROM watchlist WHERE symbol = ?').bind(symbol).run();
-				return new Response('Symbol removed', { headers: corsHeaders });
+				if (!symbol) {
+					return new Response('Missing symbol parameter', { status: 400, headers: corsHeaders });
+				}
+				const symbolUpper = symbol.toUpperCase();
+				try {
+					await env.DB.batch([
+						env.DB.prepare('DELETE FROM daily_reports WHERE symbol = ?').bind(symbolUpper),
+						env.DB.prepare('DELETE FROM news WHERE symbol = ?').bind(symbolUpper),
+						env.DB.prepare('DELETE FROM market_events WHERE symbol = ?').bind(symbolUpper),
+						env.DB.prepare('DELETE FROM market_stats WHERE symbol = ?').bind(symbolUpper),
+						env.DB.prepare('DELETE FROM alert_rules WHERE symbol = ?').bind(symbolUpper),
+						env.DB.prepare('DELETE FROM in_app_notifications WHERE symbol = ?').bind(symbolUpper),
+						env.DB.prepare('DELETE FROM watchlist WHERE symbol = ?').bind(symbolUpper)
+					]);
+					return new Response('Symbol removed', { headers: corsHeaders });
+				} catch (e) {
+					return new Response(`Failed to remove symbol from watchlist: ${(e as any).message}`, { status: 500, headers: corsHeaders });
+				}
 			}
 		}
 
@@ -399,7 +415,7 @@ export default {
 					.catch(e => console.error("Failed to purge old daily reports:", e));
 				await env.DB.prepare("DELETE FROM market_events WHERE created_at < strftime('%s', 'now', '-30 days')").run()
 					.catch(e => console.error("Failed to purge old market events:", e));
-				await env.DB.prepare("DELETE FROM news WHERE created_at < strftime('%s', 'now', '-3 days')").run()
+				await env.DB.prepare("DELETE FROM news WHERE created_at < datetime('now', '-3 days')").run()
 					.catch(e => console.error("Failed to purge old news:", e));
 			}
 
