@@ -5,6 +5,8 @@ import { sendDailyEmailReport } from './email';
 import { fetchAndStoreMarketStats } from './marketData';
 import { fetchAndStoreMarketEvents } from './marketEvents';
 import { checkAlertRules } from './alerts';
+import { getAuthUrl, exchangeCodeForTokens } from './gmail';
+import { syncAndIngestEmails, generateEmailDigests } from './emailSummarizer';
 
 export interface Env {
 	DB: D1Database;
@@ -15,6 +17,8 @@ export interface Env {
 		destination_address: string;
 	};
 	FINNHUB_API_KEY?: string;
+	GOOGLE_CLIENT_ID?: string;
+	GOOGLE_CLIENT_SECRET?: string;
 }
 
 export default {
@@ -377,6 +381,119 @@ export default {
 			}
 		}
 
+		// API: Get Google OAuth URL
+		if (url.pathname === '/api/auth/google/url') {
+			const clientId = env.GOOGLE_CLIENT_ID;
+			const redirectUri = url.searchParams.get('redirect_uri');
+			if (!clientId || !redirectUri) {
+				return new Response('Missing client_id configuration or redirect_uri parameter', { status: 400, headers: corsHeaders });
+			}
+			const authUrl = getAuthUrl(clientId, redirectUri);
+			return Response.json({ url: authUrl }, { headers: corsHeaders });
+		}
+
+		// API: Google OAuth Callback (Code Exchange)
+		if (url.pathname === '/api/auth/google/callback') {
+			try {
+				const { code, redirect_uri } = await request.json() as any;
+				const clientId = env.GOOGLE_CLIENT_ID;
+				const clientSecret = env.GOOGLE_CLIENT_SECRET;
+				if (!clientId || !clientSecret || !code || !redirect_uri) {
+					return new Response('Missing configuration, code, or redirect_uri', { status: 400, headers: corsHeaders });
+				}
+				const tokens = await exchangeCodeForTokens(code, clientId, clientSecret, redirect_uri);
+				const expiryDate = Date.now() + tokens.expires_in * 1000;
+				await env.DB.prepare(
+					'INSERT INTO gmail_oauth (id, access_token, refresh_token, expiry_date) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET access_token = excluded.access_token, refresh_token = excluded.refresh_token, expiry_date = excluded.expiry_date, updated_at = (strftime(\'%s\', \'now\'))'
+				).bind('default', tokens.access_token, tokens.refresh_token, expiryDate).run();
+				return Response.json({ success: true }, { headers: corsHeaders });
+			} catch (e) {
+				return new Response(`OAuth callback exchange failed: ${(e as any).message}`, { status: 500, headers: corsHeaders });
+			}
+		}
+
+		// API: Get Google Auth Status
+		if (url.pathname === '/api/auth/google/status') {
+			const row = await env.DB.prepare('SELECT 1 FROM gmail_oauth WHERE id = ?').bind('default').first();
+			return Response.json({ connected: !!row }, { headers: corsHeaders });
+		}
+
+		// API: Google Disconnect
+		if (url.pathname === '/api/auth/google/disconnect') {
+			await env.DB.prepare('DELETE FROM gmail_oauth WHERE id = ?').bind('default').run();
+			return new Response('Disconnected', { headers: corsHeaders });
+		}
+
+		// API: Subscriptions CRUD
+		if (url.pathname === '/api/subscriptions') {
+			if (request.method === 'GET') {
+				const { results } = await env.DB.prepare('SELECT * FROM email_subscriptions ORDER BY created_at DESC').all();
+				return Response.json(results || [], { headers: corsHeaders });
+			}
+			if (request.method === 'POST') {
+				try {
+					const { name, sender, subject_filter, label_filter, raw_query, frequency } = await request.json() as any;
+					await env.DB.prepare(
+						'INSERT INTO email_subscriptions (name, sender, subject_filter, label_filter, raw_query, frequency) VALUES (?, ?, ?, ?, ?, ?)'
+					).bind(name, sender || null, subject_filter || null, label_filter || null, raw_query || null, frequency || 'hourly').run();
+					return new Response('Subscription created', { headers: corsHeaders });
+				} catch (e) {
+					return new Response(`Failed to create subscription: ${(e as any).message}`, { status: 500, headers: corsHeaders });
+				}
+			}
+			if (request.method === 'PUT') {
+				try {
+					const { id, name, sender, subject_filter, label_filter, raw_query, frequency, is_active } = await request.json() as any;
+					await env.DB.prepare(
+						'UPDATE email_subscriptions SET name=?, sender=?, subject_filter=?, label_filter=?, raw_query=?, frequency=?, is_active=? WHERE id=?'
+					).bind(name, sender || null, subject_filter || null, label_filter || null, raw_query || null, frequency, is_active !== undefined ? (is_active ? 1 : 0) : 1, id).run();
+					return new Response('Subscription updated', { headers: corsHeaders });
+				} catch (e) {
+					return new Response(`Failed to update subscription: ${(e as any).message}`, { status: 500, headers: corsHeaders });
+				}
+			}
+			if (request.method === 'DELETE') {
+				try {
+					const id = url.searchParams.get('id');
+					if (!id) {
+						return new Response('Missing subscription ID', { status: 400, headers: corsHeaders });
+					}
+					await env.DB.prepare('DELETE FROM email_subscriptions WHERE id = ?').bind(id).run();
+					return new Response('Subscription deleted', { headers: corsHeaders });
+				} catch (e) {
+					return new Response(`Failed to delete subscription: ${(e as any).message}`, { status: 500, headers: corsHeaders });
+				}
+			}
+		}
+
+		// API: Manual Sync & Summarize
+		if (url.pathname === '/api/email-sync') {
+			ctx.waitUntil((async () => {
+				try {
+					console.log('Starting manual email sync...');
+					const newCount = await syncAndIngestEmails(env);
+					console.log(`Ingested ${newCount} new emails. Running digest generator...`);
+					await generateEmailDigests(env, true);
+					console.log('Email sync & digest completed.');
+				} catch (e) {
+					console.error('Manual email sync failed:', e);
+				}
+			})());
+			return new Response('Email sync started', { headers: corsHeaders });
+		}
+
+		// API: Get Email Digests
+		if (url.pathname === '/api/email-digests') {
+			try {
+				const { results } = await env.DB.prepare(
+					'SELECT id, category, summary, key_takeaways, source_emails, digest_date, CAST(strftime(\'%s\', created_at) as INTEGER) as created_at FROM email_digests ORDER BY created_at DESC LIMIT 50'
+				).all();
+				return Response.json(results || [], { headers: corsHeaders });
+			} catch (e) {
+				return Response.json({ error: (e as any).message }, { status: 500, headers: corsHeaders });
+			}
+		}
+
 		return new Response("Oaktree Agent Backend Running");
 	},
 
@@ -384,9 +501,11 @@ export default {
 		console.log("Running scheduled worker tasks...");
 
 		ctx.waitUntil((async () => {
-			// 1. Hourly tasks: Update prices and stats + check alerts
+			// 1. Hourly tasks: Update prices and stats + check alerts + email sync & digest
 			await fetchAndStoreMarketStats(env);
 			await checkAlertRules(env);
+			await syncAndIngestEmails(env).catch(e => console.error("Scheduled email sync failed:", e));
+			await generateEmailDigests(env, false).catch(e => console.error("Scheduled email digest generation failed:", e));
 
 			// 2. 6-Hourly tasks: run crawler, summary, events, daily email report, purge old data
 			const hour = new Date().getUTCHours();

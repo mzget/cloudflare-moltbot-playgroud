@@ -26,23 +26,64 @@ export default function RoutesLayout() {
   };
 
   const [reports, setReports] = React.useState<any[]>([]);
+  const [digests, setDigests] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
 
   const fetchReports = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/reports`);
-      if (res.ok) {
-        const data = await res.json();
-        setReports(data);
+      const [reportsRes, digestsRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/api/reports`),
+        fetch(`${API_BASE_URL}/api/email-digests`)
+      ]);
+      
+      if (reportsRes.ok) {
+        const reportsData = await reportsRes.json();
+        setReports(reportsData);
+      }
+      if (digestsRes.ok) {
+        const digestsData = await digestsRes.json();
+        setDigests(digestsData);
       }
     } catch (e) {
-      console.error("Failed to fetch reports", e);
+      console.error("Failed to fetch reports or digests", e);
     } finally {
       setLoading(false);
     }
   };
 
   React.useEffect(() => {
+    // Intercept Google OAuth callback
+    if (typeof window !== 'undefined') {
+      const searchParams = new URLSearchParams(window.location.search);
+      const code = searchParams.get('code');
+      if (code) {
+        // Clear parameters immediately to avoid double execution on reload
+        const newUrl = window.location.pathname + '?tab=sources';
+        window.history.replaceState({}, document.title, newUrl);
+
+        const exchangeOAuth = async () => {
+          try {
+            const res = await fetch(`${API_BASE_URL}/api/auth/google/callback`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                code,
+                redirect_uri: window.location.origin + '/'
+              })
+            });
+            if (res.ok) {
+              window.dispatchEvent(new CustomEvent('gmail-connected'));
+            } else {
+              console.error('Failed to exchange Google OAuth code:', await res.text());
+            }
+          } catch (e) {
+            console.error('Failed to exchange Google OAuth code', e);
+          }
+        };
+        exchangeOAuth();
+      }
+    }
+
     fetchReports();
 
     const interval = setInterval(() => {
@@ -97,7 +138,7 @@ export default function RoutesLayout() {
             <Sidebar 
               activeTab={activeTab} 
               setActiveTab={setActiveTab} 
-              reportsCount={reports.length} 
+              reportsCount={reports.length + digests.length} 
               collapsed={sidebarCollapsed}
             />
           </Sheet>
@@ -106,7 +147,7 @@ export default function RoutesLayout() {
         {/* Main Content Container */}
         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
           {activeTab === 'dashboard' && <FundametalDashboard />}
-          {activeTab === 'market' && <IntelligenceFeed reports={reports} loading={loading} />}
+          {activeTab === 'market' && <IntelligenceFeed reports={reports} digests={digests} loading={loading} />}
 
           {activeTab === 'watchlist' && <Watchlist />}
           {activeTab === 'agent' && <KnowledgeChat />}
