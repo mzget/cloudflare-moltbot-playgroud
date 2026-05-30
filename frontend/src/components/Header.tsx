@@ -1,11 +1,11 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Box, Typography, Stack, Sheet, IconButton, Tooltip, Button } from '@mui/joy';
-import { Newspaper, Bell, Settings, User, Menu, Moon, Sun } from 'lucide-react';
+import React, { useEffect, useRef, useState, useContext } from 'react';
+import { Box, Typography, Stack, Sheet, IconButton, Tooltip, Button, Dropdown, Menu as JoyMenu, MenuButton, MenuItem } from '@mui/joy';
+import { Newspaper, Bell, Settings, User, Menu, Moon, Sun, LogOut } from 'lucide-react';
 import { useColorScheme } from '@mui/joy/styles';
 import gsap from 'gsap';
 import { API_BASE_URL } from '../config';
-
 import { glassStyle } from '../styles/glass';
+import { AuthContext } from './App';
 
 interface HeaderProps {
   onOpenSidebar?: () => void;
@@ -14,6 +14,7 @@ interface HeaderProps {
 }
 
 export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapsed }: HeaderProps) {
+  const { user, logout } = useContext(AuthContext);
   const { mode, setMode } = useColorScheme();
   const [mounted, setMounted] = React.useState(false);
   const headerRef = useRef<HTMLDivElement>(null);
@@ -447,40 +448,98 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
           
           <Box sx={{ width: '1px', height: '28px', bgcolor: 'divider', mx: 1 }} />
           
-          <Sheet 
-            sx={{ 
-              ...glassStyle, 
-              display: 'flex', 
-              alignItems: 'center', 
-              px: 2, 
-              py: 0.75, 
-              gap: 2, 
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              '&:hover': { 
-                bgcolor: 'background.level1',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-                transform: 'translateY(-1px)'
-              } 
-            }}
-          >
-            <Box sx={{ 
-              width: 32, 
-              height: 32, 
-              bgcolor: 'rgba(16, 185, 129, 0.1)', 
-              borderRadius: '10px', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center', 
-              border: '1px solid rgba(16, 185, 129, 0.2)' 
-            }}>
-              <User size={18} color="#10b981" />
-            </Box>
-            <Box>
-              <Typography level="body-sm" sx={{ fontWeight: 700, color: 'text.primary' }}>Operator</Typography>
-              <Typography level="body-xs" sx={{ opacity: 0.5, fontWeight: 500 }}>Pro Account</Typography>
-            </Box>
-          </Sheet>
+          <Dropdown>
+            <MenuButton
+              slots={{ root: Box }}
+              slotProps={{
+                root: {
+                  component: Sheet,
+                  sx: {
+                    ...glassStyle,
+                    display: 'flex',
+                    alignItems: 'center',
+                    px: 2,
+                    py: 0.75,
+                    gap: 2,
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease',
+                    border: '1px solid var(--joy-palette-neutral-outlinedBorder)',
+                    borderRadius: '16px',
+                    '&:hover': {
+                      bgcolor: 'background.level1',
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                      transform: 'translateY(-1px)'
+                    }
+                  }
+                }
+              }}
+            >
+              {user?.picture ? (
+                <Box
+                  component="img"
+                  src={user.picture}
+                  alt={user.name}
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: '10px',
+                    border: '1px solid rgba(16, 185, 129, 0.2)',
+                    display: 'block'
+                  }}
+                />
+              ) : (
+                <Box sx={{
+                  width: 32,
+                  height: 32,
+                  bgcolor: 'rgba(16, 185, 129, 0.1)',
+                  borderRadius: '10px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  border: '1px solid rgba(16, 185, 129, 0.2)'
+                }}>
+                  <User size={18} color="#10b981" />
+                </Box>
+              )}
+              <Box sx={{ display: { xs: 'none', sm: 'block' }, textAlign: 'left' }}>
+                <Typography level="body-sm" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                  {user?.name || 'Operator'}
+                </Typography>
+                <Typography level="body-xs" sx={{ opacity: 0.5, fontWeight: 500 }}>
+                  {user?.email || 'Pro Account'}
+                </Typography>
+              </Box>
+            </MenuButton>
+            <JoyMenu
+              placement="bottom-end"
+              sx={{
+                ...glassStyle,
+                mt: 1,
+                minWidth: 160,
+                boxShadow: '0 12px 30px rgba(0,0,0,0.15)',
+                zIndex: 1200,
+                p: 1,
+                borderRadius: '16px',
+              }}
+            >
+              <MenuItem
+                onClick={logout}
+                sx={{
+                  borderRadius: '10px',
+                  color: 'danger.plainColor',
+                  fontWeight: 600,
+                  gap: 1.5,
+                  py: 1,
+                  '&:hover': {
+                    bgcolor: 'danger.softHoverBg',
+                  }
+                }}
+              >
+                <LogOut size={16} />
+                Sign Out
+              </MenuItem>
+            </JoyMenu>
+          </Dropdown>
         </Box>
       </Stack>
     </Sheet>

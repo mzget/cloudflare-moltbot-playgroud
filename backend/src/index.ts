@@ -7,6 +7,7 @@ import { fetchAndStoreMarketEvents } from './marketEvents';
 import { checkAlertRules } from './alerts';
 import { getAuthUrl, exchangeCodeForTokens } from './gmail';
 import { syncAndIngestEmails, generateEmailDigests } from './emailSummarizer';
+import { checkAuth, fetchGoogleUserProfile, isEmailAuthorized, signJwt, getUserLoginAuthUrl } from './auth';
 
 export interface Env {
 	DB: D1Database;
@@ -19,6 +20,8 @@ export interface Env {
 	FINNHUB_API_KEY?: string;
 	GOOGLE_CLIENT_ID?: string;
 	GOOGLE_CLIENT_SECRET?: string;
+	JWT_SECRET?: string;
+	ALLOWED_EMAILS?: string;
 }
 
 export default {
@@ -29,11 +32,91 @@ export default {
 		const corsHeaders = {
 			'Access-Control-Allow-Origin': '*',
 			'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-			'Access-Control-Allow-Headers': 'Content-Type',
+			'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+			'Access-Control-Max-Age': '86400',
 		};
 
 		if (request.method === 'OPTIONS') {
 			return new Response(null, { headers: corsHeaders });
+		}
+
+		// API: Google OAuth for User Login URL
+		if (url.pathname === '/api/auth/user/login-url') {
+			const clientId = env.GOOGLE_CLIENT_ID;
+			const redirectUri = url.searchParams.get('redirect_uri');
+			if (!clientId || !redirectUri) {
+				return new Response('Missing client_id configuration or redirect_uri parameter', { status: 400, headers: corsHeaders });
+			}
+			const authUrl = getUserLoginAuthUrl(clientId, redirectUri);
+			return Response.json({ url: authUrl }, { headers: corsHeaders });
+		}
+
+		// API: Google OAuth Callback for User Login
+		if (url.pathname === '/api/auth/user/callback') {
+			try {
+				const { code, redirect_uri } = await request.json() as any;
+				const clientId = env.GOOGLE_CLIENT_ID;
+				const clientSecret = env.GOOGLE_CLIENT_SECRET;
+				const jwtSecret = env.JWT_SECRET || 'dev-secret-key-123456';
+				if (!clientId || !clientSecret || !code || !redirect_uri) {
+					return new Response('Missing configuration, code, or redirect_uri', { status: 400, headers: corsHeaders });
+				}
+				const tokens = await exchangeCodeForTokens(code, clientId, clientSecret, redirect_uri);
+				const profile = await fetchGoogleUserProfile(tokens.access_token);
+				
+				if (!profile.email) {
+					return new Response('Failed to retrieve email from Google profile', { status: 400, headers: corsHeaders });
+				}
+				
+				// Email check
+				const allowedEmails = env.ALLOWED_EMAILS;
+				if (!isEmailAuthorized(profile.email, allowedEmails)) {
+					return new Response('Forbidden: Your email is not authorized to access this site', { status: 403, headers: corsHeaders });
+				}
+				
+				// Generate session JWT (valid for 7 days)
+				const sessionPayload = {
+					email: profile.email,
+					name: profile.name,
+					picture: profile.picture,
+					exp: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60)
+				};
+				
+				const token = await signJwt(sessionPayload, jwtSecret);
+				return Response.json({
+					success: true,
+					token,
+					user: {
+						email: profile.email,
+						name: profile.name,
+						picture: profile.picture
+					}
+				}, { headers: corsHeaders });
+			} catch (e) {
+				return new Response(`User authentication failed: ${(e as any).message}`, { status: 500, headers: corsHeaders });
+			}
+		}
+
+		// API: Get Current Authenticated User Info
+		if (url.pathname === '/api/auth/user/me') {
+			const jwtSecret = env.JWT_SECRET || 'dev-secret-key-123456';
+			const user = await checkAuth(request, jwtSecret);
+			if (!user) {
+				return new Response('Unauthorized', { status: 401, headers: corsHeaders });
+			}
+			return Response.json({ user }, { headers: corsHeaders });
+		}
+
+		// Enforce authentication on all other protected endpoints (/api/*)
+		const isUnprotectedRoute = url.pathname === '/' || 
+		                           url.pathname.startsWith('/api/auth/user/');
+		
+		if (!isUnprotectedRoute && url.pathname.startsWith('/api/')) {
+			const jwtSecret = env.JWT_SECRET || 'dev-secret-key-123456';
+			const user = await checkAuth(request, jwtSecret);
+			if (!user) {
+				return new Response('Unauthorized', { status: 401, headers: corsHeaders });
+			}
 		}
 
 		// API: Trigger Email Manually (Test)

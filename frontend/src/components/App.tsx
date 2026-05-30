@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { CssVarsProvider, extendTheme, CssBaseline, StyledEngineProvider, GlobalStyles } from '@mui/joy';
+import { CssVarsProvider, extendTheme, CssBaseline, StyledEngineProvider, GlobalStyles, CircularProgress, Box, Typography } from '@mui/joy';
 import {
   createRootRoute,
   createRoute,
@@ -8,6 +8,53 @@ import {
 } from '@tanstack/react-router';
 import { z } from 'zod';
 import RoutesLayout from './RoutesLayout';
+import LoginScreen from './LoginScreen';
+import { API_BASE_URL } from '../config';
+
+// Global Fetch Interceptor to inject JWT token
+if (typeof window !== 'undefined') {
+  const originalFetch = window.fetch;
+  window.fetch = async function (input, init) {
+    const url = typeof input === 'string'
+      ? input
+      : (input instanceof URL ? input.toString() : (input as Request).url);
+
+    const token = localStorage.getItem('auth_token');
+    if (token && (url.startsWith(API_BASE_URL) || url.startsWith('/api/'))) {
+      init = init || {};
+      const headers = new Headers(init.headers);
+      if (!headers.has('Authorization')) {
+        headers.set('Authorization', `Bearer ${token}`);
+      }
+      init.headers = headers;
+    }
+
+    const response = await originalFetch(input, init);
+
+    if (response.status === 401 && (url.startsWith(API_BASE_URL) || url.startsWith('/api/')) && !url.includes('/api/auth/user/')) {
+      localStorage.removeItem('auth_token');
+      window.dispatchEvent(new CustomEvent('auth-expired'));
+    }
+
+    return response;
+  };
+}
+
+export interface User {
+  email: string;
+  name: string;
+  picture: string;
+}
+
+interface AuthContextType {
+  user: User | null;
+  logout: () => void;
+}
+
+export const AuthContext = React.createContext<AuthContextType>({
+  user: null,
+  logout: () => {},
+});
 
 // 1. Define the Search Schema (Validation)
 const dashboardSearchSchema = z.object({
@@ -91,6 +138,144 @@ const theme = extendTheme({
 });
 
 export default function Dashboard() {
+  const [user, setUser] = React.useState<User | null>(null);
+  const [checkingAuth, setCheckingAuth] = React.useState(true);
+  const [authError, setAuthError] = React.useState<string | null>(null);
+  const [exchangingCode, setExchangingCode] = React.useState(false);
+
+  const logout = React.useCallback(() => {
+    localStorage.removeItem('auth_token');
+    setUser(null);
+    if (typeof window !== 'undefined') {
+      window.location.href = window.location.origin + '/';
+    }
+  }, []);
+
+  React.useEffect(() => {
+    const checkCurrentSession = async () => {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        setCheckingAuth(false);
+        return;
+      }
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/auth/user/me`);
+        if (res.ok) {
+          const data = await res.json();
+          setUser(data.user);
+        } else {
+          localStorage.removeItem('auth_token');
+        }
+      } catch (e) {
+        console.error('Failed to verify session:', e);
+      } finally {
+        setCheckingAuth(false);
+      }
+    };
+
+    const handleOAuthCallback = async () => {
+      const searchParams = new URLSearchParams(window.location.search);
+      const code = searchParams.get('code');
+      const state = searchParams.get('state');
+
+      if (code && state === 'user-login') {
+        setExchangingCode(true);
+        // Clear query parameters
+        const newUrl = window.location.pathname;
+        window.history.replaceState({}, document.title, newUrl);
+
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/auth/user/callback`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              code,
+              redirect_uri: window.location.origin + '/'
+            })
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            localStorage.setItem('auth_token', data.token);
+            setUser(data.user);
+            setAuthError(null);
+          } else {
+            const errText = await res.text();
+            setAuthError(errText || 'Failed to authenticate with Google');
+          }
+        } catch (e) {
+          console.error('OAuth exchange error:', e);
+          setAuthError('Connection failed when authenticating');
+        } finally {
+          setExchangingCode(false);
+          setCheckingAuth(false);
+        }
+      } else {
+        checkCurrentSession();
+      }
+    };
+
+    const handleAuthExpired = () => {
+      setUser(null);
+    };
+
+    window.addEventListener('auth-expired', handleAuthExpired);
+    handleOAuthCallback();
+
+    return () => {
+      window.removeEventListener('auth-expired', handleAuthExpired);
+    };
+  }, []);
+
+  const handleLoginClick = async () => {
+    setCheckingAuth(true);
+    try {
+      const redirectUri = window.location.origin + '/';
+      const res = await fetch(`${API_BASE_URL}/api/auth/user/login-url?redirect_uri=${encodeURIComponent(redirectUri)}`);
+      if (res.ok) {
+        const data = await res.json();
+        window.location.href = data.url;
+      } else {
+        const errText = await res.text();
+        setAuthError(errText || 'Failed to initiate login');
+        setCheckingAuth(false);
+      }
+    } catch (e) {
+      console.error('Login redirect error:', e);
+      setAuthError('Failed to connect to authentication server');
+      setCheckingAuth(false);
+    }
+  };
+
+  const renderContent = () => {
+    if (checkingAuth || exchangingCode) {
+      return (
+        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', gap: 2 }}>
+          <CircularProgress color="primary" variant="soft" size="lg" />
+          <Typography level="body-sm" sx={{ opacity: 0.7 }}>
+            {exchangingCode ? 'Exchanging Google token...' : 'Verifying session...'}
+          </Typography>
+        </Box>
+      );
+    }
+
+    if (!user) {
+      return (
+        <LoginScreen
+          onLoginClick={handleLoginClick}
+          loading={checkingAuth || exchangingCode}
+          error={authError}
+        />
+      );
+    }
+
+    return (
+      <AuthContext.Provider value={{ user, logout }}>
+        <RouterProvider router={router} />
+      </AuthContext.Provider>
+    );
+  };
+
   return (
     <StyledEngineProvider injectFirst>
       <CssVarsProvider theme={theme} defaultMode="dark">
@@ -111,7 +296,7 @@ export default function Dashboard() {
             },
           }}
         />
-        <RouterProvider router={router} />
+        {renderContent()}
       </CssVarsProvider>
     </StyledEngineProvider>
   );
