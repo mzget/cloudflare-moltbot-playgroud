@@ -48,3 +48,7 @@ coverage/
 
 .agents/skills/
 .agent/workflows/
+trace-tool/check-color.js
+trace-tool/package-lock.json
+trace-tool/package.json
+trace-tool/trace.js
