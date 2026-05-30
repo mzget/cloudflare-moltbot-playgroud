@@ -7,6 +7,8 @@ import {
   RouterProvider,
 } from '@tanstack/react-router';
 import { z } from 'zod';
+import { useTranslation } from 'react-i18next';
+import '../i18n';
 import RoutesLayout from './RoutesLayout';
 import LoginScreen from './LoginScreen';
 import { API_BASE_URL } from '../config';
@@ -126,6 +128,7 @@ const theme = extendTheme({
 });
 
 export default function Dashboard() {
+  const { t } = useTranslation();
   const [user, setUser] = React.useState<User | null>(null);
   const [checkingAuth, setCheckingAuth] = React.useState(true);
   const [authError, setAuthError] = React.useState<string | null>(null);
@@ -242,7 +245,7 @@ export default function Dashboard() {
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', gap: 2 }}>
           <CircularProgress color="primary" variant="soft" size="lg" />
           <Typography level="body-sm" sx={{ opacity: 0.7 }}>
-            {exchangingCode ? 'Exchanging Google token...' : 'Verifying session...'}
+            {exchangingCode ? t('app.exchanging_token') : t('app.verifying_session')}
           </Typography>
         </Box>
       );

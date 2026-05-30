@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useContext } from 'react';
 import { Box, Typography, Stack, Sheet, IconButton, Tooltip, Button, Dropdown, Menu as JoyMenu, MenuButton, MenuItem } from '@mui/joy';
 import { Newspaper, Bell, Settings, User, Menu, Moon, Sun, LogOut } from 'lucide-react';
 import { useColorScheme } from '@mui/joy/styles';
+import { useTranslation } from 'react-i18next';
 import gsap from 'gsap';
 import { API_BASE_URL } from '../config';
 import { glassStyle } from '../styles/glass';
@@ -15,6 +16,7 @@ interface HeaderProps {
 }
 
 export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapsed }: HeaderProps) {
+  const { t } = useTranslation();
   const { user, logout } = useContext(AuthContext);
   const { mode, setMode } = useColorScheme();
   const [mounted, setMounted] = React.useState(false);
@@ -124,12 +126,12 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
       const now = new Date();
       const diffMs = now.getTime() - date.getTime();
       const diffMins = Math.floor(diffMs / 60000);
-      if (diffMins < 1) return 'Just now';
-      if (diffMins < 60) return `${diffMins}m ago`;
+      if (diffMins < 1) return t('header.just_now');
+      if (diffMins < 60) return t('header.mins_ago', { count: diffMins });
       const diffHours = Math.floor(diffMins / 60);
-      if (diffHours < 24) return `${diffHours}h ago`;
+      if (diffHours < 24) return t('header.hours_ago', { count: diffHours });
       const diffDays = Math.floor(diffHours / 24);
-      return `${diffDays}d ago`;
+      return t('header.days_ago', { count: diffDays });
     } catch (e) {
       return String(timeVal);
     }
@@ -193,7 +195,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
     >
       <Stack direction="row" spacing={3} alignItems="center">
         {onOpenSidebar && (
-          <Tooltip title="Menu" placement="bottom">
+          <Tooltip title={t('header.menu')} placement="bottom">
             <IconButton
               variant="soft"
               color="neutral"
@@ -206,7 +208,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
         )}
         
         <Stack direction="row" spacing={2.5} alignItems="center">
-          <Tooltip title={sidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"} placement="bottom">
+          <Tooltip title={sidebarCollapsed ? t('header.expand_sidebar') : t('header.collapse_sidebar')} placement="bottom">
             <IconButton
               variant="plain"
               color="neutral"
@@ -248,7 +250,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
                 color: 'text.primary',
               }}
             >
-              Oaktree Agent
+              {t('app.title')}
             </Typography>
             <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 0.5 }}>
               <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -283,7 +285,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
                   opacity: 0.8
                 }}
               >
-                Intelligence Active
+                {t('header.intelligence_active')}
               </Typography>
             </Stack>
           </Box>
@@ -294,7 +296,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
         <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
           {/* Notifications Panel */}
           <Box ref={bellContainerRef} sx={{ position: 'relative' }}>
-            <Tooltip title="Notifications" placement="bottom">
+            <Tooltip title={t('header.notifications')} placement="bottom">
               <IconButton 
                 variant="plain" 
                 color="neutral"
@@ -347,7 +349,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
               >
                 {/* Header */}
                 <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid', borderColor: 'divider' }}>
-                  <Typography level="title-md" sx={{ fontWeight: 700 }}>Notifications</Typography>
+                  <Typography level="title-md" sx={{ fontWeight: 700 }}>{t('header.notifications')}</Typography>
                   {unreadCount > 0 && (
                     <Button 
                       size="sm" 
@@ -356,7 +358,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
                       onClick={handleMarkAllAsRead}
                       sx={{ fontSize: '0.75rem', fontWeight: 600, p: 0.5, minHeight: 0 }}
                     >
-                      Mark all as read
+                      {t('header.mark_all_read')}
                     </Button>
                   )}
                 </Box>
@@ -366,7 +368,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
                   {notifications.length === 0 ? (
                     <Box sx={{ py: 6, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 1.5 }}>
                       <Bell size={32} style={{ opacity: 0.3 }} />
-                      <Typography level="body-sm" sx={{ color: 'text.tertiary', fontWeight: 500 }}>No notifications yet</Typography>
+                      <Typography level="body-sm" sx={{ color: 'text.tertiary', fontWeight: 500 }}>{t('header.no_notifications')}</Typography>
                     </Box>
                   ) : (
                     notifications.map((n) => (
@@ -419,7 +421,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
               </Sheet>
             )}
           </Box>
-          <Tooltip title={mounted && mode === 'dark' ? "Light Mode" : "Dark Mode"} placement="bottom">
+          <Tooltip title={mounted && mode === 'dark' ? t('header.light_mode') : t('header.dark_mode')} placement="bottom">
             <IconButton 
               variant="plain" 
               color="neutral"
@@ -433,7 +435,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
               {mounted && mode === 'dark' ? <Sun size={22} /> : <Moon size={22} />}
             </IconButton>
           </Tooltip>
-          <Tooltip title="Settings" placement="bottom">
+          <Tooltip title={t('header.settings')} placement="bottom">
             <IconButton 
               variant="plain" 
               color="neutral"
@@ -500,10 +502,10 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
               )}
               <Box sx={{ display: { xs: 'none', sm: 'block' }, textAlign: 'left' }}>
                 <Typography level="body-sm" sx={{ fontWeight: 700, color: 'text.primary' }}>
-                  {user?.name || 'Operator'}
+                  {user?.name || t('header.operator')}
                 </Typography>
                 <Typography level="body-xs" sx={{ opacity: 0.5, fontWeight: 500 }}>
-                  {user?.email || 'Pro Account'}
+                  {user?.email || t('header.pro_account')}
                 </Typography>
               </Box>
             </MenuButton>
@@ -536,7 +538,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
                 }}
               >
                 <LogOut size={16} />
-                Sign Out
+                {t('header.sign_out')}
               </MenuItem>
             </JoyMenu>
           </Dropdown>

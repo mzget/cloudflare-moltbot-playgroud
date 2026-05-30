@@ -23,9 +23,11 @@
     "@tanstack/react-router": "^1.168.24",
     "astro": "^6.1.9",
     "gsap": "^3.15.0",
+    "i18next": "^26.3.0",
     "lucide-react": "^1.11.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
+    "react-i18next": "^17.0.8",
     "yaml": "^2.8.3",
     "zod": "^4.3.6"
   },

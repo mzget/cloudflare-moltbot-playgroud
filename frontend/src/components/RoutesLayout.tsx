@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Box, Grid, Sheet, Typography, Divider, Drawer, Stack, Button } from '@mui/joy';
 import { useSearch, useNavigate } from '@tanstack/react-router';
+import { useTranslation } from 'react-i18next';
 import gsap from 'gsap';
 import Header from './Header';
 import Sidebar from './Sidebar';
@@ -17,6 +18,7 @@ import { LogOut, User } from 'lucide-react';
 import { AuthContext } from './AuthContext';
 
 export default function RoutesLayout() {
+  const { t } = useTranslation();
   const { tab: activeTab } = useSearch({ from: '/' });
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(true);
@@ -154,7 +156,7 @@ export default function RoutesLayout() {
             >
               <OaktreeIcon color="white" size={20} />
             </Box>
-            <Typography level="title-md" sx={{ fontWeight: 800 }}>Oaktree Command</Typography>
+            <Typography level="title-md" sx={{ fontWeight: 800 }}>{t('sidebar.oaktree_command')}</Typography>
           </Box>
           
           <Sidebar 
@@ -198,10 +200,10 @@ export default function RoutesLayout() {
             )}
             <Box sx={{ minWidth: 0 }}>
               <Typography level="title-sm" noWrap sx={{ fontWeight: 700 }}>
-                {user?.name || 'Operator'}
+                {user?.name || t('header.operator')}
               </Typography>
               <Typography level="body-xs" noWrap sx={{ opacity: 0.5, fontWeight: 500 }}>
-                {user?.email || 'Pro Account'}
+                {user?.email || t('header.pro_account')}
               </Typography>
             </Box>
           </Stack>
@@ -217,7 +219,7 @@ export default function RoutesLayout() {
             }}
             sx={{ borderRadius: '12px', fontWeight: 600 }}
           >
-            Sign Out
+            {t('header.sign_out')}
           </Button>
         </Box>
       </Drawer>
@@ -259,14 +261,13 @@ export default function RoutesLayout() {
           {activeTab === 'sources' && <SourceManager />}
           {activeTab === 'about' && (
             <Sheet sx={{ ...glassStyle, p: 4 }}>
-              <Typography level="h2" sx={{ mb: 2 }}>About Oaktree Agent</Typography>
+              <Typography level="h2" sx={{ mb: 2 }}>{t('about.title')}</Typography>
               <Typography sx={{ mb: 2, lineHeight: 1.8 }}>
-                Inspired by the investment philosophy of Howard Marks (Oaktree Capital), this agent goes beyond raw data.
-                It synthesizes news into cohesive narratives, focusing on market cycles, risk assessment, and long-term value.
+                {t('about.description')}
               </Typography>
               <Divider sx={{ my: 3, opacity: 0.1 }} />
               <Typography level="body-sm" sx={{ opacity: 0.5 }}>
-                Powered by Cloudflare Workers, AI (Llama 3), and Browser Rendering.
+                {t('about.footer')}
               </Typography>
             </Sheet>
           )}

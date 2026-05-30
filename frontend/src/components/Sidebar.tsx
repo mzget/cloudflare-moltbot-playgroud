@@ -1,6 +1,7 @@
 import React from 'react';
 import { List, ListItem, ListItemButton, ListItemContent, ListItemDecorator, Typography, Box, Chip } from '@mui/joy';
 import { BarChart3, TrendingUp, Search, Info, Bot, LayoutDashboard } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface SidebarProps {
   activeTab: string;
@@ -10,13 +11,14 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ activeTab, setActiveTab, reportsCount, collapsed }: SidebarProps) {
+  const { t } = useTranslation();
   const menuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard size={20} /> },
-    { id: 'market', label: 'Market Intelligence', icon: <BarChart3 size={20} /> },
-    { id: 'watchlist', label: 'Watchlist', icon: <TrendingUp size={20} /> },
-    { id: 'sources', label: 'News Sources', icon: <Search size={20} /> },
-    { id: 'agent', label: 'Agent Chat', icon: <Bot size={20} /> },
-    { id: 'about', label: 'About Oaktree', icon: <Info size={20} /> },
+    { id: 'dashboard', label: t('sidebar.dashboard'), icon: <LayoutDashboard size={20} /> },
+    { id: 'market', label: t('sidebar.market_intelligence'), icon: <BarChart3 size={20} /> },
+    { id: 'watchlist', label: t('sidebar.watchlist'), icon: <TrendingUp size={20} /> },
+    { id: 'sources', label: t('sidebar.news_sources'), icon: <Search size={20} /> },
+    { id: 'agent', label: t('sidebar.agent_chat'), icon: <Bot size={20} /> },
+    { id: 'about', label: t('sidebar.about_oaktree'), icon: <Info size={20} /> },
   ];
 
   return (
@@ -36,7 +38,7 @@ export default function Sidebar({ activeTab, setActiveTab, reportsCount, collaps
             transition: 'all 0.3s ease'
           }}
         >
-          Command Center
+          {t('sidebar.command_center')}
         </Typography>
         <List sx={{ '--ListItem-radius': '12px', gap: 1 }}>
           {menuItems.map((item) => (

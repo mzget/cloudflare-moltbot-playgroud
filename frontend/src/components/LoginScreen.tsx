@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { Box, Button, Typography, Sheet, Stack, Alert } from '@mui/joy';
 import { ShieldAlert, Info, Newspaper } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { glassStyle } from '../styles/glass';
 import OaktreeIcon from './OaktreeIcon';
 
@@ -11,6 +12,7 @@ interface LoginScreenProps {
 }
 
 export default function LoginScreen({ onLoginClick, loading, error }: LoginScreenProps) {
+  const { t } = useTranslation();
   return (
     <Box
       sx={{
@@ -102,7 +104,7 @@ export default function LoginScreen({ onLoginClick, loading, error }: LoginScree
               WebkitTextFillColor: 'transparent',
             }}
           >
-            Oaktree Agent
+            {t('app.title')}
           </Typography>
 
           <Typography
@@ -115,7 +117,7 @@ export default function LoginScreen({ onLoginClick, loading, error }: LoginScree
               fontSize: '0.75rem',
             }}
           >
-            Investment Intelligence
+            {t('app.subtitle')}
           </Typography>
         </Stack>
 
@@ -127,7 +129,7 @@ export default function LoginScreen({ onLoginClick, loading, error }: LoginScree
             fontSize: '0.95rem',
           }}
         >
-          Access premium market cycle analysis, risk assessments, and news synthesis inspired by the investment philosophy of Howard Marks.
+          {t('login.description')}
         </Typography>
 
         {/* Error State */}
@@ -147,7 +149,7 @@ export default function LoginScreen({ onLoginClick, loading, error }: LoginScree
           >
             <Box>
               <Typography level="title-sm" color="danger" sx={{ fontWeight: 700 }}>
-                Access Denied
+                {t('login.access_denied')}
               </Typography>
               <Typography level="body-xs" sx={{ mt: 0.5, color: 'text.secondary' }}>
                 {error}
@@ -213,7 +215,7 @@ export default function LoginScreen({ onLoginClick, loading, error }: LoginScree
               },
             }}
           >
-            Sign in with Google
+            {t('login.sign_in')}
           </Button>
         </Stack>
 
@@ -231,7 +233,7 @@ export default function LoginScreen({ onLoginClick, loading, error }: LoginScree
         >
           <Info size={14} />
           <Typography level="body-xs" sx={{ fontWeight: 500 }}>
-            Authorized email addresses only.
+            {t('login.authorized_only')}
           </Typography>
         </Stack>
       </Sheet>
