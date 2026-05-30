@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Box, Grid, Sheet, Typography, Divider } from '@mui/joy';
+import { Box, Grid, Sheet, Typography, Divider, Drawer, Stack, Button } from '@mui/joy';
 import { useSearch, useNavigate } from '@tanstack/react-router';
 import gsap from 'gsap';
 import Header from './Header';
@@ -12,11 +12,16 @@ import IntelligenceFeed from './IntelligenceFeed';
 import { glassStyle } from '../styles/glass';
 import { API_BASE_URL } from '../config';
 import MarketEventsTimeline from './MarketEventsTimeline';
+import OaktreeIcon from './OaktreeIcon';
+import { LogOut, User } from 'lucide-react';
+import { AuthContext } from './AuthContext';
 
 export default function RoutesLayout() {
   const { tab: activeTab } = useSearch({ from: '/' });
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(true);
+  const [mobileOpen, setMobileOpen] = React.useState(false);
+  const { user, logout } = React.useContext(AuthContext);
 
   const setActiveTab = (tab: string) => {
     navigate({
@@ -115,7 +120,107 @@ export default function RoutesLayout() {
       <Header 
         onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)} 
         sidebarCollapsed={sidebarCollapsed} 
+        onOpenSidebar={() => setMobileOpen(true)}
       />
+
+      <Drawer
+        open={mobileOpen}
+        onClose={() => setMobileOpen(false)}
+        sx={{
+          display: { xs: 'block', md: 'none' },
+          '& .MuiDrawer-content': {
+            ...glassStyle,
+            p: 3,
+            width: 280,
+            borderRight: '1px solid rgba(255, 255, 255, 0.1)',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+          }
+        }}
+      >
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
+            <Box 
+              sx={{ 
+                background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
+                p: 1, 
+                borderRadius: '12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)',
+              }}
+            >
+              <OaktreeIcon color="white" size={20} />
+            </Box>
+            <Typography level="title-md" sx={{ fontWeight: 800 }}>Oaktree Command</Typography>
+          </Box>
+          
+          <Sidebar 
+            activeTab={activeTab} 
+            setActiveTab={(tab) => {
+              setActiveTab(tab);
+              setMobileOpen(false);
+            }}
+            reportsCount={reports.length + digests.length}
+            collapsed={false}
+          />
+        </Box>
+
+        <Box sx={{ mt: 'auto', pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+          <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
+            {user?.picture ? (
+              <Box
+                component="img"
+                src={user.picture}
+                alt={user.name}
+                sx={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '10px',
+                  border: '1px solid rgba(16, 185, 129, 0.2)'
+                }}
+              />
+            ) : (
+              <Box sx={{
+                width: 36,
+                height: 36,
+                bgcolor: 'rgba(16, 185, 129, 0.1)',
+                borderRadius: '10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '1px solid rgba(16, 185, 129, 0.2)'
+              }}>
+                <User size={18} color="#10b981" />
+              </Box>
+            )}
+            <Box sx={{ minWidth: 0 }}>
+              <Typography level="title-sm" noWrap sx={{ fontWeight: 700 }}>
+                {user?.name || 'Operator'}
+              </Typography>
+              <Typography level="body-xs" noWrap sx={{ opacity: 0.5, fontWeight: 500 }}>
+                {user?.email || 'Pro Account'}
+              </Typography>
+            </Box>
+          </Stack>
+          <Button
+            variant="soft"
+            color="danger"
+            fullWidth
+            startDecorator={<LogOut size={16} />}
+            onClick={() => {
+              console.log("Sign Out Button clicked in mobile Drawer, calling logout...", logout);
+              setMobileOpen(false);
+              logout();
+            }}
+            sx={{ borderRadius: '12px', fontWeight: 600 }}
+          >
+            Sign Out
+          </Button>
+        </Box>
+      </Drawer>
 
       <Box sx={{ display: 'flex', gap: 4 }}>
         {/* Sidebar Container */}

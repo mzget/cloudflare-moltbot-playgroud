@@ -10,6 +10,8 @@ import { z } from 'zod';
 import RoutesLayout from './RoutesLayout';
 import LoginScreen from './LoginScreen';
 import { API_BASE_URL } from '../config';
+import { AuthContext } from './AuthContext';
+import type { User } from './AuthContext';
 
 // Global Fetch Interceptor to inject JWT token
 if (typeof window !== 'undefined') {
@@ -40,21 +42,7 @@ if (typeof window !== 'undefined') {
   };
 }
 
-export interface User {
-  email: string;
-  name: string;
-  picture: string;
-}
 
-interface AuthContextType {
-  user: User | null;
-  logout: () => void;
-}
-
-export const AuthContext = React.createContext<AuthContextType>({
-  user: null,
-  logout: () => {},
-});
 
 // 1. Define the Search Schema (Validation)
 const dashboardSearchSchema = z.object({
@@ -144,6 +132,7 @@ export default function Dashboard() {
   const [exchangingCode, setExchangingCode] = React.useState(false);
 
   const logout = React.useCallback(() => {
+    console.log("logout function called in App.tsx - clearing auth_token");
     localStorage.removeItem('auth_token');
     setUser(null);
     if (typeof window !== 'undefined') {

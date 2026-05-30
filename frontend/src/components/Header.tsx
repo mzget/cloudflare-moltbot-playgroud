@@ -5,7 +5,8 @@ import { useColorScheme } from '@mui/joy/styles';
 import gsap from 'gsap';
 import { API_BASE_URL } from '../config';
 import { glassStyle } from '../styles/glass';
-import { AuthContext } from './App';
+import { AuthContext } from './AuthContext';
+import OaktreeIcon from './OaktreeIcon';
 
 interface HeaderProps {
   onOpenSidebar?: () => void;
@@ -235,7 +236,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
               transform: 'perspective(1000px) rotateY(-10deg)',
             }}
           >
-            <Newspaper color="white" size={28} />
+            <OaktreeIcon color="white" size={28} />
           </Box>
           <Box>
             <Typography 
@@ -290,7 +291,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
       </Stack>
 
       <Stack direction="row" spacing={2} alignItems="center">
-        <Box sx={{ display: { xs: 'none', md: 'flex' }, gap: 1.5, alignItems: 'center' }}>
+        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
           {/* Notifications Panel */}
           <Box ref={bellContainerRef} sx={{ position: 'relative' }}>
             <Tooltip title="Notifications" placement="bottom">
@@ -437,6 +438,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
               variant="plain" 
               color="neutral"
               sx={{ 
+                display: { xs: 'none', md: 'inline-flex' },
                 borderRadius: '12px',
                 '&:hover': { bgcolor: 'rgba(0,0,0,0.04)', transform: 'scale(1.05)' },
                 transition: 'all 0.2s'
@@ -446,31 +448,26 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
             </IconButton>
           </Tooltip>
           
-          <Box sx={{ width: '1px', height: '28px', bgcolor: 'divider', mx: 1 }} />
+          <Box sx={{ display: { xs: 'none', md: 'block' }, width: '1px', height: '28px', bgcolor: 'divider', mx: 1 }} />
           
           <Dropdown>
             <MenuButton
-              slots={{ root: Box }}
-              slotProps={{
-                root: {
-                  component: Sheet,
-                  sx: {
-                    ...glassStyle,
-                    display: 'flex',
-                    alignItems: 'center',
-                    px: 2,
-                    py: 0.75,
-                    gap: 2,
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease',
-                    border: '1px solid var(--joy-palette-neutral-outlinedBorder)',
-                    borderRadius: '16px',
-                    '&:hover': {
-                      bgcolor: 'background.level1',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
-                      transform: 'translateY(-1px)'
-                    }
-                  }
+              variant="plain"
+              sx={{
+                ...glassStyle,
+                display: 'flex',
+                alignItems: 'center',
+                px: { xs: 1, sm: 2 },
+                py: 0.75,
+                gap: { xs: 0, sm: 2 },
+                cursor: 'pointer',
+                transition: 'all 0.3s ease',
+                border: '1px solid var(--joy-palette-neutral-outlinedBorder)',
+                borderRadius: '16px',
+                '&:hover': {
+                  bgcolor: 'background.level1',
+                  boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+                  transform: 'translateY(-1px)'
                 }
               }}
             >
@@ -523,7 +520,10 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
               }}
             >
               <MenuItem
-                onClick={logout}
+                onClick={() => {
+                  console.log("Sign Out MenuItem clicked in Header.tsx, calling logout from context...", logout);
+                  logout();
+                }}
                 sx={{
                   borderRadius: '10px',
                   color: 'danger.plainColor',

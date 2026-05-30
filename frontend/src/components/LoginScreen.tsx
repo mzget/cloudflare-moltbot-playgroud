@@ -2,6 +2,7 @@ import * as React from 'react';
 import { Box, Button, Typography, Sheet, Stack, Alert } from '@mui/joy';
 import { ShieldAlert, Info, Newspaper } from 'lucide-react';
 import { glassStyle } from '../styles/glass';
+import OaktreeIcon from './OaktreeIcon';
 
 interface LoginScreenProps {
   onLoginClick: () => void;
@@ -77,14 +78,14 @@ export default function LoginScreen({ onLoginClick, loading, error }: LoginScree
         <Box
           sx={{
             background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-            p: 2,
+            p: 0.5,
             borderRadius: '24px',
             display: 'inline-flex',
             boxShadow: '0 12px 30px rgba(16, 185, 129, 0.3)',
             mb: 1,
           }}
         >
-          <Newspaper color="white" size={36} />
+          <OaktreeIcon color="white" size={56} />
         </Box>
 
         {/* Title & Branding */}
@@ -103,7 +104,7 @@ export default function LoginScreen({ onLoginClick, loading, error }: LoginScree
           >
             Oaktree Agent
           </Typography>
-          
+
           <Typography
             level="title-sm"
             sx={{
