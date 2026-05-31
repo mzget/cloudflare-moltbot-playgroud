@@ -25,6 +25,9 @@ export async function generateDailySummary(env: Env, symbol: string) {
 		1. Return ONLY a JSON object.
 		2. DO NOT include any introductory text, preamble, or comments.
 		3. Ensure the JSON is valid (double quotes for keys/values).
+		4. CRITICAL: Do NOT use double quotes (") inside any JSON string values (like 'summary' or 'key_takeaways'). Instead, use single quotes (') for any internal quotes or speech marks.
+		   Example: "summary": "Company's 'record performance' drive" (valid)
+		   Example: "summary": "Company's "record performance" drive" (INVALID)
 		
 		JSON Schema:
 		{
@@ -35,22 +38,56 @@ export async function generateDailySummary(env: Env, symbol: string) {
 	`;
 
 	try {
-		const response = await env.AI.run('@cf/meta/llama-3-8b-instruct', {
+		const response = await env.AI.run('@cf/google/gemma-4-26b-a4b-it', {
 			prompt,
-		});
+			response_format: {
+				type: 'json_object'
+			}
+		} as any);
 
-		let responseText = response.response || "";
-		
-		// 1. Clean up common AI artifacts (like comments)
-		// Remove // comments that models often add
-		responseText = responseText.replace(/\/\/.*$/gm, "");
+		let responseText = (response as any).choices?.[0]?.message?.content || response.response || "";
 		
 		// 2. Extract the JSON object using a more precise regex
 		const jsonMatch = responseText.match(/\{[\s\S]*\}/);
 		
 		if (jsonMatch) {
 			try {
-				const data = JSON.parse(jsonMatch[0]);
+				let data: any;
+				try {
+					data = JSON.parse(jsonMatch[0]);
+				} catch (parseError) {
+					// Attempt parsing again by escaping raw newlines in string literals
+					let inString = false;
+					let escape = false;
+					let cleaned = '';
+					const rawJson = jsonMatch[0];
+					for (let k = 0; k < rawJson.length; k++) {
+						const char = rawJson[k];
+						if (char === '"' && !escape) {
+							inString = !inString;
+							cleaned += char;
+						} else if (char === '\\' && inString) {
+							escape = !escape;
+							cleaned += char;
+						} else {
+							if (inString && (char === '\n' || char === '\r')) {
+								if (char === '\n') {
+									cleaned += '\\n';
+								} else if (char === '\r') {
+									if (rawJson[k + 1] === '\n') {
+										// handled by next character
+									} else {
+										cleaned += '\\n';
+									}
+								}
+							} else {
+								cleaned += char;
+							}
+							escape = false;
+						}
+					}
+					data = JSON.parse(cleaned);
+				}
 				
 				await env.DB.prepare(
 					'INSERT INTO daily_reports (symbol, summary, sentiment_score, key_takeaways) VALUES (?, ?, ?, ?)'
@@ -64,10 +101,13 @@ export async function generateDailySummary(env: Env, symbol: string) {
 				console.log(`Generated structured summary for ${symbol}.`);
 			} catch (parseError) {
 				console.error(`JSON Parse Error for ${symbol}:`, parseError);
-				console.debug("Raw cleaned text:", jsonMatch[0]);
+				console.error("Raw cleaned text:", jsonMatch[0]);
+				console.error("Raw response object:", JSON.stringify(response));
 			}
 		} else {
 			console.error("No JSON found in AI response for", symbol);
+			console.error("Raw responseText:", responseText);
+			console.error("Raw response object:", JSON.stringify(response));
 		}
 	} catch (error) {
 		console.error(`Error generating summary for ${symbol}:`, error);

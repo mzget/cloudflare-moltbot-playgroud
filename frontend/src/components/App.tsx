@@ -23,8 +23,13 @@ if (typeof window !== 'undefined') {
       ? input
       : (input instanceof URL ? input.toString() : (input as Request).url);
 
+    const isBackend = url.startsWith(API_BASE_URL) ||
+                      url.startsWith('http://localhost:8787') ||
+                      url.startsWith('http://127.0.0.1:8787') ||
+                      url.startsWith('/api/');
+
     const token = localStorage.getItem('auth_token');
-    if (token && (url.startsWith(API_BASE_URL) || url.startsWith('/api/'))) {
+    if (token && isBackend) {
       init = init || {};
       const headers = new Headers(init.headers);
       if (!headers.has('Authorization')) {
@@ -35,9 +40,20 @@ if (typeof window !== 'undefined') {
 
     const response = await originalFetch(input, init);
 
-    if (response.status === 401 && (url.startsWith(API_BASE_URL) || url.startsWith('/api/')) && !url.includes('/api/auth/user/')) {
-      localStorage.removeItem('auth_token');
-      window.dispatchEvent(new CustomEvent('auth-expired'));
+    if (response.status === 401 && isBackend && !url.includes('/api/auth/user/')) {
+      // Instead of clearing token immediately (which causes logouts on transient/reload errors),
+      // verify if the session is truly invalid by checking the auth status endpoint.
+      fetch(`${API_BASE_URL}/api/auth/user/me`).then(res => {
+        if (res.status === 401) {
+          console.warn("Session expired or invalid (confirmed by /api/auth/user/me). Logging out.");
+          localStorage.removeItem('auth_token');
+          window.dispatchEvent(new CustomEvent('auth-expired'));
+        } else {
+          console.log("Ignored transient 401 error. Session is still valid.");
+        }
+      }).catch(err => {
+        console.error('Failed to verify session status after 401:', err);
+      });
     }
 
     return response;

@@ -34,7 +34,8 @@ import {
   AlertCircle,
   RefreshCw,
   Sliders,
-  Play
+  Play,
+  Sparkles
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import { glassStyle } from '../styles/glass';
@@ -77,6 +78,7 @@ export default function SourceManager() {
   const [showSubForm, setShowSubForm] = useState(false);
   const [editingSub, setEditingSub] = useState<EmailSubscription | null>(null);
   const [syncingEmails, setSyncingEmails] = useState(false);
+  const [testingDigest, setTestingDigest] = useState(false);
 
   // Fetch Web/RSS news sources
   const fetchSources = async () => {
@@ -230,6 +232,24 @@ export default function SourceManager() {
       console.error('Failed to sync emails', e);
     } finally {
       setSyncingEmails(false);
+    }
+  };
+
+  const handleTestDigest = async () => {
+    setTestingDigest(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/test-email-digest`);
+      if (res.ok) {
+        alert('Email digest generated successfully!');
+      } else {
+        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+        alert(`Failed to generate digest: ${errorData.error}`);
+      }
+    } catch (e) {
+      console.error('Failed to run test email digest', e);
+      alert('Network or server error during digest generation.');
+    } finally {
+      setTestingDigest(false);
     }
   };
 
@@ -429,6 +449,16 @@ export default function SourceManager() {
                       sx={{ borderRadius: '12px' }}
                     >
                       Sync Now
+                    </Button>
+                    <Button
+                      variant="soft"
+                      color="warning"
+                      onClick={handleTestDigest}
+                      loading={testingDigest}
+                      startDecorator={<Sparkles size={16} />}
+                      sx={{ borderRadius: '12px' }}
+                    >
+                      Test Digest
                     </Button>
                     <Button
                       variant="soft"

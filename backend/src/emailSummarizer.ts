@@ -19,10 +19,6 @@ function cleanEmailBody(body: string): string {
   cleaned = cleaned.replace(/<[^>]+>/g, ' ');
   // Replace multiple spaces/newlines
   cleaned = cleaned.replace(/\s+/g, ' ');
-  // Limit size per email to save context window
-  if (cleaned.length > 8000) {
-    cleaned = cleaned.slice(0, 8000) + '... [content truncated]';
-  }
   return cleaned.trim();
 }
 
@@ -52,13 +48,16 @@ export async function syncAndIngestEmails(env: Env): Promise<number> {
     // Determine the query
     let query = '';
     if (sub.raw_query) {
-      query = sub.raw_query;
+      query = `${sub.raw_query} is:unread`;
     } else {
       const parts = [];
       if (sub.sender) parts.push(`from:${sub.sender}`);
       if (sub.subject_filter) parts.push(`subject:(${sub.subject_filter})`);
       if (sub.label_filter) parts.push(`label:${sub.label_filter}`);
-      query = parts.join(' ');
+      if (parts.length > 0) {
+        parts.push('is:unread');
+        query = parts.join(' ');
+      }
     }
 
     if (!query) continue;
@@ -147,20 +146,28 @@ export async function generateEmailDigests(env: Env, isManual = false): Promise<
     return;
   }
 
-  console.log(`Processing and summarizing ${emails.length} ingested emails for due subscriptions...`);
+  console.log(`Processing and summarizing ${emails.length} ingested emails for due subscriptions in batches...`);
 
-  // Prepare LLM prompt with all raw email contents
-  const context = emails.map((e, index) => {
-    return `--- EMAIL ${index + 1} ---
+  const BATCH_SIZE = 3;
+  for (let i = 0; i < emails.length; i += BATCH_SIZE) {
+    const batch = emails.slice(i, i + BATCH_SIZE);
+    console.log(`Processing batch ${Math.floor(i / BATCH_SIZE) + 1} of ${Math.ceil(emails.length / BATCH_SIZE)} (${batch.length} emails)...`);
+
+    try {
+      // Prepare LLM prompt with batch email contents, truncating body_text to 3000 characters on-the-fly
+      const context = batch.map((e, index) => {
+        const bodyText = e.body_text || '';
+        const truncatedBody = bodyText.length > 3000 ? bodyText.slice(0, 3000) + '... [truncated]' : bodyText;
+        return `--- EMAIL ${index + 1} ---
 ID: ${e.id}
 Sender: ${e.sender}
 Subject: ${e.subject}
 Date: ${new Date(e.received_at).toISOString()}
-Content: ${e.body_text}
+Content: ${truncatedBody}
 ----------------------`;
-  }).join('\n\n');
+      }).join('\n\n');
 
-  const prompt = `
+      const prompt = `
 You are the Oaktree Agent, a world-class financial analyst and investment strategist, writing in the style of Howard Marks.
 Analyze the following email newsletter content. Your goal is to:
 1. Extract the main financial, market, or macroeconomic stories/news items discussed in these emails.
@@ -173,6 +180,9 @@ RESPONSE INSTRUCTIONS:
 - Return ONLY a JSON object.
 - DO NOT include any markdown code blocks, comments, or introductory text.
 - Ensure the JSON is strictly valid.
+- CRITICAL: Do NOT use double quotes (") inside any JSON string values (like 'summary' or 'key_takeaways'). Instead, use single quotes (') for any internal quotes or speech marks.
+  Example: "summary": "Howard Marks' 'most important thing' concept" (valid)
+  Example: "summary": "Howard Marks' "most important thing" concept" (INVALID)
 
 JSON Schema:
 {
@@ -181,9 +191,7 @@ JSON Schema:
       "category": "Macroeconomy",
       "summary": "Detailed, Howard Marks style analysis synthesizing the macroeconomic news...",
       "key_takeaways": ["Point 1", "Point 2"],
-      "source_emails": [
-        { "id": "email_id_from_header", "subject": "email_subject", "sender": "email_sender" }
-      ]
+      "source_emails": ["email_id_1", "email_id_2"]
     }
   ]
 }
@@ -192,46 +200,101 @@ Emails content:
 ${context}
 `;
 
-  try {
-    const response = await env.AI.run('@cf/meta/llama-3-8b-instruct', {
-      prompt,
-    });
+      const response = await env.AI.run('@cf/google/gemma-4-26b-a4b-it', {
+        prompt,
+        response_format: {
+          type: 'json_object'
+        }
+      } as any);
 
-    let responseText = response.response || "";
-    // Clean up LLM syntax artifacts
-    responseText = responseText.replace(/\/\/.*$/gm, "");
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      let responseText = (response as any).choices?.[0]?.message?.content || response.response || "";
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
 
-    if (jsonMatch) {
-      const data = JSON.parse(jsonMatch[0]);
-      const digests = data.digests || [];
+      if (jsonMatch) {
+        let data: any;
+        try {
+          data = JSON.parse(jsonMatch[0]);
+        } catch (parseError) {
+          // Attempt parsing again by escaping raw newlines in string literals
+          let inString = false;
+          let escape = false;
+          let cleaned = '';
+          const rawJson = jsonMatch[0];
+          for (let k = 0; k < rawJson.length; k++) {
+            const char = rawJson[k];
+            if (char === '"' && !escape) {
+              inString = !inString;
+              cleaned += char;
+            } else if (char === '\\' && inString) {
+              escape = !escape;
+              cleaned += char;
+            } else {
+              if (inString && (char === '\n' || char === '\r')) {
+                if (char === '\n') {
+                  cleaned += '\\n';
+                } else if (char === '\r') {
+                  if (rawJson[k + 1] === '\n') {
+                    // handled by next character
+                  } else {
+                    cleaned += '\\n';
+                  }
+                }
+              } else {
+                cleaned += char;
+              }
+              escape = false;
+            }
+          }
+          data = JSON.parse(cleaned);
+        }
 
-      console.log(`AI generated ${digests.length} digest categories.`);
+        const digests = data.digests || [];
 
-      for (const digest of digests) {
+        console.log(`AI generated ${digests.length} digest categories for this batch.`);
+
+        for (const digest of digests) {
+          // Map source email IDs back to objects containing subject, sender, received_at from the batch
+          const rawSources = digest.source_emails || [];
+          const mappedSources = rawSources.map((idOrObj: any) => {
+            const emailId = typeof idOrObj === 'object' && idOrObj !== null ? idOrObj.id : idOrObj;
+            const originalEmail = batch.find(e => e.id === emailId);
+            if (originalEmail) {
+              return {
+                id: originalEmail.id,
+                subject: originalEmail.subject,
+                sender: originalEmail.sender,
+                received_at: originalEmail.received_at
+              };
+            }
+            // Fallback in case the model returned an object structure directly or didn't find the email in the batch
+            return typeof idOrObj === 'object' && idOrObj !== null ? idOrObj : { id: idOrObj };
+          });
+
+          await env.DB.prepare(
+            'INSERT INTO email_digests (category, summary, key_takeaways, source_emails) VALUES (?, ?, ?, ?)'
+          ).bind(
+            digest.category,
+            digest.summary,
+            JSON.stringify(digest.key_takeaways || []),
+            JSON.stringify(mappedSources)
+          ).run();
+        }
+
+        // Mark only this batch of emails as processed
+        const emailIds = batch.map(e => e.id);
+        const updatePlaceholders = emailIds.map(() => '?').join(',');
         await env.DB.prepare(
-          'INSERT INTO email_digests (category, summary, key_takeaways, source_emails) VALUES (?, ?, ?, ?)'
-        ).bind(
-          digest.category,
-          digest.summary,
-          JSON.stringify(digest.key_takeaways || []),
-          JSON.stringify(digest.source_emails || [])
-        ).run();
+          `UPDATE ingested_emails SET processed = 1 WHERE id IN (${updatePlaceholders})`
+        ).bind(...emailIds).run();
+
+        console.log(`Successfully completed email summarization for batch email IDs: ${emailIds.join(', ')}`);
+      } else {
+        console.error('No JSON structure found in AI response for email digests in this batch.');
+        console.error('Raw responseText:', responseText);
+        console.error('Raw response object:', JSON.stringify(response));
       }
-
-      // Mark all these emails as processed
-      const emailIds = emails.map(e => e.id);
-      const updatePlaceholders = emailIds.map(() => '?').join(',');
-      await env.DB.prepare(
-        `UPDATE ingested_emails SET processed = 1 WHERE id IN (${updatePlaceholders})`
-      ).bind(...emailIds).run();
-
-      console.log(`Successfully completed email summarization for IDs: ${emailIds.join(', ')}`);
-    } else {
-      console.error('No JSON structure found in AI response for email digests.');
-      console.debug('Raw response:', responseText);
+    } catch (batchError) {
+      console.error('Error processing email digest batch:', batchError);
     }
-  } catch (error) {
-    console.error('Error generating email digests:', error);
   }
 }

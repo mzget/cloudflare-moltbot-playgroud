@@ -565,6 +565,23 @@ export default {
 			return new Response('Email sync started', { headers: corsHeaders });
 		}
 
+		// API: Test Email Sync & Digest (Synchronous)
+		if (url.pathname === '/api/test-email-digest') {
+			try {
+				console.log('Starting manual test email digest...');
+				await generateEmailDigests(env, true);
+				return Response.json({
+					success: true,
+					message: 'Email digest generation completed successfully'
+				}, { headers: corsHeaders });
+			} catch (e) {
+				return Response.json({
+					success: false,
+					error: (e as any).message
+				}, { status: 500, headers: corsHeaders });
+			}
+		}
+
 		// API: Get Email Digests
 		if (url.pathname === '/api/email-digests') {
 			try {
