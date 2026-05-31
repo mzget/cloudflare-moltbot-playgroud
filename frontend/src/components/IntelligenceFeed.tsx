@@ -2,7 +2,6 @@ import * as React from 'react';
 import { Box, Typography, Sheet, Stack, Button, ButtonGroup } from '@mui/joy';
 import DailyReportCard from './DailyReportCard';
 import EmailDigestCard from './EmailDigestCard';
-import ManualTrigger from './ManualTrigger';
 import { glassStyle } from '../styles/glass';
 import MarketEventsTimeline from './MarketEventsTimeline';
 
@@ -57,7 +56,6 @@ export default function IntelligenceFeed({
             Synthesis of recent market movements, news signals, and email newsletter digests.
           </Typography>
         </Box>
-        <ManualTrigger />
       </Stack>
 
       <Box sx={{ display: { xs: 'block', lg: 'none' } }}>

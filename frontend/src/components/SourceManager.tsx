@@ -38,6 +38,7 @@ import {
 } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import { glassStyle } from '../styles/glass';
+import ManualTrigger from './ManualTrigger';
 
 interface NewsSource {
   id: number;
@@ -264,6 +265,44 @@ export default function SourceManager() {
 
         <TabPanel value={0} sx={{ p: 0 }}>
           {/* Tab 1: Web & RSS Crawler */}
+          {/* Crawler & Report Generation Control Panel */}
+          <Sheet
+            variant="outlined"
+            sx={{
+              p: 3,
+              borderRadius: '16px',
+              bgcolor: 'background.surface',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+              mb: 4
+            }}
+          >
+            <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2}>
+              <Stack direction="row" spacing={2} alignItems="center">
+                <Box
+                  sx={{
+                    p: 1.5,
+                    borderRadius: '12px',
+                    bgcolor: 'rgba(52, 152, 219, 0.15)',
+                    color: '#3498db',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <Globe size={24} />
+                </Box>
+                <Box>
+                  <Typography level="title-md">Crawler & Report Controls</Typography>
+                  <Typography level="body-sm" sx={{ opacity: 0.6 }}>
+                    Manually trigger a news crawl across active sources or regenerate AI summaries for watchlist.
+                  </Typography>
+                </Box>
+              </Stack>
+              <ManualTrigger />
+            </Stack>
+          </Sheet>
+
           <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
             <Box>
               <Typography level="title-md">Active Web Targets</Typography>
