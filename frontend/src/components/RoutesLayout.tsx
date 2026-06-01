@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import gsap from 'gsap';
 import Header from './Header';
 import Sidebar from './Sidebar';
+import DotaHUD from './DotaHUD';
 import SourceManager from './SourceManager';
 import Watchlist from './Watchlist';
 import KnowledgeChat from './KnowledgeChat';
@@ -24,6 +25,24 @@ export default function RoutesLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(true);
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const { user, logout } = React.useContext(AuthContext);
+
+  // Game Mode state (persisted in localStorage)
+  const [gameMode, setGameMode] = React.useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('oaktree_game_mode') !== 'false'; // default: true (game mode)
+    }
+    return true;
+  });
+
+  const toggleGameMode = React.useCallback(() => {
+    setGameMode(prev => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('oaktree_game_mode', String(next));
+      }
+      return next;
+    });
+  }, []);
 
   const setActiveTab = (tab: string) => {
     navigate({
@@ -97,7 +116,7 @@ export default function RoutesLayout() {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
         fetchReports();
       }
-    }, 180000); // Poll every 3 minutes instead of 30s
+    }, 180000);
 
     const handleVisibilityChange = () => {
       if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
@@ -117,6 +136,68 @@ export default function RoutesLayout() {
     };
   }, []);
 
+  // ═══ Shared content rendering ═══════════════════════════════════
+  const renderContent = () => (
+    <>
+      {activeTab === 'dashboard' && <FundametalDashboard />}
+      {activeTab === 'market' && (
+        <IntelligenceFeed 
+          reports={reports} 
+          digests={digests} 
+          loading={loading} 
+          onDigestRead={async (id) => {
+            setDigests(prev => prev.filter(d => d.id !== id));
+            try {
+              const res = await fetch(`${API_BASE_URL}/api/email-digests/mark-read`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id })
+              });
+              if (!res.ok) {
+                throw new Error(await res.text());
+              }
+              await fetchReports();
+            } catch (e) {
+              console.error("Failed to mark digest as read:", e);
+              await fetchReports();
+            }
+          }}
+        />
+      )}
+      {activeTab === 'watchlist' && <Watchlist />}
+      {activeTab === 'agent' && <KnowledgeChat />}
+      {activeTab === 'sources' && <SourceManager />}
+      {activeTab === 'about' && (
+        <Sheet sx={{ ...glassStyle, p: 4 }}>
+          <Typography level="h2" sx={{ mb: 2 }}>{t('about.title')}</Typography>
+          <Typography sx={{ mb: 2, lineHeight: 1.8 }}>
+            {t('about.description')}
+          </Typography>
+          <Divider sx={{ my: 3, opacity: 0.1 }} />
+          <Typography level="body-sm" sx={{ opacity: 0.5 }}>
+            {t('about.footer')}
+          </Typography>
+        </Sheet>
+      )}
+    </>
+  );
+
+  // ═══ GAME MODE: DotA HUD Layout ═══════════════════════════════
+  if (gameMode) {
+    return (
+      <DotaHUD
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        gameMode={gameMode}
+        onToggleGameMode={toggleGameMode}
+        reportsCount={reports.length + digests.length}
+      >
+        {renderContent()}
+      </DotaHUD>
+    );
+  }
+
+  // ═══ CLASSIC MODE: Original Layout ═════════════════════════════
   return (
     <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: '1600px', margin: '0 auto', minHeight: '100vh' }}>
       <Header 
@@ -213,7 +294,6 @@ export default function RoutesLayout() {
             fullWidth
             startDecorator={<LogOut size={16} />}
             onClick={() => {
-              console.log("Sign Out Button clicked in mobile Drawer, calling logout...", logout);
               setMobileOpen(false);
               logout();
             }}
@@ -225,7 +305,6 @@ export default function RoutesLayout() {
       </Drawer>
 
       <Box sx={{ display: 'flex', gap: 4 }}>
-        {/* Sidebar Container */}
         <Box 
           sx={{ 
             width: sidebarCollapsed ? '80px' : { md: '280px', lg: '320px' },
@@ -251,53 +330,10 @@ export default function RoutesLayout() {
           </Sheet>
         </Box>
 
-        {/* Main Content Container */}
         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-          {activeTab === 'dashboard' && <FundametalDashboard />}
-          {activeTab === 'market' && (
-            <IntelligenceFeed 
-              reports={reports} 
-              digests={digests} 
-              loading={loading} 
-              onDigestRead={async (id) => {
-                // Optimistic UI update
-                setDigests(prev => prev.filter(d => d.id !== id));
-                try {
-                  const res = await fetch(`${API_BASE_URL}/api/email-digests/mark-read`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id })
-                  });
-                  if (!res.ok) {
-                    throw new Error(await res.text());
-                  }
-                  await fetchReports();
-                } catch (e) {
-                  console.error("Failed to mark digest as read:", e);
-                  await fetchReports();
-                }
-              }}
-            />
-          )}
-
-          {activeTab === 'watchlist' && <Watchlist />}
-          {activeTab === 'agent' && <KnowledgeChat />}
-          {activeTab === 'sources' && <SourceManager />}
-          {activeTab === 'about' && (
-            <Sheet sx={{ ...glassStyle, p: 4 }}>
-              <Typography level="h2" sx={{ mb: 2 }}>{t('about.title')}</Typography>
-              <Typography sx={{ mb: 2, lineHeight: 1.8 }}>
-                {t('about.description')}
-              </Typography>
-              <Divider sx={{ my: 3, opacity: 0.1 }} />
-              <Typography level="body-sm" sx={{ opacity: 0.5 }}>
-                {t('about.footer')}
-              </Typography>
-            </Sheet>
-          )}
+          {renderContent()}
         </Box>
 
-        {/* Right Sidebar Container */}
         {activeTab === 'market' && (
           <Box 
             sx={{ 
