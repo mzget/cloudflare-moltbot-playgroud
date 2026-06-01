@@ -8,6 +8,7 @@ binding = "BROWSER"
 
 [ai]
 binding = "AI"
+remote = true
 
 [[d1_databases]]
 binding = "DB"

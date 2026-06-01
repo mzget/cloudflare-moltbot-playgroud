@@ -154,10 +154,10 @@ export async function generateEmailDigests(env: Env, isManual = false): Promise<
     console.log(`Processing batch ${Math.floor(i / BATCH_SIZE) + 1} of ${Math.ceil(emails.length / BATCH_SIZE)} (${batch.length} emails)...`);
 
     try {
-      // Prepare LLM prompt with batch email contents, truncating body_text to 1500 characters on-the-fly
+      // Prepare LLM prompt with batch email contents, truncating body_text to 8000 characters on-the-fly
       const context = batch.map((e, index) => {
         const bodyText = e.body_text || '';
-        const truncatedBody = bodyText.length > 1500 ? bodyText.slice(0, 1500) + '... [truncated]' : bodyText;
+        const truncatedBody = bodyText.length > 8000 ? bodyText.slice(0, 8000) + '... [truncated]' : bodyText;
         return `--- EMAIL ${index + 1} ---
 ID: ${e.id}
 Sender: ${e.sender}
@@ -172,8 +172,8 @@ You are the Oaktree Agent, a world-class financial analyst and investment strate
 Analyze the following email newsletter content. Your goal is to:
 1. Extract the main financial, market, or macroeconomic stories/news items discussed in these emails.
 2. Group them into distinct thematic categories (e.g. 'Macroeconomy', 'Technology & AI', 'Corporate Earnings', 'Geopolitics', 'Crypto & Digital Assets').
-3. For each category group, write a cohesive, professional Howard Marks-style summary (insightful, focusing on long-term risk and market cycles) that synthesizes the stories in that category. Keep the summary concise, strictly between 2 to 3 sentences.
-4. Provide a list of key takeaways (bullet points) for each category. Limit this to a maximum of 3 bullet points.
+3. For each category group, write a detailed, cohesive, professional Howard Marks-style summary (insightful, focusing on long-term risk and market cycles) that synthesizes the stories in that category. The summary should be thorough, detailed, and clear, consisting of at least 1 to 2 paragraphs (roughly 5 to 8 sentences total), ensuring that a reader can easily understand the context, main arguments, and key details without having to refer to the original email.
+4. Provide a list of key takeaways (bullet points) for each category. Provide 3 to 5 key takeaways per category to ensure important details are covered.
 5. Identify which email IDs are associated with each digest category (source_emails).
 
 RESPONSE INSTRUCTIONS:
