@@ -148,16 +148,16 @@ export async function generateEmailDigests(env: Env, isManual = false): Promise<
 
   console.log(`Processing and summarizing ${emails.length} ingested emails for due subscriptions in batches...`);
 
-  const BATCH_SIZE = 3;
+  const BATCH_SIZE = 2;
   for (let i = 0; i < emails.length; i += BATCH_SIZE) {
     const batch = emails.slice(i, i + BATCH_SIZE);
     console.log(`Processing batch ${Math.floor(i / BATCH_SIZE) + 1} of ${Math.ceil(emails.length / BATCH_SIZE)} (${batch.length} emails)...`);
 
     try {
-      // Prepare LLM prompt with batch email contents, truncating body_text to 3000 characters on-the-fly
+      // Prepare LLM prompt with batch email contents, truncating body_text to 1500 characters on-the-fly
       const context = batch.map((e, index) => {
         const bodyText = e.body_text || '';
-        const truncatedBody = bodyText.length > 3000 ? bodyText.slice(0, 3000) + '... [truncated]' : bodyText;
+        const truncatedBody = bodyText.length > 1500 ? bodyText.slice(0, 1500) + '... [truncated]' : bodyText;
         return `--- EMAIL ${index + 1} ---
 ID: ${e.id}
 Sender: ${e.sender}
@@ -172,12 +172,13 @@ You are the Oaktree Agent, a world-class financial analyst and investment strate
 Analyze the following email newsletter content. Your goal is to:
 1. Extract the main financial, market, or macroeconomic stories/news items discussed in these emails.
 2. Group them into distinct thematic categories (e.g. 'Macroeconomy', 'Technology & AI', 'Corporate Earnings', 'Geopolitics', 'Crypto & Digital Assets').
-3. For each category group, write a cohesive, professional Howard Marks-style summary (insightful, focusing on long-term risk and market cycles) that synthesizes the stories in that category.
-4. Provide a list of key takeaways (bullet points) for each category.
+3. For each category group, write a cohesive, professional Howard Marks-style summary (insightful, focusing on long-term risk and market cycles) that synthesizes the stories in that category. Keep the summary concise, strictly between 2 to 3 sentences.
+4. Provide a list of key takeaways (bullet points) for each category. Limit this to a maximum of 3 bullet points.
 5. Identify which email IDs are associated with each digest category (source_emails).
 
 RESPONSE INSTRUCTIONS:
 - Return ONLY a JSON object.
+- CRITICAL: Keep your internal reasoning/thinking process very short (under 100 words) so you do not run out of token space.
 - DO NOT include any markdown code blocks, comments, or introductory text.
 - Ensure the JSON is strictly valid.
 - CRITICAL: Do NOT use double quotes (") inside any JSON string values (like 'summary' or 'key_takeaways'). Instead, use single quotes (') for any internal quotes or speech marks.
@@ -201,7 +202,10 @@ ${context}
 `;
 
       const response = await env.AI.run('@cf/google/gemma-4-26b-a4b-it', {
-        prompt,
+        messages: [
+          { role: 'user', content: prompt }
+        ],
+        max_tokens: 8192,
         response_format: {
           type: 'json_object'
         }

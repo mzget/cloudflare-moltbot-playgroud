@@ -11,11 +11,11 @@ export async function generateDailySummary(env: Env, symbol: string) {
 		return;
 	}
 
-	const context = news.map(n => `- ${n.title}\n  Summary: ${n.summary || 'No summary available.'}`).join('\n\n');
+	const context = news.slice(0, 10).map(n => `- ${n.title}\n  Summary: ${n.summary || 'No summary available.'}`).join('\n\n');
 	
 	const prompt = `
 		You are the Oaktree Agent, an expert financial analyst. 
-		Summarize the following news headlines for ${symbol} into a concise, professional report.
+		Summarize the following news headlines for ${symbol} into a concise, professional report (strictly 2 to 3 sentences).
 		Style: Howard Marks Memo (insightful, long-term oriented, cautious but clear).
 		
 		News Headlines:
@@ -23,9 +23,10 @@ export async function generateDailySummary(env: Env, symbol: string) {
 		
 		RESPONSE INSTRUCTIONS:
 		1. Return ONLY a JSON object.
-		2. DO NOT include any introductory text, preamble, or comments.
-		3. Ensure the JSON is valid (double quotes for keys/values).
-		4. CRITICAL: Do NOT use double quotes (") inside any JSON string values (like 'summary' or 'key_takeaways'). Instead, use single quotes (') for any internal quotes or speech marks.
+		2. CRITICAL: Keep your internal reasoning/thinking process very short (under 100 words) so you do not run out of token space.
+		3. DO NOT include any introductory text, preamble, or comments.
+		4. Ensure the JSON is valid (double quotes for keys/values).
+		5. CRITICAL: Do NOT use double quotes (") inside any JSON string values (like 'summary' or 'key_takeaways'). Instead, use single quotes (') for any internal quotes or speech marks.
 		   Example: "summary": "Company's 'record performance' drive" (valid)
 		   Example: "summary": "Company's "record performance" drive" (INVALID)
 		
@@ -39,7 +40,10 @@ export async function generateDailySummary(env: Env, symbol: string) {
 
 	try {
 		const response = await env.AI.run('@cf/google/gemma-4-26b-a4b-it', {
-			prompt,
+			messages: [
+				{ role: 'user', content: prompt }
+			],
+			max_tokens: 8192,
 			response_format: {
 				type: 'json_object'
 			}
