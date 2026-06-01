@@ -254,7 +254,31 @@ export default function RoutesLayout() {
         {/* Main Content Container */}
         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
           {activeTab === 'dashboard' && <FundametalDashboard />}
-          {activeTab === 'market' && <IntelligenceFeed reports={reports} digests={digests} loading={loading} />}
+          {activeTab === 'market' && (
+            <IntelligenceFeed 
+              reports={reports} 
+              digests={digests} 
+              loading={loading} 
+              onDigestRead={async (id) => {
+                // Optimistic UI update
+                setDigests(prev => prev.filter(d => d.id !== id));
+                try {
+                  const res = await fetch(`${API_BASE_URL}/api/email-digests/mark-read`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id })
+                  });
+                  if (!res.ok) {
+                    throw new Error(await res.text());
+                  }
+                  await fetchReports();
+                } catch (e) {
+                  console.error("Failed to mark digest as read:", e);
+                  await fetchReports();
+                }
+              }}
+            />
+          )}
 
           {activeTab === 'watchlist' && <Watchlist />}
           {activeTab === 'agent' && <KnowledgeChat />}

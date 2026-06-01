@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { Box, Typography, Card, CardContent, Chip, Stack } from '@mui/joy';
-import { Mail, Calendar, Sparkles } from 'lucide-react';
+import { Box, Typography, Card, CardContent, Chip, Stack, Button } from '@mui/joy';
+import { Mail, Calendar, Sparkles, Check } from 'lucide-react';
 import { glassStyle } from '../styles/glass';
 
 interface EmailSource {
@@ -18,9 +18,16 @@ interface EmailDigest {
   source_emails: string; // JSON string of array of EmailSource
   digest_date: string;
   created_at: number; // timestamp
+  is_readed?: number;
 }
 
-export function EmailDigestCard({ digest }: { digest: EmailDigest }) {
+export function EmailDigestCard({ 
+  digest,
+  onMarkAsRead
+}: { 
+  digest: EmailDigest;
+  onMarkAsRead?: (id: number) => void;
+}) {
   const takeaways = React.useMemo(() => {
     try {
       return JSON.parse(digest.key_takeaways || '[]');
@@ -60,7 +67,38 @@ export function EmailDigestCard({ digest }: { digest: EmailDigest }) {
               Compiled on {new Date(digest.digest_date).toLocaleDateString()}
             </Typography>
           </Box>
-          <Sparkles size={36} color="var(--joy-palette-primary-plainColor)" style={{ opacity: 0.15 }} />
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            {onMarkAsRead && (
+              <Button
+                variant="outlined"
+                color="neutral"
+                size="sm"
+                startDecorator={<Check size={14} />}
+                onClick={() => onMarkAsRead(digest.id)}
+                sx={{
+                  borderRadius: '10px',
+                  fontWeight: 600,
+                  fontSize: '0.8rem',
+                  borderColor: 'rgba(255, 255, 255, 0.1)',
+                  bgcolor: 'rgba(255, 255, 255, 0.02)',
+                  transition: 'all 0.2s',
+                  '&:hover': {
+                    bgcolor: 'primary.softBg',
+                    color: 'primary.softColor',
+                    borderColor: 'primary.softBorder',
+                    transform: 'translateY(-1px)',
+                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.1)',
+                  },
+                  '&:active': {
+                    transform: 'translateY(0)',
+                  }
+                }}
+              >
+                Mark as Read
+              </Button>
+            )}
+            <Sparkles size={28} color="var(--joy-palette-primary-plainColor)" style={{ opacity: 0.15 }} />
+          </Stack>
         </Stack>
 
         <Typography level="body-lg" sx={{ opacity: 0.9, fontStyle: 'italic', mb: 4, lineHeight: 1.7, borderLeft: '4px solid var(--joy-palette-primary-500)', pl: 3 }}>

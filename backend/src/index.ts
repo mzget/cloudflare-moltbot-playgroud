@@ -582,11 +582,27 @@ export default {
 			}
 		}
 
+		// API: Mark Email Digest as Read
+		if (url.pathname === '/api/email-digests/mark-read' && request.method === 'POST') {
+			try {
+				const { id } = await request.json() as any;
+				if (!id) {
+					return Response.json({ error: 'Missing digest ID' }, { status: 400, headers: corsHeaders });
+				}
+				await env.DB.prepare(
+					'UPDATE email_digests SET is_readed = 1 WHERE id = ?'
+				).bind(id).run();
+				return Response.json({ success: true, message: 'Digest marked as read' }, { headers: corsHeaders });
+			} catch (e) {
+				return Response.json({ error: (e as any).message }, { status: 500, headers: corsHeaders });
+			}
+		}
+
 		// API: Get Email Digests
 		if (url.pathname === '/api/email-digests') {
 			try {
 				const { results } = await env.DB.prepare(
-					'SELECT id, category, summary, key_takeaways, source_emails, digest_date, CAST(strftime(\'%s\', created_at) as INTEGER) as created_at FROM email_digests ORDER BY created_at DESC LIMIT 50'
+					'SELECT id, category, summary, key_takeaways, source_emails, digest_date, is_readed, CAST(strftime(\'%s\', created_at) as INTEGER) as created_at FROM email_digests WHERE is_readed = 0 ORDER BY created_at DESC LIMIT 50'
 				).all();
 				return Response.json(results || [], { headers: corsHeaders });
 			} catch (e) {

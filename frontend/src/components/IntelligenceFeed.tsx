@@ -8,11 +8,13 @@ import MarketEventsTimeline from './MarketEventsTimeline';
 export default function IntelligenceFeed({
   reports,
   digests = [],
-  loading
+  loading,
+  onDigestRead
 }: {
   reports: any[];
   digests?: any[];
   loading: boolean;
+  onDigestRead?: (id: number) => void;
 }) {
   const [filter, setFilter] = React.useState<'all' | 'reports' | 'digests'>('all');
 
@@ -139,7 +141,7 @@ export default function IntelligenceFeed({
             if (item.symbol) {
               return <DailyReportCard key={`report-${item.id}`} report={item} />;
             } else {
-              return <EmailDigestCard key={`digest-${item.id}`} digest={item} />;
+              return <EmailDigestCard key={`digest-${item.id}`} digest={item} onMarkAsRead={onDigestRead} />;
             }
           })}
         </Stack>
