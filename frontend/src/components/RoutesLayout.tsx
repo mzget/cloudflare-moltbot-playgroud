@@ -204,6 +204,8 @@ export default function RoutesLayout() {
         onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)} 
         sidebarCollapsed={sidebarCollapsed} 
         onOpenSidebar={() => setMobileOpen(true)}
+        gameMode={gameMode}
+        onToggleGameMode={toggleGameMode}
       />
 
       <Drawer

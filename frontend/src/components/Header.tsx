@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useContext } from 'react';
 import { Box, Typography, Stack, Sheet, IconButton, Tooltip, Button, Dropdown, Menu as JoyMenu, MenuButton, MenuItem } from '@mui/joy';
-import { Newspaper, Bell, Settings, User, Menu, Moon, Sun, LogOut } from 'lucide-react';
+import { Newspaper, Bell, Settings, User, Menu, Moon, Sun, LogOut, Gamepad2, Monitor } from 'lucide-react';
 import { useColorScheme } from '@mui/joy/styles';
 import { useTranslation } from 'react-i18next';
 import gsap from 'gsap';
@@ -13,9 +13,11 @@ interface HeaderProps {
   onOpenSidebar?: () => void;
   onToggleSidebar?: () => void;
   sidebarCollapsed?: boolean;
+  onToggleGameMode?: () => void;
+  gameMode?: boolean;
 }
 
-export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapsed }: HeaderProps) {
+export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapsed, onToggleGameMode, gameMode }: HeaderProps) {
   const { t } = useTranslation();
   const { user, logout } = useContext(AuthContext);
   const { mode, setMode } = useColorScheme();
@@ -435,6 +437,22 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
               {mounted && mode === 'dark' ? <Sun size={22} /> : <Moon size={22} />}
             </IconButton>
           </Tooltip>
+          {onToggleGameMode && (
+            <Tooltip title={gameMode ? 'Classic Mode' : 'Game Mode'} placement="bottom">
+              <IconButton 
+                variant="plain" 
+                color="neutral"
+                onClick={onToggleGameMode}
+                sx={{ 
+                  borderRadius: '12px',
+                  '&:hover': { bgcolor: 'rgba(0,0,0,0.04)', transform: 'scale(1.05)' },
+                  transition: 'all 0.2s'
+                }}
+              >
+                {gameMode ? <Monitor size={22} /> : <Gamepad2 size={22} />}
+              </IconButton>
+            </Tooltip>
+          )}
           <Tooltip title={t('header.settings')} placement="bottom">
             <IconButton 
               variant="plain" 
