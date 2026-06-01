@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Box, Typography, Sheet, Stack, Button, ButtonGroup } from '@mui/joy';
+import { Box, Typography, Sheet, Stack, Button, ButtonGroup, Badge } from '@mui/joy';
 import DailyReportCard from './DailyReportCard';
 import EmailDigestCard from './EmailDigestCard';
 import { glassStyle } from '../styles/glass';
@@ -115,7 +115,21 @@ export default function IntelligenceFeed({
               '&:hover': { bgcolor: filter === 'digests' ? 'background.surface' : 'background.level2' }
             }}
           >
-            Email Digests
+            <Badge
+              color="danger"
+              variant="solid"
+              size="sm"
+              invisible={digests.length === 0}
+              sx={{
+                '& .MuiBadge-badge': {
+                  right: -10,
+                  top: -2,
+                  boxShadow: '0 0 8px rgba(225, 29, 72, 0.5)',
+                }
+              }}
+            >
+              Email Digests
+            </Badge>
           </Button>
         </ButtonGroup>
       </Stack>
