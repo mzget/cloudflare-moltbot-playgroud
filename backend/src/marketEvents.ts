@@ -45,10 +45,6 @@ export async function fetchAndStoreMarketEvents(env: Env): Promise<void> {
 
 	// Date calculations
 	const now = new Date();
-	const toDateStr = now.toISOString().split('T')[0];
-	
-	const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-	const fromDateStrNews = sevenDaysAgo.toISOString().split('T')[0];
 
 	const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 	const fromDateStrGeneral = thirtyDaysAgo.toISOString().split('T')[0];
@@ -58,28 +54,6 @@ export async function fetchAndStoreMarketEvents(env: Env): Promise<void> {
 
 	for (const symbol of symbols) {
 		try {
-			// A. Company News (Press Releases)
-			const newsUrl = `https://finnhub.io/api/v1/company-news?symbol=${symbol}&from=${fromDateStrNews}&to=${toDateStr}&token=${apiKey}`;
-			const newsRes = await fetch(newsUrl);
-			if (newsRes.ok) {
-				const newsItems = await newsRes.json() as any[];
-				for (const item of newsItems) {
-					const eventId = `news-${item.id}`;
-					const eventDate = new Date(item.datetime * 1000).toISOString();
-					const metadata = JSON.stringify({ source: item.source });
-					
-					await env.DB.prepare(`
-						INSERT INTO market_events (id, symbol, event_type, event_date, title, description, url, metadata)
-						VALUES (?, ?, 'news', ?, ?, ?, ?, ?)
-						ON CONFLICT(id) DO UPDATE SET
-							title=excluded.title,
-							description=excluded.description,
-							url=excluded.url,
-							metadata=excluded.metadata
-					`).bind(eventId, symbol, eventDate, item.headline, item.summary || '', item.url || '', metadata).run();
-				}
-			}
-
 			// B. Dividends
 			const divUrl = `https://finnhub.io/api/v1/stock/dividend?symbol=${symbol}&from=${fromDateStrGeneral}&to=${toDateStrGeneral}&token=${apiKey}`;
 			const divRes = await fetch(divUrl);
