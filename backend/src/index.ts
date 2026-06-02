@@ -13,6 +13,8 @@ import { syncAndProcessFacebookPosts } from './facebook';
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
 
+export { OaktreeSyncWorkflow } from './workflow';
+
 export interface Env {
 	DB: D1Database;
 	AI: any;
@@ -28,6 +30,7 @@ export interface Env {
 	ALLOWED_EMAILS?: string;
 	FACEBOOK_PAGE_ID?: string;
 	FACEBOOK_PAGE_ACCESS_TOKEN?: string;
+	OAKTREE_SYNC_WORKFLOW: Workflow;
 }
 
 const app = new Hono<{
@@ -131,8 +134,15 @@ app.get('/api/auth/user/me', async (c) => {
 
 // API: Trigger Email Manually (Test)
 app.get('/api/email-test', async (c) => {
-	c.executionCtx.waitUntil(sendDailyEmailReport(c.env));
-	return c.text('Email trigger started');
+	try {
+		const instance = await c.env.OAKTREE_SYNC_WORKFLOW.create({
+			id: `manual-email-test-${Date.now()}`,
+			params: { sendDailyEmailReport: true }
+		});
+		return c.text(`Email trigger started via Workflow: ${instance.id}`);
+	} catch (e) {
+		return c.text(`Failed to start email trigger workflow: ${(e as any).message}`, 500);
+	}
 });
 
 // API: Get Latest Reports (One per symbol) / Purge Old Reports
@@ -260,24 +270,28 @@ app.delete('/api/sources', async (c) => {
 
 // API: Trigger Crawler (Chains to Summarizer)
 app.get('/api/crawl', async (c) => {
-	c.executionCtx.waitUntil((async () => {
-		await runCrawler(c.env);
-	})());
-	return c.text('Crawler sequence started');
+	try {
+		const instance = await c.env.OAKTREE_SYNC_WORKFLOW.create({
+			id: `manual-crawl-${Date.now()}`,
+			params: { runCrawler: true }
+		});
+		return c.text(`Crawler sequence started via Workflow: ${instance.id}`);
+	} catch (e) {
+		return c.text(`Failed to start crawler workflow: ${(e as any).message}`, 500);
+	}
 });
 
 // API: Summarize All Symbols
 app.get('/api/summarize-all', async (c) => {
-	c.executionCtx.waitUntil((async () => {
-		const { results } = await c.env.DB.prepare('SELECT symbol FROM watchlist WHERE is_active = 1').all();
-		console.log(`Summarizing ${results.length} symbols...`);
-		await Promise.all(results.map(row =>
-			generateDailySummary(c.env, row.symbol as string)
-				.catch(e => console.error(`Summary failed for ${row.symbol}:`, e))
-		));
-		console.log("All summaries completed.");
-	})());
-	return c.text('Summarization started');
+	try {
+		const instance = await c.env.OAKTREE_SYNC_WORKFLOW.create({
+			id: `manual-summarize-all-${Date.now()}`,
+			params: { generateDailySummaries: true }
+		});
+		return c.text(`Summarization started via Workflow: ${instance.id}`);
+	} catch (e) {
+		return c.text(`Failed to start summarization workflow: ${(e as any).message}`, 500);
+	}
 });
 
 // API: Trigger Full Daily Sequence Manually (Legacy/Combined)
@@ -297,8 +311,15 @@ app.get('/api/test-market-stats', async (c) => {
 
 // API: Trigger Market Events Update Manually (Test)
 app.get('/api/crawl-events', async (c) => {
-	c.executionCtx.waitUntil(fetchAndStoreMarketEvents(c.env));
-	return c.text('Market events fetch started');
+	try {
+		const instance = await c.env.OAKTREE_SYNC_WORKFLOW.create({
+			id: `manual-crawl-events-${Date.now()}`,
+			params: { fetchMarketEvents: true }
+		});
+		return c.text(`Market events fetch started via Workflow: ${instance.id}`);
+	} catch (e) {
+		return c.text(`Failed to start market events fetch workflow: ${(e as any).message}`, 500);
+	}
 });
 
 // API: Get Market Events / Purge Old Market Events
@@ -562,19 +583,20 @@ app.delete('/api/subscriptions', async (c) => {
 
 // API: Manual Sync & Summarize
 app.get('/api/email-sync', async (c) => {
-	c.executionCtx.waitUntil((async () => {
-		try {
-			console.log('Starting manual email sync...');
-			const newCount = await syncAndIngestEmails(c.env);
-			console.log(`Ingested ${newCount} new emails. Running digest generator...`);
-			await generateEmailDigests(c.env, true);
-			console.log('Email sync & digest completed. Syncing to Facebook...');
-			await syncAndProcessFacebookPosts(c.env);
-		} catch (e) {
-			console.error('Manual email sync failed:', e);
-		}
-	})());
-	return c.text('Email sync started');
+	try {
+		const instance = await c.env.OAKTREE_SYNC_WORKFLOW.create({
+			id: `manual-email-sync-${Date.now()}`,
+			params: {
+				syncEmails: true,
+				generateEmailDigests: true,
+				emailDigestsManual: true,
+				syncFacebookPosts: true,
+			}
+		});
+		return c.text(`Email sync started via Workflow: ${instance.id}`);
+	} catch (e) {
+		return c.text(`Failed to start email sync workflow: ${(e as any).message}`, 500);
+	}
 });
 
 // API: Test Email Sync & Digest (Synchronous)
@@ -654,50 +676,32 @@ export default {
 	fetch: app.fetch,
 
 	async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
-		console.log("Running scheduled worker tasks...");
+		console.log("Running scheduled worker tasks via Workflow...");
+		const hour = new Date().getUTCHours();
+		const isSixHourly = hour % 6 === 0;
 
 		ctx.waitUntil((async () => {
-			// 1. Hourly tasks: Update prices and stats + check alerts + email sync & digest
-			await fetchAndStoreMarketStats(env);
-			await checkAlertRules(env);
-			await syncAndIngestEmails(env).catch(e => console.error("Scheduled email sync failed:", e));
-			await generateEmailDigests(env, false).catch(e => console.error("Scheduled email digest generation failed:", e));
-
-			// 2. 6-Hourly tasks: run crawler, summary, events, daily email report, purge old data
-			const hour = new Date().getUTCHours();
-			if (hour % 6 === 0) {
-				console.log("Running 6-hourly crawler and summaries sequence...");
-				
-				// Run Crawler
-				await runCrawler(env);
-
-				// Generate Summaries for all symbols in parallel
-				const { results } = await env.DB.prepare('SELECT symbol FROM watchlist WHERE is_active = 1').all();
-				await Promise.all(results.map(row =>
-					generateDailySummary(env, row.symbol as string)
-						.catch(e => console.error(`Scheduled summary failed for ${row.symbol}:`, e))
-				));
-
-				// Fetch and store market events
-				await fetchAndStoreMarketEvents(env).catch(e => console.error("Scheduled events fetch failed:", e));
-
-				// Send Email Report
-				await sendDailyEmailReport(env);
-
-				// Purges
-				console.log("Purging old data...");
-				await env.DB.prepare("DELETE FROM daily_reports WHERE created_at < datetime('now', '-3 days')").run()
-					.catch(e => console.error("Failed to purge old daily reports:", e));
-				await env.DB.prepare("DELETE FROM market_events WHERE created_at < strftime('%s', 'now', '-30 days')").run()
-					.catch(e => console.error("Failed to purge old market events:", e));
-				await env.DB.prepare("DELETE FROM news WHERE created_at < datetime('now', '-3 days')").run()
-					.catch(e => console.error("Failed to purge old news:", e));
+			try {
+				await env.OAKTREE_SYNC_WORKFLOW.create({
+					id: `cron-${Date.now()}`,
+					params: {
+						fetchMarketStats: true,
+						checkAlertRules: true,
+						syncEmails: true,
+						generateEmailDigests: true,
+						emailDigestsManual: false,
+						runCrawler: isSixHourly,
+						generateDailySummaries: isSixHourly,
+						fetchMarketEvents: isSixHourly,
+						sendDailyEmailReport: isSixHourly,
+						purgeOldData: isSixHourly,
+						syncFacebookPosts: true,
+					}
+				});
+				console.log("Workflow instance triggered successfully.");
+			} catch (e) {
+				console.error("Failed to trigger Workflow instance:", e);
 			}
-
-			console.log("Syncing and processing Facebook posts...");
-			await syncAndProcessFacebookPosts(env).catch(e => console.error("Scheduled Facebook post processing failed:", e));
-
-			console.log("Scheduled sequence completed.");
 		})());
 	},
 };

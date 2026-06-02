@@ -22,3 +22,7 @@ destination_address = "rattajak.n@gmail.com"
 [triggers]
 crons = ["0 * * * *"] # Every hour
 
+[[workflows]]
+name = "oaktree-sync-workflow"
+binding = "OAKTREE_SYNC_WORKFLOW"
+class_name = "OaktreeSyncWorkflow"
