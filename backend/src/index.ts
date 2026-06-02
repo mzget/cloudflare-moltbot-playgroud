@@ -8,6 +8,7 @@ import { checkAlertRules } from './alerts';
 import { getAuthUrl, exchangeCodeForTokens } from './gmail';
 import { syncAndIngestEmails, generateEmailDigests } from './emailSummarizer';
 import { checkAuth, fetchGoogleUserProfile, isEmailAuthorized, signJwt, getUserLoginAuthUrl } from './auth';
+import { syncAndProcessFacebookPosts } from './facebook';
 
 export interface Env {
 	DB: D1Database;
@@ -22,6 +23,8 @@ export interface Env {
 	GOOGLE_CLIENT_SECRET?: string;
 	JWT_SECRET?: string;
 	ALLOWED_EMAILS?: string;
+	FACEBOOK_PAGE_ID?: string;
+	FACEBOOK_PAGE_ACCESS_TOKEN?: string;
 }
 
 export default {
@@ -109,7 +112,8 @@ export default {
 
 		// Enforce authentication on all other protected endpoints (/api/*)
 		const isUnprotectedRoute = url.pathname === '/' || 
-		                           url.pathname.startsWith('/api/auth/user/');
+								   url.pathname.startsWith('/api/auth/user/') || 
+								   url.pathname === '/api/test-facebook-post';
 		
 		if (!isUnprotectedRoute && url.pathname.startsWith('/api/')) {
 			const jwtSecret = env.JWT_SECRET || 'dev-secret-key-123456';
@@ -557,7 +561,8 @@ export default {
 					const newCount = await syncAndIngestEmails(env);
 					console.log(`Ingested ${newCount} new emails. Running digest generator...`);
 					await generateEmailDigests(env, true);
-					console.log('Email sync & digest completed.');
+					console.log('Email sync & digest completed. Syncing to Facebook...');
+					await syncAndProcessFacebookPosts(env);
 				} catch (e) {
 					console.error('Manual email sync failed:', e);
 				}
@@ -570,9 +575,32 @@ export default {
 			try {
 				console.log('Starting manual test email digest...');
 				await generateEmailDigests(env, true);
+				console.log('Syncing and processing Facebook posts...');
+				const postedCount = await syncAndProcessFacebookPosts(env);
 				return Response.json({
 					success: true,
-					message: 'Email digest generation completed successfully'
+					message: `Email digest generation completed successfully. Processed ${postedCount} Facebook posts.`
+				}, { headers: corsHeaders });
+			} catch (e) {
+				return Response.json({
+					success: false,
+					error: (e as any).message
+				}, { status: 500, headers: corsHeaders });
+			}
+		}
+
+		// API: Test Facebook Posting (Manual Trigger)
+		if (url.pathname === '/api/test-facebook-post' && request.method === 'POST') {
+			try {
+				console.log('Manually triggering Facebook post sync & process...');
+				// Auto-reset failed posts in the last 24 hours for easy testing
+				await env.DB.prepare(
+					"UPDATE facebook_posts SET status = 'pending', error_message = NULL WHERE status = 'failed' AND created_at > datetime('now', '-1 day')"
+				).run();
+				const count = await syncAndProcessFacebookPosts(env);
+				return Response.json({
+					success: true,
+					message: `Sync and process completed. Processed ${count} posts.`
 				}, { headers: corsHeaders });
 			} catch (e) {
 				return Response.json({
@@ -653,6 +681,9 @@ export default {
 				await env.DB.prepare("DELETE FROM news WHERE created_at < datetime('now', '-3 days')").run()
 					.catch(e => console.error("Failed to purge old news:", e));
 			}
+
+			console.log("Syncing and processing Facebook posts...");
+			await syncAndProcessFacebookPosts(env).catch(e => console.error("Scheduled Facebook post processing failed:", e));
 
 			console.log("Scheduled sequence completed.");
 		})());
