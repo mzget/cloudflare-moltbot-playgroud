@@ -18,6 +18,10 @@ export default function IntelligenceFeed({
 }) {
   const [filter, setFilter] = React.useState<'all' | 'reports' | 'digests'>('all');
 
+  const unreadCount = React.useMemo(() => {
+    return digests.filter(d => d.is_readed !== 1).length;
+  }, [digests]);
+
   const getReportTime = (item: any) => {
     if (item.symbol) {
       // Symbol report (created_at is a string "YYYY-MM-DD HH:MM:SS" in UTC)
@@ -116,13 +120,14 @@ export default function IntelligenceFeed({
             }}
           >
             <Badge
+              badgeContent={unreadCount}
               color="danger"
               variant="solid"
               size="sm"
-              invisible={digests.length === 0}
+              invisible={unreadCount === 0}
               sx={{
                 '& .MuiBadge-badge': {
-                  right: -10,
+                  right: -15,
                   top: -2,
                   boxShadow: '0 0 8px rgba(225, 29, 72, 0.5)',
                 }
