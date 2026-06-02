@@ -17,6 +17,7 @@
     "@cloudflare/ai-chat": "^0.7.0",
     "@cloudflare/puppeteer": "^0.0.13",
     "ai": "^6.0.182",
+    "hono": "^4.12.23",
     "mimetext": "^3.0.24",
     "papaparse": "^5.5.3",
     "workers-ai-provider": "^3.1.14"
