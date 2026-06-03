@@ -1,4 +1,4 @@
-import { Env } from './index';
+﻿import { Env } from './index';
 
 interface FacebookPostRow {
 	id: number;
@@ -46,8 +46,8 @@ export async function processPendingFacebookPosts(env: Env): Promise<number> {
 		).bind(post.id).run();
 
 		try {
-			// 2. Fetch original content
-			let englishContent = '';
+			// 2. Fetch original Thai content
+			let thaiContent = '';
 			let subjectInfo = '';
 
 			if (post.source_type === 'daily_report') {
@@ -60,7 +60,7 @@ export async function processPendingFacebookPosts(env: Env): Promise<number> {
 				}
 
 				const takeaways = JSON.parse(report.key_takeaways || '[]');
-				englishContent = `Stock Symbol: ${report.symbol}\nDaily Summary: ${report.summary}\nKey Takeaways:\n${takeaways.map((t: string) => `- ${t}`).join('\n')}`;
+				thaiContent = `Stock Symbol: ${report.symbol}\nDaily Summary: ${report.summary}\nKey Takeaways:\n${takeaways.map((t: string) => `- ${t}`).join('\n')}`;
 				subjectInfo = `Stock Report: ${report.symbol}`;
 			} else if (post.source_type === 'email_digest') {
 				const digest = await env.DB.prepare(
@@ -72,15 +72,15 @@ export async function processPendingFacebookPosts(env: Env): Promise<number> {
 				}
 
 				const takeaways = JSON.parse(digest.key_takeaways || '[]');
-				englishContent = `Category: ${digest.category}\nDigest Summary: ${digest.summary}\nKey Takeaways:\n${takeaways.map((t: string) => `- ${t}`).join('\n')}`;
+				thaiContent = `Category: ${digest.category}\nDigest Summary: ${digest.summary}\nKey Takeaways:\n${takeaways.map((t: string) => `- ${t}`).join('\n')}`;
 				subjectInfo = `Market Digest: ${digest.category}`;
 			} else {
 				throw new Error(`Invalid source_type: ${post.source_type}`);
 			}
 
-			// 3. Generate Thai translation using Workers AI
-			console.log(`Translating and rewriting to Thai: ${subjectInfo}`);
-			const thaiPost = await translateAndStyleToThai(env, englishContent, post.source_type);
+			// 3. Format and style Thai content for Facebook using Workers AI
+			console.log(`Formatting and styling Facebook post for Thai: ${subjectInfo}`);
+			const thaiPost = await formatAndStyleFacebookPost(env, thaiContent, post.source_type);
 
 			if (!thaiPost) {
 				throw new Error('AI failed to generate Thai translation content');
@@ -169,22 +169,23 @@ export async function syncAndProcessFacebookPosts(env: Env): Promise<number> {
 	return await processPendingFacebookPosts(env);
 }
 
-async function translateAndStyleToThai(env: Env, content: string, type: 'daily_report' | 'email_digest'): Promise<string> {
+async function formatAndStyleFacebookPost(env: Env, content: string, type: 'daily_report' | 'email_digest'): Promise<string> {
 	const systemPrompt = `
-You are the Oaktree Agent, a premium financial analyst translating investment intelligence for a Thai audience on Facebook.
-Your job is to translate and rewrite the English report into Thai.
+You are the Oaktree Agent, a premium financial analyst preparing investment intelligence for a Thai audience on Facebook.
+Your job is to format and rewrite the Thai report content into a premium, engaging Facebook post.
 
 TONE & STYLE RULES:
 - Write in the style of a Howard Marks Memo (thoughtful, focus on cycles, risk awareness, and market psychology, cautious yet clear).
 - Keep it highly professional yet readable and engaging for a social media audience.
 - Use clear spacing, bold headings (without markdown if possible, or use standard emojis for headings), and clean bullet points.
-- Use subtle, professional emojis (e.g. ??, ??, ??, ??, ??, ??) to separate sections and highlight key points.
-- End the post with relevant hashtags (e.g. #OaktreeAgent #????????????????? #???????????????? #HowardMarks) and any relevant stock symbol.
-- Output ONLY the final Thai Facebook post message content. Do not include any introductory meta text (like "Here is the translation:") or markdown code block surrounds.
+- Use subtle, professional emojis (e.g. ðŸ“Š, ðŸ”‘, ðŸ’¡, âš ï¸, ðŸ”, ðŸ“) to separate sections and highlight key points.
+- End the post with relevant hashtags (e.g. #OaktreeAgent #à¸§à¸´à¹€à¸„à¸£à¸²à¸°à¸«à¹Œà¸à¸²à¸£à¸¥à¸‡à¸—à¸¸à¸™ #à¸ˆà¸´à¸•à¸§à¸´à¸—à¸¢à¸²à¸à¸²à¸£à¸¥à¸‡à¸—à¸¸à¸™) and any relevant stock symbol.
+- CRITICAL HASHTAG RULE: Do NOT use or allow any hashtags that refer to investor names (e.g. do NOT use #HowardMarks, #Marks, #Howard, #Buffett, #Munger, etc.).
+- Output ONLY the final Thai Facebook post message content. Do not include any introductory meta text or markdown code block surrounds.
 `;
 
 	const userPrompt = `
-Translate and format the following content:
+Format and polish the following Thai content for Facebook:
 ---
 ${content}
 ---
@@ -202,11 +203,11 @@ ${content}
 		const responseText = (response as any).choices?.[0]?.message?.content || response.response || "";
 		return responseText.trim();
 	} catch (e) {
-		console.error('Workers AI translation failed, trying fallback prompt style:', e);
+		console.error('Workers AI formatting failed, trying fallback prompt style:', e);
 		// Simple fallback in case system prompt isn't supported by the model structure
 		const response = await env.AI.run('@cf/google/gemma-3-12b-it', {
 			messages: [
-				{ role: 'user', content: `${systemPrompt}\n\nContent to translate:\n${content}` }
+				{ role: 'user', content: `${systemPrompt}\n\nContent to format:\n${content}` }
 			],
 			max_tokens: 4096,
 		} as any);

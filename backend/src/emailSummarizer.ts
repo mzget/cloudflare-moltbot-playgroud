@@ -1,4 +1,4 @@
-// backend/src/emailSummarizer.ts
+﻿// backend/src/emailSummarizer.ts
 import { D1Database } from '@cloudflare/workers-types';
 import { Env } from './index';
 import {
@@ -171,27 +171,28 @@ Content: ${truncatedBody}
 You are the Oaktree Agent, a world-class financial analyst and investment strategist, writing in the style of Howard Marks.
 Analyze the following email newsletter content. Your goal is to:
 1. Extract the main financial, market, or macroeconomic stories/news items discussed in these emails.
-2. Group them into distinct thematic categories (e.g. 'Macroeconomy', 'Technology & AI', 'Corporate Earnings', 'Geopolitics', 'Crypto & Digital Assets').
-3. For each category group, write a detailed, cohesive, professional Howard Marks-style summary (insightful, focusing on long-term risk and market cycles) that synthesizes the stories in that category. The summary should be thorough, detailed, and clear, consisting of at least 1 to 2 paragraphs (roughly 5 to 8 sentences total), ensuring that a reader can easily understand the context, main arguments, and key details without having to refer to the original email.
-4. Provide a list of key takeaways (bullet points) for each category. Provide 3 to 5 key takeaways per category to ensure important details are covered.
+2. Group them into distinct thematic categories (e.g. 'Macroeconomy', 'Technology & AI', 'Corporate Earnings', 'Geopolitics', 'Crypto & Digital Assets'). Keep category names in English.
+3. For each category group, write a detailed, cohesive, professional Howard Marks-style summary (insightful, focusing on long-term risk and market cycles) WRITTEN IN THAI. The summary should be thorough, detailed, and clear, consisting of at least 1 to 2 paragraphs (roughly 5 to 8 sentences total), ensuring that a reader can easily understand the context, main arguments, and key details without having to refer to the original email.
+4. Provide a list of key takeaways (bullet points) for each category WRITTEN IN THAI. Provide 3 to 5 key takeaways per category to ensure important details are covered.
 5. Identify which email IDs are associated with each digest category (source_emails).
 
 RESPONSE INSTRUCTIONS:
 - Return ONLY a JSON object.
+- The "summary" and "key_takeaways" fields MUST be written in Thai language.
 - CRITICAL: Keep your internal reasoning/thinking process very short (under 100 words) so you do not run out of token space.
 - DO NOT include any markdown code blocks, comments, or introductory text.
 - Ensure the JSON is strictly valid.
 - CRITICAL: Do NOT use double quotes (") inside any JSON string values (like 'summary' or 'key_takeaways'). Instead, use single quotes (') for any internal quotes or speech marks.
-  Example: "summary": "Howard Marks' 'most important thing' concept" (valid)
-  Example: "summary": "Howard Marks' "most important thing" concept" (INVALID)
+  Example: "summary": "à¸à¸²à¸£à¸§à¸´à¹€à¸„à¸£à¸²à¸°à¸«à¹Œà¸ªà¹„à¸•à¸¥à¹Œ Howard Marks à¹€à¸à¸µà¹ˆà¸¢à¸§à¸à¸±à¸š 'à¸­à¸±à¸•à¸£à¸²à¸”à¸­à¸à¹€à¸šà¸µà¹‰à¸¢'..." (valid)
+  Example: "summary": "à¸à¸²à¸£à¸§à¸´à¹€à¸„à¸£à¸²à¸°à¸«à¹Œà¸ªà¹„à¸•à¸¥à¹Œ Howard Marks à¹€à¸à¸µà¹ˆà¸¢à¸§à¸à¸±à¸š \"à¸­à¸±à¸•à¸£à¸²à¸”à¸­à¸à¹€à¸šà¸µà¹‰à¸¢\"..." (INVALID)
 
 JSON Schema:
 {
   "digests": [
     {
       "category": "Macroeconomy",
-      "summary": "Detailed, Howard Marks style analysis synthesizing the macroeconomic news...",
-      "key_takeaways": ["Point 1", "Point 2"],
+      "summary": "Detailed, Howard Marks style analysis in Thai...",
+      "key_takeaways": ["Point 1 in Thai", "Point 2 in Thai"],
       "source_emails": ["email_id_1", "email_id_2"]
     }
   ]
@@ -302,3 +303,4 @@ ${context}
     }
   }
 }
+

@@ -1,4 +1,4 @@
-import { Env } from './index';
+﻿import { Env } from './index';
 
 export async function generateDailySummary(env: Env, symbol: string) {
 	// Fetch news from the last 24h
@@ -15,7 +15,7 @@ export async function generateDailySummary(env: Env, symbol: string) {
 	
 	const prompt = `
 		You are the Oaktree Agent, an expert financial analyst. 
-		Summarize the following news headlines for ${symbol} into a concise, professional report (strictly 2 to 3 sentences).
+		Summarize the following news headlines for ${symbol} into a concise, professional report (strictly 2 to 3 sentences) WRITTEN IN THAI.
 		Style: Howard Marks Memo (insightful, long-term oriented, cautious but clear).
 		
 		News Headlines:
@@ -23,12 +23,13 @@ export async function generateDailySummary(env: Env, symbol: string) {
 		
 		RESPONSE INSTRUCTIONS:
 		1. Return ONLY a JSON object.
-		2. CRITICAL: Keep your internal reasoning/thinking process very short (under 100 words) so you do not run out of token space.
-		3. DO NOT include any introductory text, preamble, or comments.
-		4. Ensure the JSON is valid (double quotes for keys/values).
-		5. CRITICAL: Do NOT use double quotes (") inside any JSON string values (like 'summary' or 'key_takeaways'). Instead, use single quotes (') for any internal quotes or speech marks.
-		   Example: "summary": "Company's 'record performance' drive" (valid)
-		   Example: "summary": "Company's "record performance" drive" (INVALID)
+		2. The "summary" and "key_takeaways" fields MUST be written in Thai language.
+		3. CRITICAL: Keep your internal reasoning/thinking process very short (under 100 words) so you do not run out of token space.
+		4. DO NOT include any introductory text, preamble, or comments.
+		5. Ensure the JSON is valid (double quotes for keys/values).
+		6. CRITICAL: Do NOT use double quotes (") inside any JSON string values (like 'summary' or 'key_takeaways'). Instead, use single quotes (') for any internal quotes or speech marks.
+		   Example: "summary": "à¸£à¸²à¸¢à¸‡à¸²à¸™ 'à¸„à¸§à¸²à¸¡à¸•à¸¶à¸‡à¹€à¸„à¸£à¸µà¸¢à¸”' à¸—à¸²à¸‡à¸ à¸¹à¸¡à¸´à¸£à¸±à¸à¸¨à¸²à¸ªà¸•à¸£à¹Œ" (valid)
+		   Example: "summary": "à¸£à¸²à¸¢à¸‡à¸²à¸™ "à¸„à¸§à¸²à¸¡à¸•à¸¶à¸‡à¹€à¸„à¸£à¸µà¸¢à¸”" à¸—à¸²à¸‡à¸ à¸¹à¸¡à¸´à¸£à¸±à¸à¸¨à¸²à¸ªà¸•à¸£à¹Œ" (INVALID)
 		
 		JSON Schema:
 		{
@@ -117,3 +118,4 @@ export async function generateDailySummary(env: Env, symbol: string) {
 		console.error(`Error generating summary for ${symbol}:`, error);
 	}
 }
+
