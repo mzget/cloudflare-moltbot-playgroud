@@ -148,11 +148,15 @@ app.get('/api/email-test', async (c) => {
 // API: Get Latest Reports (One per symbol) / Purge Old Reports
 app.get('/api/reports', async (c) => {
 	const { results } = await c.env.DB.prepare(`
-		SELECT * FROM (
-			SELECT *, ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY created_at DESC) as rn
-			FROM daily_reports
-		) WHERE rn = 1
-		ORDER BY created_at DESC
+		SELECT m.*
+		FROM (SELECT DISTINCT symbol FROM daily_reports) s
+		JOIN daily_reports m ON m.id IN (
+			SELECT id FROM daily_reports
+			WHERE symbol = s.symbol
+			ORDER BY created_at DESC
+			LIMIT 1
+		)
+		ORDER BY m.created_at DESC
 	`).all();
 	return c.json(results);
 });
@@ -358,24 +362,29 @@ app.get('/api/market-events', async (c) => {
 		query = `SELECT * FROM market_events WHERE ${conditions.join(' AND ')} ORDER BY event_date DESC LIMIT 100`;
 	} else {
 		if (eventType) {
-			params.push(eventType);
+			params.push(eventType, eventType);
 			query = `
-				SELECT id, symbol, event_type, event_date, title, description, url, metadata, created_at
-				FROM (
-					SELECT *, ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY event_date DESC) as rn
-					FROM market_events
-					WHERE event_type = ?
-				) WHERE rn <= 5
-				ORDER BY event_date DESC
+				SELECT m.id, m.symbol, m.event_type, m.event_date, m.title, m.description, m.url, m.metadata, m.created_at
+				FROM (SELECT DISTINCT symbol FROM market_events WHERE event_type = ?) s
+				JOIN market_events m ON m.id IN (
+					SELECT id FROM market_events
+					WHERE symbol = s.symbol AND event_type = ?
+					ORDER BY event_date DESC
+					LIMIT 5
+				)
+				ORDER BY m.event_date DESC
 			`;
 		} else {
 			query = `
-				SELECT id, symbol, event_type, event_date, title, description, url, metadata, created_at
-				FROM (
-					SELECT *, ROW_NUMBER() OVER (PARTITION BY symbol ORDER BY event_date DESC) as rn
-					FROM market_events
-				) WHERE rn <= 5
-				ORDER BY event_date DESC
+				SELECT m.id, m.symbol, m.event_type, m.event_date, m.title, m.description, m.url, m.metadata, m.created_at
+				FROM (SELECT DISTINCT symbol FROM market_events) s
+				JOIN market_events m ON m.id IN (
+					SELECT id FROM market_events
+					WHERE symbol = s.symbol
+					ORDER BY event_date DESC
+					LIMIT 5
+				)
+				ORDER BY m.event_date DESC
 			`;
 		}
 	}
