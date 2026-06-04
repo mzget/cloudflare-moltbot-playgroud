@@ -703,8 +703,8 @@ async function recalcHoldings(db: any, symbol: string) {
 
   // Also ensure symbol is in watchlist
   await db.prepare(`
-    INSERT OR IGNORE INTO watchlist (symbol, name, is_active, in_portfolio)
-    VALUES (?, ?, 1, 1)
+    INSERT OR IGNORE INTO watchlist (symbol, name, is_active)
+    VALUES (?, ?, 1)
   `).bind(symbol, symbol).run();
 }
 
@@ -719,7 +719,7 @@ app.get('/api/portfolio/holdings', async (c) => {
       m.price as last_price, m.previous_close, m.market_cap, m.p_e,
       COALESCE(d.total_dividends, 0) as tot_div_income,
       COALESCE(t.realized_gain_sum, 0) as realized_gain_amt,
-      COALESCE(t.realized_cost_sum, 0) as realized_cost_basis
+      COALESCE(t.realized_cost_basis, 0) as realized_cost_basis
     FROM holdings h
     LEFT JOIN watchlist w ON h.symbol = w.symbol
     LEFT JOIN market_stats m ON h.symbol = m.symbol
@@ -980,8 +980,8 @@ app.post('/api/portfolio/holdings', async (c) => {
 
   // Also ensure symbol is in watchlist
   await c.env.DB.prepare(`
-    INSERT OR IGNORE INTO watchlist (symbol, name, is_active, in_portfolio)
-    VALUES (?, ?, 1, 1)
+    INSERT OR IGNORE INTO watchlist (symbol, name, is_active)
+    VALUES (?, ?, 1)
   `).bind(symbol.toUpperCase(), symbol.toUpperCase()).run();
 
   return c.json({ success: true });

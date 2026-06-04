@@ -1,16 +1,15 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Box, Typography, Sheet, Button, Input, Stack, Tabs, TabList, Tab, Divider, Modal, ModalDialog, DialogTitle, DialogContent, ModalClose, FormControl, FormLabel, Chip } from '@mui/joy';
-import { Plus, TrendingUp } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Box, Typography, Sheet, Button, Input, Stack, Tabs, TabList, Tab, Divider, Modal, ModalDialog, DialogTitle, DialogContent, ModalClose, FormControl, FormLabel } from '@mui/joy';
 import { API_BASE_URL } from '../config';
 import { glassStyle } from '../styles/glass';
-import HoldingsTable from './HoldingsTable';
 import type { Holding } from './HoldingsTable';
-import ExpandedRow from './ExpandedRow';
 import FundametalDashboard from './FundamentalDashboard';
 import PortfolioChart from './PortfolioChart';
+import SummaryTab from './SummaryTab';
+import HoldingsTab from './HoldingsTab';
 import '../styles/yahooPortfolio.css';
 
-interface PortfolioSummary {
+export interface PortfolioSummary {
   total_market_value: number;
   total_cost: number;
   cash: number;
@@ -22,13 +21,13 @@ interface PortfolioSummary {
   total_dividends: number;
 }
 
-const formatCurrency = (val: number | null | undefined, showSign = true): string => {
+export const formatCurrency = (val: number | null | undefined, showSign = true): string => {
   if (val === null || val === undefined) return '--';
   const sign = showSign ? (val >= 0 ? '+' : '') : '';
   return `${sign}$${Math.abs(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
-const formatPct = (val: number | null | undefined): string => {
+export const formatPct = (val: number | null | undefined): string => {
   if (val === null || val === undefined) return '--';
   const sign = val >= 0 ? '+' : '';
   return `${sign}${val.toFixed(2)}%`;
@@ -61,13 +60,19 @@ function parseCSV(text: string): any[] {
 
   const headerMap: Record<string, string> = {
     symbol: 'symbol', ticker: 'symbol',
-    date: 'date',
-    type: 'type', action: 'type',
+    date: 'quote_date',
+    'trade date': 'date',
+    type: 'type', action: 'type', 'transaction type': 'type',
     shares: 'shares', quantity: 'shares', qty: 'shares',
-    price: 'price', cost: 'price', rate: 'price', cost_per_share: 'price',
+    price: 'price', cost: 'price', rate: 'price', cost_per_share: 'price', 'purchase price': 'price',
     commission: 'commission', fee: 'commission', fees: 'commission',
-    note: 'note', notes: 'note', memo: 'note'
+    note: 'note', notes: 'note', memo: 'note', comment: 'note'
   };
+
+  // If there is no 'trade date' in headers but there is 'date', we map 'date' to 'date'
+  if (!headers.includes('trade date') && headers.includes('date')) {
+    headerMap['date'] = 'date';
+  }
 
   const normalizedHeaders = headers.map(h => headerMap[h] || h);
 
@@ -80,11 +85,24 @@ function parseCSV(text: string): any[] {
     normalizedHeaders.forEach((header, index) => {
       tx[header] = values[index];
     });
-    
+
+    // Fallback if trade date was not present but quote date was
+    if (!tx.date && tx.quote_date) {
+      tx.date = tx.quote_date;
+    }
+
     if (tx.symbol && tx.date && tx.shares && tx.price) {
+      // Normalize date format to YYYY-MM-DD
+      let dateVal = tx.date.trim();
+      if (/^\d{8}$/.test(dateVal)) {
+        dateVal = `${dateVal.slice(0, 4)}-${dateVal.slice(4, 6)}-${dateVal.slice(6, 8)}`;
+      } else if (dateVal.includes('/')) {
+        dateVal = dateVal.replace(/\//g, '-');
+      }
+
       transactions.push({
         symbol: tx.symbol.toUpperCase(),
-        date: tx.date,
+        date: dateVal,
         type: (tx.type && tx.type.toLowerCase().startsWith('s')) ? 'Sell' : 'Buy',
         shares: parseFloat(tx.shares) || 0,
         price: parseFloat(tx.price) || 0,
@@ -102,9 +120,6 @@ export default function YahooPortfolio() {
   const [summary, setSummary] = useState<PortfolioSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<number>(1);
-  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
-  const [sortBy, setSortBy] = useState<string>('symbol');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [newSymbol, setNewSymbol] = useState('');
   const [newShares, setNewShares] = useState('');
@@ -138,30 +153,6 @@ export default function YahooPortfolio() {
     const interval = setInterval(fetchAll, 180000);
     return () => clearInterval(interval);
   }, [fetchAll]);
-
-  const sortedHoldings = useMemo(() => {
-    return [...holdings].sort((a, b) => {
-      const aVal = (a as any)[sortBy];
-      const bVal = (b as any)[sortBy];
-      if (aVal === null || aVal === undefined) return 1;
-      if (bVal === null || bVal === undefined) return -1;
-      const cmp = typeof aVal === 'string' ? aVal.localeCompare(bVal) : (aVal as number) - (bVal as number);
-      return sortDir === 'asc' ? cmp : -cmp;
-    });
-  }, [holdings, sortBy, sortDir]);
-
-  const handleSort = useCallback((column: string) => {
-    if (sortBy === column) setSortDir(prev => prev === 'asc' ? 'desc' : 'asc');
-    else { setSortBy(column); setSortDir('asc'); }
-  }, [sortBy]);
-
-  const handleExpandRow = useCallback((symbol: string) => {
-    setExpandedRows(prev => {
-      const next = new Set(prev);
-      next.has(symbol) ? next.delete(symbol) : next.add(symbol);
-      return next;
-    });
-  }, []);
 
   const handleAddTicker = async () => {
     if (!newSymbol.trim()) return;
@@ -274,10 +265,36 @@ export default function YahooPortfolio() {
       {/* Tabs */}
       <Box sx={{ mb: 2 }}>
         <Tabs value={activeTab} onChange={(_, val) => setActiveTab(val as number)} sx={{ bgcolor: 'transparent' }}>
-          <TabList disableUnderline sx={{ gap: 0, borderBottom: '1px solid', borderColor: 'divider',
-            '& .MuiTab-root': { fontWeight: 600, fontSize: '0.875rem', px: 2, py: 1, minHeight: 40,
-              '&[aria-selected="true"]': { color: 'primary.plainColor', borderBottom: '2px solid', borderColor: 'primary.plainColor' },
-              '&:hover': { bgcolor: 'transparent', color: 'text.primary' } } }}>
+          <TabList
+            variant="soft"
+            sx={{
+              p: 0.5,
+              gap: 1,
+              borderRadius: '12px',
+              bgcolor: 'background.level1',
+              width: 'fit-content',
+              '& .MuiTab-root': {
+                fontWeight: 600,
+                fontSize: '0.875rem',
+                px: 3,
+                py: 1,
+                minHeight: 36,
+                borderRadius: '8px',
+                color: 'text.secondary',
+                bgcolor: 'transparent',
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                '&.Mui-selected': {
+                  color: 'primary.plainColor',
+                  bgcolor: 'background.surface',
+                  boxShadow: 'sm',
+                },
+                '&:hover:not(.Mui-selected)': {
+                  color: 'text.primary',
+                  bgcolor: 'background.level2',
+                }
+              }
+            }}
+          >
             <Tab disableIndicator>Fundamentals</Tab>
             <Tab disableIndicator>Holdings</Tab>
             <Tab disableIndicator>Summary</Tab>
@@ -287,87 +304,29 @@ export default function YahooPortfolio() {
 
       {/* Summary Tab */}
       {activeTab === 2 && summary && (
-        <Sheet sx={{ ...glassStyle, p: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1.5 }}>
-            <Typography level="h4" sx={{ fontWeight: 700 }}>Portfolio Summary</Typography>
-            <Sheet
-              sx={{
-                ...glassStyle,
-                px: 2,
-                py: 0.5,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1.5,
-                borderRadius: '12px'
-              }}
-            >
-              <Typography level="body-xs" sx={{ opacity: 0.7 }}>
-                Portfolio Sentiment
-              </Typography>
-              <Chip
-                variant="soft"
-                color="success"
-                size="sm"
-                startDecorator={<TrendingUp size={14} />}
-              >
-                Bullish
-              </Chip>
-            </Sheet>
-          </Box>
-          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: 'repeat(4, 1fr)' }, gap: 2 }}>
-            {[
-              { label: 'Total Market Value', value: formatCurrency(summary.total_market_value, false) },
-              { label: 'Total Cost Basis', value: formatCurrency(summary.total_cost, false) },
-              { label: 'Day Change', value: formatCurrency(summary.day_change_amt), cls: summary.day_change_amt >= 0 ? 'yf-positive' : 'yf-negative' },
-              { label: 'Unrealized G/L', value: formatCurrency(summary.unrealized_gain_amt), cls: summary.unrealized_gain_amt >= 0 ? 'yf-positive' : 'yf-negative' },
-            ].map(card => (
-              <Box key={card.label} sx={{ p: 2, borderRadius: '12px', border: '1px solid', borderColor: 'divider' }}>
-                <Typography level="body-xs" sx={{ opacity: 0.6, mb: 0.5 }}>{card.label}</Typography>
-                <Typography level="h4" sx={{ fontWeight: 800 }} className={card.cls || ''}>{card.value}</Typography>
-              </Box>
-            ))}
-          </Box>
-          <Typography level="body-sm" sx={{ opacity: 0.5, mt: 2 }}>
-            {holdings.length} holdings · {holdings.filter(h => h.status === 'Open').length} open positions
-          </Typography>
-        </Sheet>
+        <SummaryTab
+          summary={summary}
+          holdingsCount={holdings.length}
+          openPositionsCount={holdings.filter(h => h.status === 'Open').length}
+        />
       )}
 
       {/* Holdings Tab */}
       {activeTab === 1 && (
-        <Sheet sx={{ ...glassStyle, p: 0, overflow: 'hidden' }}>
-          {holdings.length > 0 && (
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
-              <Typography level="title-md" sx={{ fontWeight: 700 }}>
-                Positions
-              </Typography>
-              <Button variant="outlined" color="neutral" size="sm" startDecorator={<Plus size={16} />}
-                onClick={() => setAddModalOpen(true)} sx={{ borderRadius: '20px', fontWeight: 600, px: 2 }}>
-                Add Ticker
-              </Button>
-            </Box>
-          )}
-          <Box sx={{ overflowX: 'auto' }}>
-            <HoldingsTable holdings={sortedHoldings} onExpandRow={handleExpandRow} expandedRows={expandedRows}
-              sortBy={sortBy} sortDir={sortDir} onSort={handleSort}
-              expandedContent={(symbol: string, lastPrice: number | null, colSpan: number) => (
-                <ExpandedRow symbol={symbol} lastPrice={lastPrice} colSpan={colSpan} onDataChange={fetchAll} />
-              )} />
-          </Box>
-          {holdings.length === 0 && !loading && (
-            <Box sx={{ p: 6, textAlign: 'center' }}>
-              <Typography level="h4" sx={{ mb: 1, opacity: 0.6 }}>No holdings yet</Typography>
-              <Typography level="body-sm" sx={{ mb: 3, opacity: 0.4 }}>Add tickers to start tracking your portfolio</Typography>
-              <Button variant="solid" color="primary" startDecorator={<Plus size={16} />} onClick={() => setAddModalOpen(true)}>
-                Add your first ticker
-              </Button>
-            </Box>
-          )}
-        </Sheet>
+        <HoldingsTab
+          holdings={holdings}
+          loading={loading}
+          onAddTicker={() => setAddModalOpen(true)}
+          onDataChange={fetchAll}
+        />
       )}
 
       {/* Fundamentals Tab */}
-      {activeTab === 0 && <FundametalDashboard />}
+      {activeTab === 0 && (
+        <Box className="tab-pane-active">
+          <FundametalDashboard />
+        </Box>
+      )}
 
       {/* Add Ticker Modal */}
       <Modal open={addModalOpen} onClose={() => setAddModalOpen(false)}>

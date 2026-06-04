@@ -1,4 +1,4 @@
--- Migration: Add portfolio_daily_history table to track daily historical portfolio performance
+-- Migration: Create portfolio_daily_history table to track daily historical portfolio performance
 CREATE TABLE IF NOT EXISTS portfolio_daily_history (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   date TEXT NOT NULL UNIQUE, -- 'YYYY-MM-DD'

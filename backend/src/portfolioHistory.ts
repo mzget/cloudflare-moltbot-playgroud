@@ -42,7 +42,7 @@ export async function recordDailyPortfolioHistory(db: D1Database) {
 
     // 3. Insert or update the history for today
     await db.prepare(`
-      INSERT INTO portfolio_history (date, total_market_value, total_cost, unrealized_gain, realized_gain, total_dividends)
+      INSERT INTO portfolio_daily_history (date, total_market_value, total_cost, unrealized_gain, realized_gain, total_dividends)
       VALUES (?, ?, ?, ?, ?, ?)
       ON CONFLICT(date) DO UPDATE SET
         total_market_value = excluded.total_market_value,
@@ -64,7 +64,7 @@ export async function getPortfolioHistory(db: D1Database) {
 
   const { results } = await db.prepare(`
     SELECT date, total_market_value, total_cost, unrealized_gain, realized_gain, total_dividends
-    FROM portfolio_history
+    FROM portfolio_daily_history
     ORDER BY date ASC
     LIMIT 90
   `).all();

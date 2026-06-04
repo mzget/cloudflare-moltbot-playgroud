@@ -54,3 +54,4 @@ trace-tool/package.json
 trace-tool/trace.js
 .clinerules
 .cursorrules
+prototype/**

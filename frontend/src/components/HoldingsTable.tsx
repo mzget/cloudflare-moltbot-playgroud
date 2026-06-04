@@ -43,20 +43,19 @@ interface Column {
 }
 
 const COLUMNS: Column[] = [
-  { key: 'symbol',           label: 'Symbol',             align: 'left'  },
-  { key: 'status',           label: 'Status',             align: 'left'  },
-  { key: 'shares',           label: 'Shares',             align: 'right' },
-  { key: 'last_price',       label: 'Last Price',         align: 'right' },
-  { key: 'avg_cost',         label: 'AC/Share',           align: 'right' },
-  { key: 'total_cost',       label: 'Total Cost ($)',     align: 'right' },
-  { key: 'market_value',     label: 'Market Value ($)',   align: 'right' },
-  { key: 'tot_div_income',   label: 'Tot Div Income ($)', align: 'right' },
-  { key: 'day_gain_pct',     label: 'Day Gain (%)',       align: 'right' },
-  { key: 'day_gain_amt',     label: 'Day Gain ($)',       align: 'right' },
-  { key: 'tot_gain_pct',     label: 'Tot Gain (%)',       align: 'right' },
-  { key: 'tot_gain_amt',     label: 'Tot Gain ($)',       align: 'right' },
-  { key: 'realized_gain_pct', label: 'Realized (%)',      align: 'right' },
-  { key: 'realized_gain_amt', label: 'Realized ($)',      align: 'right' },
+  { key: 'symbol', label: 'Symbol', align: 'left' },
+  { key: 'shares', label: 'Shares', align: 'right' },
+  { key: 'last_price', label: 'Last Price', align: 'right' },
+  { key: 'avg_cost', label: 'AC/Share', align: 'right' },
+  { key: 'total_cost', label: 'Total Cost', align: 'right' },
+  { key: 'market_value', label: 'Market Value', align: 'right' },
+  { key: 'tot_div_income', label: 'Tot Div Income', align: 'right' },
+  { key: 'day_gain_pct', label: 'Day Gain (%)', align: 'right' },
+  { key: 'day_gain_amt', label: 'Day Gain ($)', align: 'right' },
+  { key: 'tot_gain_pct', label: 'Tot Gain (%)', align: 'right' },
+  { key: 'tot_gain_amt', label: 'Tot Gain ($)', align: 'right' },
+  { key: 'realized_gain_pct', label: 'Realized (%)', align: 'right' },
+  { key: 'realized_gain_amt', label: 'Realized ($)', align: 'right' },
 ];
 
 const TOTAL_COL_SPAN = COLUMNS.length + 1; // +1 for chevron column
@@ -152,9 +151,6 @@ export default function HoldingsTable({
                       {h.name}
                     </span>
                   </td>
-
-                  {/* Status */}
-                  <td className="left">{h.status}</td>
 
                   {/* Shares */}
                   <td>{fmtNum(h.shares, 0)}</td>
