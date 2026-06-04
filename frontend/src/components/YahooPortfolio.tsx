@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Box, Typography, Sheet, Button, Input, Stack, Tabs, TabList, Tab, Divider, Modal, ModalDialog, DialogTitle, DialogContent, ModalClose, FormControl, FormLabel } from '@mui/joy';
-import { Plus } from 'lucide-react';
+import { Box, Typography, Sheet, Button, Input, Stack, Tabs, TabList, Tab, Divider, Modal, ModalDialog, DialogTitle, DialogContent, ModalClose, FormControl, FormLabel, Chip } from '@mui/joy';
+import { Plus, TrendingUp } from 'lucide-react';
 import { API_BASE_URL } from '../config';
 import { glassStyle } from '../styles/glass';
 import HoldingsTable from './HoldingsTable';
@@ -271,8 +271,8 @@ export default function YahooPortfolio() {
         </Sheet>
       )}
 
-      {/* Tabs + Add Button */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
+      {/* Tabs */}
+      <Box sx={{ mb: 2 }}>
         <Tabs value={activeTab} onChange={(_, val) => setActiveTab(val as number)} sx={{ bgcolor: 'transparent' }}>
           <TabList disableUnderline sx={{ gap: 0, borderBottom: '1px solid', borderColor: 'divider',
             '& .MuiTab-root': { fontWeight: 600, fontSize: '0.875rem', px: 2, py: 1, minHeight: 40,
@@ -283,16 +283,37 @@ export default function YahooPortfolio() {
             <Tab disableIndicator>Summary</Tab>
           </TabList>
         </Tabs>
-        <Button variant="outlined" color="neutral" size="sm" startDecorator={<Plus size={16} />}
-          onClick={() => setAddModalOpen(true)} sx={{ borderRadius: '20px', fontWeight: 600, px: 2 }}>
-          Add tickers
-        </Button>
       </Box>
 
       {/* Summary Tab */}
       {activeTab === 2 && summary && (
         <Sheet sx={{ ...glassStyle, p: 3 }}>
-          <Typography level="h4" sx={{ mb: 2, fontWeight: 700 }}>Portfolio Summary</Typography>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1.5 }}>
+            <Typography level="h4" sx={{ fontWeight: 700 }}>Portfolio Summary</Typography>
+            <Sheet
+              sx={{
+                ...glassStyle,
+                px: 2,
+                py: 0.5,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+                borderRadius: '12px'
+              }}
+            >
+              <Typography level="body-xs" sx={{ opacity: 0.7 }}>
+                Portfolio Sentiment
+              </Typography>
+              <Chip
+                variant="soft"
+                color="success"
+                size="sm"
+                startDecorator={<TrendingUp size={14} />}
+              >
+                Bullish
+              </Chip>
+            </Sheet>
+          </Box>
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: 'repeat(4, 1fr)' }, gap: 2 }}>
             {[
               { label: 'Total Market Value', value: formatCurrency(summary.total_market_value, false) },
@@ -315,6 +336,17 @@ export default function YahooPortfolio() {
       {/* Holdings Tab */}
       {activeTab === 1 && (
         <Sheet sx={{ ...glassStyle, p: 0, overflow: 'hidden' }}>
+          {holdings.length > 0 && (
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+              <Typography level="title-md" sx={{ fontWeight: 700 }}>
+                Positions
+              </Typography>
+              <Button variant="outlined" color="neutral" size="sm" startDecorator={<Plus size={16} />}
+                onClick={() => setAddModalOpen(true)} sx={{ borderRadius: '20px', fontWeight: 600, px: 2 }}>
+                Add Ticker
+              </Button>
+            </Box>
+          )}
           <Box sx={{ overflowX: 'auto' }}>
             <HoldingsTable holdings={sortedHoldings} onExpandRow={handleExpandRow} expandedRows={expandedRows}
               sortBy={sortBy} sortDir={sortDir} onSort={handleSort}

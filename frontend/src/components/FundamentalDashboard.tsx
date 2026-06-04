@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { Box, Sheet, Typography, Stack, Chip, Divider } from '@mui/joy';
-import { BarChart3, TrendingUp } from 'lucide-react';
+import { Box, Sheet, Typography, Stack, Divider } from '@mui/joy';
+import { BarChart3 } from 'lucide-react';
 import CompanyStatsTable, { ALL_COLUMNS } from './CompanyStatsTable';
 import CompanyStatsToolbar from './CompanyStatsToolbar';
 import type { DensityMode } from './CompanyStatsToolbar';
@@ -95,47 +95,17 @@ export default function FundametalDashboard() {
   return (
     <Box>
       {/* ── Page header ───────────────────────────────────────── */}
-      <Stack
-        direction="row"
-        justifyContent="space-between"
-        alignItems="center"
-        sx={{ mb: 4 }}
-      >
-        <Box>
-          <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 0.5 }}>
-            <BarChart3 size={28} color="#2ecc71" />
-            <Typography level="h2" sx={{ fontWeight: 700 }}>
-              Fundamental Dashboard
-            </Typography>
-          </Stack>
-          <Typography level="body-md" sx={{ opacity: 0.6, pl: 0.5 }}>
-            Fundamental financial metrics · {data.length} companies
+      <Box sx={{ mb: 4 }}>
+        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 0.5 }}>
+          <BarChart3 size={28} color="#2ecc71" />
+          <Typography level="h2" sx={{ fontWeight: 700 }}>
+            Fundamental Dashboard
           </Typography>
-        </Box>
-
-        <Sheet
-          sx={{
-            ...glassStyle,
-            px: 3,
-            py: 1,
-            display: 'flex',
-            alignItems: 'center',
-            gap: 2,
-          }}
-        >
-          <Typography level="body-sm" sx={{ opacity: 0.7 }}>
-            Portfolio Sentiment
-          </Typography>
-          <Chip
-            variant="soft"
-            color="success"
-            size="sm"
-            startDecorator={<TrendingUp size={14} />}
-          >
-            Bullish
-          </Chip>
-        </Sheet>
-      </Stack>
+        </Stack>
+        <Typography level="body-md" sx={{ opacity: 0.6, pl: 0.5 }}>
+          Fundamental financial metrics · {data.length} companies
+        </Typography>
+      </Box>
 
       {/* ── Stats table card ──────────────────────────────────── */}
       <Sheet sx={{ ...glassStyle, p: { xs: 2, md: 3 }, overflow: 'hidden' }}>
