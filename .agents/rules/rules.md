@@ -1,6 +1,9 @@
-# Workspace Rules for Antigravity Agent
+# Workspace Rules for Oaktree Agent
 
-These rules govern the behavior of the Antigravity agent in this repository. The agent **MUST** read and adhere to these guidelines for every task.
+- **Rule Name**: Workspace Rules for Oaktree Agent
+- **Description**: Defines guidelines, mandatory skills activation, and stack constraints for the Moltbot workspace.
+
+These rules govern the behavior of the Oaktree Agent in this repository. The agent **MUST** read and adhere to these guidelines for every task.
 
 ## Mandatory Skills Activation
 
@@ -34,4 +37,3 @@ For all tasks, code changes, and analysis in this repository, you **MUST** load 
 - **Frontend**: Astro framework UI using React with **MUI Joy UI** and **`sx` props** (no Tailwind).
 - **Conflict Resolution**: The project stack constraints (Astro + React, MUI Joy UI, `sx` prop, and no Tailwind) **MUST** take precedence over the default stack suggested in the Antigravity UI & Motion Design Expert skill.
 - Avoid introducing unnecessary libraries or frameworks.
-

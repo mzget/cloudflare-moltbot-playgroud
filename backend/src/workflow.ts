@@ -8,6 +8,8 @@ import { fetchAndStoreMarketEvents } from './marketEvents';
 import { checkAlertRules } from './alerts';
 import { syncAndIngestEmails, generateEmailDigests } from './emailSummarizer';
 import { syncAndProcessFacebookPosts } from './facebook';
+import { recordDailyPortfolioHistory } from './portfolioHistory';
+
 
 export interface OaktreeWorkflowParams {
 	fetchMarketStats?: boolean;
@@ -29,7 +31,9 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 
 		if (params.fetchMarketStats) {
 			await step.do('fetch-market-stats', async () => {
-				return await fetchAndStoreMarketStats(this.env);
+				const statsResult = await fetchAndStoreMarketStats(this.env);
+				await recordDailyPortfolioHistory(this.env.DB);
+				return statsResult;
 			});
 		}
 

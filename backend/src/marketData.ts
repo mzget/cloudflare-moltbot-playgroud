@@ -70,6 +70,7 @@ export async function fetchAndStoreMarketStats(env: Env): Promise<{ symbol: stri
 		let p_ocf = null, p_fcf = null, capex_to_ocf = null, rd_to_revenue = null, debt_equity = null;
 		let p_e = null, fcf_margin = null, total_cash = null, net_debt = null, total_debt = null, dividend_yield = null;
 		let price = null;
+		let previous_close = null, day_high = null, day_low = null, open_price = null;
 		let quoteError = null;
 
 		try {
@@ -88,6 +89,10 @@ export async function fetchAndStoreMarketStats(env: Env): Promise<{ symbol: stri
 				price = null;
 			} else {
 				price = quoteData?.c ?? null;
+				previous_close = quoteData?.pc ?? null;
+				day_high = quoteData?.h ?? null;
+				day_low = quoteData?.l ?? null;
+				open_price = quoteData?.o ?? null;
 			}
 
 			// Basic Valuation & Stats
@@ -186,8 +191,8 @@ export async function fetchAndStoreMarketStats(env: Env): Promise<{ symbol: stri
 					gross_profit_margin, operating_margin, ev_ebit, ev_sales,
 					p_ocf, p_fcf, capex_to_ocf, rd_to_revenue, debt_equity,
 					p_e, fcf_margin, total_cash, net_debt, total_debt, dividend_yield,
-					price, updated_at
-				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+					price, previous_close, day_high, day_low, open_price, updated_at
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 				ON CONFLICT(symbol) DO UPDATE SET
 					market_cap=excluded.market_cap,
 					revenues=excluded.revenues,
@@ -210,13 +215,17 @@ export async function fetchAndStoreMarketStats(env: Env): Promise<{ symbol: stri
 					total_debt=excluded.total_debt,
 					dividend_yield=excluded.dividend_yield,
 					price=excluded.price,
+					previous_close=excluded.previous_close,
+					day_high=excluded.day_high,
+					day_low=excluded.day_low,
+					open_price=excluded.open_price,
 					updated_at=CURRENT_TIMESTAMP
 			`).bind(
 				symbol, market_cap, revenues, revenue_3y_cagr, revenue_1y_growth, revenue_5y_cagr,
 				gross_profit_margin, operating_margin, ev_ebit, ev_sales,
 				p_ocf, p_fcf, capex_to_ocf, rd_to_revenue, debt_equity,
 				p_e, fcf_margin, total_cash, net_debt, total_debt, dividend_yield,
-				price
+				price, previous_close, day_high, day_low, open_price
 			).run();
 
 			runResults.push({ symbol, success: true, price, error: quoteError });

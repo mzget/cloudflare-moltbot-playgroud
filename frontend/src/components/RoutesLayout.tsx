@@ -7,8 +7,8 @@ import Header from './Header';
 import Sidebar from './Sidebar';
 import SourceManager from './SourceManager';
 import Watchlist from './Watchlist';
+import YahooPortfolio from './YahooPortfolio';
 import KnowledgeChat from './KnowledgeChat';
-import FundametalDashboard from './FundamentalDashboard';
 import IntelligenceFeed from './IntelligenceFeed';
 import { glassStyle } from '../styles/glass';
 import { API_BASE_URL } from '../config';
@@ -253,7 +253,7 @@ export default function RoutesLayout() {
 
         {/* Main Content Container */}
         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-          {activeTab === 'dashboard' && <FundametalDashboard />}
+          {activeTab === 'dashboard' && <YahooPortfolio />}
           {activeTab === 'market' && (
             <IntelligenceFeed 
               reports={reports} 

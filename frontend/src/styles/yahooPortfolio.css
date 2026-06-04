@@ -1,0 +1,375 @@
+/* Yahoo Finance Portfolio Styles */
+:root {
+  --yf-bg: #ffffff;
+  --yf-border: #e0e0e0;
+  --yf-header-bg: #f7f7f7;
+  --yf-text: #1d1d1f;
+  --yf-text-secondary: #6b6b6b;
+  --yf-positive: #00a651;
+  --yf-negative: #ff3333;
+  --yf-link: #0f69ff;
+  --yf-row-hover: #f5f8ff;
+  --yf-expanded-bg: #fafafa;
+}
+
+[data-joy-color-scheme='dark'] {
+  --yf-bg: #1a1a2e;
+  --yf-border: #2a2a3e;
+  --yf-header-bg: #16162a;
+  --yf-text: #e0e0e0;
+  --yf-text-secondary: #8b8b9e;
+  --yf-positive: #00d46a;
+  --yf-negative: #ff5555;
+  --yf-link: #4d94ff;
+  --yf-row-hover: #1e1e38;
+  --yf-expanded-bg: #141428;
+}
+
+/* -- Container ------------------------------------------------ */
+.yf-portfolio {
+  color: var(--yf-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+/* -- Summary bar ---------------------------------------------- */
+.yf-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--yf-border);
+  margin-bottom: 12px;
+}
+
+.yf-summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.yf-summary-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--yf-text-secondary);
+}
+
+.yf-summary-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--yf-text);
+  line-height: 1.2;
+}
+
+/* -- Tabs ----------------------------------------------------- */
+.yf-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--yf-border);
+  margin-bottom: 0;
+}
+
+.yf-tab {
+  padding: 10px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--yf-text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.15s;
+  white-space: nowrap;
+}
+
+.yf-tab:hover {
+  color: var(--yf-text);
+}
+
+.yf-tab.active {
+  color: var(--yf-link);
+}
+
+.yf-tab.active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 2px;
+  background: var(--yf-link);
+  border-radius: 1px 1px 0 0;
+}
+
+/* -- Table ---------------------------------------------------- */
+.yf-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.yf-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.yf-table th {
+  background: var(--yf-header-bg);
+  color: var(--yf-text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 8px 12px;
+  text-align: right;
+  border-bottom: 1px solid var(--yf-border);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  user-select: none;
+  cursor: pointer;
+}
+
+.yf-table th:hover {
+  color: var(--yf-text);
+}
+
+.yf-table th.left {
+  text-align: left;
+}
+
+.yf-table th.center {
+  text-align: center;
+}
+
+.yf-table th .sort-arrow {
+  display: inline-block;
+  margin-left: 3px;
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+.yf-table td {
+  padding: 8px 12px;
+  text-align: right;
+  border-bottom: 1px solid var(--yf-border);
+  color: var(--yf-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.yf-table td.left {
+  text-align: left;
+}
+
+.yf-table td.center {
+  text-align: center;
+}
+
+.yf-table tbody tr:hover > td {
+  background: var(--yf-row-hover);
+}
+
+/* -- Gain / loss colours -------------------------------------- */
+.yf-positive {
+  color: var(--yf-positive) !important;
+}
+
+.yf-negative {
+  color: var(--yf-negative) !important;
+}
+
+/* -- Symbol link ---------------------------------------------- */
+.yf-symbol-link {
+  color: var(--yf-link);
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.yf-symbol-link:hover {
+  text-decoration: underline;
+}
+
+/* -- Chevron (expand / collapse) ------------------------------ */
+.yf-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--yf-text-secondary);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.yf-chevron:hover {
+  background: var(--yf-row-hover);
+  color: var(--yf-text);
+}
+
+/* -- Expanded row --------------------------------------------- */
+.yf-expanded {
+  background: var(--yf-expanded-bg);
+}
+
+.yf-expanded td {
+  padding: 0;
+  border-bottom: 1px solid var(--yf-border);
+}
+
+.yf-expanded-inner {
+  padding: 16px 20px;
+}
+
+/* -- Sub-tabs inside expanded rows ---------------------------- */
+.yf-sub-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--yf-border);
+  margin-bottom: 12px;
+}
+
+.yf-sub-tab {
+  padding: 8px 16px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--yf-text-secondary);
+  background: none;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  transition: color 0.15s;
+}
+
+.yf-sub-tab:hover {
+  color: var(--yf-text);
+}
+
+.yf-sub-tab.active {
+  color: var(--yf-link);
+}
+
+.yf-sub-tab.active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--yf-link);
+  border-radius: 1px 1px 0 0;
+}
+
+/* -- Sub-table (lots / txns / divs) --------------------------- */
+.yf-sub-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.yf-sub-table th {
+  background: var(--yf-header-bg);
+  color: var(--yf-text-secondary);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  padding: 6px 10px;
+  text-align: right;
+  border-bottom: 1px solid var(--yf-border);
+}
+
+.yf-sub-table th.left {
+  text-align: left;
+}
+
+.yf-sub-table td {
+  padding: 6px 10px;
+  text-align: right;
+  border-bottom: 1px solid var(--yf-border);
+  color: var(--yf-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.yf-sub-table td.left {
+  text-align: left;
+}
+
+.yf-sub-table tbody tr:hover > td {
+  background: var(--yf-row-hover);
+}
+
+/* -- Add-row form inputs -------------------------------------- */
+.yf-add-row td {
+  background: var(--yf-expanded-bg);
+  padding: 4px 6px;
+  border-bottom: none;
+}
+
+.yf-add-row input,
+.yf-add-row select {
+  width: 100%;
+  min-width: 60px;
+}
+
+/* -- Responsive ----------------------------------------------- */
+@media (max-width: 992px) {
+  .yf-summary {
+    gap: 16px;
+  }
+
+  .yf-summary-value {
+    font-size: 16px;
+  }
+
+  .yf-tab {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .yf-table th,
+  .yf-table td {
+    padding: 6px 8px;
+    font-size: 12px;
+  }
+
+  /* Make first column (chevron) and second column (Symbol) sticky */
+  .yf-table th:first-child,
+  .yf-table td:first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: var(--yf-header-bg);
+  }
+
+  .yf-table td:first-child {
+    background: var(--yf-bg);
+  }
+
+  .yf-table th:nth-child(2),
+  .yf-table td:nth-child(2) {
+    position: sticky;
+    left: 36px;
+    z-index: 2;
+    background: var(--yf-header-bg);
+    border-right: 2px solid var(--yf-border);
+  }
+
+  .yf-table td:nth-child(2) {
+    background: var(--yf-bg);
+  }
+
+  /* Hover background override for sticky columns */
+  .yf-table tbody tr:hover td:first-child,
+  .yf-table tbody tr:hover td:nth-child(2) {
+    background: var(--yf-row-hover);
+  }
+}
+

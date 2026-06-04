@@ -9,6 +9,8 @@ import { getAuthUrl, exchangeCodeForTokens } from './gmail';
 import { syncAndIngestEmails, generateEmailDigests } from './emailSummarizer';
 import { checkAuth, fetchGoogleUserProfile, isEmailAuthorized, signJwt, getUserLoginAuthUrl } from './auth';
 import { syncAndProcessFacebookPosts } from './facebook';
+import { recordDailyPortfolioHistory, getPortfolioHistory } from './portfolioHistory';
+
 
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
@@ -674,6 +676,444 @@ app.get('/api/email-digests', async (c) => {
 	} catch (e) {
 		return c.json({ error: (e as any).message }, 500);
 	}
+});
+
+
+// Helper: Recalculate holdings aggregate from share_lots
+async function recalcHoldings(db: any, symbol: string) {
+  const { results } = await db.prepare(
+    'SELECT SUM(shares) as total_shares, SUM(total_cost) as total_cost FROM share_lots WHERE symbol = ?'
+  ).bind(symbol).all();
+  const row = results?.[0] as any;
+  const totalShares = row?.total_shares || 0;
+  const totalCost = row?.total_cost || 0;
+  const avgCost = totalShares > 0 ? totalCost / totalShares : 0;
+  const status = totalShares > 0 ? 'Open' : 'Closed';
+  
+  await db.prepare(`
+    INSERT INTO holdings (symbol, shares, avg_cost, total_cost, status)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(symbol) DO UPDATE SET
+      shares = excluded.shares,
+      avg_cost = excluded.avg_cost,
+      total_cost = excluded.total_cost,
+      status = excluded.status,
+      updated_at = strftime('%s', 'now')
+  `).bind(symbol, totalShares, avgCost, totalCost, status).run();
+
+  // Also ensure symbol is in watchlist
+  await db.prepare(`
+    INSERT OR IGNORE INTO watchlist (symbol, name, is_active, in_portfolio)
+    VALUES (?, ?, 1, 1)
+  `).bind(symbol, symbol).run();
+}
+
+// ===== PORTFOLIO API =====
+
+// GET /api/portfolio/holdings - All holdings with computed gains
+app.get('/api/portfolio/holdings', async (c) => {
+  const { results } = await c.env.DB.prepare(`
+    SELECT 
+      h.symbol, h.shares, h.avg_cost, h.total_cost, h.status,
+      w.name,
+      m.price as last_price, m.previous_close, m.market_cap, m.p_e,
+      COALESCE(d.total_dividends, 0) as tot_div_income,
+      COALESCE(t.realized_gain_sum, 0) as realized_gain_amt,
+      COALESCE(t.realized_cost_sum, 0) as realized_cost_basis
+    FROM holdings h
+    LEFT JOIN watchlist w ON h.symbol = w.symbol
+    LEFT JOIN market_stats m ON h.symbol = m.symbol
+    LEFT JOIN (
+      SELECT symbol, SUM(amount) as total_dividends FROM dividends GROUP BY symbol
+    ) d ON h.symbol = d.symbol
+    LEFT JOIN (
+      SELECT symbol, 
+        SUM(CASE WHEN type = 'Sell' THEN realized_gain_amt ELSE 0 END) as realized_gain_sum,
+        SUM(CASE WHEN type = 'Sell' THEN total_cost ELSE 0 END) as realized_cost_basis
+      FROM transactions GROUP BY symbol
+    ) t ON h.symbol = t.symbol
+    ORDER BY h.symbol ASC
+  `).all();
+
+  // Compute derived fields
+  const holdings = (results || []).map((row: any) => {
+    const shares = row.shares || 0;
+    const lastPrice = row.last_price;
+    const avgCost = row.avg_cost;
+    const totalCost = row.total_cost || (shares * (avgCost || 0));
+    const marketValue = lastPrice ? shares * lastPrice : null;
+    const prevClose = row.previous_close;
+    
+    // Day gain
+    const dayGainPct = (lastPrice && prevClose && prevClose > 0) 
+      ? ((lastPrice - prevClose) / prevClose) * 100 : null;
+    const dayGainAmt = (lastPrice && prevClose) 
+      ? shares * (lastPrice - prevClose) : null;
+    
+    // Total unrealized gain
+    const totGainAmt = (marketValue !== null && totalCost) 
+      ? marketValue - totalCost : null;
+    const totGainPct = (totGainAmt !== null && totalCost && totalCost > 0) 
+      ? (totGainAmt / totalCost) * 100 : null;
+    
+    // Realized gain percentage
+    const realizedGainAmt = row.realized_gain_amt || 0;
+    const realizedCostBasis = row.realized_cost_basis || 0;
+    const realizedGainPct = realizedCostBasis > 0 
+      ? (realizedGainAmt / realizedCostBasis) * 100 : null;
+
+    return {
+      symbol: row.symbol,
+      name: row.name || row.symbol,
+      status: row.status || 'Open',
+      shares,
+      last_price: lastPrice,
+      avg_cost: avgCost,
+      total_cost: totalCost,
+      market_value: marketValue,
+      tot_div_income: row.tot_div_income,
+      day_gain_pct: dayGainPct,
+      day_gain_amt: dayGainAmt,
+      tot_gain_pct: totGainPct,
+      tot_gain_amt: totGainAmt,
+      realized_gain_pct: realizedGainPct,
+      realized_gain_amt: realizedGainAmt,
+    };
+  });
+
+  return c.json(holdings);
+});
+
+// GET /api/portfolio/summary - Portfolio totals
+app.get('/api/portfolio/summary', async (c) => {
+  const { results } = await c.env.DB.prepare(`
+    SELECT 
+      h.symbol, h.shares, h.avg_cost, h.total_cost,
+      m.price as last_price, m.previous_close,
+      COALESCE(d.total_dividends, 0) as tot_div_income
+    FROM holdings h
+    LEFT JOIN market_stats m ON h.symbol = m.symbol
+    LEFT JOIN (
+      SELECT symbol, SUM(amount) as total_dividends FROM dividends GROUP BY symbol
+    ) d ON h.symbol = d.symbol
+    WHERE h.status != 'Closed'
+  `).all();
+
+  let totalMarketValue = 0;
+  let totalCost = 0;
+  let totalDayChange = 0;
+  let totalDividends = 0;
+
+  for (const row of (results || []) as any[]) {
+    const shares = row.shares || 0;
+    const price = row.last_price || 0;
+    const prevClose = row.previous_close || price;
+    const cost = row.total_cost || 0;
+    
+    totalMarketValue += shares * price;
+    totalCost += cost;
+    totalDayChange += shares * (price - prevClose);
+    totalDividends += row.tot_div_income || 0;
+  }
+
+  // Get realized gains
+  const { results: txResults } = await c.env.DB.prepare(`
+    SELECT COALESCE(SUM(realized_gain_amt), 0) as total_realized
+    FROM transactions WHERE type = 'Sell'
+  `).all();
+  const totalRealized = (txResults?.[0] as any)?.total_realized || 0;
+
+  const unrealizedGain = totalMarketValue - totalCost;
+  const unrealizedGainPct = totalCost > 0 ? (unrealizedGain / totalCost) * 100 : 0;
+  const dayChangePct = (totalMarketValue - totalDayChange) > 0 
+    ? (totalDayChange / (totalMarketValue - totalDayChange)) * 100 : 0;
+
+  // Record history snapshot in background
+  c.executionCtx.waitUntil(recordDailyPortfolioHistory(c.env.DB));
+
+  return c.json({
+    total_market_value: totalMarketValue,
+    total_cost: totalCost,
+    cash: 0,
+    day_change_amt: totalDayChange,
+    day_change_pct: dayChangePct,
+    unrealized_gain_amt: unrealizedGain,
+    unrealized_gain_pct: unrealizedGainPct,
+    realized_gain_amt: totalRealized,
+    total_dividends: totalDividends,
+  });
+});
+
+// GET /api/portfolio/history - Historical portfolio values
+app.get('/api/portfolio/history', async (c) => {
+  try {
+    const history = await getPortfolioHistory(c.env.DB);
+    return c.json(history);
+  } catch (e) {
+    return c.json({ error: (e as any).message }, 500);
+  }
+});
+
+// POST /api/portfolio/import - Bulk import transactions from CSV (parsed frontend JSON)
+app.post('/api/portfolio/import', async (c) => {
+  try {
+    const transactions = await c.req.json() as any[];
+    if (!Array.isArray(transactions)) {
+      return c.json({ error: 'Invalid payload, expected array of transactions' }, 400);
+    }
+
+    // Sort transactions chronologically to ensure FIFO lot matching behaves correctly
+    transactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    const affectedSymbols = new Set<string>();
+
+    for (const tx of transactions) {
+      if (!tx.symbol || !tx.date || isNaN(parseFloat(tx.shares)) || isNaN(parseFloat(tx.price))) {
+        continue;
+      }
+
+      const symbol = tx.symbol.trim().toUpperCase();
+      const date = tx.date;
+      const type = tx.type || 'Buy';
+      const shares = parseFloat(tx.shares);
+      const price = parseFloat(tx.price);
+      const commission = parseFloat(tx.commission) || 0;
+      const note = tx.note || null;
+
+      affectedSymbols.add(symbol);
+
+      const totalCost = (shares * price) + commission;
+
+      // 1. Record the transaction
+      await c.env.DB.prepare(`
+        INSERT INTO transactions (symbol, date, type, shares, cost_per_share, commission, total_cost, note)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(symbol, date, type, shares, price, commission, totalCost, note).run();
+
+      if (type === 'Buy') {
+        // 2. Add buy lot
+        await c.env.DB.prepare(`
+          INSERT INTO share_lots (symbol, date, shares, cost_per_share, total_cost, note)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `).bind(symbol, date, shares, price, totalCost - commission, note).run();
+      } else if (type === 'Sell') {
+        // 3. FIFO deduct lots
+        const { results: lots } = await c.env.DB.prepare(`
+          SELECT * FROM share_lots WHERE symbol = ? AND shares > 0 ORDER BY date ASC
+        `).bind(symbol).all();
+
+        let remainingToSell = shares;
+        for (const lot of (lots || []) as any[]) {
+          if (remainingToSell <= 0) break;
+
+          const lotShares = lot.shares;
+          const lotCostPerShare = lot.cost_per_share;
+
+          if (lotShares <= remainingToSell) {
+            const realizedAmt = (lotShares * price) - (lotShares * lotCostPerShare);
+            const realizedPct = lotCostPerShare > 0 ? (realizedAmt / (lotShares * lotCostPerShare)) * 100 : 0;
+
+            await c.env.DB.prepare(`
+              UPDATE transactions 
+              SET realized_gain_amt = COALESCE(realized_gain_amt, 0) + ?,
+                  realized_gain_pct = ?
+              WHERE symbol = ? AND date = ? AND type = 'Sell' AND shares = ?
+            `).bind(realizedAmt, realizedPct, symbol, date, shares).run();
+
+            await c.env.DB.prepare('DELETE FROM share_lots WHERE id = ?').bind(lot.id).run();
+            remainingToSell -= lotShares;
+          } else {
+            const realizedAmt = (remainingToSell * price) - (remainingToSell * lotCostPerShare);
+            const realizedPct = lotCostPerShare > 0 ? (realizedAmt / (remainingToSell * lotCostPerShare)) * 100 : 0;
+
+            await c.env.DB.prepare(`
+              UPDATE transactions 
+              SET realized_gain_amt = COALESCE(realized_gain_amt, 0) + ?,
+                  realized_gain_pct = ?
+              WHERE symbol = ? AND date = ? AND type = 'Sell' AND shares = ?
+            `).bind(realizedAmt, realizedPct, symbol, date, shares).run();
+
+            const newShares = lotShares - remainingToSell;
+            const newCost = newShares * lotCostPerShare;
+            await c.env.DB.prepare(`
+              UPDATE share_lots 
+              SET shares = ?, total_cost = ? 
+              WHERE id = ?
+            `).bind(newShares, newCost, lot.id).run();
+            remainingToSell = 0;
+          }
+        }
+      }
+    }
+
+    // Recalculate positions
+    for (const symbol of affectedSymbols) {
+      await recalcHoldings(c.env.DB, symbol);
+    }
+
+    return c.json({ success: true, count: transactions.length });
+  } catch (e) {
+    return c.json({ error: (e as any).message }, 500);
+  }
+});
+
+
+
+// POST /api/portfolio/holdings - Add new holding
+app.post('/api/portfolio/holdings', async (c) => {
+  const body = await c.req.json();
+  const { symbol, shares, avg_cost, status } = body;
+  if (!symbol) return c.json({ error: 'Symbol is required' }, 400);
+  
+  const totalCost = (shares || 0) * (avg_cost || 0);
+  
+  await c.env.DB.prepare(`
+    INSERT INTO holdings (symbol, shares, avg_cost, total_cost, status)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(symbol) DO UPDATE SET
+      shares = excluded.shares,
+      avg_cost = excluded.avg_cost,
+      total_cost = excluded.total_cost,
+      status = excluded.status,
+      updated_at = strftime('%s', 'now')
+  `).bind(symbol.toUpperCase(), shares || 0, avg_cost || null, totalCost, status || 'Open').run();
+
+  // Also ensure symbol is in watchlist
+  await c.env.DB.prepare(`
+    INSERT OR IGNORE INTO watchlist (symbol, name, is_active, in_portfolio)
+    VALUES (?, ?, 1, 1)
+  `).bind(symbol.toUpperCase(), symbol.toUpperCase()).run();
+
+  return c.json({ success: true });
+});
+
+// PUT /api/portfolio/holdings/:symbol - Update holding
+app.put('/api/portfolio/holdings/:symbol', async (c) => {
+  const symbol = c.req.param('symbol').toUpperCase();
+  const body = await c.req.json();
+  const { shares, avg_cost, status } = body;
+  const totalCost = (shares || 0) * (avg_cost || 0);
+  
+  await c.env.DB.prepare(`
+    UPDATE holdings SET shares = ?, avg_cost = ?, total_cost = ?, status = ?, updated_at = strftime('%s', 'now')
+    WHERE symbol = ?
+  `).bind(shares || 0, avg_cost || null, totalCost, status || 'Open', symbol).run();
+
+  return c.json({ success: true });
+});
+
+// DELETE /api/portfolio/holdings/:symbol
+app.delete('/api/portfolio/holdings/:symbol', async (c) => {
+  const symbol = c.req.param('symbol').toUpperCase();
+  await c.env.DB.prepare('DELETE FROM holdings WHERE symbol = ?').bind(symbol).run();
+  await c.env.DB.prepare('DELETE FROM share_lots WHERE symbol = ?').bind(symbol).run();
+  await c.env.DB.prepare('DELETE FROM transactions WHERE symbol = ?').bind(symbol).run();
+  await c.env.DB.prepare('DELETE FROM dividends WHERE symbol = ?').bind(symbol).run();
+  return c.json({ success: true });
+});
+
+// GET /api/portfolio/lots/:symbol
+app.get('/api/portfolio/lots/:symbol', async (c) => {
+  const symbol = c.req.param('symbol').toUpperCase();
+  const { results } = await c.env.DB.prepare(
+    'SELECT * FROM share_lots WHERE symbol = ? ORDER BY date DESC'
+  ).bind(symbol).all();
+  return c.json(results || []);
+});
+
+// POST /api/portfolio/lots
+app.post('/api/portfolio/lots', async (c) => {
+  const body = await c.req.json();
+  const { symbol, date, shares, cost_per_share, low_limit, high_limit, note } = body;
+  if (!symbol || !date || !shares || !cost_per_share) {
+    return c.json({ error: 'symbol, date, shares, cost_per_share are required' }, 400);
+  }
+  const totalCost = shares * cost_per_share;
+  
+  await c.env.DB.prepare(`
+    INSERT INTO share_lots (symbol, date, shares, cost_per_share, total_cost, low_limit, high_limit, note)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(symbol.toUpperCase(), date, shares, cost_per_share, totalCost, low_limit || null, high_limit || null, note || null).run();
+
+  // Recalculate holdings aggregate
+  await recalcHoldings(c.env.DB, symbol.toUpperCase());
+
+  return c.json({ success: true });
+});
+
+// DELETE /api/portfolio/lots/:id
+app.delete('/api/portfolio/lots/:id', async (c) => {
+  const id = c.req.param('id');
+  const { results } = await c.env.DB.prepare('SELECT symbol FROM share_lots WHERE id = ?').bind(id).all();
+  const symbol = (results?.[0] as any)?.symbol;
+  await c.env.DB.prepare('DELETE FROM share_lots WHERE id = ?').bind(id).run();
+  if (symbol) await recalcHoldings(c.env.DB, symbol);
+  return c.json({ success: true });
+});
+
+// GET /api/portfolio/transactions/:symbol
+app.get('/api/portfolio/transactions/:symbol', async (c) => {
+  const symbol = c.req.param('symbol').toUpperCase();
+  const { results } = await c.env.DB.prepare(
+    'SELECT * FROM transactions WHERE symbol = ? ORDER BY date DESC'
+  ).bind(symbol).all();
+  return c.json(results || []);
+});
+
+// POST /api/portfolio/transactions
+app.post('/api/portfolio/transactions', async (c) => {
+  const body = await c.req.json();
+  const { symbol, date, type, shares, cost_per_share, commission, realized_gain_pct, realized_gain_amt, note } = body;
+  if (!symbol || !date || !shares || !cost_per_share) {
+    return c.json({ error: 'symbol, date, shares, cost_per_share are required' }, 400);
+  }
+  const totalCost = (shares * cost_per_share) + (commission || 0);
+  
+  await c.env.DB.prepare(`
+    INSERT INTO transactions (symbol, date, type, shares, cost_per_share, commission, total_cost, realized_gain_pct, realized_gain_amt, note)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(symbol.toUpperCase(), date, type || 'Buy', shares, cost_per_share, commission || 0, totalCost, realized_gain_pct || null, realized_gain_amt || null, note || null).run();
+
+  return c.json({ success: true });
+});
+
+// DELETE /api/portfolio/transactions/:id
+app.delete('/api/portfolio/transactions/:id', async (c) => {
+  const id = c.req.param('id');
+  await c.env.DB.prepare('DELETE FROM transactions WHERE id = ?').bind(id).run();
+  return c.json({ success: true });
+});
+
+// GET /api/portfolio/dividends/:symbol
+app.get('/api/portfolio/dividends/:symbol', async (c) => {
+  const symbol = c.req.param('symbol').toUpperCase();
+  const { results } = await c.env.DB.prepare(
+    'SELECT * FROM dividends WHERE symbol = ? ORDER BY date DESC'
+  ).bind(symbol).all();
+  return c.json(results || []);
+});
+
+// POST /api/portfolio/dividends
+app.post('/api/portfolio/dividends', async (c) => {
+  const body = await c.req.json();
+  const { symbol, date, amount, per_share, note } = body;
+  if (!symbol || !date || !amount) {
+    return c.json({ error: 'symbol, date, amount are required' }, 400);
+  }
+  
+  await c.env.DB.prepare(`
+    INSERT INTO dividends (symbol, date, amount, per_share, note)
+    VALUES (?, ?, ?, ?, ?)
+  `).bind(symbol.toUpperCase(), date, amount, per_share || null, note || null).run();
+
+  return c.json({ success: true });
+});
+
+// DELETE /api/portfolio/dividends/:id
+app.delete('/api/portfolio/dividends/:id', async (c) => {
+  const id = c.req.param('id');
+  await c.env.DB.prepare('DELETE FROM dividends WHERE id = ?').bind(id).run();
+  return c.json({ success: true });
 });
 
 // Fallback for non-matching API routes
