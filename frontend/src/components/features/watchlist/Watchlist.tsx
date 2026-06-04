@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Box, Typography, Sheet, IconButton, Button, Input, Stack, Card, CardContent, Divider, Switch, Grid, CardActions, Avatar, Modal, ModalDialog, DialogTitle, DialogContent, ModalClose, FormControl, FormLabel, Select, Option, FormHelperText, Badge } from '@mui/joy';
 import { Plus, Trash2, Bell } from 'lucide-react';
-import { API_BASE_URL } from '../config';
+import { API_BASE_URL } from '../../../config';
 
 interface WatchlistItem {
   symbol: string;
@@ -11,7 +11,7 @@ interface WatchlistItem {
   active_alerts_count?: number;
 }
 
-import { glassStyle } from '../styles/glass';
+import { glassStyle } from '../../../styles/glass';
 
 export default function Watchlist() {
   const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);

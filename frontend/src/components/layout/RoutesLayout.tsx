@@ -5,17 +5,17 @@ import { useTranslation } from 'react-i18next';
 import gsap from 'gsap';
 import Header from './Header';
 import Sidebar from './Sidebar';
-import SourceManager from './SourceManager';
-import Watchlist from './Watchlist';
-import YahooPortfolio from './YahooPortfolio';
-import KnowledgeChat from './KnowledgeChat';
-import IntelligenceFeed from './IntelligenceFeed';
-import { glassStyle } from '../styles/glass';
-import { API_BASE_URL } from '../config';
-import MarketEventsTimeline from './MarketEventsTimeline';
-import OaktreeIcon from './OaktreeIcon';
+import SourceManager from '../features/sources/SourceManager';
+import Watchlist from '../features/watchlist/Watchlist';
+import YahooPortfolio from '../features/portfolio/YahooPortfolio';
+import KnowledgeChat from '../features/agent/KnowledgeChat';
+import IntelligenceFeed from '../features/market/IntelligenceFeed';
+import { glassStyle } from '../../styles/glass';
+import { API_BASE_URL } from '../../config';
+import MarketEventsTimeline from '../features/market/MarketEventsTimeline';
+import OaktreeIcon from '../common/OaktreeIcon';
 import { LogOut, User } from 'lucide-react';
-import { AuthContext } from './AuthContext';
+import { AuthContext } from '../common/AuthContext';
 
 export default function RoutesLayout() {
   const { t } = useTranslation();

@@ -1,8 +1,8 @@
 import * as React from 'react';
 import { Box, Typography, Sheet } from '@mui/joy';
 import { ChevronDown, ChevronRight } from 'lucide-react';
-import { glassStyle } from '../styles/glass';
-import '../styles/yahooPortfolio.css';
+import { glassStyle } from '../../../styles/glass';
+import '../../../styles/yahooPortfolio.css';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

@@ -1,10 +1,10 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { Box, Typography, Sheet, Button } from '@mui/joy';
 import { Plus } from 'lucide-react';
-import { glassStyle } from '../styles/glass';
+import { glassStyle } from '../../../styles/glass';
 import HoldingsTable from './HoldingsTable';
 import type { Holding } from './HoldingsTable';
-import ExpandedRow from './ExpandedRow';
+import ExpandedRow from '../watchlist/ExpandedRow';
 
 interface HoldingsTabProps {
   holdings: Holding[];

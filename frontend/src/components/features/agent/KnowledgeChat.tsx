@@ -3,8 +3,8 @@ import { Box, Typography, Input, Button, Card, Stack, Sheet, CircularProgress } 
 import { Send, Bot } from 'lucide-react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
-import { MCP_WORKER_URL } from '../config';
-import { glassStyle } from '../styles/glass';
+import { MCP_WORKER_URL } from '../../../config';
+import { glassStyle } from '../../../styles/glass';
 
 export default function KnowledgeChat() {
   const [input, setInput] = useState('');

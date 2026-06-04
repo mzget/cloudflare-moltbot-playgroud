@@ -2,8 +2,8 @@ import * as React from 'react';
 import { Box, Button, Typography, Sheet, Stack, Alert } from '@mui/joy';
 import { ShieldAlert, Info, Newspaper } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { glassStyle } from '../styles/glass';
-import OaktreeIcon from './OaktreeIcon';
+import { glassStyle } from '../../../styles/glass';
+import OaktreeIcon from '../../common/OaktreeIcon';
 
 interface LoginScreenProps {
   onLoginClick: () => void;

@@ -2,7 +2,7 @@ import * as React from 'react';
 import { Box, Typography, Card, CardContent, Chip, Stack } from '@mui/joy';
 import { TrendingUp, TrendingDown, Minus, Quote } from 'lucide-react';
 
-import { glassStyle } from '../styles/glass';
+import { glassStyle } from '../../../styles/glass';
 
 export function DailyReportCard({ report }: { report: any }) {
   const takeaways = JSON.parse(report.key_takeaways || '[]');

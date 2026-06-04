@@ -1,12 +1,12 @@
 import * as React from 'react';
 import { Box, Sheet, Typography, Stack, Divider } from '@mui/joy';
 import { BarChart3 } from 'lucide-react';
-import CompanyStatsTable, { ALL_COLUMNS } from './CompanyStatsTable';
-import CompanyStatsToolbar from './CompanyStatsToolbar';
-import type { DensityMode } from './CompanyStatsToolbar';
-import { API_BASE_URL } from '../config';
-import type { CompanyStats } from '../types/companyStats';
-import { glassStyle } from '../styles/glass';
+import CompanyStatsTable, { ALL_COLUMNS } from '../watchlist/CompanyStatsTable';
+import CompanyStatsToolbar from '../watchlist/CompanyStatsToolbar';
+import type { DensityMode } from '../watchlist/CompanyStatsToolbar';
+import { API_BASE_URL } from '../../../config';
+import type { CompanyStats } from '../../../types/companyStats';
+import { glassStyle } from '../../../styles/glass';
 
 // ─── Default visible columns (spec: 6 on first load) ─────────────────────────
 

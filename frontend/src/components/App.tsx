@@ -9,11 +9,11 @@ import {
 import { z } from 'zod';
 import { useTranslation } from 'react-i18next';
 import '../i18n';
-import RoutesLayout from './RoutesLayout';
-import LoginScreen from './LoginScreen';
+import RoutesLayout from './layout/RoutesLayout';
+import LoginScreen from './features/auth/LoginScreen';
 import { API_BASE_URL } from '../config';
-import { AuthContext } from './AuthContext';
-import type { User } from './AuthContext';
+import { AuthContext } from './common/AuthContext';
+import type { User } from './common/AuthContext';
 
 // Global Fetch Interceptor to inject JWT token
 if (typeof window !== 'undefined') {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Box, Typography, Stack, Button, ButtonGroup, CircularProgress } from '@mui/joy';
-import { API_BASE_URL } from '../config';
+import { API_BASE_URL } from '../../../config';
 
 interface HistoryPoint {
   date: string;

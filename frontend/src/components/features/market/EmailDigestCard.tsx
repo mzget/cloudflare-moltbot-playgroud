@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { Box, Typography, Card, CardContent, Chip, Stack, Button } from '@mui/joy';
 import { Mail, Calendar, Sparkles, Check } from 'lucide-react';
-import { glassStyle } from '../styles/glass';
+import { glassStyle } from '../../../styles/glass';
 
 interface EmailSource {
   id: string;

@@ -2,7 +2,7 @@ import * as React from 'react';
 import { Box, Typography, Sheet, Stack, Button, ButtonGroup, Badge } from '@mui/joy';
 import DailyReportCard from './DailyReportCard';
 import EmailDigestCard from './EmailDigestCard';
-import { glassStyle } from '../styles/glass';
+import { glassStyle } from '../../../styles/glass';
 import MarketEventsTimeline from './MarketEventsTimeline';
 
 export default function IntelligenceFeed({

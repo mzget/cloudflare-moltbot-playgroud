@@ -1,3 +1,7 @@
+---
+trigger: always_on
+---
+
 # Workspace Rules for Oaktree Agent
 
 - **Rule Name**: Workspace Rules for Oaktree Agent
@@ -37,3 +41,11 @@ For all tasks, code changes, and analysis in this repository, you **MUST** load 
 - **Frontend**: Astro framework UI using React with **MUI Joy UI** and **`sx` props** (no Tailwind).
 - **Conflict Resolution**: The project stack constraints (Astro + React, MUI Joy UI, `sx` prop, and no Tailwind) **MUST** take precedence over the default stack suggested in the Antigravity UI & Motion Design Expert skill.
 - Avoid introducing unnecessary libraries or frameworks.
+
+### 3. Component Folder Structure & Best Practices
+- **React Entrypoint**: `src/components/App.tsx` **MUST** remain directly under `src/components/` so it integrates smoothly into Astro pages (e.g., [index.astro](file:///c:/Users/natta/Documents/oaktree-agent/frontend/src/pages/index.astro)).
+- **Subdirectory Classification**:
+  - `src/components/layout/` – Shell components for the dashboard frame (`Header.tsx`, `Sidebar.tsx`, `RoutesLayout.tsx`).
+  - `src/components/common/` – Reusable contexts, helper components, and SVGs (`AuthContext.tsx`, `OaktreeIcon.tsx`, `ThemeToggle.tsx`).
+  - `src/components/features/` – Domain-specific views organized by subfolders (`auth/`, `portfolio/`, `watchlist/`, `market/`, `agent/`, `sources/`).
+- **Relative Path Integrity**: Always use correct relative path imports when traversing module boundaries (e.g., importing type definitions from `../../../types/` or shared components from `../../common/`). Do not write flat component lists directly inside `src/components/`.

@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Box, Typography, Sheet, Button, Input, Stack, Tabs, TabList, Tab, Divider, Modal, ModalDialog, DialogTitle, DialogContent, ModalClose, FormControl, FormLabel } from '@mui/joy';
-import { API_BASE_URL } from '../config';
-import { glassStyle } from '../styles/glass';
+import { API_BASE_URL } from '../../../config';
+import { glassStyle } from '../../../styles/glass';
 import type { Holding } from './HoldingsTable';
 import FundametalDashboard from './FundamentalDashboard';
 import PortfolioChart from './PortfolioChart';
 import SummaryTab from './SummaryTab';
 import HoldingsTab from './HoldingsTab';
-import '../styles/yahooPortfolio.css';
+import '../../../styles/yahooPortfolio.css';
 
 export interface PortfolioSummary {
   total_market_value: number;

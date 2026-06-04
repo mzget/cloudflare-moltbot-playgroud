@@ -37,8 +37,8 @@ import {
   Play,
   Sparkles
 } from 'lucide-react';
-import { API_BASE_URL } from '../config';
-import { glassStyle } from '../styles/glass';
+import { API_BASE_URL } from '../../../config';
+import { glassStyle } from '../../../styles/glass';
 import ManualTrigger from './ManualTrigger';
 
 interface NewsSource {

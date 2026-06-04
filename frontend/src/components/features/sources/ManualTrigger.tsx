@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Button, Tooltip, Stack, Typography } from '@mui/joy';
 import { Play, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
-import { API_BASE_URL } from '../config';
+import { API_BASE_URL } from '../../../config';
 
 export default function ManualTrigger() {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');

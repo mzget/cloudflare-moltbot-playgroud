@@ -10,7 +10,7 @@ import {
 } from '@mui/joy';
 import { X } from 'lucide-react';
 import { ALL_COLUMNS } from './CompanyStatsTable';
-import type { CompanyStats } from '../types/companyStats';
+import type { CompanyStats } from '../../../types/companyStats';
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 

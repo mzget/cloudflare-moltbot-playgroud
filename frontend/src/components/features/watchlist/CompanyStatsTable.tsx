@@ -6,7 +6,7 @@ import {
   Box,
 } from '@mui/joy';
 import { ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
-import type { CompanyStats } from '../types/companyStats';
+import type { CompanyStats } from '../../../types/companyStats';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 

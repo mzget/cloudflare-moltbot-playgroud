@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Typography, Sheet, Chip } from '@mui/joy';
 import { TrendingUp } from 'lucide-react';
-import { glassStyle } from '../styles/glass';
+import { glassStyle } from '../../../styles/glass';
 import { formatCurrency, formatPct } from './YahooPortfolio';
 import type { PortfolioSummary } from './YahooPortfolio';
 

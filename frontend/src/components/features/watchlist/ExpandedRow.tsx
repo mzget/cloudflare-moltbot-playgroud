@@ -1,8 +1,8 @@
-﻿import * as React from 'react';
+import * as React from 'react';
 import { Box, Typography, Input, Select, Option, Button } from '@mui/joy';
 import { Plus, Trash2 } from 'lucide-react';
-import { API_BASE_URL } from '../config';
-import '../styles/yahooPortfolio.css';
+import { API_BASE_URL } from '../../../config';
+import '../../../styles/yahooPortfolio.css';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 

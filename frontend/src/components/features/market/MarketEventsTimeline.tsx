@@ -26,8 +26,8 @@ import {
   DollarSign,
   Briefcase
 } from 'lucide-react';
-import { API_BASE_URL } from '../config';
-import { glassStyle } from '../styles/glass';
+import { API_BASE_URL } from '../../../config';
+import { glassStyle } from '../../../styles/glass';
 
 interface MarketEvent {
   id: string;

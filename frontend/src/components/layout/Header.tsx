@@ -4,10 +4,10 @@ import { Newspaper, Bell, Settings, User, Menu, Moon, Sun, LogOut } from 'lucide
 import { useColorScheme } from '@mui/joy/styles';
 import { useTranslation } from 'react-i18next';
 import gsap from 'gsap';
-import { API_BASE_URL } from '../config';
-import { glassStyle } from '../styles/glass';
-import { AuthContext } from './AuthContext';
-import OaktreeIcon from './OaktreeIcon';
+import { API_BASE_URL } from '../../config';
+import { glassStyle } from '../../styles/glass';
+import { AuthContext } from '../common/AuthContext';
+import OaktreeIcon from '../common/OaktreeIcon';
 
 interface HeaderProps {
   onOpenSidebar?: () => void;
