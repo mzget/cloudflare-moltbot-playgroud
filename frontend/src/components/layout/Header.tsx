@@ -8,6 +8,7 @@ import { API_BASE_URL } from '../../config';
 import { glassStyle } from '../../styles/glass';
 import { AuthContext } from '../common/AuthContext';
 import OaktreeIcon from '../common/OaktreeIcon';
+import { useSettingsStore, type DensityMode } from '../../store/settingsStore';
 
 interface HeaderProps {
   onOpenSidebar?: () => void;
@@ -37,32 +38,11 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
   const bellContainerRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
 
-  const [density, setDensity] = useState<'compact' | 'cozy' | 'comfort'>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('table_density');
-      if (saved && ['compact', 'cozy', 'comfort'].includes(saved)) {
-        return saved as 'compact' | 'cozy' | 'comfort';
-      }
-    }
-    return 'cozy';
-  });
+  const { density, setDensity } = useSettingsStore();
 
-  const handleDensitySelect = (newDensity: 'compact' | 'cozy' | 'comfort') => {
+  const handleDensitySelect = (newDensity: DensityMode) => {
     setDensity(newDensity);
-    localStorage.setItem('table_density', newDensity);
-    window.dispatchEvent(new CustomEvent('table-density-changed', { detail: newDensity }));
   };
-
-  useEffect(() => {
-    const handleDensityChange = (e: Event) => {
-      const customEvent = e as CustomEvent<'compact' | 'cozy' | 'comfort'>;
-      if (customEvent.detail && ['compact', 'cozy', 'comfort'].includes(customEvent.detail)) {
-        setDensity(customEvent.detail);
-      }
-    };
-    window.addEventListener('table-density-changed', handleDensityChange);
-    return () => window.removeEventListener('table-density-changed', handleDensityChange);
-  }, []);
 
   const fetchNotifications = async () => {
     try {

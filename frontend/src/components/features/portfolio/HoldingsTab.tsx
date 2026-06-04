@@ -4,7 +4,7 @@ import { Plus } from 'lucide-react';
 import { glassStyle } from '../../../styles/glass';
 import HoldingsTable from './HoldingsTable';
 import type { Holding } from './HoldingsTable';
-import type { DensityMode } from '../watchlist/CompanyStatsToolbar';
+import { useSettingsStore, type DensityMode } from '../../../store/settingsStore';
 import ExpandedRow from '../watchlist/ExpandedRow';
 
 interface HoldingsTabProps {
@@ -18,26 +18,7 @@ export default function HoldingsTab({ holdings, loading, onAddTicker, onDataChan
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [sortBy, setSortBy] = useState<string>('total_cost');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
-  const [density, setDensity] = useState<DensityMode>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('table_density');
-      if (saved && ['compact', 'cozy', 'comfort'].includes(saved)) {
-        return saved as DensityMode;
-      }
-    }
-    return 'cozy';
-  });
-
-  useEffect(() => {
-    const handleDensityChange = (e: Event) => {
-      const customEvent = e as CustomEvent<DensityMode>;
-      if (customEvent.detail && ['compact', 'cozy', 'comfort'].includes(customEvent.detail)) {
-        setDensity(customEvent.detail);
-      }
-    };
-    window.addEventListener('table-density-changed', handleDensityChange);
-    return () => window.removeEventListener('table-density-changed', handleDensityChange);
-  }, []);
+  const density = useSettingsStore((state) => state.density);
 
   const sortedHoldings = useMemo(() => {
     return [...holdings].sort((a, b) => {

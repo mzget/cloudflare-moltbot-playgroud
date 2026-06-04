@@ -3,7 +3,7 @@ import { Box, Sheet, Typography, Stack, Divider } from '@mui/joy';
 import { BarChart3 } from 'lucide-react';
 import CompanyStatsTable, { ALL_COLUMNS } from '../watchlist/CompanyStatsTable';
 import CompanyStatsToolbar from '../watchlist/CompanyStatsToolbar';
-import type { DensityMode } from '../watchlist/CompanyStatsToolbar';
+import { useSettingsStore, type DensityMode } from '../../../store/settingsStore';
 import { API_BASE_URL } from '../../../config';
 import type { CompanyStats } from '../../../types/companyStats';
 import { glassStyle } from '../../../styles/glass';
@@ -35,15 +35,7 @@ export default function FundametalDashboard() {
       }
       return DEFAULT_VISIBLE;
     });
-  const [density, setDensity] = React.useState<DensityMode>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('table_density');
-      if (saved && ['compact', 'cozy', 'comfort'].includes(saved)) {
-        return saved as DensityMode;
-      }
-    }
-    return 'cozy';
-  });
+  const density = useSettingsStore((state) => state.density);
 
   React.useEffect(() => {
     const fetchData = async () => {
@@ -72,16 +64,7 @@ export default function FundametalDashboard() {
     localStorage.setItem('visible_columns', JSON.stringify(visibleColumnIds));
   }, [visibleColumnIds]);
 
-  React.useEffect(() => {
-    const handleDensityChange = (e: Event) => {
-      const customEvent = e as CustomEvent<DensityMode>;
-      if (customEvent.detail && ['compact', 'cozy', 'comfort'].includes(customEvent.detail)) {
-        setDensity(customEvent.detail);
-      }
-    };
-    window.addEventListener('table-density-changed', handleDensityChange);
-    return () => window.removeEventListener('table-density-changed', handleDensityChange);
-  }, []);
+
 
   // Toggle a column on / off while preserving original column order
   const handleToggleColumn = (id: keyof CompanyStats) => {

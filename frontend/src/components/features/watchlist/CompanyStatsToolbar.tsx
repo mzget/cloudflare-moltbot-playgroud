@@ -14,7 +14,6 @@ import type { CompanyStats } from '../../../types/companyStats';
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 
-export type DensityMode = 'compact' | 'cozy' | 'comfort';
 
 interface CompanyStatsToolbarProps {
   visibleColumnIds: Array<keyof CompanyStats>;
