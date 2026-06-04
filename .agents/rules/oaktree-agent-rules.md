@@ -2,9 +2,9 @@
 trigger: always_on
 ---
 
-# Workspace Rules for Oaktree Agent
+# Oaktree Agent Rules
 
-- **Rule Name**: Workspace Rules for Oaktree Agent
+- **Rule Name**: Oaktree Agent Rules
 - **Description**: Defines guidelines, mandatory skills activation, and stack constraints for the Moltbot workspace.
 
 These rules govern the behavior of the Oaktree Agent in this repository. The agent **MUST** read and adhere to these guidelines for every task.
