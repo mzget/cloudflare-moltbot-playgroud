@@ -124,6 +124,7 @@ export default function YahooPortfolio() {
   const [newSymbol, setNewSymbol] = useState('');
   const [newShares, setNewShares] = useState('');
   const [newCost, setNewCost] = useState('');
+  const [newCommission, setNewCommission] = useState('');
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
@@ -164,10 +165,11 @@ export default function YahooPortfolio() {
           symbol: newSymbol.trim().toUpperCase(),
           shares: parseFloat(newShares) || 0,
           avg_cost: parseFloat(newCost) || null,
+          commission: parseFloat(newCommission) || 0,
           status: parseFloat(newShares) > 0 ? 'Open' : 'Add',
         }),
       });
-      setNewSymbol(''); setNewShares(''); setNewCost('');
+      setNewSymbol(''); setNewShares(''); setNewCost(''); setNewCommission('');
       setAddModalOpen(false);
       fetchAll();
     } catch (e) { console.error('Failed to add holding:', e); }
@@ -346,6 +348,10 @@ export default function YahooPortfolio() {
             <FormControl>
               <FormLabel>Average Cost / Share ($)</FormLabel>
               <Input type="number" placeholder="e.g. 394.40" value={newCost} onChange={e => setNewCost(e.target.value)} />
+            </FormControl>
+            <FormControl>
+              <FormLabel>Commission ($)</FormLabel>
+              <Input type="number" placeholder="e.g. 5.00" value={newCommission} onChange={e => setNewCommission(e.target.value)} />
             </FormControl>
             <Button variant="solid" color="primary" onClick={handleAddTicker} disabled={!newSymbol.trim()}
               sx={{ mt: 1, borderRadius: '12px', fontWeight: 700 }}>

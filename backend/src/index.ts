@@ -882,7 +882,9 @@ app.post('/api/portfolio/import', async (c) => {
 
       affectedSymbols.add(symbol);
 
-      const totalCost = (shares * price) + commission;
+      const totalCost = type === 'Sell'
+        ? (shares * price) - commission
+        : (shares * price) + commission;
 
       // 1. Record the transaction
       await c.env.DB.prepare(`
@@ -895,7 +897,7 @@ app.post('/api/portfolio/import', async (c) => {
         await c.env.DB.prepare(`
           INSERT INTO share_lots (symbol, date, shares, cost_per_share, total_cost, note)
           VALUES (?, ?, ?, ?, ?, ?)
-        `).bind(symbol, date, shares, price, totalCost - commission, note).run();
+        `).bind(symbol, date, shares, price, totalCost, note).run();
       } else if (type === 'Sell') {
         // 3. FIFO deduct lots
         const { results: lots } = await c.env.DB.prepare(`
@@ -907,11 +909,14 @@ app.post('/api/portfolio/import', async (c) => {
           if (remainingToSell <= 0) break;
 
           const lotShares = lot.shares;
-          const lotCostPerShare = lot.cost_per_share;
+          const lotCostBasisPerShare = lot.total_cost && lot.shares > 0
+            ? lot.total_cost / lot.shares
+            : lot.cost_per_share;
 
           if (lotShares <= remainingToSell) {
-            const realizedAmt = (lotShares * price) - (lotShares * lotCostPerShare);
-            const realizedPct = lotCostPerShare > 0 ? (realizedAmt / (lotShares * lotCostPerShare)) * 100 : 0;
+            const proportionalSellComm = (lotShares / shares) * commission;
+            const realizedAmt = (lotShares * price - proportionalSellComm) - (lotShares * lotCostBasisPerShare);
+            const realizedPct = lotCostBasisPerShare > 0 ? (realizedAmt / (lotShares * lotCostBasisPerShare)) * 100 : 0;
 
             await c.env.DB.prepare(`
               UPDATE transactions 
@@ -923,8 +928,9 @@ app.post('/api/portfolio/import', async (c) => {
             await c.env.DB.prepare('DELETE FROM share_lots WHERE id = ?').bind(lot.id).run();
             remainingToSell -= lotShares;
           } else {
-            const realizedAmt = (remainingToSell * price) - (remainingToSell * lotCostPerShare);
-            const realizedPct = lotCostPerShare > 0 ? (realizedAmt / (remainingToSell * lotCostPerShare)) * 100 : 0;
+            const proportionalSellComm = (remainingToSell / shares) * commission;
+            const realizedAmt = (remainingToSell * price - proportionalSellComm) - (remainingToSell * lotCostBasisPerShare);
+            const realizedPct = lotCostBasisPerShare > 0 ? (realizedAmt / (remainingToSell * lotCostBasisPerShare)) * 100 : 0;
 
             await c.env.DB.prepare(`
               UPDATE transactions 
@@ -934,7 +940,7 @@ app.post('/api/portfolio/import', async (c) => {
             `).bind(realizedAmt, realizedPct, symbol, date, shares).run();
 
             const newShares = lotShares - remainingToSell;
-            const newCost = newShares * lotCostPerShare;
+            const newCost = newShares * lotCostBasisPerShare;
             await c.env.DB.prepare(`
               UPDATE share_lots 
               SET shares = ?, total_cost = ? 
@@ -962,27 +968,51 @@ app.post('/api/portfolio/import', async (c) => {
 // POST /api/portfolio/holdings - Add new holding
 app.post('/api/portfolio/holdings', async (c) => {
   const body = await c.req.json();
-  const { symbol, shares, avg_cost, status } = body;
+  const { symbol, shares, avg_cost, commission, status } = body;
   if (!symbol) return c.json({ error: 'Symbol is required' }, 400);
-  
-  const totalCost = (shares || 0) * (avg_cost || 0);
-  
-  await c.env.DB.prepare(`
-    INSERT INTO holdings (symbol, shares, avg_cost, total_cost, status)
-    VALUES (?, ?, ?, ?, ?)
-    ON CONFLICT(symbol) DO UPDATE SET
-      shares = excluded.shares,
-      avg_cost = excluded.avg_cost,
-      total_cost = excluded.total_cost,
-      status = excluded.status,
-      updated_at = strftime('%s', 'now')
-  `).bind(symbol.toUpperCase(), shares || 0, avg_cost || null, totalCost, status || 'Open').run();
 
-  // Also ensure symbol is in watchlist
+  const sym = symbol.toUpperCase();
+  const numShares = parseFloat(shares) || 0;
+  const avgCost = avg_cost !== undefined && avg_cost !== null ? parseFloat(avg_cost) : null;
+  const comm = parseFloat(commission) || 0;
+
+  // Ensure symbol is in watchlist
   await c.env.DB.prepare(`
     INSERT OR IGNORE INTO watchlist (symbol, name, is_active)
     VALUES (?, ?, 1)
-  `).bind(symbol.toUpperCase(), symbol.toUpperCase()).run();
+  `).bind(sym, sym).run();
+
+  if (numShares > 0 && avgCost !== null) {
+    const dateStr = new Date().toISOString().split('T')[0];
+    const lotTotalCost = (numShares * avgCost) + comm;
+
+    // 1. Add buy lot
+    await c.env.DB.prepare(`
+      INSERT INTO share_lots (symbol, date, shares, cost_per_share, total_cost, note)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).bind(sym, dateStr, numShares, avgCost, lotTotalCost, 'Initial Position').run();
+
+    // 2. Add buy transaction
+    await c.env.DB.prepare(`
+      INSERT INTO transactions (symbol, date, type, shares, cost_per_share, commission, total_cost, note)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).bind(sym, dateStr, 'Buy', numShares, avgCost, comm, lotTotalCost, 'Initial Position').run();
+
+    // 3. Recalculate holdings
+    await recalcHoldings(c.env.DB, sym);
+  } else {
+    // Just insert empty holding if shares is 0
+    await c.env.DB.prepare(`
+      INSERT INTO holdings (symbol, shares, avg_cost, total_cost, status)
+      VALUES (?, 0, NULL, 0, ?)
+      ON CONFLICT(symbol) DO UPDATE SET
+        shares = excluded.shares,
+        avg_cost = excluded.avg_cost,
+        total_cost = excluded.total_cost,
+        status = excluded.status,
+        updated_at = strftime('%s', 'now')
+    `).bind(sym, status || 'Open').run();
+  }
 
   return c.json({ success: true });
 });
@@ -1067,7 +1097,9 @@ app.post('/api/portfolio/transactions', async (c) => {
   if (!symbol || !date || !shares || !cost_per_share) {
     return c.json({ error: 'symbol, date, shares, cost_per_share are required' }, 400);
   }
-  const totalCost = (shares * cost_per_share) + (commission || 0);
+  const totalCost = type === 'Sell'
+    ? (shares * cost_per_share) - (commission || 0)
+    : (shares * cost_per_share) + (commission || 0);
   
   await c.env.DB.prepare(`
     INSERT INTO transactions (symbol, date, type, shares, cost_per_share, commission, total_cost, realized_gain_pct, realized_gain_amt, note)
