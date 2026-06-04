@@ -4,7 +4,6 @@ import { API_BASE_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
 import type { Holding } from './HoldingsTable';
 import FundametalDashboard from './FundamentalDashboard';
-import PortfolioChart from './PortfolioChart';
 import SummaryTab from './SummaryTab';
 import HoldingsTab from './HoldingsTab';
 import '../../../styles/yahooPortfolio.css';
@@ -224,45 +223,6 @@ export default function YahooPortfolio() {
 
   return (
     <Box className="yf-portfolio">
-      {/* Portfolio Summary */}
-      {summary && (
-        <Sheet sx={{ ...glassStyle, p: 3, mb: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 3 }}>
-            <Box>
-              <Typography level="h2" sx={{ fontWeight: 800, fontSize: '2rem', letterSpacing: '-0.02em' }}>
-                {formatCurrency(summary.total_market_value, false)}
-              </Typography>
-              <Typography level="body-sm" sx={{ opacity: 0.6, mt: 0.5 }}>
-                <Box component="span" sx={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', bgcolor: 'var(--yf-positive)', mr: 0.75, verticalAlign: 'middle' }} />
-                Market Value {formatCurrency(summary.total_market_value, false)}
-              </Typography>
-              <Divider sx={{ my: 1.5, opacity: 0.15 }} />
-              <Stack spacing={0.75}>
-                {[
-                  { label: 'Day Change', val: summary.day_change_amt, pct: summary.day_change_pct },
-                  { label: 'Unrealized G/L', val: summary.unrealized_gain_amt, pct: summary.unrealized_gain_pct },
-                ].map(item => (
-                  <Box key={item.label} sx={{ display: 'flex', justifyContent: 'space-between', gap: 4 }}>
-                    <Typography level="body-sm" sx={{ opacity: 0.7 }}>{item.label}</Typography>
-                    <Typography level="body-sm" sx={{ fontWeight: 700 }} className={item.val >= 0 ? 'yf-positive' : 'yf-negative'}>
-                      {formatCurrency(item.val)} ({formatPct(item.pct)})
-                    </Typography>
-                  </Box>
-                ))}
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 4 }}>
-                  <Typography level="body-sm" sx={{ opacity: 0.7 }}>Realized G/L</Typography>
-                  <Typography level="body-sm" sx={{ fontWeight: 700 }} className={summary.realized_gain_amt >= 0 ? 'yf-positive' : 'yf-negative'}>
-                    {formatCurrency(summary.realized_gain_amt)}
-                  </Typography>
-                </Box>
-              </Stack>
-            </Box>
-            <Box sx={{ flex: 1, minWidth: 300, maxWidth: 600, width: '100%', display: 'block' }}>
-              <PortfolioChart />
-            </Box>
-          </Box>
-        </Sheet>
-      )}
 
       {/* Tabs */}
       <Box sx={{ mb: 2 }}>

@@ -73,8 +73,15 @@ export default function FundametalDashboard() {
   }, [visibleColumnIds]);
 
   React.useEffect(() => {
-    localStorage.setItem('table_density', density);
-  }, [density]);
+    const handleDensityChange = (e: Event) => {
+      const customEvent = e as CustomEvent<DensityMode>;
+      if (customEvent.detail && ['compact', 'cozy', 'comfort'].includes(customEvent.detail)) {
+        setDensity(customEvent.detail);
+      }
+    };
+    window.addEventListener('table-density-changed', handleDensityChange);
+    return () => window.removeEventListener('table-density-changed', handleDensityChange);
+  }, []);
 
   // Toggle a column on / off while preserving original column order
   const handleToggleColumn = (id: keyof CompanyStats) => {
@@ -114,8 +121,6 @@ export default function FundametalDashboard() {
           <CompanyStatsToolbar
             visibleColumnIds={visibleColumnIds}
             onToggleColumn={handleToggleColumn}
-            density={density}
-            onDensityChange={setDensity}
           />
         </Stack>
 

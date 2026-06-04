@@ -19,8 +19,6 @@ export type DensityMode = 'compact' | 'cozy' | 'comfort';
 interface CompanyStatsToolbarProps {
   visibleColumnIds: Array<keyof CompanyStats>;
   onToggleColumn: (id: keyof CompanyStats) => void;
-  density: DensityMode;
-  onDensityChange: (d: DensityMode) => void;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -28,8 +26,6 @@ interface CompanyStatsToolbarProps {
 export default function CompanyStatsToolbar({
   visibleColumnIds,
   onToggleColumn,
-  density,
-  onDensityChange,
 }: CompanyStatsToolbarProps) {
   // Only show chips for visible columns
   const visibleCols = ALL_COLUMNS.filter(c => visibleColumnIds.includes(c.id));
@@ -104,57 +100,28 @@ export default function CompanyStatsToolbar({
           gap: 2.5,
         }}
       >
-        {/* Left column of right controls: Currency/Ownership stack on top of Density */}
-        <Stack spacing={1.5} alignItems="flex-start">
-          {/* Currency and Ownership Box */}
-          <Stack direction="row" spacing={1.5} alignItems="center">
-            {/* Currency toggle (v1: USD only) */}
-            <Stack direction="row" spacing={1} alignItems="center">
-              <Typography level="body-xs" sx={{ opacity: 0.6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Currency
-              </Typography>
-              <Chip size="sm" variant="soft" sx={{ fontWeight: 700 }}>
-                USD
-              </Chip>
-            </Stack>
-
-            {/* Ownership (v1: UI only, disabled) */}
-            <Tooltip title="Portfolio ownership — coming soon" size="sm">
-              <Chip
-                size="sm"
-                variant="outlined"
-                sx={{ opacity: 0.4, cursor: 'default' }}
-              >
-                Ownership
-              </Chip>
-            </Tooltip>
-          </Stack>
-
-          {/* Density selector Box */}
+        {/* Currency and Ownership Box */}
+        <Stack direction="row" spacing={1.5} alignItems="center">
+          {/* Currency toggle (v1: USD only) */}
           <Stack direction="row" spacing={1} alignItems="center">
             <Typography level="body-xs" sx={{ opacity: 0.6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Density
+              Currency
             </Typography>
-            <ButtonGroup size="sm" variant="outlined" sx={{ '--ButtonGroup-radius': '8px' }}>
-              {(['compact', 'cozy', 'comfort'] as DensityMode[]).map(d => (
-                <Button
-                  key={d}
-                  onClick={() => onDensityChange(d)}
-                  sx={{
-                    px: 1.5,
-                    fontWeight: 600,
-                    fontSize: '0.75rem',
-                    textTransform: 'capitalize',
-                    color: density === d ? 'primary.plainColor' : 'text.tertiary',
-                    bgcolor: density === d ? 'var(--joy-palette-primary-softBg)' : 'transparent',
-                    '&:hover': { bgcolor: 'background.level1' },
-                  }}
-                >
-                  {d}
-                </Button>
-              ))}
-            </ButtonGroup>
+            <Chip size="sm" variant="soft" sx={{ fontWeight: 700 }}>
+              USD
+            </Chip>
           </Stack>
+
+          {/* Ownership (v1: UI only, disabled) */}
+          <Tooltip title="Portfolio ownership — coming soon" size="sm">
+            <Chip
+              size="sm"
+              variant="outlined"
+              sx={{ opacity: 0.4, cursor: 'default' }}
+            >
+              Ownership
+            </Chip>
+          </Tooltip>
         </Stack>
       </Stack>
     </Box>

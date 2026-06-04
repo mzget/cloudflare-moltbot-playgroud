@@ -1,9 +1,10 @@
-import React, { useState, useMemo, useCallback } from 'react';
-import { Box, Typography, Sheet, Button } from '@mui/joy';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import { Box, Typography, Sheet, Button, ButtonGroup, Stack } from '@mui/joy';
 import { Plus } from 'lucide-react';
 import { glassStyle } from '../../../styles/glass';
 import HoldingsTable from './HoldingsTable';
 import type { Holding } from './HoldingsTable';
+import type { DensityMode } from '../watchlist/CompanyStatsToolbar';
 import ExpandedRow from '../watchlist/ExpandedRow';
 
 interface HoldingsTabProps {
@@ -15,8 +16,28 @@ interface HoldingsTabProps {
 
 export default function HoldingsTab({ holdings, loading, onAddTicker, onDataChange }: HoldingsTabProps) {
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
-  const [sortBy, setSortBy] = useState<string>('symbol');
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+  const [sortBy, setSortBy] = useState<string>('total_cost');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [density, setDensity] = useState<DensityMode>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('table_density');
+      if (saved && ['compact', 'cozy', 'comfort'].includes(saved)) {
+        return saved as DensityMode;
+      }
+    }
+    return 'cozy';
+  });
+
+  useEffect(() => {
+    const handleDensityChange = (e: Event) => {
+      const customEvent = e as CustomEvent<DensityMode>;
+      if (customEvent.detail && ['compact', 'cozy', 'comfort'].includes(customEvent.detail)) {
+        setDensity(customEvent.detail);
+      }
+    };
+    window.addEventListener('table-density-changed', handleDensityChange);
+    return () => window.removeEventListener('table-density-changed', handleDensityChange);
+  }, []);
 
   const sortedHoldings = useMemo(() => {
     return [...holdings].sort((a, b) => {
@@ -30,8 +51,12 @@ export default function HoldingsTab({ holdings, loading, onAddTicker, onDataChan
   }, [holdings, sortBy, sortDir]);
 
   const handleSort = useCallback((column: string) => {
-    if (sortBy === column) setSortDir(prev => prev === 'asc' ? 'desc' : 'asc');
-    else { setSortBy(column); setSortDir('asc'); }
+    if (sortBy === column) {
+      setSortDir(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(column);
+      setSortDir(column === 'total_cost' ? 'desc' : 'asc');
+    }
   }, [sortBy]);
 
   const handleExpandRow = useCallback((symbol: string) => {
@@ -46,7 +71,7 @@ export default function HoldingsTab({ holdings, loading, onAddTicker, onDataChan
     <Box className="tab-pane-active">
       <Sheet sx={{ ...glassStyle, p: 0, overflow: 'hidden' }}>
         {holdings.length > 0 && (
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, borderBottom: '1px solid', borderColor: 'divider' }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, borderBottom: '1px solid', borderColor: 'divider', flexWrap: 'wrap', gap: 1.5 }}>
             <Typography level="title-md" sx={{ fontWeight: 700 }}>
               Positions
             </Typography>
@@ -58,7 +83,7 @@ export default function HoldingsTab({ holdings, loading, onAddTicker, onDataChan
         )}
         <Box sx={{ overflowX: 'auto' }}>
           <HoldingsTable holdings={sortedHoldings} onExpandRow={handleExpandRow} expandedRows={expandedRows}
-            sortBy={sortBy} sortDir={sortDir} onSort={handleSort}
+            sortBy={sortBy} sortDir={sortDir} onSort={handleSort} density={density}
             expandedContent={(symbol: string, lastPrice: number | null, colSpan: number) => (
               <ExpandedRow symbol={symbol} lastPrice={lastPrice} colSpan={colSpan} onDataChange={onDataChange} />
             )} />

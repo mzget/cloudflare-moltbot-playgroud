@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState, useContext } from 'react';
-import { Box, Typography, Stack, Sheet, IconButton, Tooltip, Button, Dropdown, Menu as JoyMenu, MenuButton, MenuItem } from '@mui/joy';
-import { Newspaper, Bell, Settings, User, Menu, Moon, Sun, LogOut } from 'lucide-react';
+import { Box, Typography, Stack, Sheet, IconButton, Tooltip, Button, Dropdown, Menu as JoyMenu, MenuButton, MenuItem, Divider } from '@mui/joy';
+import { Newspaper, Bell, Settings, User, Menu, Moon, Sun, LogOut, Check } from 'lucide-react';
 import { useColorScheme } from '@mui/joy/styles';
 import { useTranslation } from 'react-i18next';
 import gsap from 'gsap';
@@ -36,6 +36,33 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
   const [showNotifications, setShowNotifications] = useState(false);
   const bellContainerRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
+
+  const [density, setDensity] = useState<'compact' | 'cozy' | 'comfort'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('table_density');
+      if (saved && ['compact', 'cozy', 'comfort'].includes(saved)) {
+        return saved as 'compact' | 'cozy' | 'comfort';
+      }
+    }
+    return 'cozy';
+  });
+
+  const handleDensitySelect = (newDensity: 'compact' | 'cozy' | 'comfort') => {
+    setDensity(newDensity);
+    localStorage.setItem('table_density', newDensity);
+    window.dispatchEvent(new CustomEvent('table-density-changed', { detail: newDensity }));
+  };
+
+  useEffect(() => {
+    const handleDensityChange = (e: Event) => {
+      const customEvent = e as CustomEvent<'compact' | 'cozy' | 'comfort'>;
+      if (customEvent.detail && ['compact', 'cozy', 'comfort'].includes(customEvent.detail)) {
+        setDensity(customEvent.detail);
+      }
+    };
+    window.addEventListener('table-density-changed', handleDensityChange);
+    return () => window.removeEventListener('table-density-changed', handleDensityChange);
+  }, []);
 
   const fetchNotifications = async () => {
     try {
@@ -435,20 +462,70 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
               {mounted && mode === 'dark' ? <Sun size={22} /> : <Moon size={22} />}
             </IconButton>
           </Tooltip>
-          <Tooltip title={t('header.settings')} placement="bottom">
-            <IconButton 
-              variant="plain" 
-              color="neutral"
-              sx={{ 
-                display: { xs: 'none', md: 'inline-flex' },
-                borderRadius: '12px',
-                '&:hover': { bgcolor: 'rgba(0,0,0,0.04)', transform: 'scale(1.05)' },
-                transition: 'all 0.2s'
+          <Dropdown>
+            <Tooltip title={t('header.settings')} placement="bottom">
+              <MenuButton 
+                slots={{ root: IconButton }}
+                slotProps={{
+                  root: {
+                    variant: 'plain',
+                    color: 'neutral',
+                    sx: {
+                      display: { xs: 'none', md: 'inline-flex' },
+                      borderRadius: '12px',
+                      '&:hover': { bgcolor: 'rgba(0,0,0,0.04)', transform: 'scale(1.05)' },
+                      transition: 'all 0.2s'
+                    }
+                  }
+                }}
+              >
+                <Settings size={22} />
+              </MenuButton>
+            </Tooltip>
+            <JoyMenu
+              placement="bottom-end"
+              sx={{
+                ...glassStyle,
+                mt: 1,
+                minWidth: 180,
+                boxShadow: '0 12px 30px rgba(0,0,0,0.15)',
+                zIndex: 1200,
+                p: 1.5,
+                borderRadius: '16px',
               }}
             >
-              <Settings size={22} />
-            </IconButton>
-          </Tooltip>
+              <Typography level="body-xs" sx={{ px: 1, py: 0.5, fontWeight: 700, color: 'text.tertiary', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Table Density
+              </Typography>
+              <Divider sx={{ my: 1, opacity: 0.15 }} />
+              {(['compact', 'cozy', 'comfort'] as const).map((d) => (
+                <MenuItem
+                  key={d}
+                  selected={density === d}
+                  onClick={() => handleDensitySelect(d)}
+                  sx={{
+                    borderRadius: '10px',
+                    fontWeight: 600,
+                    fontSize: '0.85rem',
+                    textTransform: 'capitalize',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    py: 1,
+                    my: 0.25,
+                    bgcolor: density === d ? 'var(--joy-palette-primary-softBg)' : 'transparent',
+                    color: density === d ? 'primary.plainColor' : 'text.primary',
+                    '&:hover': {
+                      bgcolor: density === d ? 'var(--joy-palette-primary-softBg)' : 'background.level1',
+                    }
+                  }}
+                >
+                  {d}
+                  {density === d && <Check size={16} />}
+                </MenuItem>
+              ))}
+            </JoyMenu>
+          </Dropdown>
           
           <Box sx={{ display: { xs: 'none', md: 'block' }, width: '1px', height: '28px', bgcolor: 'divider', mx: 1 }} />
           

@@ -32,6 +32,7 @@ export interface HoldingsTableProps {
   sortBy: string;
   sortDir: 'asc' | 'desc';
   onSort: (column: string) => void;
+  density: 'compact' | 'cozy' | 'comfort';
 }
 
 // ── Columns spec ──────────────────────────────────────────────────────────────
@@ -93,11 +94,42 @@ export default function HoldingsTable({
   sortBy,
   sortDir,
   onSort,
+  density,
 }: HoldingsTableProps) {
   const sortArrow = (col: string) => {
     if (sortBy !== col) return null;
     return <span className="sort-arrow">{sortDir === 'asc' ? '▲' : '▼'}</span>;
   };
+
+  const densityStyles = React.useMemo(() => {
+    const config = {
+      compact: {
+        paddingX: '8px',
+        paddingY: '5px',
+        fontSize: '0.75rem',
+        headerSize: '0.65rem',
+        chevronSize: 12,
+        nameSize: '10px',
+      },
+      cozy: {
+        paddingX: '12px',
+        paddingY: '9px',
+        fontSize: '0.8rem',
+        headerSize: '0.7rem',
+        chevronSize: 14,
+        nameSize: '11px',
+      },
+      comfort: {
+        paddingX: '18px',
+        paddingY: '14px',
+        fontSize: '0.88rem',
+        headerSize: '0.75rem',
+        chevronSize: 16,
+        nameSize: '12px',
+      },
+    };
+    return config[density];
+  }, [density]);
 
   return (
     <Sheet sx={{ ...glassStyle, p: 0, overflow: 'hidden' }}>
@@ -106,12 +138,16 @@ export default function HoldingsTable({
           <thead>
             <tr>
               {/* Chevron column */}
-              <th className="center" style={{ width: 36 }}>&nbsp;</th>
+              <th className="center" style={{ width: 36, padding: `${densityStyles.paddingY} ${densityStyles.paddingX}` }}>&nbsp;</th>
               {COLUMNS.map((col) => (
                 <th
                   key={col.key}
                   className={col.align}
                   onClick={() => onSort(col.key)}
+                  style={{
+                    padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`,
+                    fontSize: densityStyles.headerSize,
+                  }}
                 >
                   {col.label}
                   {sortArrow(col.key)}
@@ -124,69 +160,74 @@ export default function HoldingsTable({
               <React.Fragment key={h.symbol}>
                 {/* Main data row */}
                 <tr>
-                  <td className="center">
+                  <td className="center" style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}` }}>
                     <button
                       className="yf-chevron"
                       onClick={() => onExpandRow(h.symbol)}
                       aria-label={expandedRows.has(h.symbol) ? 'Collapse' : 'Expand'}
+                      style={{
+                        width: density === 'compact' ? 20 : density === 'comfort' ? 28 : 24,
+                        height: density === 'compact' ? 20 : density === 'comfort' ? 28 : 24,
+                      }}
                     >
                       {expandedRows.has(h.symbol)
-                        ? <ChevronDown size={14} />
-                        : <ChevronRight size={14} />}
+                        ? <ChevronDown size={densityStyles.chevronSize} />
+                        : <ChevronRight size={densityStyles.chevronSize} />}
                     </button>
                   </td>
 
                   {/* Symbol */}
-                  <td className="left">
+                  <td className="left" style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>
                     <a
                       className="yf-symbol-link"
                       href={`https://finance.yahoo.com/quote/${h.symbol}`}
                       target="_blank"
                       rel="noopener noreferrer"
+                      style={{ fontSize: densityStyles.fontSize }}
                     >
                       {h.symbol}
                     </a>
                     <br />
-                    <span style={{ fontSize: 11, color: 'var(--yf-text-secondary)' }}>
+                    <span style={{ fontSize: densityStyles.nameSize, color: 'var(--yf-text-secondary)' }}>
                       {h.name}
                     </span>
                   </td>
 
                   {/* Shares */}
-                  <td>{fmtNum(h.shares, 0)}</td>
+                  <td style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{fmtNum(h.shares, 0)}</td>
 
                   {/* Last Price */}
-                  <td>{fmtNum(h.last_price)}</td>
+                  <td style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{fmtNum(h.last_price)}</td>
 
                   {/* AC/Share */}
-                  <td>{fmtNum(h.avg_cost)}</td>
+                  <td style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{fmtNum(h.avg_cost)}</td>
 
                   {/* Total Cost */}
-                  <td>{fmtNum(h.total_cost)}</td>
+                  <td style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{fmtNum(h.total_cost)}</td>
 
                   {/* Market Value */}
-                  <td>{fmtNum(h.market_value)}</td>
+                  <td style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{fmtNum(h.market_value)}</td>
 
                   {/* Tot Div Income */}
-                  <td>{fmtNum(h.tot_div_income)}</td>
+                  <td style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{fmtNum(h.tot_div_income)}</td>
 
                   {/* Day Gain % */}
-                  <td className={gainClass(h.day_gain_pct)}>{fmtPct(h.day_gain_pct)}</td>
+                  <td className={gainClass(h.day_gain_pct)} style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{fmtPct(h.day_gain_pct)}</td>
 
                   {/* Day Gain $ */}
-                  <td className={gainClass(h.day_gain_amt)}>{fmtNum(h.day_gain_amt)}</td>
+                  <td className={gainClass(h.day_gain_amt)} style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{fmtNum(h.day_gain_amt)}</td>
 
                   {/* Tot Gain % */}
-                  <td className={gainClass(h.tot_gain_pct)}>{fmtPct(h.tot_gain_pct)}</td>
+                  <td className={gainClass(h.tot_gain_pct)} style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{fmtPct(h.tot_gain_pct)}</td>
 
                   {/* Tot Gain $ */}
-                  <td className={gainClass(h.tot_gain_amt)}>{fmtNum(h.tot_gain_amt)}</td>
+                  <td className={gainClass(h.tot_gain_amt)} style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{fmtNum(h.tot_gain_amt)}</td>
 
                   {/* Realized % */}
-                  <td className={gainClass(h.realized_gain_pct)}>{fmtPct(h.realized_gain_pct)}</td>
+                  <td className={gainClass(h.realized_gain_pct)} style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{fmtPct(h.realized_gain_pct)}</td>
 
                   {/* Realized $ */}
-                  <td className={gainClass(h.realized_gain_amt)}>{fmtNum(h.realized_gain_amt)}</td>
+                  <td className={gainClass(h.realized_gain_amt)} style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{fmtNum(h.realized_gain_amt)}</td>
                 </tr>
 
                 {/* Expanded sub-section */}

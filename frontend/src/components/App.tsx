@@ -24,9 +24,9 @@ if (typeof window !== 'undefined') {
       : (input instanceof URL ? input.toString() : (input as Request).url);
 
     const isBackend = url.startsWith(API_BASE_URL) ||
-                      url.startsWith('http://localhost:8787') ||
-                      url.startsWith('http://127.0.0.1:8787') ||
-                      url.startsWith('/api/');
+      url.startsWith('http://localhost:8787') ||
+      url.startsWith('http://127.0.0.1:8787') ||
+      url.startsWith('/api/');
 
     const token = localStorage.getItem('auth_token');
     if (token && isBackend) {
@@ -143,7 +143,7 @@ const theme = extendTheme({
   },
 });
 
-export default function Dashboard() {
+export default function App() {
   const { t } = useTranslation();
   const [user, setUser] = React.useState<User | null>(null);
   const [checkingAuth, setCheckingAuth] = React.useState(true);
