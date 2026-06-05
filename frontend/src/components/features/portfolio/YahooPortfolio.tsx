@@ -127,6 +127,7 @@ export default function YahooPortfolio() {
   const [importError, setImportError] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
+  const [watchlist, setWatchlist] = useState<any[]>([]);
 
   const fetchHoldings = useCallback(async () => {
     try {
@@ -142,11 +143,18 @@ export default function YahooPortfolio() {
     } catch (e) { console.error('Failed to fetch summary:', e); }
   }, []);
 
+  const fetchWatchlist = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/watchlist`);
+      if (res.ok) setWatchlist(await res.json());
+    } catch (e) { console.error('Failed to fetch watchlist:', e); }
+  }, []);
+
   const fetchAll = useCallback(async () => {
     setLoading(true);
-    await Promise.all([fetchHoldings(), fetchSummary()]);
+    await Promise.all([fetchHoldings(), fetchSummary(), fetchWatchlist()]);
     setLoading(false);
-  }, [fetchHoldings, fetchSummary]);
+  }, [fetchHoldings, fetchSummary, fetchWatchlist]);
 
   useEffect(() => {
     fetchAll();
@@ -221,6 +229,10 @@ export default function YahooPortfolio() {
     reader.readAsText(file);
   };
 
+  const symbolUpper = newSymbol.trim().toUpperCase();
+  const inHoldings = holdings.some(h => h.symbol === symbolUpper);
+  const inWatchlist = watchlist.some(w => w.symbol === symbolUpper);
+
   return (
     <Box className="yf-portfolio">
 
@@ -294,13 +306,24 @@ export default function YahooPortfolio() {
       <Modal open={addModalOpen} onClose={() => setAddModalOpen(false)}>
         <ModalDialog sx={{ ...glassStyle, minWidth: { xs: '90%', sm: 400 }, maxWidth: 460, borderRadius: '20px', p: 3 }}>
           <ModalClose />
-          <DialogTitle sx={{ fontWeight: 800, fontSize: '1.3rem', mb: 1 }}>Add Ticker</DialogTitle>
+          <DialogTitle sx={{ fontWeight: 800, fontSize: '1.3rem', mb: 1 }}>
+            {inHoldings ? 'Add Transaction' : 'Add Ticker'}
+          </DialogTitle>
           <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <FormControl required>
               <FormLabel>Symbol</FormLabel>
               <Input placeholder="e.g. MSFT" value={newSymbol} onChange={e => setNewSymbol(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleAddTicker()} />
             </FormControl>
+            {newSymbol.trim() && (
+              <Typography level="body-xs" sx={{ mt: -0.5, color: inHoldings ? 'warning.plainColor' : 'success.plainColor', fontWeight: 600 }}>
+                {inHoldings 
+                  ? '✨ Already in holdings. This will record a new transaction.' 
+                  : inWatchlist 
+                    ? 'ℹ️ Found in watchlist. This will create a new holding.' 
+                    : 'ℹ️ New ticker. This will create a new holding and add it to your watchlist.'}
+              </Typography>
+            )}
             <FormControl>
               <FormLabel>Shares</FormLabel>
               <Input type="number" placeholder="e.g. 35" value={newShares} onChange={e => setNewShares(e.target.value)} />
@@ -313,9 +336,9 @@ export default function YahooPortfolio() {
               <FormLabel>Commission ($)</FormLabel>
               <Input type="number" placeholder="e.g. 5.00" value={newCommission} onChange={e => setNewCommission(e.target.value)} />
             </FormControl>
-            <Button variant="solid" color="primary" onClick={handleAddTicker} disabled={!newSymbol.trim()}
+            <Button variant="solid" color={inHoldings ? 'warning' : 'primary'} onClick={handleAddTicker} disabled={!newSymbol.trim()}
               sx={{ mt: 1, borderRadius: '12px', fontWeight: 700 }}>
-              Add to Portfolio
+              {inHoldings ? 'Add Transaction' : 'Add to Portfolio'}
             </Button>
             <Divider sx={{ my: 1 }}>OR</Divider>
             <Box>

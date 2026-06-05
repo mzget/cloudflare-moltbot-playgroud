@@ -10,6 +10,7 @@ import { syncAndIngestEmails, generateEmailDigests } from './emailSummarizer';
 import { checkAuth, fetchGoogleUserProfile, isEmailAuthorized, signJwt, getUserLoginAuthUrl } from './auth';
 import { syncAndProcessFacebookPosts } from './facebook';
 import { recordDailyPortfolioHistory, getPortfolioHistory } from './portfolioHistory';
+import { sortTransactions } from './portfolioUtils';
 
 
 import { Hono } from 'hono';
@@ -863,11 +864,11 @@ app.post('/api/portfolio/import', async (c) => {
     }
 
     // Sort transactions chronologically to ensure FIFO lot matching behaves correctly
-    transactions.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const sortedTransactions = sortTransactions(transactions);
 
     const affectedSymbols = new Set<string>();
 
-    for (const tx of transactions) {
+    for (const tx of sortedTransactions) {
       if (!tx.symbol || !tx.date || isNaN(parseFloat(tx.shares)) || isNaN(parseFloat(tx.price))) {
         continue;
       }
@@ -976,42 +977,77 @@ app.post('/api/portfolio/holdings', async (c) => {
   const avgCost = avg_cost !== undefined && avg_cost !== null ? parseFloat(avg_cost) : null;
   const comm = parseFloat(commission) || 0;
 
-  // Ensure symbol is in watchlist
-  await c.env.DB.prepare(`
-    INSERT OR IGNORE INTO watchlist (symbol, name, is_active)
-    VALUES (?, ?, 1)
-  `).bind(sym, sym).run();
+  // Check if symbol is in holdings already
+  const existingHolding = await c.env.DB.prepare('SELECT 1 FROM holdings WHERE symbol = ?').bind(sym).first();
+  const isAlreadyInHoldings = !!existingHolding;
 
-  if (numShares > 0 && avgCost !== null) {
-    const dateStr = new Date().toISOString().split('T')[0];
-    const lotTotalCost = (numShares * avgCost) + comm;
+  if (isAlreadyInHoldings) {
+    // === Add Transaction Logic ===
+    if (numShares > 0 && avgCost !== null) {
+      const dateStr = new Date().toISOString().split('T')[0];
+      const lotTotalCost = (numShares * avgCost) + comm;
 
-    // 1. Add buy lot
-    await c.env.DB.prepare(`
-      INSERT INTO share_lots (symbol, date, shares, cost_per_share, total_cost, note)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `).bind(sym, dateStr, numShares, avgCost, lotTotalCost, 'Initial Position').run();
+      // Add buy lot
+      await c.env.DB.prepare(`
+        INSERT INTO share_lots (symbol, date, shares, cost_per_share, total_cost, note)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).bind(sym, dateStr, numShares, avgCost, lotTotalCost, 'Additional Position').run();
 
-    // 2. Add buy transaction
-    await c.env.DB.prepare(`
-      INSERT INTO transactions (symbol, date, type, shares, cost_per_share, commission, total_cost, note)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).bind(sym, dateStr, 'Buy', numShares, avgCost, comm, lotTotalCost, 'Initial Position').run();
+      // Add buy transaction
+      await c.env.DB.prepare(`
+        INSERT INTO transactions (symbol, date, type, shares, cost_per_share, commission, total_cost, note)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(sym, dateStr, 'Buy', numShares, avgCost, comm, lotTotalCost, 'Additional Position').run();
 
-    // 3. Recalculate holdings
-    await recalcHoldings(c.env.DB, sym);
+      // Recalculate holdings
+      await recalcHoldings(c.env.DB, sym);
+    }
   } else {
-    // Just insert empty holding if shares is 0
-    await c.env.DB.prepare(`
-      INSERT INTO holdings (symbol, shares, avg_cost, total_cost, status)
-      VALUES (?, 0, NULL, 0, ?)
-      ON CONFLICT(symbol) DO UPDATE SET
-        shares = excluded.shares,
-        avg_cost = excluded.avg_cost,
-        total_cost = excluded.total_cost,
-        status = excluded.status,
-        updated_at = strftime('%s', 'now')
-    `).bind(sym, status || 'Open').run();
+    // === Add New Holding Logic ===
+    // Check if symbol exists in watchlist
+    const watchlistEntry = await c.env.DB.prepare('SELECT * FROM watchlist WHERE symbol = ?').bind(sym).first();
+    if (watchlistEntry) {
+      // If in watchlist, ensure is_active is 1
+      await c.env.DB.prepare('UPDATE watchlist SET is_active = 1 WHERE symbol = ?').bind(sym).run();
+    } else {
+      // If not in watchlist, insert it
+      await c.env.DB.prepare(`
+        INSERT INTO watchlist (symbol, name, is_active)
+        VALUES (?, ?, 1)
+      `).bind(sym, sym).run();
+    }
+
+    if (numShares > 0 && avgCost !== null) {
+      const dateStr = new Date().toISOString().split('T')[0];
+      const lotTotalCost = (numShares * avgCost) + comm;
+
+      // Add buy lot
+      await c.env.DB.prepare(`
+        INSERT INTO share_lots (symbol, date, shares, cost_per_share, total_cost, note)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `).bind(sym, dateStr, numShares, avgCost, lotTotalCost, 'Initial Position').run();
+
+      // Add buy transaction
+      await c.env.DB.prepare(`
+        INSERT INTO transactions (symbol, date, type, shares, cost_per_share, commission, total_cost, note)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(sym, dateStr, 'Buy', numShares, avgCost, comm, lotTotalCost, 'Initial Position').run();
+
+      // Recalculate holdings
+      await recalcHoldings(c.env.DB, sym);
+    } else {
+      // Just insert empty holding if shares is 0
+      await c.env.DB.prepare(`
+        INSERT INTO holdings (symbol, shares, avg_cost, total_cost, status)
+        VALUES (?, 0, NULL, 0, ?)
+        ON CONFLICT(symbol) DO UPDATE SET
+          shares = excluded.shares,
+          avg_cost = excluded.avg_cost,
+          total_cost = excluded.total_cost,
+          status = excluded.status,
+          updated_at = strftime('%s', 'now')
+      `).bind(sym, status || 'Open').run();
+    }
   }
 
   return c.json({ success: true });
