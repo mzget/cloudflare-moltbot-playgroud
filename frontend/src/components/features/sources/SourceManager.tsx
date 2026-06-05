@@ -1,4 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { useCrawlerSources } from './hooks/useCrawlerSources';
+import type { NewsSource } from './hooks/useCrawlerSources';
+import { useGmailSubscriptions } from './hooks/useGmailSubscriptions';
+import type { EmailSubscription } from './hooks/useGmailSubscriptions';
 import {
   Box,
   Typography,
@@ -41,89 +45,38 @@ import { API_BASE_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
 import ManualTrigger from './ManualTrigger';
 
-interface NewsSource {
-  id: number;
-  name: string;
-  url_pattern: string;
-  selector: string;
-  type: 'RSS' | 'WEB';
-  enabled: boolean;
-}
-
-interface EmailSubscription {
-  id?: number;
-  name: string;
-  sender?: string;
-  subject_filter?: string;
-  label_filter?: string;
-  raw_query?: string;
-  frequency: 'hourly' | 'daily' | 'weekly';
-  is_active: boolean | number;
-}
-
 export default function SourceManager() {
   const [index, setIndex] = useState(0);
 
-  // RSS/Web Sources State
-  const [sources, setSources] = useState<NewsSource[]>([]);
-  const [loadingSources, setLoadingSources] = useState(true);
+  const {
+    sources,
+    loading: loadingSources,
+    fetchSources,
+    saveSource,
+    deleteSource
+  } = useCrawlerSources();
+
+  const {
+    gmailConnected,
+    checkingGmail,
+    subscriptions,
+    loadingSubs,
+    actionsLoading,
+    checkGmailStatus,
+    fetchSubscriptions,
+    connectGmail,
+    disconnectGmail,
+    saveSubscription,
+    deleteSubscription,
+    syncEmails,
+    testDigest
+  } = useGmailSubscriptions();
+
+  // Modal forms visibility states
   const [showSourceForm, setShowSourceForm] = useState(false);
   const [editingSource, setEditingSource] = useState<NewsSource | null>(null);
-
-  // Gmail / Subscriptions State
-  const [gmailConnected, setGmailConnected] = useState(false);
-  const [checkingGmail, setCheckingGmail] = useState(true);
-  const [subscriptions, setSubscriptions] = useState<EmailSubscription[]>([]);
-  const [loadingSubs, setLoadingSubs] = useState(true);
   const [showSubForm, setShowSubForm] = useState(false);
   const [editingSub, setEditingSub] = useState<EmailSubscription | null>(null);
-  const [syncingEmails, setSyncingEmails] = useState(false);
-  const [testingDigest, setTestingDigest] = useState(false);
-
-  // Fetch Web/RSS news sources
-  const fetchSources = async () => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/sources`);
-      if (res.ok) {
-        const data = await res.json();
-        setSources(data);
-      }
-    } catch (e) {
-      console.error('Failed to fetch sources', e);
-    } finally {
-      setLoadingSources(false);
-    }
-  };
-
-  // Fetch Gmail Connection Status
-  const checkGmailStatus = async () => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/auth/google/status`);
-      if (res.ok) {
-        const data = await res.json();
-        setGmailConnected(data.connected);
-      }
-    } catch (e) {
-      console.error('Failed to check Gmail status', e);
-    } finally {
-      setCheckingGmail(false);
-    }
-  };
-
-  // Fetch Email Subscriptions
-  const fetchSubscriptions = async () => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/subscriptions`);
-      if (res.ok) {
-        const data = await res.json();
-        setSubscriptions(data);
-      }
-    } catch (e) {
-      console.error('Failed to fetch subscriptions', e);
-    } finally {
-      setLoadingSubs(false);
-    }
-  };
 
   useEffect(() => {
     fetchSources();
@@ -138,20 +91,14 @@ export default function SourceManager() {
     return () => {
       window.removeEventListener('gmail-connected', handleConnected);
     };
-  }, []);
+  }, [fetchSources, checkGmailStatus, fetchSubscriptions]);
 
   // Web/RSS actions
   const handleSaveSource = async (source: any) => {
     try {
-      const method = source.id ? 'PUT' : 'POST';
-      await fetch(`${API_BASE_URL}/api/sources`, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(source)
-      });
+      await saveSource(source);
       setShowSourceForm(false);
       setEditingSource(null);
-      fetchSources();
     } catch (e) {
       console.error('Failed to save source', e);
     }
@@ -160,8 +107,7 @@ export default function SourceManager() {
   const handleDeleteSource = async (id: number) => {
     if (!confirm('Delete this source?')) return;
     try {
-      await fetch(`${API_BASE_URL}/api/sources?id=${id}`, { method: 'DELETE' });
-      fetchSources();
+      await deleteSource(id);
     } catch (e) {
       console.error('Failed to delete source', e);
     }
@@ -170,14 +116,7 @@ export default function SourceManager() {
   // Gmail OAuth / Subscriptions Actions
   const handleConnectGmail = async () => {
     try {
-      const redirectUri = window.location.origin + '/';
-      const res = await fetch(
-        `${API_BASE_URL}/api/auth/google/url?redirect_uri=${encodeURIComponent(redirectUri)}`
-      );
-      if (res.ok) {
-        const data = await res.json();
-        window.location.href = data.url;
-      }
+      await connectGmail();
     } catch (e) {
       console.error('Failed to initiate Google OAuth', e);
     }
@@ -186,10 +125,7 @@ export default function SourceManager() {
   const handleDisconnectGmail = async () => {
     if (!confirm('Disconnect from Gmail? This will stop email subscription updates.')) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/api/auth/google/disconnect`, { method: 'DELETE' });
-      if (res.ok) {
-        setGmailConnected(false);
-      }
+      await disconnectGmail();
     } catch (e) {
       console.error('Failed to disconnect Gmail', e);
     }
@@ -197,15 +133,9 @@ export default function SourceManager() {
 
   const handleSaveSub = async (sub: any) => {
     try {
-      const method = sub.id ? 'PUT' : 'POST';
-      await fetch(`${API_BASE_URL}/api/subscriptions`, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sub)
-      });
+      await saveSubscription(sub);
       setShowSubForm(false);
       setEditingSub(null);
-      fetchSubscriptions();
     } catch (e) {
       console.error('Failed to save subscription', e);
     }
@@ -214,31 +144,26 @@ export default function SourceManager() {
   const handleDeleteSub = async (id: number) => {
     if (!confirm('Delete this email subscription?')) return;
     try {
-      await fetch(`${API_BASE_URL}/api/subscriptions?id=${id}`, { method: 'DELETE' });
-      fetchSubscriptions();
+      await deleteSubscription(id);
     } catch (e) {
       console.error('Failed to delete subscription', e);
     }
   };
 
   const handleSyncEmails = async () => {
-    setSyncingEmails(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/email-sync`, { method: 'POST' });
+      const res = await syncEmails();
       if (res.ok) {
         alert('Gmail sync and AI summarization task started in background.');
       }
     } catch (e) {
       console.error('Failed to sync emails', e);
-    } finally {
-      setSyncingEmails(false);
     }
   };
 
   const handleTestDigest = async () => {
-    setTestingDigest(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/test-email-digest`);
+      const res = await testDigest();
       if (res.ok) {
         alert('Email digest generated successfully!');
       } else {
@@ -248,8 +173,6 @@ export default function SourceManager() {
     } catch (e) {
       console.error('Failed to run test email digest', e);
       alert('Network or server error during digest generation.');
-    } finally {
-      setTestingDigest(false);
     }
   };
 
@@ -444,7 +367,7 @@ export default function SourceManager() {
                       variant="soft"
                       color="primary"
                       onClick={handleSyncEmails}
-                      loading={syncingEmails}
+                      loading={actionsLoading.syncing}
                       startDecorator={<Play size={16} />}
                       sx={{ borderRadius: '12px' }}
                     >
@@ -454,7 +377,7 @@ export default function SourceManager() {
                       variant="soft"
                       color="warning"
                       onClick={handleTestDigest}
-                      loading={testingDigest}
+                      loading={actionsLoading.testing}
                       startDecorator={<Sparkles size={16} />}
                       sx={{ borderRadius: '12px' }}
                     >

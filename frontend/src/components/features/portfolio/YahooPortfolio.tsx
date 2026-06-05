@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
+import { usePortfolio } from './hooks/usePortfolio';
 import { Box, Typography, Sheet, Button, Input, Stack, Tabs, TabList, Tab, Divider, Modal, ModalDialog, DialogTitle, DialogContent, ModalClose, FormControl, FormLabel } from '@mui/joy';
 import { API_BASE_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
@@ -115,68 +116,49 @@ function parseCSV(text: string): any[] {
 
 
 export default function YahooPortfolio() {
-  const [holdings, setHoldings] = useState<Holding[]>([]);
-  const [summary, setSummary] = useState<PortfolioSummary | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { holdings, summary, loading, watchlist, fetchAll } = usePortfolio();
+
   const [activeTab, setActiveTab] = useState<number>(1);
   const [addModalOpen, setAddModalOpen] = useState(false);
-  const [newSymbol, setNewSymbol] = useState('');
-  const [newShares, setNewShares] = useState('');
-  const [newCost, setNewCost] = useState('');
-  const [newCommission, setNewCommission] = useState('');
-  const [importError, setImportError] = useState<string | null>(null);
-  const [importSuccess, setImportSuccess] = useState<string | null>(null);
-  const [importing, setImporting] = useState(false);
-  const [watchlist, setWatchlist] = useState<any[]>([]);
 
-  const fetchHoldings = useCallback(async () => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/portfolio/holdings`);
-      if (res.ok) setHoldings(await res.json());
-    } catch (e) { console.error('Failed to fetch holdings:', e); }
-  }, []);
+  const [form, setForm] = useState({
+    symbol: '',
+    shares: '',
+    cost: '',
+    commission: '',
+  });
 
-  const fetchSummary = useCallback(async () => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/portfolio/summary`);
-      if (res.ok) setSummary(await res.json());
-    } catch (e) { console.error('Failed to fetch summary:', e); }
-  }, []);
+  const [importStatus, setImportStatus] = useState<{
+    importing: boolean;
+    error: string | null;
+    success: string | null;
+  }>({
+    importing: false,
+    error: null,
+    success: null,
+  });
 
-  const fetchWatchlist = useCallback(async () => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/watchlist`);
-      if (res.ok) setWatchlist(await res.json());
-    } catch (e) { console.error('Failed to fetch watchlist:', e); }
-  }, []);
-
-  const fetchAll = useCallback(async () => {
-    setLoading(true);
-    await Promise.all([fetchHoldings(), fetchSummary(), fetchWatchlist()]);
-    setLoading(false);
-  }, [fetchHoldings, fetchSummary, fetchWatchlist]);
-
-  useEffect(() => {
-    fetchAll();
-    const interval = setInterval(fetchAll, 180000);
-    return () => clearInterval(interval);
-  }, [fetchAll]);
+  const handleFormChange = (field: keyof typeof form) => (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    setForm(prev => ({ ...prev, [field]: e.target.value }));
+  };
 
   const handleAddTicker = async () => {
-    if (!newSymbol.trim()) return;
+    if (!form.symbol.trim()) return;
     try {
       await fetch(`${API_BASE_URL}/api/portfolio/holdings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          symbol: newSymbol.trim().toUpperCase(),
-          shares: parseFloat(newShares) || 0,
-          avg_cost: parseFloat(newCost) || null,
-          commission: parseFloat(newCommission) || 0,
-          status: parseFloat(newShares) > 0 ? 'Open' : 'Add',
+          symbol: form.symbol.trim().toUpperCase(),
+          shares: parseFloat(form.shares) || 0,
+          avg_cost: parseFloat(form.cost) || null,
+          commission: parseFloat(form.commission) || 0,
+          status: parseFloat(form.shares) > 0 ? 'Open' : 'Add',
         }),
       });
-      setNewSymbol(''); setNewShares(''); setNewCost(''); setNewCommission('');
+      setForm({ symbol: '', shares: '', cost: '', commission: '' });
       setAddModalOpen(false);
       fetchAll();
     } catch (e) { console.error('Failed to add holding:', e); }
@@ -186,9 +168,7 @@ export default function YahooPortfolio() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setImporting(true);
-    setImportError(null);
-    setImportSuccess(null);
+    setImportStatus({ importing: true, error: null, success: null });
 
     const reader = new FileReader();
     reader.onload = async (event) => {
@@ -197,8 +177,11 @@ export default function YahooPortfolio() {
         const transactions = parseCSV(text);
 
         if (transactions.length === 0) {
-          setImportError('No valid transactions found in CSV. Please verify column headers.');
-          setImporting(false);
+          setImportStatus({
+            importing: false,
+            error: 'No valid transactions found in CSV. Please verify column headers.',
+            success: null,
+          });
           return;
         }
 
@@ -210,26 +193,36 @@ export default function YahooPortfolio() {
 
         if (res.ok) {
           const result = await res.json();
-          setImportSuccess(`Successfully imported ${result.count} transactions!`);
+          setImportStatus({
+            importing: false,
+            error: null,
+            success: `Successfully imported ${result.count} transactions!`,
+          });
           fetchAll();
           setTimeout(() => {
             setAddModalOpen(false);
-            setImportSuccess(null);
+            setImportStatus(prev => ({ ...prev, success: null }));
           }, 2000);
         } else {
           const errorText = await res.text();
-          setImportError(`Import failed: ${errorText}`);
+          setImportStatus({
+            importing: false,
+            error: `Import failed: ${errorText}`,
+            success: null,
+          });
         }
       } catch (error) {
-        setImportError(`Failed to parse CSV file: ${(error as any).message}`);
-      } finally {
-        setImporting(false);
+        setImportStatus({
+          importing: false,
+          error: `Failed to parse CSV file: ${(error as any).message}`,
+          success: null,
+        });
       }
     };
     reader.readAsText(file);
   };
 
-  const symbolUpper = newSymbol.trim().toUpperCase();
+  const symbolUpper = form.symbol.trim().toUpperCase();
   const inHoldings = holdings.some(h => h.symbol === symbolUpper);
   const inWatchlist = watchlist.some(w => w.symbol === symbolUpper);
 
@@ -312,10 +305,10 @@ export default function YahooPortfolio() {
           <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <FormControl required>
               <FormLabel>Symbol</FormLabel>
-              <Input placeholder="e.g. MSFT" value={newSymbol} onChange={e => setNewSymbol(e.target.value)}
+              <Input placeholder="e.g. MSFT" value={form.symbol} onChange={handleFormChange('symbol')}
                 onKeyDown={e => e.key === 'Enter' && handleAddTicker()} />
             </FormControl>
-            {newSymbol.trim() && (
+            {form.symbol.trim() && (
               <Typography level="body-xs" sx={{ mt: -0.5, color: inHoldings ? 'warning.plainColor' : 'success.plainColor', fontWeight: 600 }}>
                 {inHoldings 
                   ? '✨ Already in holdings. This will record a new transaction.' 
@@ -326,17 +319,17 @@ export default function YahooPortfolio() {
             )}
             <FormControl>
               <FormLabel>Shares</FormLabel>
-              <Input type="number" placeholder="e.g. 35" value={newShares} onChange={e => setNewShares(e.target.value)} />
+              <Input type="number" placeholder="e.g. 35" value={form.shares} onChange={handleFormChange('shares')} />
             </FormControl>
             <FormControl>
               <FormLabel>Average Cost / Share ($)</FormLabel>
-              <Input type="number" placeholder="e.g. 394.40" value={newCost} onChange={e => setNewCost(e.target.value)} />
+              <Input type="number" placeholder="e.g. 394.40" value={form.cost} onChange={handleFormChange('cost')} />
             </FormControl>
             <FormControl>
               <FormLabel>Commission ($)</FormLabel>
-              <Input type="number" placeholder="e.g. 5.00" value={newCommission} onChange={e => setNewCommission(e.target.value)} />
+              <Input type="number" placeholder="e.g. 5.00" value={form.commission} onChange={handleFormChange('commission')} />
             </FormControl>
-            <Button variant="solid" color={inHoldings ? 'warning' : 'primary'} onClick={handleAddTicker} disabled={!newSymbol.trim()}
+            <Button variant="solid" color={inHoldings ? 'warning' : 'primary'} onClick={handleAddTicker} disabled={!form.symbol.trim()}
               sx={{ mt: 1, borderRadius: '12px', fontWeight: 700 }}>
               {inHoldings ? 'Add Transaction' : 'Add to Portfolio'}
             </Button>
@@ -350,7 +343,7 @@ export default function YahooPortfolio() {
                 variant="outlined"
                 color="neutral"
                 component="label"
-                loading={importing}
+                loading={importStatus.importing}
                 sx={{ width: '100%', borderRadius: '12px', py: 1, fontWeight: 700 }}
               >
                 Upload CSV File
@@ -359,17 +352,17 @@ export default function YahooPortfolio() {
                   accept=".csv"
                   hidden
                   onChange={handleCSVUpload}
-                  disabled={importing}
+                  disabled={importStatus.importing}
                 />
               </Button>
-              {importError && (
+              {importStatus.error && (
                 <Typography level="body-xs" color="danger" sx={{ mt: 1, fontWeight: 600 }}>
-                  {importError}
+                  {importStatus.error}
                 </Typography>
               )}
-              {importSuccess && (
+              {importStatus.success && (
                 <Typography level="body-xs" color="success" sx={{ mt: 1, fontWeight: 600 }}>
-                  {importSuccess}
+                  {importStatus.success}
                 </Typography>
               )}
             </Box>

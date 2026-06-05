@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useWatchlist } from './hooks/useWatchlist';
+import { useAlertRules } from './hooks/useAlertRules';
 import { Box, Typography, Sheet, IconButton, Button, Input, Stack, Card, CardContent, Divider, Switch, Grid, CardActions, Avatar, Modal, ModalDialog, DialogTitle, DialogContent, ModalClose, FormControl, FormLabel, Select, Option, FormHelperText, Badge } from '@mui/joy';
 import { Plus, Trash2, Bell } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
@@ -14,10 +16,29 @@ interface WatchlistItem {
 import { glassStyle } from '../../../styles/glass';
 
 export default function Watchlist() {
-  const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
-  const [newSymbol, setNewSymbol] = useState('');
-  const [newName, setNewName] = useState('');
-  const [marketStats, setMarketStats] = useState<any[]>([]);
+  const {
+    watchlist,
+    marketStats,
+    addWatchlist,
+    deleteWatchlist,
+    toggleActive,
+    togglePortfolioStatus,
+    fetchWatchlist
+  } = useWatchlist();
+
+  const {
+    symbolRules,
+    fetchRulesForSymbol,
+    createRule,
+    toggleRule,
+    deleteRule
+  } = useAlertRules(fetchWatchlist);
+
+  const [newSecurityForm, setNewSecurityForm] = useState({
+    symbol: '',
+    name: ''
+  });
+
   const [sortBy, setSortBy] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('watchlist_sort_by');
@@ -64,80 +85,38 @@ export default function Watchlist() {
   // Alert Modal State
   const [isAlertsModalOpen, setIsAlertsModalOpen] = useState(false);
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
-  const [symbolRules, setSymbolRules] = useState<any[]>([]);
-  const [newRuleMetric, setNewRuleMetric] = useState('price');
-  const [newRuleCondition, setNewRuleCondition] = useState('cross_up');
-  const [newRuleTarget, setNewRuleTarget] = useState('');
 
-  const fetchMarketStats = async () => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/market-intelligence`);
-      if (res.ok) {
-        const data = await res.json();
-        setMarketStats(data);
-      }
-    } catch (e) {
-      console.error("Failed to fetch market stats", e);
-    }
-  };
-
-  const fetchWatchlist = async () => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/watchlist`);
-      if (res.ok) {
-        const data = await res.json();
-        setWatchlist(data);
-      }
-    } catch (e) {
-      console.error("Failed to fetch watchlist", e);
-    }
-  };
-
-  const fetchRulesForSymbol = async (symbol: string) => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/alerts?symbol=${symbol}`);
-      if (res.ok) {
-        const data = await res.json();
-        setSymbolRules(data);
-      }
-    } catch (e) {
-      console.error("Failed to fetch alert rules", e);
-    }
-  };
+  // Group rule form state
+  const [ruleForm, setRuleForm] = useState({
+    metric: 'price',
+    condition: 'cross_up',
+    target: ''
+  });
 
   const handleOpenAlertsModal = (symbol: string) => {
     setSelectedSymbol(symbol);
     fetchRulesForSymbol(symbol);
-    setNewRuleMetric('price');
-    setNewRuleCondition('cross_up');
-    setNewRuleTarget('');
+    setRuleForm({
+      metric: 'price',
+      condition: 'cross_up',
+      target: ''
+    });
     setIsAlertsModalOpen(true);
   };
 
   const handleCreateRule = async () => {
-    if (!selectedSymbol || !newRuleTarget || isNaN(Number(newRuleTarget))) return;
+    if (!selectedSymbol || !ruleForm.target || isNaN(Number(ruleForm.target))) return;
     
-    let targetVal = Number(newRuleTarget);
-    if (newRuleMetric === 'market_cap') {
+    let targetVal = Number(ruleForm.target);
+    if (ruleForm.metric === 'market_cap') {
       // User inputs in Billions, DB stores in Millions
       targetVal = targetVal * 1000;
     }
 
     try {
-      const res = await fetch(`${API_BASE_URL}/api/alerts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          symbol: selectedSymbol,
-          metric: newRuleMetric,
-          condition_type: newRuleCondition,
-          target_value: targetVal
-        })
-      });
+      const res = await createRule(selectedSymbol, ruleForm.metric, ruleForm.condition, targetVal);
       if (res.ok) {
-        setNewRuleTarget('');
-        fetchRulesForSymbol(selectedSymbol);
-        fetchWatchlist();
+        setRuleForm(prev => ({ ...prev, target: '' }));
       }
     } catch (e) {
       console.error("Failed to create alert rule", e);
@@ -146,17 +125,8 @@ export default function Watchlist() {
 
   const handleToggleRule = async (ruleId: number, currentStatus: number) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/alerts`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          id: ruleId,
-          is_active: currentStatus === 1 ? 0 : 1
-        })
-      });
-      if (res.ok && selectedSymbol) {
-        fetchRulesForSymbol(selectedSymbol);
-        fetchWatchlist();
+      if (selectedSymbol) {
+        await toggleRule(selectedSymbol, ruleId, currentStatus);
       }
     } catch (e) {
       console.error("Failed to toggle alert rule", e);
@@ -165,12 +135,8 @@ export default function Watchlist() {
 
   const handleDeleteRule = async (ruleId: number) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/alerts?id=${ruleId}`, {
-        method: 'DELETE'
-      });
-      if (res.ok && selectedSymbol) {
-        fetchRulesForSymbol(selectedSymbol);
-        fetchWatchlist();
+      if (selectedSymbol) {
+        await deleteRule(selectedSymbol, ruleId);
       }
     } catch (e) {
       console.error("Failed to delete alert rule", e);
@@ -230,22 +196,13 @@ export default function Watchlist() {
     return '';
   };
 
-  useEffect(() => {
-    fetchWatchlist();
-    fetchMarketStats();
-  }, []);
-
   const handleAdd = async () => {
-    if (!newSymbol) return;
+    if (!newSecurityForm.symbol) return;
     try {
-      await fetch(`${API_BASE_URL}/api/watchlist`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbol: newSymbol.toUpperCase(), name: newName })
-      });
-      setNewSymbol('');
-      setNewName('');
-      fetchWatchlist();
+      const res = await addWatchlist(newSecurityForm.symbol, newSecurityForm.name);
+      if (res.ok) {
+        setNewSecurityForm({ symbol: '', name: '' });
+      }
     } catch (e) {
       console.error("Failed to add to watchlist", e);
     }
@@ -253,8 +210,7 @@ export default function Watchlist() {
 
   const handleDelete = async (symbol: string) => {
     try {
-      await fetch(`${API_BASE_URL}/api/watchlist?symbol=${symbol}`, { method: 'DELETE' });
-      fetchWatchlist();
+      await deleteWatchlist(symbol);
     } catch (e) {
       console.error("Failed to delete from watchlist", e);
     }
@@ -262,12 +218,7 @@ export default function Watchlist() {
 
   const handleToggleActive = async (symbol: string, currentStatus: number) => {
     try {
-      await fetch(`${API_BASE_URL}/api/watchlist`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbol, is_active: !currentStatus })
-      });
-      fetchWatchlist();
+      await toggleActive(symbol, currentStatus);
     } catch (e) {
       console.error("Failed to toggle watchlist status", e);
     }
@@ -275,12 +226,7 @@ export default function Watchlist() {
 
   const handleTogglePortfolio = async (symbol: string, currentPortfolioStatus: number) => {
     try {
-      await fetch(`${API_BASE_URL}/api/watchlist`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbol, in_portfolio: !currentPortfolioStatus })
-      });
-      fetchWatchlist();
+      await togglePortfolioStatus(symbol, currentPortfolioStatus);
     } catch (e) {
       console.error("Failed to toggle portfolio status", e);
     }
@@ -296,14 +242,14 @@ export default function Watchlist() {
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             <Input 
               placeholder="Symbol (e.g. AAPL)" 
-              value={newSymbol} 
-              onChange={e => setNewSymbol(e.target.value)}
+              value={newSecurityForm.symbol} 
+              onChange={e => setNewSecurityForm(prev => ({ ...prev, symbol: e.target.value }))}
               sx={{ flex: 1 }}
             />
             <Input 
               placeholder="Company Name" 
-              value={newName} 
-              onChange={e => setNewName(e.target.value)}
+              value={newSecurityForm.name} 
+              onChange={e => setNewSecurityForm(prev => ({ ...prev, name: e.target.value }))}
               sx={{ flex: 2 }}
             />
             <Button 
@@ -495,8 +441,8 @@ export default function Watchlist() {
                   <FormControl sx={{ flex: 1 }}>
                     <FormLabel sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Metric</FormLabel>
                     <Select
-                      value={newRuleMetric}
-                      onChange={(_, val) => setNewRuleMetric(val || 'price')}
+                      value={ruleForm.metric}
+                      onChange={(_, val) => setRuleForm(prev => ({ ...prev, metric: val || 'price' }))}
                       size="sm"
                     >
                       <Option value="price">Price ($)</Option>
@@ -510,8 +456,8 @@ export default function Watchlist() {
                   <FormControl sx={{ flex: 1 }}>
                     <FormLabel sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Condition</FormLabel>
                     <Select
-                      value={newRuleCondition}
-                      onChange={(_, val) => setNewRuleCondition(val || 'cross_up')}
+                      value={ruleForm.condition}
+                      onChange={(_, val) => setRuleForm(prev => ({ ...prev, condition: val || 'cross_up' }))}
                       size="sm"
                     >
                       <Option value="cross_up">Crosses Up</Option>
@@ -526,8 +472,8 @@ export default function Watchlist() {
                     <Input
                       type="number"
                       placeholder="e.g. 150"
-                      value={newRuleTarget}
-                      onChange={e => setNewRuleTarget(e.target.value)}
+                      value={ruleForm.target}
+                      onChange={e => setRuleForm(prev => ({ ...prev, target: e.target.value }))}
                       size="sm"
                       sx={{ flex: 1 }}
                     />
@@ -541,7 +487,7 @@ export default function Watchlist() {
                     </Button>
                   </Stack>
                   <FormHelperText sx={{ fontSize: '0.72rem', color: 'text.secondary', fontWeight: 500, mt: 0.5 }}>
-                    {getHelperTextForMetric(newRuleMetric)}
+                    {getHelperTextForMetric(ruleForm.metric)}
                   </FormHelperText>
                 </FormControl>
               </Stack>

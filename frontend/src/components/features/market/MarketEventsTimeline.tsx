@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useMarketEvents } from './hooks/useMarketEvents';
 import {
   Box,
   Typography,
@@ -42,77 +43,17 @@ interface MarketEvent {
 }
 
 export default function MarketEventsTimeline({ inSidebar = false }: { inSidebar?: boolean }) {
-  const [events, setEvents] = React.useState<MarketEvent[]>([]);
-  const [symbols, setSymbols] = React.useState<string[]>([]);
   const [selectedSymbol, setSelectedSymbol] = React.useState<string>('ALL');
   const [selectedType, setSelectedType] = React.useState<string>('ALL');
-  const [loading, setLoading] = React.useState(true);   // initial mount — shows full spinner
-  const [fetching, setFetching] = React.useState(false); // filter change — subtle inline indicator
-  const [refreshing, setRefreshing] = React.useState(false);
 
-  const fetchWatchlistSymbols = async () => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/watchlist`);
-      if (res.ok) {
-        const data = await res.json();
-        const activeSymbols = data
-          .filter((item: any) => item.is_active === 1)
-          .map((item: any) => item.symbol);
-        setSymbols(activeSymbols);
-      }
-    } catch (e) {
-      console.error('Failed to fetch watchlist symbols', e);
-    }
-  };
-
-  const fetchEvents = async (symbol: string, eventType: string, isInitial = false) => {
-    if (isInitial) setLoading(true);
-    else setFetching(true);
-    try {
-      const params = new URLSearchParams();
-      if (symbol !== 'ALL') params.set('symbol', symbol);
-      if (eventType !== 'ALL') params.set('event_type', eventType);
-      const url = `${API_BASE_URL}/api/market-events${params.toString() ? '?' + params.toString() : ''}`;
-      const res = await fetch(url);
-      if (res.ok) {
-        const data = await res.json();
-        setEvents(data);
-      }
-    } catch (e) {
-      console.error('Failed to fetch market events', e);
-    } finally {
-      if (isInitial) setLoading(false);
-      else setFetching(false);
-    }
-  };
-
-  const triggerCrawl = async () => {
-    setRefreshing(true);
-    try {
-      await fetch(`${API_BASE_URL}/api/crawl-events`);
-      setTimeout(async () => {
-        await fetchEvents(selectedSymbol, selectedType);
-        setRefreshing(false);
-      }, 3000);
-    } catch (e) {
-      console.error('Failed to trigger events crawl', e);
-      setRefreshing(false);
-    }
-  };
-
-  // Fetch watchlist symbols and initial events (latest 5 per symbol) on mount
-  const isMounted = React.useRef(false);
-  React.useEffect(() => {
-    fetchWatchlistSymbols();
-    fetchEvents('ALL', 'ALL', true); // initial — show full spinner
-    isMounted.current = true;
-  }, []);
-
-  // Re-fetch from server whenever a filter changes (skip initial mount)
-  React.useEffect(() => {
-    if (!isMounted.current) return;
-    fetchEvents(selectedSymbol, selectedType, false); // filter change — subtle indicator
-  }, [selectedSymbol, selectedType]);
+  const {
+    events,
+    symbols,
+    loading,
+    fetching,
+    refreshing,
+    triggerCrawl
+  } = useMarketEvents(selectedSymbol, selectedType);
 
 
 

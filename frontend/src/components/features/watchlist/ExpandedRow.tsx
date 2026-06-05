@@ -1,7 +1,8 @@
 import * as React from 'react';
 import { Box, Typography, Input, Select, Option, Button } from '@mui/joy';
 import { Plus, Trash2 } from 'lucide-react';
-import { API_BASE_URL } from '../../../config';
+import { useHoldingDetails } from '../portfolio/hooks/useHoldingDetails';
+import type { Lot, Transaction, Dividend } from '../portfolio/hooks/useHoldingDetails';
 import '../../../styles/yahooPortfolio.css';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -11,43 +12,6 @@ interface ExpandedRowProps {
   lastPrice: number | null;
   colSpan: number;
   onDataChange?: () => void;
-}
-
-interface Lot {
-  id?: number;
-  date: string;
-  shares: number;
-  cost_per_share: number;
-  total_cost: number;
-  market_value: number | null;
-  day_gain_pct: number | null;
-  day_gain_amt: number | null;
-  tot_gain_pct: number | null;
-  tot_gain_amt: number | null;
-  low_limit: number | null;
-  high_limit: number | null;
-  note: string;
-}
-
-interface Transaction {
-  id?: number;
-  date: string;
-  type: 'Buy' | 'Sell';
-  shares: number;
-  cost_per_share: number;
-  commission: number;
-  total_cost: number;
-  realized_gain_pct: number | null;
-  realized_gain_amt: number | null;
-  note: string;
-}
-
-interface Dividend {
-  id?: number;
-  date: string;
-  amount: number;
-  per_share: number;
-  note: string;
 }
 
 type SubTab = 'lots' | 'transactions' | 'dividends';
@@ -80,16 +44,25 @@ function gainClass(v: number | null | undefined): string {
 export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }: ExpandedRowProps) {
   const [activeTab, setActiveTab] = React.useState<SubTab>('lots');
 
-  // Data state
-  const [lots, setLots] = React.useState<Lot[]>([]);
-  const [transactions, setTransactions] = React.useState<Transaction[]>([]);
-  const [dividends, setDividends] = React.useState<Dividend[]>([]);
-  const [loading, setLoading] = React.useState(false);
+  const {
+    lots,
+    transactions,
+    dividends,
+    loading,
+    addLot,
+    addTxn,
+    addDiv,
+    deleteLot,
+    deleteTxn,
+    deleteDiv
+  } = useHoldingDetails(symbol, onDataChange);
 
-  // Add-form visibility
-  const [showAddLot, setShowAddLot] = React.useState(false);
-  const [showAddTxn, setShowAddTxn] = React.useState(false);
-  const [showAddDiv, setShowAddDiv] = React.useState(false);
+  // Add-form visibility state
+  const [showForms, setShowForms] = React.useState({
+    lot: false,
+    txn: false,
+    div: false
+  });
 
   // Add-form state
   const [newLot, setNewLot] = React.useState({
@@ -102,65 +75,21 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
     date: '', amount: '', per_share: '', note: '',
   });
 
-  // ── Fetch data ──────────────────────────────────────────────────────────────
-
-  const fetchLots = React.useCallback(async () => {
-    try {
-      const res = await fetch(API_BASE_URL + '/api/portfolio/lots/' + symbol);
-      if (res.ok) setLots(await res.json());
-    } catch (e) {
-      console.error('Failed to fetch lots', e);
-    }
-  }, [symbol]);
-
-  const fetchTransactions = React.useCallback(async () => {
-    try {
-      const res = await fetch(API_BASE_URL + '/api/portfolio/transactions/' + symbol);
-      if (res.ok) setTransactions(await res.json());
-    } catch (e) {
-      console.error('Failed to fetch transactions', e);
-    }
-  }, [symbol]);
-
-  const fetchDividends = React.useCallback(async () => {
-    try {
-      const res = await fetch(API_BASE_URL + '/api/portfolio/dividends/' + symbol);
-      if (res.ok) setDividends(await res.json());
-    } catch (e) {
-      console.error('Failed to fetch dividends', e);
-    }
-  }, [symbol]);
-
-  React.useEffect(() => {
-    setLoading(true);
-    Promise.all([fetchLots(), fetchTransactions(), fetchDividends()]).finally(() =>
-      setLoading(false),
-    );
-  }, [fetchLots, fetchTransactions, fetchDividends]);
-
   // ── Add handlers ────────────────────────────────────────────────────────────
 
   const handleAddLot = async () => {
     try {
-      const body = {
-        symbol,
+      const res = await addLot({
         date: newLot.date,
         shares: parseFloat(newLot.shares) || 0,
         cost_per_share: parseFloat(newLot.cost_per_share) || 0,
         low_limit: newLot.low_limit ? parseFloat(newLot.low_limit) : null,
         high_limit: newLot.high_limit ? parseFloat(newLot.high_limit) : null,
         note: newLot.note,
-      };
-      const res = await fetch(API_BASE_URL + '/api/portfolio/lots', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
       });
       if (res.ok) {
-        await fetchLots();
         setNewLot({ date: '', shares: '', cost_per_share: '', low_limit: '', high_limit: '', note: '' });
-        setShowAddLot(false);
-        if (onDataChange) onDataChange();
+        setShowForms(prev => ({ ...prev, lot: false }));
       }
     } catch (e) {
       console.error('Failed to add lot', e);
@@ -169,25 +98,17 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
 
   const handleAddTxn = async () => {
     try {
-      const body = {
-        symbol,
+      const res = await addTxn({
         date: newTxn.date,
         type: newTxn.type,
         shares: parseFloat(newTxn.shares) || 0,
         cost_per_share: parseFloat(newTxn.cost_per_share) || 0,
         commission: parseFloat(newTxn.commission) || 0,
         note: newTxn.note,
-      };
-      const res = await fetch(API_BASE_URL + '/api/portfolio/transactions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
       });
       if (res.ok) {
-        await fetchTransactions();
         setNewTxn({ date: '', type: 'Buy', shares: '', cost_per_share: '', commission: '', note: '' });
-        setShowAddTxn(false);
-        if (onDataChange) onDataChange();
+        setShowForms(prev => ({ ...prev, txn: false }));
       }
     } catch (e) {
       console.error('Failed to add transaction', e);
@@ -196,23 +117,15 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
 
   const handleAddDiv = async () => {
     try {
-      const body = {
-        symbol,
+      const res = await addDiv({
         date: newDiv.date,
         amount: parseFloat(newDiv.amount) || 0,
         per_share: parseFloat(newDiv.per_share) || 0,
         note: newDiv.note,
-      };
-      const res = await fetch(API_BASE_URL + '/api/portfolio/dividends', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
       });
       if (res.ok) {
-        await fetchDividends();
         setNewDiv({ date: '', amount: '', per_share: '', note: '' });
-        setShowAddDiv(false);
-        if (onDataChange) onDataChange();
+        setShowForms(prev => ({ ...prev, div: false }));
       }
     } catch (e) {
       console.error('Failed to add dividend', e);
@@ -222,39 +135,24 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
   // ── Delete handlers ─────────────────────────────────────────────────────────
 
   const handleDeleteLot = async (id: number | undefined) => {
-    if (!id) return;
     try {
-      const res = await fetch(API_BASE_URL + '/api/portfolio/lots/' + id, { method: 'DELETE' });
-      if (res.ok) {
-        await fetchLots();
-        if (onDataChange) onDataChange();
-      }
+      await deleteLot(id);
     } catch (e) {
       console.error('Failed to delete lot', e);
     }
   };
 
   const handleDeleteTxn = async (id: number | undefined) => {
-    if (!id) return;
     try {
-      const res = await fetch(API_BASE_URL + '/api/portfolio/transactions/' + id, { method: 'DELETE' });
-      if (res.ok) {
-        await fetchTransactions();
-        if (onDataChange) onDataChange();
-      }
+      await deleteTxn(id);
     } catch (e) {
       console.error('Failed to delete transaction', e);
     }
   };
 
   const handleDeleteDiv = async (id: number | undefined) => {
-    if (!id) return;
     try {
-      const res = await fetch(API_BASE_URL + '/api/portfolio/dividends/' + id, { method: 'DELETE' });
-      if (res.ok) {
-        await fetchDividends();
-        if (onDataChange) onDataChange();
-      }
+      await deleteDiv(id);
     } catch (e) {
       console.error('Failed to delete dividend', e);
     }
@@ -309,7 +207,7 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
             </tr>
           ))}
 
-          {lots.length === 0 && !showAddLot && (
+          {lots.length === 0 && !showForms.lot && (
             <tr>
               <td colSpan={13} className="left" style={{ padding: '16px 10px', opacity: 0.5 }}>
                 No share lots recorded.
@@ -317,7 +215,7 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
             </tr>
           )}
 
-          {showAddLot && (
+          {showForms.lot && (
             <tr className="yf-add-row">
               <td className="left">
                 <Input size="sm" type="date" value={newLot.date}
@@ -367,9 +265,9 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
           variant="plain"
           color="primary"
           startDecorator={<Plus size={14} />}
-          onClick={() => setShowAddLot(!showAddLot)}
+          onClick={() => setShowForms(prev => ({ ...prev, lot: !prev.lot }))}
         >
-          {showAddLot ? 'Cancel' : 'Add Lot'}
+          {showForms.lot ? 'Cancel' : 'Add Lot'}
         </Button>
       </Box>
     </>
@@ -416,7 +314,7 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
             </tr>
           ))}
 
-          {transactions.length === 0 && !showAddTxn && (
+          {transactions.length === 0 && !showForms.txn && (
             <tr>
               <td colSpan={10} className="left" style={{ padding: '16px 10px', opacity: 0.5 }}>
                 No transactions recorded.
@@ -424,7 +322,7 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
             </tr>
           )}
 
-          {showAddTxn && (
+          {showForms.txn && (
             <tr className="yf-add-row">
               <td className="left">
                 <Input size="sm" type="date" value={newTxn.date}
@@ -475,9 +373,9 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
           variant="plain"
           color="primary"
           startDecorator={<Plus size={14} />}
-          onClick={() => setShowAddTxn(!showAddTxn)}
+          onClick={() => setShowForms(prev => ({ ...prev, txn: !prev.txn }))}
         >
-          {showAddTxn ? 'Cancel' : 'Add Transaction'}
+          {showForms.txn ? 'Cancel' : 'Add Transaction'}
         </Button>
       </Box>
     </>
@@ -514,7 +412,7 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
             </tr>
           ))}
 
-          {dividends.length === 0 && !showAddDiv && (
+          {dividends.length === 0 && !showForms.div && (
             <tr>
               <td colSpan={5} className="left" style={{ padding: '16px 10px', opacity: 0.5 }}>
                 No dividends recorded.
@@ -522,7 +420,7 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
             </tr>
           )}
 
-          {showAddDiv && (
+          {showForms.div && (
             <tr className="yf-add-row">
               <td className="left">
                 <Input size="sm" type="date" value={newDiv.date}
@@ -560,9 +458,9 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
           variant="plain"
           color="primary"
           startDecorator={<Plus size={14} />}
-          onClick={() => setShowAddDiv(!showAddDiv)}
+          onClick={() => setShowForms(prev => ({ ...prev, div: !prev.div }))}
         >
-          {showAddDiv ? 'Cancel' : 'Add Dividend'}
+          {showForms.div ? 'Cancel' : 'Add Dividend'}
         </Button>
       </Box>
     </>
