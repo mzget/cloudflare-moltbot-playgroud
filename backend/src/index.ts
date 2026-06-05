@@ -34,6 +34,7 @@ export interface Env {
 	FACEBOOK_PAGE_ID?: string;
 	FACEBOOK_PAGE_ACCESS_TOKEN?: string;
 	OAKTREE_SYNC_WORKFLOW: Workflow;
+	IS_LOCAL?: string;
 }
 
 const app = new Hono<{
@@ -55,12 +56,23 @@ app.use('*', cors({
 app.use('/api/*', async (c, next) => {
 	const path = c.req.path;
 	const isUnprotectedRoute = path === '/' || 
-							   path.startsWith('/api/auth/user/') || 
+							   path === '/api/auth/user/login-url' || 
+							   path === '/api/auth/user/callback' || 
 							   path === '/api/test-facebook-post';
 	
 	if (!isUnprotectedRoute) {
 		const jwtSecret = c.env.JWT_SECRET || 'dev-secret-key-123456';
-		const user = await checkAuth(c.req.raw, jwtSecret);
+		let user = await checkAuth(c.req.raw, jwtSecret);
+		
+		// Bypass authentication in local development mode
+		if (!user && c.env.IS_LOCAL === 'true') {
+			user = {
+				email: 'local@example.com',
+				name: 'Local User',
+				picture: ''
+			};
+		}
+		
 		if (!user) {
 			return c.text('Unauthorized', 401);
 		}

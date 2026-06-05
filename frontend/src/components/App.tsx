@@ -160,6 +160,19 @@ export default function App() {
   }, []);
 
   React.useEffect(() => {
+    const isLocalhost = typeof window !== 'undefined' && 
+      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+    if (isLocalhost) {
+      setUser({
+        email: 'local@example.com',
+        name: 'Local User',
+        picture: ''
+      });
+      setCheckingAuth(false);
+      return;
+    }
+
     const checkCurrentSession = async () => {
       const token = localStorage.getItem('auth_token');
       if (!token) {
