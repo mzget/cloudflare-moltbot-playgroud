@@ -3,6 +3,7 @@ import { Box, Typography, Sheet } from '@mui/joy';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { glassStyle } from '../../../styles/glass';
 import '../../../styles/yahooPortfolio.css';
+import { useSettingsStore } from '../../../store/settingsStore';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -96,6 +97,10 @@ export default function HoldingsTable({
   onSort,
   density,
 }: HoldingsTableProps) {
+  const showMoneyValues = useSettingsStore(state => state.showMoneyValues);
+  const displayNum = (v: number | null, decimals = 2) => showMoneyValues ? fmtNum(v, decimals) : '•••••';
+  const displayPct = (v: number | null) => fmtPct(v);
+
   const sortArrow = (col: string) => {
     if (sortBy !== col) return null;
     return <span className="sort-arrow">{sortDir === 'asc' ? '▲' : '▼'}</span>;
@@ -194,40 +199,40 @@ export default function HoldingsTable({
                   </td>
 
                   {/* Shares */}
-                  <td style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{fmtNum(h.shares, 0)}</td>
+                  <td style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{displayNum(h.shares, 0)}</td>
 
                   {/* Last Price */}
-                  <td style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{fmtNum(h.last_price)}</td>
+                  <td style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{displayNum(h.last_price)}</td>
 
                   {/* AC/Share */}
-                  <td style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{fmtNum(h.avg_cost)}</td>
+                  <td style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{displayNum(h.avg_cost)}</td>
 
                   {/* Total Cost */}
-                  <td style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{fmtNum(h.total_cost)}</td>
+                  <td style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{displayNum(h.total_cost)}</td>
 
                   {/* Market Value */}
-                  <td style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{fmtNum(h.market_value)}</td>
+                  <td style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{displayNum(h.market_value)}</td>
 
                   {/* Tot Div Income */}
-                  <td style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{fmtNum(h.tot_div_income)}</td>
+                  <td style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{displayNum(h.tot_div_income)}</td>
 
                   {/* Day Gain % */}
-                  <td className={gainClass(h.day_gain_pct)} style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{fmtPct(h.day_gain_pct)}</td>
+                  <td className={gainClass(h.day_gain_pct)} style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{displayPct(h.day_gain_pct)}</td>
 
                   {/* Day Gain $ */}
-                  <td className={gainClass(h.day_gain_amt)} style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{fmtNum(h.day_gain_amt)}</td>
+                  <td className={gainClass(h.day_gain_amt)} style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{displayNum(h.day_gain_amt)}</td>
 
                   {/* Tot Gain % */}
-                  <td className={gainClass(h.tot_gain_pct)} style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{fmtPct(h.tot_gain_pct)}</td>
+                  <td className={gainClass(h.tot_gain_pct)} style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{displayPct(h.tot_gain_pct)}</td>
 
                   {/* Tot Gain $ */}
-                  <td className={gainClass(h.tot_gain_amt)} style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{fmtNum(h.tot_gain_amt)}</td>
+                  <td className={gainClass(h.tot_gain_amt)} style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{displayNum(h.tot_gain_amt)}</td>
 
                   {/* Realized % */}
-                  <td className={gainClass(h.realized_gain_pct)} style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{fmtPct(h.realized_gain_pct)}</td>
+                  <td className={gainClass(h.realized_gain_pct)} style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{displayPct(h.realized_gain_pct)}</td>
 
                   {/* Realized $ */}
-                  <td className={gainClass(h.realized_gain_amt)} style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{fmtNum(h.realized_gain_amt)}</td>
+                  <td className={gainClass(h.realized_gain_amt)} style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{displayNum(h.realized_gain_amt)}</td>
                 </tr>
 
                 {/* Expanded sub-section */}

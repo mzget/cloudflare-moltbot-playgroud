@@ -4,6 +4,7 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useHoldingDetails } from '../portfolio/hooks/useHoldingDetails';
 import type { Lot, Transaction, Dividend } from '../portfolio/hooks/useHoldingDetails';
 import '../../../styles/yahooPortfolio.css';
+import { useSettingsStore } from '../../../store/settingsStore';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -43,6 +44,10 @@ function gainClass(v: number | null | undefined): string {
 
 export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }: ExpandedRowProps) {
   const [activeTab, setActiveTab] = React.useState<SubTab>('lots');
+  const showMoneyValues = useSettingsStore(state => state.showMoneyValues);
+
+  const displayNum = (v: number | null | undefined, decimals = 2) => showMoneyValues ? fmtNum(v, decimals) : '•••••';
+  const displayPct = (v: number | null | undefined) => fmtPct(v);
 
   const {
     lots,
@@ -184,16 +189,16 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
           {lots.map((lot, i) => (
             <tr key={lot.id ?? i}>
               <td className="left">{lot.date}</td>
-              <td>{fmtNum(lot.shares, 0)}</td>
-              <td>{fmtNum(lot.cost_per_share)}</td>
-              <td>{fmtNum(lot.total_cost)}</td>
-              <td>{fmtNum(lot.market_value)}</td>
-              <td className={gainClass(lot.day_gain_pct)}>{fmtPct(lot.day_gain_pct)}</td>
-              <td className={gainClass(lot.day_gain_amt)}>{fmtNum(lot.day_gain_amt)}</td>
-              <td className={gainClass(lot.tot_gain_pct)}>{fmtPct(lot.tot_gain_pct)}</td>
-              <td className={gainClass(lot.tot_gain_amt)}>{fmtNum(lot.tot_gain_amt)}</td>
-              <td>{fmtNum(lot.low_limit)}</td>
-              <td>{fmtNum(lot.high_limit)}</td>
+              <td>{displayNum(lot.shares, 0)}</td>
+              <td>{displayNum(lot.cost_per_share)}</td>
+              <td>{displayNum(lot.total_cost)}</td>
+              <td>{displayNum(lot.market_value)}</td>
+              <td className={gainClass(lot.day_gain_pct)}>{displayPct(lot.day_gain_pct)}</td>
+              <td className={gainClass(lot.day_gain_amt)}>{displayNum(lot.day_gain_amt)}</td>
+              <td className={gainClass(lot.tot_gain_pct)}>{displayPct(lot.tot_gain_pct)}</td>
+              <td className={gainClass(lot.tot_gain_amt)}>{displayNum(lot.tot_gain_amt)}</td>
+              <td>{displayNum(lot.low_limit)}</td>
+              <td>{displayNum(lot.high_limit)}</td>
               <td className="left">{lot.note || '--'}</td>
               <td>
                 <button
@@ -295,12 +300,12 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
             <tr key={txn.id ?? i}>
               <td className="left">{txn.date}</td>
               <td className="left">{txn.type}</td>
-              <td>{fmtNum(txn.shares, 0)}</td>
-              <td>{fmtNum(txn.cost_per_share)}</td>
-              <td>{fmtNum(txn.commission)}</td>
-              <td>{fmtNum(txn.total_cost)}</td>
-              <td className={gainClass(txn.realized_gain_pct)}>{fmtPct(txn.realized_gain_pct)}</td>
-              <td className={gainClass(txn.realized_gain_amt)}>{fmtNum(txn.realized_gain_amt)}</td>
+              <td>{displayNum(txn.shares, 0)}</td>
+              <td>{displayNum(txn.cost_per_share)}</td>
+              <td>{displayNum(txn.commission)}</td>
+              <td>{displayNum(txn.total_cost)}</td>
+              <td className={gainClass(txn.realized_gain_pct)}>{displayPct(txn.realized_gain_pct)}</td>
+              <td className={gainClass(txn.realized_gain_amt)}>{displayNum(txn.realized_gain_amt)}</td>
               <td className="left">{txn.note || '--'}</td>
               <td>
                 <button
@@ -397,8 +402,8 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
           {dividends.map((div, i) => (
             <tr key={div.id ?? i}>
               <td className="left">{div.date}</td>
-              <td>{fmtNum(div.amount)}</td>
-              <td>{fmtNum(div.per_share)}</td>
+              <td>{displayNum(div.amount)}</td>
+              <td>{displayNum(div.per_share)}</td>
               <td className="left">{div.note || '--'}</td>
               <td>
                 <button

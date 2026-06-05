@@ -1,10 +1,11 @@
 import React from 'react';
-import { Box, Typography, Sheet, Chip, Divider, Stack } from '@mui/joy';
-import { TrendingUp } from 'lucide-react';
+import { Box, Typography, Sheet, Chip, Divider, Stack, IconButton } from '@mui/joy';
+import { TrendingUp, Eye, EyeOff } from 'lucide-react';
 import { glassStyle } from '../../../styles/glass';
 import { formatCurrency, formatPct } from './YahooPortfolio';
 import type { PortfolioSummary } from './YahooPortfolio';
 import PortfolioChart from './PortfolioChart';
+import { useSettingsStore } from '../../../store/settingsStore';
 
 interface SummaryTabProps {
   summary: PortfolioSummary;
@@ -13,15 +14,29 @@ interface SummaryTabProps {
 }
 
 export default function SummaryTab({ summary, holdingsCount, openPositionsCount }: SummaryTabProps) {
+  const showMoneyValues = useSettingsStore(state => state.showMoneyValues);
+  const setShowMoneyValues = useSettingsStore(state => state.setShowMoneyValues);
+
   return (
     <Box className="tab-pane-active">
       <Sheet sx={{ ...glassStyle, p: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 3 }}>
           <Box sx={{ minWidth: 260 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, mb: 0.5 }}>
-              <Typography level="h2" sx={{ fontWeight: 800, fontSize: '2rem', letterSpacing: '-0.02em' }}>
-                {formatCurrency(summary.total_market_value, false)}
-              </Typography>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Typography level="h2" sx={{ fontWeight: 800, fontSize: '2rem', letterSpacing: '-0.02em' }}>
+                  {showMoneyValues ? formatCurrency(summary.total_market_value, false) : '•••••'}
+                </Typography>
+                <IconButton
+                  size="sm"
+                  variant="plain"
+                  color="neutral"
+                  onClick={() => setShowMoneyValues(!showMoneyValues)}
+                  sx={{ borderRadius: '50%' }}
+                >
+                  {showMoneyValues ? <EyeOff size={16} /> : <Eye size={16} />}
+                </IconButton>
+              </Stack>
               <Chip
                 variant="soft"
                 color="success"
@@ -41,7 +56,7 @@ export default function SummaryTab({ summary, holdingsCount, openPositionsCount 
               <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 4 }}>
                 <Typography level="body-sm" sx={{ opacity: 0.7 }}>Total Cost</Typography>
                 <Typography level="body-sm" sx={{ fontWeight: 700 }}>
-                  {formatCurrency(summary.total_cost, false)}
+                  {showMoneyValues ? formatCurrency(summary.total_cost, false) : '•••••'}
                 </Typography>
               </Box>
               {[
@@ -51,14 +66,14 @@ export default function SummaryTab({ summary, holdingsCount, openPositionsCount 
                 <Box key={item.label} sx={{ display: 'flex', justifyContent: 'space-between', gap: 4 }}>
                   <Typography level="body-sm" sx={{ opacity: 0.7 }}>{item.label}</Typography>
                   <Typography level="body-sm" sx={{ fontWeight: 700 }} className={item.val >= 0 ? 'yf-positive' : 'yf-negative'}>
-                    {formatCurrency(item.val)} ({formatPct(item.pct)})
+                    {showMoneyValues ? formatCurrency(item.val) : '•••••'} ({formatPct(item.pct)})
                   </Typography>
                 </Box>
               ))}
               <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 4 }}>
                 <Typography level="body-sm" sx={{ opacity: 0.7 }}>Realized G/L</Typography>
                 <Typography level="body-sm" sx={{ fontWeight: 700 }} className={summary.realized_gain_amt >= 0 ? 'yf-positive' : 'yf-negative'}>
-                  {formatCurrency(summary.realized_gain_amt)}
+                  {showMoneyValues ? formatCurrency(summary.realized_gain_amt) : '•••••'}
                 </Typography>
               </Box>
             </Stack>

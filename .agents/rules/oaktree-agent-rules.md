@@ -28,13 +28,18 @@ For all tasks, code changes, and analysis in this repository, you **MUST** load 
    - **Description**: Core UI/UX engineering skill for building highly interactive, spatial, weightless, and glassmorphism-based web interfaces.
    - **Key Requirement**: Apply weightlessness (layered soft drop-shadows), spatial depth, glassmorphism (translucency, background blur), and smooth motion design. Adapt these principles to the project's stack constraints (do not use Tailwind or Next.js).
 
+4. **Hono Web Framework**:
+   - **File Path**: [SKILL.md](file:///c:/Users/natta/Documents/oaktree-agent/.agents/skills/@hono/SKILL.md)
+   - **Description**: Build ultra-fast web APIs and full-stack apps with Hono — runs on Cloudflare Workers, Deno, Bun, Node.js, and any WinterCG-compatible runtime.
+   - **Key Requirement**: Use Hono's routing, middleware, Zod validation middleware (`zValidator`), and RPC client (`hc`) for building clean, type-safe API endpoints on Cloudflare Workers.
+
 ---
 
 ## Guidelines for execution
 
 ### 1. Verification of Skills
-- Read the instructions in all three skill files above before proposing any changes or modifications to the code.
-- Align code designs with Cloudflare Wrangler specifications, the simplified architecture guidelines from Andrej Karpathy, and the Antigravity design principles.
+- Read the instructions in all four skill files above before proposing any changes or modifications to the code.
+- Align code designs with Cloudflare Wrangler specifications, the simplified architecture guidelines from Andrej Karpathy, the Antigravity design principles, and Hono framework best practices.
 
 ### 2. Stack Constraints (Precedence Rule)
 - **Backend**: Cloudflare Worker running in Node.js compatibility mode.

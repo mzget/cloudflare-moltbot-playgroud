@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Box, Typography, Stack, Button, ButtonGroup, CircularProgress } from '@mui/joy';
 import { API_BASE_URL } from '../../../config';
+import { useSettingsStore } from '../../../store/settingsStore';
 
 interface HistoryPoint {
   date: string;
@@ -17,6 +18,7 @@ const formatCurrency = (val: number | null | undefined): string => {
 };
 
 export default function PortfolioChart() {
+  const showMoneyValues = useSettingsStore(state => state.showMoneyValues);
   const [history, setHistory] = useState<HistoryPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [timeframe, setTimeframe] = useState<7 | 30 | 90>(30);
@@ -169,21 +171,24 @@ export default function PortfolioChart() {
           </Typography>
           <Stack direction="row" alignItems="baseline" spacing={1.5} sx={{ mt: 0.5 }}>
             <Typography level="h3" sx={{ fontWeight: 800, fontSize: '1.5rem', lineHeight: 1 }}>
-              {formatCurrency(activeDisplay?.total_market_value)}
+              {showMoneyValues ? formatCurrency(activeDisplay?.total_market_value) : '$•••••'}
             </Typography>
             {gainLossInfo && (
               <Typography level="body-sm" sx={{ fontWeight: 700 }} className={gainLossInfo.isPositive ? 'yf-positive' : 'yf-negative'}>
-                {gainLossInfo.isPositive ? '+' : ''}{formatCurrency(gainLossInfo.diff)} ({gainLossInfo.isPositive ? '+' : ''}{gainLossInfo.pct.toFixed(2)}%)
+                {showMoneyValues 
+                  ? `${gainLossInfo.isPositive ? '+' : ''}${formatCurrency(gainLossInfo.diff)}`
+                  : '•••••'
+                } ({gainLossInfo.isPositive ? '+' : ''}{gainLossInfo.pct.toFixed(2)}%)
               </Typography>
             )}
           </Stack>
           <Stack direction="row" spacing={2} sx={{ mt: 0.5 }}>
             <Typography level="body-xs" sx={{ opacity: 0.6 }}>
-              Cost Basis: <Box component="span" sx={{ fontWeight: 600 }}>{formatCurrency(activeDisplay?.total_cost)}</Box>
+              Cost Basis: <Box component="span" sx={{ fontWeight: 600 }}>{showMoneyValues ? formatCurrency(activeDisplay?.total_cost) : '$•••••'}</Box>
             </Typography>
             {activeDisplay && activeDisplay.total_dividends > 0 && (
               <Typography level="body-xs" sx={{ opacity: 0.6 }}>
-                Dividends: <Box component="span" sx={{ fontWeight: 600 }} className="yf-positive">{formatCurrency(activeDisplay.total_dividends)}</Box>
+                Dividends: <Box component="span" sx={{ fontWeight: 600 }} className="yf-positive">{showMoneyValues ? formatCurrency(activeDisplay.total_dividends) : '$•••••'}</Box>
               </Typography>
             )}
           </Stack>

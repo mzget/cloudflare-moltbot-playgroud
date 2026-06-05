@@ -6,6 +6,8 @@ export type DensityMode = 'compact' | 'cozy' | 'comfort';
 interface SettingsState {
   density: DensityMode;
   setDensity: (density: DensityMode) => void;
+  showMoneyValues: boolean;
+  setShowMoneyValues: (show: boolean) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -21,6 +23,8 @@ export const useSettingsStore = create<SettingsState>()(
         return 'cozy';
       })(),
       setDensity: (density) => set({ density }),
+      showMoneyValues: true,
+      setShowMoneyValues: (show) => set({ showMoneyValues: show }),
     }),
     {
       name: 'table_density_storage', // Key name in localStorage
