@@ -264,17 +264,6 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
         </tbody>
       </table>
 
-      <Box sx={{ mt: 1 }}>
-        <Button
-          size="sm"
-          variant="plain"
-          color="primary"
-          startDecorator={<Plus size={14} />}
-          onClick={() => setShowForms(prev => ({ ...prev, lot: !prev.lot }))}
-        >
-          {showForms.lot ? 'Cancel' : 'Add Lot'}
-        </Button>
-      </Box>
     </>
   );
 
@@ -372,17 +361,6 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
         </tbody>
       </table>
 
-      <Box sx={{ mt: 1 }}>
-        <Button
-          size="sm"
-          variant="plain"
-          color="primary"
-          startDecorator={<Plus size={14} />}
-          onClick={() => setShowForms(prev => ({ ...prev, txn: !prev.txn }))}
-        >
-          {showForms.txn ? 'Cancel' : 'Add Transaction'}
-        </Button>
-      </Box>
     </>
   );
 
@@ -457,17 +435,6 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
         </tbody>
       </table>
 
-      <Box sx={{ mt: 1 }}>
-        <Button
-          size="sm"
-          variant="plain"
-          color="primary"
-          startDecorator={<Plus size={14} />}
-          onClick={() => setShowForms(prev => ({ ...prev, div: !prev.div }))}
-        >
-          {showForms.div ? 'Cancel' : 'Add Dividend'}
-        </Button>
-      </Box>
     </>
   );
 
@@ -496,6 +463,42 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
             {tab === 'lots' ? 'Share Lots' : tab === 'transactions' ? 'Transactions' : 'Dividends'}
           </button>
         ))}
+
+        <Box sx={{ marginLeft: 'auto', alignSelf: 'center', mb: 0.5 }}>
+          {activeTab === 'lots' && (
+            <Button
+              size="sm"
+              variant="plain"
+              color="primary"
+              startDecorator={<Plus size={14} />}
+              onClick={() => setShowForms(prev => ({ ...prev, lot: !prev.lot }))}
+            >
+              {showForms.lot ? 'Cancel' : 'Add Lot'}
+            </Button>
+          )}
+          {activeTab === 'transactions' && (
+            <Button
+              size="sm"
+              variant="plain"
+              color="primary"
+              startDecorator={<Plus size={14} />}
+              onClick={() => setShowForms(prev => ({ ...prev, txn: !prev.txn }))}
+            >
+              {showForms.txn ? 'Cancel' : 'Add Transaction'}
+            </Button>
+          )}
+          {activeTab === 'dividends' && (
+            <Button
+              size="sm"
+              variant="plain"
+              color="primary"
+              startDecorator={<Plus size={14} />}
+              onClick={() => setShowForms(prev => ({ ...prev, div: !prev.div }))}
+            >
+              {showForms.div ? 'Cancel' : 'Add Dividend'}
+            </Button>
+          )}
+        </Box>
       </div>
 
       {/* Tab content */}
