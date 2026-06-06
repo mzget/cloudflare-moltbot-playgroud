@@ -144,13 +144,13 @@ export default function AssetAllocationChart({
   }, [chartData, totalValue]);
 
   // SVG parameters
-  const size = 280;
+  const size = 320;
   const cx = size / 2;
   const cy = size / 2;
-  const rOuterDefault = 120;
-  const rInnerDefault = 88;
-  const rOuterHover = 125;
-  const rInnerHover = 84;
+  const rOuterDefault = 135;
+  const rInnerDefault = 100;
+  const rOuterHover = 140;
+  const rInnerHover = 95;
 
   // Active slice for center text display
   const activeSlice = hoveredIndex !== null ? slices[hoveredIndex] : null;
@@ -202,7 +202,7 @@ export default function AssetAllocationChart({
           flexDirection: { xs: 'column', sm: 'row' },
           alignItems: 'center',
           justifyContent: 'center',
-          gap: { xs: 3, sm: 4 },
+          gap: { xs: 2, sm: 3 },
           flexGrow: 1,
         }}
       >
@@ -312,7 +312,7 @@ export default function AssetAllocationChart({
         </Box>
 
         {/* Legend Panel */}
-        <Stack spacing={0.5} sx={{ flexGrow: 1, width: '100%', maxWidth: { sm: '48%', md: '45%' }, maxHeight: 240, overflowY: 'auto', pr: 0.5 }}>
+        <Stack spacing={0.5} sx={{ flexGrow: 1, width: '100%', maxWidth: { sm: '38%', md: '33%' }, maxHeight: 280, overflowY: 'auto', pr: 0.5 }}>
           {slices.map((slice, index) => {
             const isHovered = hoveredIndex === index;
             return (

@@ -272,7 +272,7 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
     <Box className="tab-pane-active" sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
 
       {/* Top Metrics Cards (THB) */}
-      <Grid container spacing={3}>
+      <Grid container spacing={2}>
         {/* Stocks Only Card */}
         <Grid xs={12} md={4}>
           <Sheet sx={{ ...glassStyle, p: 3, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
@@ -332,7 +332,7 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
         </Grid>
 
         {/* All Assets Card */}
-        <Grid xs={12} md={4}>
+        <Grid xs={12} md={5}>
           <Sheet sx={{ ...glassStyle, p: 3, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 3 }}>
               <Box sx={{ width: '100%' }}>
@@ -399,7 +399,7 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
         </Grid>
 
         {/* Static Settings (Exchange Rate) Card */}
-        <Grid xs={12} md={4}>
+        <Grid xs={12} md={3}>
           <Sheet sx={{ ...glassStyle, p: 3, display: 'flex', flexDirection: 'column', gap: 2, height: '100%' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
               <Settings size={20} color="#10b981" />
@@ -434,7 +434,7 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
       </Grid>
 
       {/* Portfolio Performance & Asset Allocation Grid */}
-      <Grid container spacing={3}>
+      <Grid container spacing={2}>
         {/* Daily TWR Performance vs S&P 500 (holdings stock) */}
         <Grid xs={12} md={6}>
           <Sheet sx={{ ...glassStyle, p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -595,7 +595,7 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
               </tr>
             </thead>
             <tbody>
-              {brokers.map(broker => (
+              {brokers.filter(b => b.broker_name !== 'Cash').map(broker => (
                 <tr key={broker.broker_name}>
                   <td style={{ fontWeight: 700 }}>{broker.broker_name}</td>
                   <td style={{ textAlign: 'right' }}>
