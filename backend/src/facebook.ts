@@ -1,4 +1,4 @@
-﻿import { Env } from './index';
+import { Env } from './index';
 
 interface FacebookPostRow {
 	id: number;
@@ -178,8 +178,8 @@ TONE & STYLE RULES:
 - Write in the style of a Howard Marks Memo (thoughtful, focus on cycles, risk awareness, and market psychology, cautious yet clear).
 - Keep it highly professional yet readable and engaging for a social media audience.
 - Use clear spacing, bold headings (without markdown if possible, or use standard emojis for headings), and clean bullet points.
-- Use subtle, professional emojis (e.g. ðŸ“Š, ðŸ”‘, ðŸ’¡, âš ï¸, ðŸ”, ðŸ“) to separate sections and highlight key points.
-- End the post with relevant hashtags (e.g. #OaktreeAgent #à¸§à¸´à¹€à¸„à¸£à¸²à¸°à¸«à¹Œà¸à¸²à¸£à¸¥à¸‡à¸—à¸¸à¸™ #à¸ˆà¸´à¸•à¸§à¸´à¸—à¸¢à¸²à¸à¸²à¸£à¸¥à¸‡à¸—à¸¸à¸™) and any relevant stock symbol.
+- Use subtle, professional emojis (e.g. 📊, 🔑, 💡, ⚠️, 🔍, 📌) to separate sections and highlight key points.
+- End the post with relevant hashtags (e.g. #OaktreeAgent #วิเคราะห์การลงทุน #จิตวิทยาการลงทุน) and any relevant stock symbol.
 - CRITICAL HASHTAG RULE: Do NOT use or allow any hashtags that refer to investor names (e.g. do NOT use #HowardMarks, #Marks, #Howard, #Buffett, #Munger, etc.).
 - Output ONLY the final Thai Facebook post message content. Do not include any introductory meta text or markdown code block surrounds.
 `;
@@ -192,7 +192,7 @@ ${content}
 `;
 
 	try {
-		const response = await env.AI.run('@cf/google/gemma-3-12b-it', {
+		const response = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
 			messages: [
 				{ role: 'system', content: systemPrompt },
 				{ role: 'user', content: userPrompt }
@@ -205,7 +205,7 @@ ${content}
 	} catch (e) {
 		console.error('Workers AI formatting failed, trying fallback prompt style:', e);
 		// Simple fallback in case system prompt isn't supported by the model structure
-		const response = await env.AI.run('@cf/google/gemma-3-12b-it', {
+		const response = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
 			messages: [
 				{ role: 'user', content: `${systemPrompt}\n\nContent to format:\n${content}` }
 			],

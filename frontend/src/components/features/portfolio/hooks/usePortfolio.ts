@@ -3,11 +3,14 @@ import { API_BASE_URL } from '../../../../config';
 import type { Holding } from '../HoldingsTable';
 import type { PortfolioSummary } from '../YahooPortfolio';
 
+import { useSettingsStore } from '../../../../store/settingsStore';
+
 export function usePortfolio() {
   const [holdings, setHoldings] = useState<Holding[]>([]);
   const [summary, setSummary] = useState<PortfolioSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [watchlist, setWatchlist] = useState<any[]>([]);
+  const usdThbRate = useSettingsStore(state => state.usdThbRate);
 
   const fetchHoldings = useCallback(async () => {
     try {
@@ -18,10 +21,10 @@ export function usePortfolio() {
 
   const fetchSummary = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/portfolio/summary`);
+      const res = await fetch(`${API_BASE_URL}/api/portfolio/summary?rate=${usdThbRate}`);
       if (res.ok) setSummary(await res.json());
     } catch (e) { console.error('Failed to fetch summary:', e); }
-  }, []);
+  }, [usdThbRate]);
 
   const fetchWatchlist = useCallback(async () => {
     try {

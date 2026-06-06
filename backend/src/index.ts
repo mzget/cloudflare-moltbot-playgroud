@@ -800,7 +800,10 @@ app.get('/api/portfolio/holdings', async (c) => {
 
 // GET /api/portfolio/summary - Portfolio totals
 app.get('/api/portfolio/summary', async (c) => {
-  const { results } = await c.env.DB.prepare(`
+  const rate = parseFloat(c.req.query('rate') || '36.5');
+  
+  // 1. Fetch stocks
+  const { results: stockResults } = await c.env.DB.prepare(`
     SELECT 
       h.symbol, h.shares, h.avg_cost, h.total_cost,
       m.price as last_price, m.previous_close,
@@ -813,21 +816,95 @@ app.get('/api/portfolio/summary', async (c) => {
     WHERE h.status != 'Closed'
   `).all();
 
-  let totalMarketValue = 0;
-  let totalCost = 0;
-  let totalDayChange = 0;
-  let totalDividends = 0;
+  let stockMarketValueUsd = 0;
+  let stockCostUsd = 0;
+  let stockDayChangeUsd = 0;
+  let stockDividendsUsd = 0;
 
-  for (const row of (results || []) as any[]) {
+  for (const row of (stockResults || []) as any[]) {
     const shares = row.shares || 0;
     const price = row.last_price || 0;
     const prevClose = row.previous_close || price;
     const cost = row.total_cost || 0;
     
-    totalMarketValue += shares * price;
-    totalCost += cost;
-    totalDayChange += shares * (price - prevClose);
-    totalDividends += row.tot_div_income || 0;
+    stockMarketValueUsd += shares * price;
+    stockCostUsd += cost;
+    stockDayChangeUsd += shares * (price - prevClose);
+    stockDividendsUsd += row.tot_div_income || 0;
+  }
+
+  // 2. Fetch fund allocations total
+  const { results: fundResults } = await c.env.DB.prepare(`
+    SELECT COALESCE(SUM(amount), 0) as total_funds FROM fund_allocations
+  `).all();
+  const totalFundsThb = (fundResults?.[0] as any)?.total_funds || 0;
+
+  // 3. Fetch manual broker overrides total cost & balance (excluding the main auto-calculated ones to avoid double counting)
+  const { results: manualResults } = await c.env.DB.prepare(`
+    SELECT 
+      COALESCE(SUM(cost_override), 0) as total_cost_override,
+      COALESCE(SUM(balance_override), 0) as total_balance_override
+    FROM manual_broker_balances
+    WHERE broker_name NOT IN ('Common Stock', 'Finnomena', 'Krungsri')
+  `).all();
+  const manualCostThb = (manualResults?.[0] as any)?.total_cost_override || 0;
+  const manualBalanceThb = (manualResults?.[0] as any)?.total_balance_override || 0;
+
+  // Fetch all overrides to adjust main broker calculations if overridden
+  const { results: allOverrides } = await c.env.DB.prepare(`
+    SELECT * FROM manual_broker_balances
+  `).all();
+  const overridesMap = new Map((allOverrides || []).map((row: any) => [row.broker_name, row]));
+
+  // Calculate final THB values
+  let totalMarketValueThb = (stockMarketValueUsd * rate) + totalFundsThb + manualBalanceThb;
+  let totalCostThb = (stockCostUsd * rate) + totalFundsThb + manualCostThb;
+  let totalDayChangeThb = stockDayChangeUsd * rate;
+  let totalDividendsThb = stockDividendsUsd * rate;
+
+  // Adjust for any overrides of the main brokers
+  const commonStockOverride = overridesMap.get('Common Stock') as any;
+  if (commonStockOverride) {
+    if (commonStockOverride.cost_override !== null && commonStockOverride.cost_override !== undefined) {
+      totalCostThb = totalCostThb - (stockCostUsd * rate) + commonStockOverride.cost_override;
+    }
+    if (commonStockOverride.balance_override !== null && commonStockOverride.balance_override !== undefined) {
+      totalMarketValueThb = totalMarketValueThb - (stockMarketValueUsd * rate) + commonStockOverride.balance_override;
+    }
+  }
+
+  const krungsriOverride = overridesMap.get('Krungsri') as any;
+  if (krungsriOverride) {
+    const { results: kFunds } = await c.env.DB.prepare(`
+      SELECT COALESCE(SUM(a.amount), 0) as amt 
+      FROM fund_allocations a 
+      JOIN portfolio_funds f ON a.fund_id = f.id 
+      WHERE f.broker_name = 'Krungsri'
+    `).all();
+    const kAmt = (kFunds?.[0] as any)?.amt || 0;
+    if (krungsriOverride.cost_override !== null && krungsriOverride.cost_override !== undefined) {
+      totalCostThb = totalCostThb - kAmt + krungsriOverride.cost_override;
+    }
+    if (krungsriOverride.balance_override !== null && krungsriOverride.balance_override !== undefined) {
+      totalMarketValueThb = totalMarketValueThb - kAmt + krungsriOverride.balance_override;
+    }
+  }
+
+  const finnomenaOverride = overridesMap.get('Finnomena') as any;
+  if (finnomenaOverride) {
+    const { results: fFunds } = await c.env.DB.prepare(`
+      SELECT COALESCE(SUM(a.amount), 0) as amt 
+      FROM fund_allocations a 
+      JOIN portfolio_funds f ON a.fund_id = f.id 
+      WHERE f.broker_name = 'Finnomena'
+    `).all();
+    const fAmt = (fFunds?.[0] as any)?.amt || 0;
+    if (finnomenaOverride.cost_override !== null && finnomenaOverride.cost_override !== undefined) {
+      totalCostThb = totalCostThb - fAmt + finnomenaOverride.cost_override;
+    }
+    if (finnomenaOverride.balance_override !== null && finnomenaOverride.balance_override !== undefined) {
+      totalMarketValueThb = totalMarketValueThb - fAmt + finnomenaOverride.balance_override;
+    }
   }
 
   // Get realized gains
@@ -835,26 +912,58 @@ app.get('/api/portfolio/summary', async (c) => {
     SELECT COALESCE(SUM(realized_gain_amt), 0) as total_realized
     FROM transactions WHERE type = 'Sell'
   `).all();
-  const totalRealized = (txResults?.[0] as any)?.total_realized || 0;
+  const totalRealizedUsd = (txResults?.[0] as any)?.total_realized || 0;
+  const totalRealizedThb = totalRealizedUsd * rate;
 
-  const unrealizedGain = totalMarketValue - totalCost;
-  const unrealizedGainPct = totalCost > 0 ? (unrealizedGain / totalCost) * 100 : 0;
-  const dayChangePct = (totalMarketValue - totalDayChange) > 0 
-    ? (totalDayChange / (totalMarketValue - totalDayChange)) * 100 : 0;
+  const unrealizedGainThb = totalMarketValueThb - totalCostThb;
+  const unrealizedGainPct = totalCostThb > 0 ? (unrealizedGainThb / totalCostThb) * 100 : 0;
+  const dayChangePct = (totalMarketValueThb - totalDayChangeThb) > 0 
+    ? (totalDayChangeThb / (totalMarketValueThb - totalDayChangeThb)) * 100 : 0;
+
+  // Calculate stock-only values (in USD)
+  let stockMarketValueUsdFinal = stockMarketValueUsd;
+  let stockCostUsdFinal = stockCostUsd;
+  const stockDayChangeUsdFinal = stockDayChangeUsd;
+  const stockDividendsUsdFinal = stockDividendsUsd;
+
+  if (commonStockOverride) {
+    if (commonStockOverride.cost_override !== null && commonStockOverride.cost_override !== undefined) {
+      stockCostUsdFinal = commonStockOverride.cost_override / rate;
+    }
+    if (commonStockOverride.balance_override !== null && commonStockOverride.balance_override !== undefined) {
+      stockMarketValueUsdFinal = commonStockOverride.balance_override / rate;
+    }
+  }
+
+  const stockUnrealizedGainUsd = stockMarketValueUsdFinal - stockCostUsdFinal;
+  const stockUnrealizedGainPct = stockCostUsdFinal > 0 ? (stockUnrealizedGainUsd / stockCostUsdFinal) * 100 : 0;
+  const stockDayChangePct = (stockMarketValueUsdFinal - stockDayChangeUsdFinal) > 0 
+    ? (stockDayChangeUsdFinal / (stockMarketValueUsdFinal - stockDayChangeUsdFinal)) * 100 : 0;
 
   // Record history snapshot in background
   c.executionCtx.waitUntil(recordDailyPortfolioHistory(c.env.DB));
 
   return c.json({
-    total_market_value: totalMarketValue,
-    total_cost: totalCost,
+    total_market_value: totalMarketValueThb,
+    total_cost: totalCostThb,
     cash: 0,
-    day_change_amt: totalDayChange,
+    day_change_amt: totalDayChangeThb,
     day_change_pct: dayChangePct,
-    unrealized_gain_amt: unrealizedGain,
+    unrealized_gain_amt: unrealizedGainThb,
     unrealized_gain_pct: unrealizedGainPct,
-    realized_gain_amt: totalRealized,
-    total_dividends: totalDividends,
+    realized_gain_amt: totalRealizedThb,
+    total_dividends: totalDividendsThb,
+    is_thb: true,
+    stocks: {
+      total_market_value: stockMarketValueUsdFinal,
+      total_cost: stockCostUsdFinal,
+      day_change_amt: stockDayChangeUsdFinal,
+      day_change_pct: stockDayChangePct,
+      unrealized_gain_amt: stockUnrealizedGainUsd,
+      unrealized_gain_pct: stockUnrealizedGainPct,
+      realized_gain_amt: totalRealizedUsd,
+      total_dividends: stockDividendsUsdFinal
+    }
   });
 });
 
@@ -1205,6 +1314,278 @@ app.post('/api/portfolio/dividends', async (c) => {
 app.delete('/api/portfolio/dividends/:id', async (c) => {
   const id = c.req.param('id');
   await c.env.DB.prepare('DELETE FROM dividends WHERE id = ?').bind(id).run();
+  return c.json({ success: true });
+});
+
+// GET /api/portfolio/history/yearly
+app.get('/api/portfolio/history/yearly', async (c) => {
+  const { results } = await c.env.DB.prepare(
+    'SELECT * FROM portfolio_history ORDER BY year ASC'
+  ).all();
+  return c.json(results || []);
+});
+
+// POST /api/portfolio/history/yearly
+app.post('/api/portfolio/history/yearly', async (c) => {
+  const body = await c.req.json();
+  const { year, capital, balance, total_gain_pct, remark } = body;
+  if (!year) return c.json({ error: 'Year is required' }, 400);
+  
+  await c.env.DB.prepare(`
+    INSERT INTO portfolio_history (year, capital, balance, total_gain_pct, remark)
+    VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT(year) DO UPDATE SET
+      capital = excluded.capital,
+      balance = excluded.balance,
+      total_gain_pct = excluded.total_gain_pct,
+      remark = excluded.remark
+  `).bind(year, capital || 0, balance || 0, total_gain_pct || 0, remark || '').run();
+  
+  return c.json({ success: true });
+});
+
+// DELETE /api/portfolio/history/yearly/:year
+app.delete('/api/portfolio/history/yearly/:year', async (c) => {
+  const year = c.req.param('year');
+  await c.env.DB.prepare('DELETE FROM portfolio_history WHERE year = ?').bind(year).run();
+  return c.json({ success: true });
+});
+
+// GET /api/portfolio/tax-savings
+app.get('/api/portfolio/tax-savings', async (c) => {
+  const { results } = await c.env.DB.prepare(
+    'SELECT * FROM tax_savings ORDER BY year ASC'
+  ).all();
+  return c.json(results || []);
+});
+
+// POST /api/portfolio/tax-savings
+app.post('/api/portfolio/tax-savings', async (c) => {
+  const body = await c.req.json();
+  const { year, ltf, rmf, ssf } = body;
+  if (!year) return c.json({ error: 'Year is required' }, 400);
+  
+  await c.env.DB.prepare(`
+    INSERT INTO tax_savings (year, ltf, rmf, ssf)
+    VALUES (?, ?, ?, ?)
+    ON CONFLICT(year) DO UPDATE SET
+      ltf = excluded.ltf,
+      rmf = excluded.rmf,
+      ssf = excluded.ssf
+  `).bind(year, ltf || 0, rmf || 0, ssf || 0).run();
+  
+  return c.json({ success: true });
+});
+
+// DELETE /api/portfolio/tax-savings/:year
+app.delete('/api/portfolio/tax-savings/:year', async (c) => {
+  const year = c.req.param('year');
+  await c.env.DB.prepare('DELETE FROM tax_savings WHERE year = ?').bind(year).run();
+  return c.json({ success: true });
+});
+
+// GET /api/portfolio/funds
+app.get('/api/portfolio/funds', async (c) => {
+  const { results } = await c.env.DB.prepare(
+    'SELECT * FROM portfolio_funds ORDER BY id ASC'
+  ).all();
+  return c.json(results || []);
+});
+
+// POST /api/portfolio/funds
+app.post('/api/portfolio/funds', async (c) => {
+  const body = await c.req.json();
+  const { id, name, broker_name } = body;
+  if (!name || !broker_name) return c.json({ error: 'name and broker_name are required' }, 400);
+  
+  if (id) {
+    await c.env.DB.prepare(`
+      UPDATE portfolio_funds SET name = ?, broker_name = ? WHERE id = ?
+    `).bind(name, broker_name, id).run();
+  } else {
+    await c.env.DB.prepare(`
+      INSERT INTO portfolio_funds (name, broker_name) VALUES (?, ?)
+    `).bind(name, broker_name).run();
+  }
+  return c.json({ success: true });
+});
+
+// DELETE /api/portfolio/funds/:id
+app.delete('/api/portfolio/funds/:id', async (c) => {
+  const id = c.req.param('id');
+  await c.env.DB.prepare('DELETE FROM portfolio_funds WHERE id = ?').bind(id).run();
+  return c.json({ success: true });
+});
+
+// GET /api/portfolio/categories
+app.get('/api/portfolio/categories', async (c) => {
+  const { results } = await c.env.DB.prepare(
+    'SELECT * FROM asset_categories ORDER BY id ASC'
+  ).all();
+  return c.json(results || []);
+});
+
+// POST /api/portfolio/categories
+app.post('/api/portfolio/categories', async (c) => {
+  const body = await c.req.json();
+  const { id, name, target_weight } = body;
+  if (!name) return c.json({ error: 'name is required' }, 400);
+  
+  if (id) {
+    await c.env.DB.prepare(`
+      UPDATE asset_categories SET name = ?, target_weight = ? WHERE id = ?
+    `).bind(name, target_weight || 0, id).run();
+  } else {
+    await c.env.DB.prepare(`
+      INSERT INTO asset_categories (name, target_weight) VALUES (?, ?)
+    `).bind(name, target_weight || 0).run();
+  }
+  return c.json({ success: true });
+});
+
+// DELETE /api/portfolio/categories/:id
+app.delete('/api/portfolio/categories/:id', async (c) => {
+  const id = c.req.param('id');
+  await c.env.DB.prepare('DELETE FROM asset_categories WHERE id = ?').bind(id).run();
+  return c.json({ success: true });
+});
+
+// GET /api/portfolio/fund-allocations
+app.get('/api/portfolio/fund-allocations', async (c) => {
+  const { results } = await c.env.DB.prepare(`
+    SELECT category_id, fund_id, amount FROM fund_allocations
+  `).all();
+  return c.json(results || []);
+});
+
+// POST /api/portfolio/fund-allocations
+app.post('/api/portfolio/fund-allocations', async (c) => {
+  const allocations = await c.req.json();
+  if (!Array.isArray(allocations)) return c.json({ error: 'Expected array of allocations' }, 400);
+  
+  // Clear existing allocations first or do insert or replace
+  const statements = allocations.map(a => 
+    c.env.DB.prepare('INSERT OR REPLACE INTO fund_allocations (category_id, fund_id, amount) VALUES (?, ?, ?)')
+      .bind(a.category_id, a.fund_id, a.amount)
+  );
+  await c.env.DB.batch(statements);
+  return c.json({ success: true });
+});
+
+// GET /api/portfolio/brokers
+app.get('/api/portfolio/brokers', async (c) => {
+  const rate = parseFloat(c.req.query('rate') || '36.5');
+  
+  // 1. Fetch auto-calculated stock balances per broker from holdings table
+  const { results: stockResults } = await c.env.DB.prepare(`
+    SELECT 
+      h.broker_name,
+      SUM(h.total_cost) as cost_usd,
+      SUM(h.shares * COALESCE(m.price, 0)) as balance_usd
+    FROM holdings h
+    LEFT JOIN market_stats m ON h.symbol = m.symbol
+    WHERE h.status != 'Closed'
+    GROUP BY h.broker_name
+  `).all();
+  
+  // 2. Fetch fund balances per broker
+  const { results: fundResults } = await c.env.DB.prepare(`
+    SELECT 
+      f.broker_name,
+      SUM(a.amount) as balance_thb
+    FROM fund_allocations a
+    JOIN portfolio_funds f ON a.fund_id = f.id
+    GROUP BY f.broker_name
+  `).all();
+  
+  // 3. Fetch manual overrides
+  const { results: overrideResults } = await c.env.DB.prepare(`
+    SELECT * FROM manual_broker_balances
+  `).all();
+  
+  const overrides = new Map((overrideResults || []).map((row: any) => [row.broker_name, row]));
+  
+  // 4. Combine all brokers
+  const brokersMap = new Map<string, { broker_name: string; cost: number; balance: number }>();
+  
+  // Process stocks (convert USD to THB)
+  for (const row of (stockResults || []) as any[]) {
+    const broker = row.broker_name || 'Common Stock';
+    const cost = (row.cost_usd || 0) * rate;
+    const balance = (row.balance_usd || 0) * rate;
+    brokersMap.set(broker, { broker_name: broker, cost, balance });
+  }
+  
+  // Process funds (balances are in THB; cost defaults to balance unless overridden)
+  for (const row of (fundResults || []) as any[]) {
+    const broker = row.broker_name;
+    const balance = row.balance_thb || 0;
+    const existing = brokersMap.get(broker);
+    if (existing) {
+      existing.balance += balance;
+      existing.cost += balance;
+    } else {
+      brokersMap.set(broker, { broker_name: broker, cost: balance, balance });
+    }
+  }
+  
+  // Apply overrides and ensure manual-only brokers are included
+  const allBrokerNames = new Set([
+    ...brokersMap.keys(),
+    ...overrides.keys()
+  ]);
+  
+  const output = Array.from(allBrokerNames).map(name => {
+    const calculated = brokersMap.get(name) || { broker_name: name, cost: 0, balance: 0 };
+    const override = overrides.get(name) as any;
+    
+    let finalCost = calculated.cost;
+    let finalBalance = calculated.balance;
+    
+    if (override) {
+      if (override.cost_override !== null && override.cost_override !== undefined) {
+        finalCost = override.cost_override;
+      }
+      if (override.balance_override !== null && override.balance_override !== undefined) {
+        finalBalance = override.balance_override;
+      }
+    }
+    
+    const gain_amt = finalBalance - finalCost;
+    const gain_pct = finalCost > 0 ? (gain_amt / finalCost) * 100 : 0;
+    
+    return {
+      broker_name: name,
+      cost: finalCost,
+      balance: finalBalance,
+      gain_amt,
+      gain_pct,
+      cost_override: override?.cost_override ?? null,
+      balance_override: override?.balance_override ?? null
+    };
+  });
+  
+  return c.json(output);
+});
+
+// POST /api/portfolio/brokers/override
+app.post('/api/portfolio/brokers/override', async (c) => {
+  const body = await c.req.json();
+  const { broker_name, cost_override, balance_override } = body;
+  if (!broker_name) return c.json({ error: 'broker_name is required' }, 400);
+  
+  await c.env.DB.prepare(`
+    INSERT INTO manual_broker_balances (broker_name, cost_override, balance_override)
+    VALUES (?, ?, ?)
+    ON CONFLICT(broker_name) DO UPDATE SET
+      cost_override = excluded.cost_override,
+      balance_override = excluded.balance_override
+  `).bind(
+    broker_name, 
+    (cost_override === undefined || cost_override === null || cost_override === '') ? null : parseFloat(cost_override), 
+    (balance_override === undefined || balance_override === null || balance_override === '') ? null : parseFloat(balance_override)
+  ).run();
+  
   return c.json({ success: true });
 });
 

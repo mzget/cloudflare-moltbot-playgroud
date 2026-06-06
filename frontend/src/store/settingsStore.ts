@@ -8,6 +8,8 @@ interface SettingsState {
   setDensity: (density: DensityMode) => void;
   showMoneyValues: boolean;
   setShowMoneyValues: (show: boolean) => void;
+  usdThbRate: number;
+  setUsdThbRate: (rate: number) => void;
 }
 
 export const useSettingsStore = create<SettingsState>()(
@@ -25,6 +27,8 @@ export const useSettingsStore = create<SettingsState>()(
       setDensity: (density) => set({ density }),
       showMoneyValues: true,
       setShowMoneyValues: (show) => set({ showMoneyValues: show }),
+      usdThbRate: 36.5,
+      setUsdThbRate: (rate) => set({ usdThbRate: rate }),
     }),
     {
       name: 'table_density_storage', // Key name in localStorage

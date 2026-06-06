@@ -19,12 +19,22 @@ export interface PortfolioSummary {
   unrealized_gain_pct: number;
   realized_gain_amt: number;
   total_dividends: number;
+  stocks?: {
+    total_market_value: number;
+    total_cost: number;
+    day_change_amt: number;
+    day_change_pct: number;
+    unrealized_gain_amt: number;
+    unrealized_gain_pct: number;
+    realized_gain_amt: number;
+    total_dividends: number;
+  };
 }
 
-export const formatCurrency = (val: number | null | undefined, showSign = true): string => {
+export const formatCurrency = (val: number | null | undefined, showSign = true, currencySymbol = '$'): string => {
   if (val === null || val === undefined) return '--';
   const sign = showSign ? (val >= 0 ? '+' : '') : '';
-  return `${sign}$${Math.abs(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `${sign}${currencySymbol}${Math.abs(val).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };
 
 export const formatPct = (val: number | null | undefined): string => {
@@ -275,6 +285,7 @@ export default function YahooPortfolio() {
           summary={summary}
           holdingsCount={holdings.length}
           openPositionsCount={holdings.filter(h => h.status === 'Open').length}
+          holdings={holdings}
         />
       )}
 

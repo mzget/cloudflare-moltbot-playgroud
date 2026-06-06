@@ -1,4 +1,4 @@
-﻿// backend/src/emailSummarizer.ts
+// backend/src/emailSummarizer.ts
 import { D1Database } from '@cloudflare/workers-types';
 import { Env } from './index';
 import {
@@ -183,8 +183,8 @@ RESPONSE INSTRUCTIONS:
 - DO NOT include any markdown code blocks, comments, or introductory text.
 - Ensure the JSON is strictly valid.
 - CRITICAL: Do NOT use double quotes (") inside any JSON string values (like 'summary' or 'key_takeaways'). Instead, use single quotes (') for any internal quotes or speech marks.
-  Example: "summary": "à¸à¸²à¸£à¸§à¸´à¹€à¸„à¸£à¸²à¸°à¸«à¹Œà¸ªà¹„à¸•à¸¥à¹Œ Howard Marks à¹€à¸à¸µà¹ˆà¸¢à¸§à¸à¸±à¸š 'à¸­à¸±à¸•à¸£à¸²à¸”à¸­à¸à¹€à¸šà¸µà¹‰à¸¢'..." (valid)
-  Example: "summary": "à¸à¸²à¸£à¸§à¸´à¹€à¸„à¸£à¸²à¸°à¸«à¹Œà¸ªà¹„à¸•à¸¥à¹Œ Howard Marks à¹€à¸à¸µà¹ˆà¸¢à¸§à¸à¸±à¸š \"à¸­à¸±à¸•à¸£à¸²à¸”à¸­à¸à¹€à¸šà¸µà¹‰à¸¢\"..." (INVALID)
+  Example: "summary": "การวิเคราะห์สไตล์ Howard Marks เกี่ยวกับ 'อัตราดอกเบี้ย'..." (valid)
+  Example: "summary": "การวิเคราะห์สไตล์ Howard Marks เกี่ยวกับ \"อัตราดอกเบี้ย\"..." (INVALID)
 
 JSON Schema:
 {

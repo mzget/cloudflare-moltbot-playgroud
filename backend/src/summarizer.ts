@@ -1,4 +1,4 @@
-﻿import { Env } from './index';
+import { Env } from './index';
 
 export async function generateDailySummary(env: Env, symbol: string) {
 	// Fetch news from the last 24h
@@ -28,8 +28,8 @@ export async function generateDailySummary(env: Env, symbol: string) {
 		4. DO NOT include any introductory text, preamble, or comments.
 		5. Ensure the JSON is valid (double quotes for keys/values).
 		6. CRITICAL: Do NOT use double quotes (") inside any JSON string values (like 'summary' or 'key_takeaways'). Instead, use single quotes (') for any internal quotes or speech marks.
-		   Example: "summary": "à¸£à¸²à¸¢à¸‡à¸²à¸™ 'à¸„à¸§à¸²à¸¡à¸•à¸¶à¸‡à¹€à¸„à¸£à¸µà¸¢à¸”' à¸—à¸²à¸‡à¸ à¸¹à¸¡à¸´à¸£à¸±à¸à¸¨à¸²à¸ªà¸•à¸£à¹Œ" (valid)
-		   Example: "summary": "à¸£à¸²à¸¢à¸‡à¸²à¸™ "à¸„à¸§à¸²à¸¡à¸•à¸¶à¸‡à¹€à¸„à¸£à¸µà¸¢à¸”" à¸—à¸²à¸‡à¸ à¸¹à¸¡à¸´à¸£à¸±à¸à¸¨à¸²à¸ªà¸•à¸£à¹Œ" (INVALID)
+		   Example: "summary": "รายงาน 'ความตึงเครียด' ทางภูมิรัฐศาสตร์" (valid)
+		   Example: "summary": "รายงาน "ความตึงเครียด" ทางภูมิรัฐศาสตร์" (INVALID)
 		
 		JSON Schema:
 		{
