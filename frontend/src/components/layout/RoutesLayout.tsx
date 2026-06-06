@@ -9,6 +9,7 @@ import SourceManager from '../features/sources/SourceManager';
 import Watchlist from '../features/watchlist/Watchlist';
 import YahooPortfolio from '../features/portfolio/YahooPortfolio';
 import KnowledgeChat from '../features/agent/KnowledgeChat';
+import DatabaseChat from '../features/agent/DatabaseChat';
 import IntelligenceFeed from '../features/market/IntelligenceFeed';
 import { glassStyle } from '../../styles/glass';
 import { API_BASE_URL } from '../../config';
@@ -282,6 +283,7 @@ export default function RoutesLayout() {
 
           {activeTab === 'watchlist' && <Watchlist />}
           {activeTab === 'agent' && <KnowledgeChat />}
+          {activeTab === 'db-agent' && <DatabaseChat />}
           {activeTab === 'sources' && <SourceManager />}
           {activeTab === 'about' && (
             <Sheet sx={{ ...glassStyle, p: 4 }}>

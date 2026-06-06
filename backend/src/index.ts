@@ -11,6 +11,7 @@ import { checkAuth, fetchGoogleUserProfile, isEmailAuthorized, signJwt, getUserL
 import { syncAndProcessFacebookPosts } from './facebook';
 import { recordDailyPortfolioHistory, getPortfolioHistory } from './portfolioHistory';
 import { sortTransactions } from './portfolioUtils';
+import { calculatePerformanceComparison } from './historicalPrices';
 
 
 import { Hono } from 'hono';
@@ -862,6 +863,17 @@ app.get('/api/portfolio/history', async (c) => {
   try {
     const history = await getPortfolioHistory(c.env.DB);
     return c.json(history);
+  } catch (e) {
+    return c.json({ error: (e as any).message }, 500);
+  }
+});
+
+// GET /api/portfolio/performance-comparison - Compare portfolio performance with S&P 500
+app.get('/api/portfolio/performance-comparison', async (c) => {
+  try {
+    const timeframe = c.req.query('timeframe') || '1y';
+    const result = await calculatePerformanceComparison(c.env.DB, timeframe);
+    return c.json(result);
   } catch (e) {
     return c.json({ error: (e as any).message }, 500);
   }

@@ -11,6 +11,10 @@ binding = "DB"
 database_name = "oaktree-db"
 database_id = "97634677-4bac-44d1-bd02-6c733328a137"
 
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "oaktree-assets"
+
 [durable_objects]
 bindings = [
   { name = "OAKTREE_MCP", class_name = "OaktreeMCP" }
@@ -24,3 +28,5 @@ new_sqlite_classes = ["OaktreeMCP"]
 # Override with: npx wrangler secret put NOTEBOOKLM_BRIDGE_URL
 [vars]
 NOTEBOOKLM_BRIDGE_URL = ""  # e.g. "https://xxxx.trycloudflare.com"
+ENABLE_DATABASE_AGENT = "false" # Set to "false" to temporarily disable the Database Agent
+

@@ -1,202 +1,202 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Box, Typography, Stack, Button, ButtonGroup, CircularProgress } from '@mui/joy';
 import { API_BASE_URL } from '../../../config';
-import { useSettingsStore } from '../../../store/settingsStore';
 
-interface HistoryPoint {
-  date: string;
-  total_market_value: number;
-  total_cost: number;
-  unrealized_gain: number;
-  realized_gain: number;
-  total_dividends: number;
+interface PerformanceData {
+  dates: string[];
+  portfolioReturns: number[];
+  sp500Returns: number[];
 }
 
-const formatCurrency = (val: number | null | undefined): string => {
-  if (val === null || val === undefined) return '--';
-  return `$${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const formatReturn = (val: number | null | undefined): string => {
+  if (val === null || val === undefined) return '--%';
+  const sign = val >= 0 ? '+' : '';
+  return `${sign}${val.toFixed(2)}%`;
 };
 
 export default function PortfolioChart() {
-  const showMoneyValues = useSettingsStore(state => state.showMoneyValues);
-  const [history, setHistory] = useState<HistoryPoint[]>([]);
+  const [data, setData] = useState<PerformanceData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [timeframe, setTimeframe] = useState<7 | 30 | 90>(30);
-  const [hoveredPoint, setHoveredPoint] = useState<HistoryPoint | null>(null);
+  const [timeframe, setTimeframe] = useState<'ytd' | '1y' | '3y' | '5y'>('1y');
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
   useEffect(() => {
-    async function fetchHistory() {
+    async function fetchPerformance() {
       try {
         setLoading(true);
-        const res = await fetch(`${API_BASE_URL}/api/portfolio/history`);
+        const res = await fetch(`${API_BASE_URL}/api/portfolio/performance-comparison?timeframe=${timeframe}`);
         if (res.ok) {
-          const data = await res.json();
-          setHistory(data);
+          const result = await res.json();
+          setData(result);
         }
       } catch (e) {
-        console.error('Failed to fetch portfolio history:', e);
+        console.error('Failed to fetch performance comparison:', e);
       } finally {
         setLoading(false);
       }
     }
-    fetchHistory();
-  }, []);
-
-  const filteredHistory = useMemo(() => {
-    if (history.length === 0) return [];
-    return history.slice(-timeframe);
-  }, [history, timeframe]);
+    fetchPerformance();
+  }, [timeframe]);
 
   // Chart dimensions
   const width = 500;
-  const height = 140;
-  const paddingX = 20;
-  const paddingY = 15;
+  const height = 180;
+  const paddingX = 25;
+  const paddingY = 20;
 
-  const chartData = useMemo(() => {
-    if (filteredHistory.length === 0) return null;
+  const { minVal, maxVal } = useMemo(() => {
+    if (!data || !data.dates || data.dates.length === 0) return { minVal: 0, maxVal: 0 };
+    const allReturns = [...data.portfolioReturns, ...data.sp500Returns];
+    let min = Math.min(...allReturns);
+    let max = Math.max(...allReturns);
 
-    // Get min/max for scaling
-    const vals = filteredHistory.flatMap(p => [p.total_market_value, p.total_cost]);
-    let minVal = Math.min(...vals);
-    let maxVal = Math.max(...vals);
-
-    const diff = maxVal - minVal;
+    const diff = max - min;
     if (diff === 0) {
-      minVal -= 10;
-      maxVal += 10;
+      min -= 5;
+      max += 5;
     } else {
-      minVal -= diff * 0.1; // 10% padding bottom
-      maxVal += diff * 0.1; // 10% padding top
+      min -= diff * 0.15; // 15% padding bottom
+      max += diff * 0.15; // 15% padding top
     }
+    return { minVal: min, maxVal: max };
+  }, [data]);
 
-    const points = filteredHistory.map((p, i) => {
-      const x = paddingX + (i / (filteredHistory.length - 1)) * (width - paddingX * 2);
-      const yVal = height - paddingY - ((p.total_market_value - minVal) / (maxVal - minVal)) * (height - paddingY * 2);
-      const yCost = height - paddingY - ((p.total_cost - minVal) / (maxVal - minVal)) * (height - paddingY * 2);
+  const points = useMemo(() => {
+    if (!data || !data.dates || data.dates.length === 0) return null;
+    return data.dates.map((date, i) => {
+      const x = paddingX + (i / (data.dates.length - 1)) * (width - paddingX * 2);
+      const yPort = height - paddingY - ((data.portfolioReturns[i] - minVal) / (maxVal - minVal)) * (height - paddingY * 2);
+      const ySp500 = height - paddingY - ((data.sp500Returns[i] - minVal) / (maxVal - minVal)) * (height - paddingY * 2);
       return {
         x,
-        yVal,
-        yCost,
-        raw: p,
+        yPort,
+        ySp500,
+        date,
+        portReturn: data.portfolioReturns[i],
+        sp500Return: data.sp500Returns[i],
       };
     });
+  }, [data, minVal, maxVal]);
 
-    // Build SVG paths
-    const valPath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.yVal}`).join(' ');
-    const costPath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.yCost}`).join(' ');
-    const areaPath = `${valPath} L ${points[points.length - 1].x} ${height - paddingY} L ${points[0].x} ${height - paddingY} Z`;
+  const chartPaths = useMemo(() => {
+    if (!points || points.length === 0) return null;
+
+    const portPath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.yPort}`).join(' ');
+    const sp500Path = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.ySp500}`).join(' ');
+    const portAreaPath = `${portPath} L ${points[points.length - 1].x} ${height - paddingY} L ${points[0].x} ${height - paddingY} Z`;
 
     return {
-      points,
-      valPath,
-      costPath,
-      areaPath,
+      portPath,
+      sp500Path,
+      portAreaPath,
     };
-  }, [filteredHistory]);
+  }, [points]);
 
   const handleMouseMove = (e: React.MouseEvent<SVGSVGElement, MouseEvent>) => {
-    if (!svgRef.current || !chartData || chartData.points.length === 0) return;
+    if (!svgRef.current || !data || !data.dates || data.dates.length === 0) return;
     const rect = svgRef.current.getBoundingClientRect();
     const mouseX = e.clientX - rect.left;
-    
+
     // Scale mouseX to fit internal SVG coordinate system width
     const svgWidth = rect.width;
     const scale = width / svgWidth;
     const internalX = mouseX * scale;
 
-    // Find closest point
-    let closestIndex = 0;
-    let minDistance = Infinity;
-    chartData.points.forEach((p, idx) => {
-      const dist = Math.abs(p.x - internalX);
-      if (dist < minDistance) {
-        minDistance = dist;
-        closestIndex = idx;
-      }
-    });
+    // Find closest index based on x position
+    const step = (width - paddingX * 2) / (data.dates.length - 1);
+    let closestIndex = Math.round((internalX - paddingX) / step);
+    closestIndex = Math.max(0, Math.min(data.dates.length - 1, closestIndex));
 
-    setHoveredPoint(chartData.points[closestIndex].raw);
+    setHoveredIndex(closestIndex);
   };
 
   const handleMouseLeave = () => {
-    setHoveredPoint(null);
+    setHoveredIndex(null);
   };
 
-  // Show active values: either hovered point, or the latest point
-  const activeDisplay = hoveredPoint || (filteredHistory.length > 0 ? filteredHistory[filteredHistory.length - 1] : null);
+  // Resolve active displays
+  const activeIndex = hoveredIndex !== null ? hoveredIndex : (data?.dates && data.dates.length > 0 ? data.dates.length - 1 : null);
+  const activeDate = activeIndex !== null && data ? data.dates[activeIndex] : null;
+  const activePort = activeIndex !== null && data ? data.portfolioReturns[activeIndex] : null;
+  const activeSp500 = activeIndex !== null && data ? data.sp500Returns[activeIndex] : null;
 
-  const gainLossInfo = useMemo(() => {
-    if (!activeDisplay) return null;
-    const diff = activeDisplay.total_market_value - activeDisplay.total_cost;
-    const pct = activeDisplay.total_cost > 0 ? (diff / activeDisplay.total_cost) * 100 : 0;
-    const isPositive = diff >= 0;
-    return {
-      diff,
-      pct,
-      isPositive,
-    };
-  }, [activeDisplay]);
+  const activePoints = points && activeIndex !== null ? points[activeIndex] : null;
 
-  if (loading) {
+  const diffReturn = activePort !== null && activeSp500 !== null ? activePort - activeSp500 : null;
+
+  if (loading && !data) {
     return (
-      <Box sx={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Box sx={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <CircularProgress size="sm" />
       </Box>
     );
   }
 
-  if (filteredHistory.length === 0) {
+  if (!data || !data.dates || data.dates.length === 0) {
     return (
-      <Box sx={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <Box sx={{ height: 220, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <Typography level="body-xs" sx={{ opacity: 0.5 }}>No performance data available</Typography>
       </Box>
     );
   }
 
-  // Active hover positions
-  const hoverPoints = chartData && activeDisplay ? (() => {
-    const idx = filteredHistory.findIndex(p => p.date === activeDisplay.date);
-    return idx >= 0 ? chartData.points[idx] : null;
-  })() : null;
-
   return (
     <Box sx={{ width: '100%' }}>
       {/* Chart Header Info */}
-      <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1.5 }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
         <Box>
           <Typography level="body-xs" sx={{ opacity: 0.5, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-            {hoveredPoint ? `Snapshot: ${hoveredPoint.date}` : `Portfolio Performance (${timeframe}D)`}
+            {hoveredIndex !== null ? `Snapshot: ${activeDate}` : `Performance vs S&P 500 (${timeframe.toUpperCase()})`}
           </Typography>
-          <Stack direction="row" alignItems="baseline" spacing={1.5} sx={{ mt: 0.5 }}>
-            <Typography level="h3" sx={{ fontWeight: 800, fontSize: '1.5rem', lineHeight: 1 }}>
-              {showMoneyValues ? formatCurrency(activeDisplay?.total_market_value) : '$•••••'}
-            </Typography>
-            {gainLossInfo && (
-              <Typography level="body-sm" sx={{ fontWeight: 700 }} className={gainLossInfo.isPositive ? 'yf-positive' : 'yf-negative'}>
-                {showMoneyValues 
-                  ? `${gainLossInfo.isPositive ? '+' : ''}${formatCurrency(gainLossInfo.diff)}`
-                  : '•••••'
-                } ({gainLossInfo.isPositive ? '+' : ''}{gainLossInfo.pct.toFixed(2)}%)
+          <Stack direction="row" alignItems="baseline" spacing={2} sx={{ mt: 0.5 }}>
+            <Box>
+              <Typography level="body-xs" sx={{ opacity: 0.6, fontWeight: 700 }}>PORTFOLIO</Typography>
+              <Typography
+                level="h4"
+                sx={{
+                  fontWeight: 800,
+                  color: activePort !== null && activePort >= 0 ? 'success.plainColor' : 'danger.plainColor',
+                  lineHeight: 1.1,
+                }}
+              >
+                {formatReturn(activePort)}
               </Typography>
-            )}
-          </Stack>
-          <Stack direction="row" spacing={2} sx={{ mt: 0.5 }}>
-            <Typography level="body-xs" sx={{ opacity: 0.6 }}>
-              Cost Basis: <Box component="span" sx={{ fontWeight: 600 }}>{showMoneyValues ? formatCurrency(activeDisplay?.total_cost) : '$•••••'}</Box>
-            </Typography>
-            {activeDisplay && activeDisplay.total_dividends > 0 && (
-              <Typography level="body-xs" sx={{ opacity: 0.6 }}>
-                Dividends: <Box component="span" sx={{ fontWeight: 600 }} className="yf-positive">{showMoneyValues ? formatCurrency(activeDisplay.total_dividends) : '$•••••'}</Box>
+            </Box>
+            <Box sx={{ borderLeft: '1px solid', borderColor: 'divider', pl: 2 }}>
+              <Typography level="body-xs" sx={{ opacity: 0.6, fontWeight: 700 }}>S&P 500</Typography>
+              <Typography
+                level="h4"
+                sx={{
+                  fontWeight: 800,
+                  color: activeSp500 !== null && activeSp500 >= 0 ? 'success.plainColor' : 'danger.plainColor',
+                  lineHeight: 1.1,
+                }}
+              >
+                {formatReturn(activeSp500)}
               </Typography>
+            </Box>
+            {diffReturn !== null && (
+              <Box sx={{ borderLeft: '1px solid', borderColor: 'divider', pl: 2 }}>
+                <Typography level="body-xs" sx={{ opacity: 0.6, fontWeight: 700 }}>VS S&P 500</Typography>
+                <Typography
+                  level="h4"
+                  sx={{
+                    fontWeight: 800,
+                    color: diffReturn >= 0 ? 'success.plainColor' : 'danger.plainColor',
+                    lineHeight: 1.1,
+                  }}
+                >
+                  {diffReturn >= 0 ? `+${diffReturn.toFixed(2)}%` : `${diffReturn.toFixed(2)}%`}
+                </Typography>
+              </Box>
             )}
           </Stack>
         </Box>
 
         {/* Timeframe Buttons */}
         <ButtonGroup variant="outlined" size="sm" sx={{ borderRadius: '20px', overflow: 'hidden' }}>
-          {([7, 30, 90] as const).map(tf => (
+          {(['ytd', '1y', '3y', '5y'] as const).map(tf => (
             <Button
               key={tf}
               onClick={() => setTimeframe(tf)}
@@ -211,14 +211,14 @@ export default function PortfolioChart() {
                 '&:hover': { bgcolor: 'background.level1' },
               }}
             >
-              {tf}D
+              {tf.toUpperCase()}
             </Button>
           ))}
         </ButtonGroup>
       </Stack>
 
       {/* SVG Plot */}
-      {chartData && (
+      {chartPaths && (
         <Box sx={{ position: 'relative', width: '100%' }}>
           <svg
             ref={svgRef}
@@ -230,30 +230,44 @@ export default function PortfolioChart() {
             onMouseLeave={handleMouseLeave}
           >
             <defs>
-              <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="var(--joy-palette-primary-solidBg, #007aff)" stopOpacity="0.25" />
+              <linearGradient id="portGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="var(--joy-palette-primary-solidBg, #007aff)" stopOpacity="0.18" />
                 <stop offset="100%" stopColor="var(--joy-palette-primary-solidBg, #007aff)" stopOpacity="0.00" />
               </linearGradient>
             </defs>
 
-            {/* Grid Line (Cost Basis) */}
+            {/* Zero Return Line Reference */}
+            {minVal < 0 && maxVal > 0 && (
+              <line
+                x1={paddingX}
+                y1={height - paddingY - ((0 - minVal) / (maxVal - minVal)) * (height - paddingY * 2)}
+                x2={width - paddingX}
+                y2={height - paddingY - ((0 - minVal) / (maxVal - minVal)) * (height - paddingY * 2)}
+                stroke="var(--joy-palette-neutral-outlinedBorder, rgba(0, 0, 0, 0.1))"
+                strokeWidth="1"
+                strokeDasharray="2 4"
+              />
+            )}
+
+            {/* S&P 500 Reference Line */}
             <path
-              d={chartData.costPath}
+              d={chartPaths.sp500Path}
               fill="none"
-              stroke="var(--joy-palette-neutral-outlinedBorder, rgba(0, 0, 0, 0.15))"
+              stroke="var(--joy-palette-neutral-solidBg, #9ba6b2)"
               strokeWidth="1.5"
-              strokeDasharray="4 4"
+              strokeDasharray="4 3"
+              strokeOpacity="0.75"
             />
 
-            {/* Filled Area */}
+            {/* Portfolio Filled Area */}
             <path
-              d={chartData.areaPath}
-              fill="url(#chartGradient)"
+              d={chartPaths.portAreaPath}
+              fill="url(#portGradient)"
             />
 
-            {/* Value Line */}
+            {/* Portfolio Value Line */}
             <path
-              d={chartData.valPath}
+              d={chartPaths.portPath}
               fill="none"
               stroke="var(--joy-palette-primary-solidBg, #007aff)"
               strokeWidth="2.5"
@@ -262,34 +276,34 @@ export default function PortfolioChart() {
             />
 
             {/* Interactive Overlay & Guide line */}
-            {hoverPoints && (
+            {activePoints && hoveredIndex !== null && (
               <>
                 {/* Vertical Cursor Guide */}
                 <line
-                  x1={hoverPoints.x}
+                  x1={activePoints.x}
                   y1={paddingY}
-                  x2={hoverPoints.x}
+                  x2={activePoints.x}
                   y2={height - paddingY}
                   stroke="var(--joy-palette-primary-solidBg, #007aff)"
                   strokeWidth="1"
-                  strokeOpacity="0.3"
+                  strokeOpacity="0.25"
                   strokeDasharray="2 2"
                 />
 
-                {/* Dot for Cost */}
+                {/* Dot for S&P 500 */}
                 <circle
-                  cx={hoverPoints.x}
-                  cy={hoverPoints.yCost}
-                  r="3.5"
+                  cx={activePoints.x}
+                  cy={activePoints.ySp500}
+                  r="4"
                   fill="var(--joy-palette-background-surface, #fff)"
-                  stroke="var(--joy-palette-neutral-solidBg, #636b74)"
+                  stroke="var(--joy-palette-neutral-solidBg, #9ba6b2)"
                   strokeWidth="1.5"
                 />
 
-                {/* Dot for Market Value */}
+                {/* Dot for Portfolio Return */}
                 <circle
-                  cx={hoverPoints.x}
-                  cy={hoverPoints.yVal}
+                  cx={activePoints.x}
+                  cy={activePoints.yPort}
                   r="5"
                   fill="var(--joy-palette-primary-solidBg, #007aff)"
                   stroke="var(--joy-palette-background-surface, #fff)"
@@ -300,6 +314,18 @@ export default function PortfolioChart() {
           </svg>
         </Box>
       )}
+
+      {/* Legend */}
+      <Stack direction="row" spacing={2.5} justifyContent="center" sx={{ mt: 1.5 }}>
+        <Stack direction="row" alignItems="center" spacing={0.75}>
+          <Box sx={{ width: 12, height: 3, bgcolor: 'primary.solidBg', borderRadius: 2 }} />
+          <Typography level="body-xs" sx={{ fontWeight: 600, color: 'text.secondary' }}>Portfolio</Typography>
+        </Stack>
+        <Stack direction="row" alignItems="center" spacing={0.75}>
+          <Box sx={{ width: 12, height: 3, bgcolor: 'neutral.solidBg', borderRadius: 2, opacity: 0.7, borderStyle: 'dashed', borderWidth: '0 0 2px 0' }} />
+          <Typography level="body-xs" sx={{ fontWeight: 600, color: 'text.secondary' }}>S&P 500 Index</Typography>
+        </Stack>
+      </Stack>
     </Box>
   );
 }

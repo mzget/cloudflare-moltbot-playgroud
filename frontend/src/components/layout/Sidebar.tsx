@@ -1,6 +1,6 @@
 import React from 'react';
 import { List, ListItem, ListItemButton, ListItemContent, ListItemDecorator, Typography, Box, Chip } from '@mui/joy';
-import { BarChart3, TrendingUp, Search, Info, Bot, LayoutDashboard } from 'lucide-react';
+import { BarChart3, TrendingUp, Search, Info, Bot, LayoutDashboard, Database } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 interface SidebarProps {
@@ -18,6 +18,7 @@ export default function Sidebar({ activeTab, setActiveTab, reportsCount, collaps
     { id: 'watchlist', label: t('sidebar.watchlist'), icon: <TrendingUp size={20} /> },
     { id: 'sources', label: t('sidebar.news_sources'), icon: <Search size={20} /> },
     { id: 'agent', label: t('sidebar.agent_chat'), icon: <Bot size={20} /> },
+    { id: 'db-agent', label: t('sidebar.db_agent'), icon: <Database size={20} /> },
     { id: 'about', label: t('sidebar.about_oaktree'), icon: <Info size={20} /> },
   ];
 
