@@ -6,7 +6,7 @@ import {
 } from '@mui/joy';
 import {
   TrendingUp, Eye, EyeOff, Edit, Plus, Trash2, Save, Settings,
-  Coins, Landmark, Percent, RefreshCw, BarChart2
+  Coins, Landmark, Percent, RefreshCw, BarChart2, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { glassStyle } from '../../../styles/glass';
 import { formatCurrency, formatPct } from './YahooPortfolio';
@@ -51,6 +51,16 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
   const [allocations, setAllocations] = useState<any[]>([]);
   const [brokers, setBrokers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Expanded years state for yearly history table
+  const [expandedYears, setExpandedYears] = useState<Record<number, boolean>>({});
+
+  const toggleYearExpanded = (year: number) => {
+    setExpandedYears(prev => ({
+      ...prev,
+      [year]: !prev[year]
+    }));
+  };
 
   // Edit states
   const [rateInput, setRateInput] = useState(usdThbRate.toString());
@@ -117,14 +127,20 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
     }
   };
 
-  // Yearly History operations
   const handleSaveYearly = async () => {
     if (!editingYear || !editingYear.year) return;
     try {
+      const cap = parseFloat(editingYear.capital) || 0;
+      const bal = parseFloat(editingYear.balance) || 0;
+      const gainPct = cap > 0 ? (bal - cap) / cap : 0;
+
       const res = await fetch(`${API_BASE_URL}/api/portfolio/history/yearly`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editingYear)
+        body: JSON.stringify({
+          ...editingYear,
+          total_gain_pct: gainPct
+        })
       });
       if (res.ok) {
         setYearlyModalOpen(false);
@@ -575,7 +591,7 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
       <Sheet sx={{ ...glassStyle, p: 3 }}>
         <Box>
           <Typography level="title-lg" sx={{ fontWeight: 800, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Coins size={20} color="#10b981" /> Broker & Account Balances (THB)
+            <Coins size={20} color="#10b981" /> Broker & Platform (THB)
           </Typography>
           <Typography level="body-xs" sx={{ opacity: 0.6, mb: 2.5 }}>
             Consolidated balances by platform. Cost/Balances are auto-derived from stock prices and fund allocations, or overridden manually.
@@ -654,7 +670,7 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
       </Sheet>
 
       {/* Yearly History and Tax Savings Tabs Group */}
-      <Grid container spacing={3}>
+      <Grid container spacing={2}>
         {/* Yearly Performance History */}
         <Grid xs={12} md={6}>
           <Sheet sx={{ ...glassStyle, p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -680,6 +696,7 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
               <Table aria-label="yearly history table">
                 <thead>
                   <tr>
+                    <th style={{ width: 40 }}></th>
                     <th>Year</th>
                     <th style={{ textAlign: 'right' }}>Capital (฿)</th>
                     <th style={{ textAlign: 'right' }}>Balance (฿)</th>
@@ -688,38 +705,72 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
                   </tr>
                 </thead>
                 <tbody>
-                  {yearlyHistory.map(row => (
-                    <tr key={row.year}>
-                      <td style={{ fontWeight: 700 }}>{row.year}</td>
-                      <td style={{ textAlign: 'right' }}>{row.capital.toLocaleString('en-US')}</td>
-                      <td style={{ textAlign: 'right' }}>{row.balance.toLocaleString('en-US')}</td>
-                      <td style={{ textAlign: 'right', fontWeight: 700 }} className={row.total_gain_pct >= 0 ? 'yf-positive' : 'yf-negative'}>
-                        {(row.total_gain_pct * 100).toFixed(2)}%
-                      </td>
-                      <td>
-                        <Stack direction="row" spacing={0.5} justifyContent="flex-end">
-                          <IconButton size="sm" variant="plain" color="neutral" onClick={() => {
-                            setEditingYear({
-                              year: row.year,
-                              capital: row.capital.toString(),
-                              balance: row.balance.toString(),
-                              total_gain_pct: (row.total_gain_pct * 100).toString(),
-                              remark: row.remark
-                            });
-                            setYearlyModalOpen(true);
-                          }}>
-                            <Edit size={14} />
-                          </IconButton>
-                          <IconButton size="sm" variant="plain" color="danger" onClick={() => handleDeleteYearly(row.year)}>
-                            <Trash2 size={14} />
-                          </IconButton>
-                        </Stack>
-                      </td>
-                    </tr>
-                  ))}
+                  {yearlyHistory.map(row => {
+                    const isExpanded = !!expandedYears[row.year];
+                    const calculatedReturn = row.capital > 0 ? (row.balance - row.capital) / row.capital : 0;
+                    return (
+                      <React.Fragment key={row.year}>
+                        <tr 
+                          onClick={() => toggleYearExpanded(row.year)}
+                          style={{ cursor: 'pointer', backgroundColor: isExpanded ? 'rgba(16, 185, 129, 0.02)' : 'transparent' }}
+                        >
+                          <td>
+                            <IconButton 
+                              size="sm" 
+                              variant="plain" 
+                              color="neutral"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleYearExpanded(row.year);
+                              }}
+                            >
+                              {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                            </IconButton>
+                          </td>
+                          <td style={{ fontWeight: 700 }}>{row.year}</td>
+                          <td style={{ textAlign: 'right' }}>{row.capital.toLocaleString('en-US')}</td>
+                          <td style={{ textAlign: 'right' }}>{row.balance.toLocaleString('en-US')}</td>
+                          <td style={{ textAlign: 'right', fontWeight: 700 }} className={calculatedReturn >= 0 ? 'yf-positive' : 'yf-negative'}>
+                            {(calculatedReturn * 100).toFixed(2)}%
+                          </td>
+                          <td>
+                            <Stack direction="row" spacing={0.5} justifyContent="flex-end" onClick={(e) => e.stopPropagation()}>
+                              <IconButton size="sm" variant="plain" color="neutral" onClick={() => {
+                                setEditingYear({
+                                  year: row.year,
+                                  capital: row.capital.toString(),
+                                  balance: row.balance.toString(),
+                                  total_gain_pct: (calculatedReturn * 100).toString(),
+                                  remark: row.remark
+                                });
+                                setYearlyModalOpen(true);
+                              }}>
+                                <Edit size={14} />
+                              </IconButton>
+                              <IconButton size="sm" variant="plain" color="danger" onClick={() => handleDeleteYearly(row.year)}>
+                                <Trash2 size={14} />
+                              </IconButton>
+                            </Stack>
+                          </td>
+                        </tr>
+                        {isExpanded && (
+                          <tr style={{ backgroundColor: 'rgba(16, 185, 129, 0.01)' }}>
+                            <td colSpan={6} style={{ padding: '12px 16px', borderBottom: '1px solid var(--joy-palette-divider)' }}>
+                              <Typography level="body-xs" sx={{ fontWeight: 600, color: 'text.secondary', mb: 0.5 }}>
+                                Year {row.year} Remark
+                              </Typography>
+                              <Typography level="body-sm" sx={{ whiteSpace: 'pre-wrap' }}>
+                                {row.remark || 'No remarks recorded for this year.'}
+                              </Typography>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
                   {yearlyHistory.length === 0 && (
                     <tr>
-                      <td colSpan={5} style={{ textAlign: 'center', opacity: 0.5 }}>No yearly records found</td>
+                      <td colSpan={6} style={{ textAlign: 'center', opacity: 0.5 }}>No yearly records found</td>
                     </tr>
                   )}
                 </tbody>
@@ -881,11 +932,18 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
             <FormControl>
               <FormLabel>Return / Gain Percentage (%)</FormLabel>
               <Input
-                type="number"
-                placeholder="e.g. 15.17"
-                value={editingYear?.total_gain_pct || ''}
-                onChange={e => setEditingYear((prev: any) => ({ ...prev, total_gain_pct: (parseFloat(e.target.value) || 0) / 100 }))}
+                type="text"
+                disabled
+                value={
+                  editingYear?.capital && editingYear?.balance && parseFloat(editingYear.capital) > 0
+                    ? (((parseFloat(editingYear.balance) - parseFloat(editingYear.capital)) / parseFloat(editingYear.capital)) * 100).toFixed(2) + '%'
+                    : '0.00%'
+                }
+                sx={{ bgcolor: 'background.level1' }}
               />
+              <Typography level="body-xs" sx={{ mt: 0.5, opacity: 0.6 }}>
+                Auto-calculated from Capital and Ending Balance.
+              </Typography>
             </FormControl>
             <FormControl>
               <FormLabel>Remark / Notes</FormLabel>

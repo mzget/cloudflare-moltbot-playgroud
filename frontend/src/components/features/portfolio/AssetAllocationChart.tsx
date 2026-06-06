@@ -71,6 +71,7 @@ export default function AssetAllocationChart({
     if (viewMode === 0) {
       // Platform / Broker View
       return brokers
+        .filter(b => b.broker_name !== 'Cash')
         .map((b, i) => ({
           name: b.broker_name,
           value: b.balance || 0,
