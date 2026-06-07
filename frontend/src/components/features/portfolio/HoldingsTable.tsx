@@ -136,6 +136,37 @@ export default function HoldingsTable({
     return config[density];
   }, [density]);
 
+  const totals = React.useMemo(() => {
+    if (holdings.length === 0) return null;
+
+    const totalCost = holdings.reduce((sum, h) => sum + (h.total_cost || 0), 0);
+    const totalMarketValue = holdings.reduce((sum, h) => sum + (h.market_value || 0), 0);
+    const totalDividends = holdings.reduce((sum, h) => sum + (h.tot_div_income || 0), 0);
+    const totalDayGainAmt = holdings.reduce((sum, h) => sum + (h.day_gain_amt || 0), 0);
+    
+    const prevMarketValue = totalMarketValue - totalDayGainAmt;
+    const totalDayGainPct = prevMarketValue > 0 ? (totalDayGainAmt / prevMarketValue) * 100 : null;
+
+    const totalTotGainAmt = totalMarketValue - totalCost;
+    const costForUnrealizedGain = holdings.reduce((sum, h) => h.market_value !== null ? sum + (h.total_cost || 0) : sum, 0);
+    const totalTotGainPct = costForUnrealizedGain > 0 ? (totalTotGainAmt / costForUnrealizedGain) * 100 : null;
+
+    const totalRealizedAmt = holdings.reduce((sum, h) => sum + (h.realized_gain_amt || 0), 0);
+    const totalRealizedPct = null; // We don't have realized cost basis in Holding model
+
+    return {
+      totalCost,
+      totalMarketValue,
+      totalDividends,
+      totalDayGainAmt,
+      totalDayGainPct,
+      totalTotGainAmt,
+      totalTotGainPct,
+      totalRealizedAmt,
+      totalRealizedPct,
+    };
+  }, [holdings]);
+
   return (
     <Sheet sx={{ ...glassStyle, p: 0, overflow: 'hidden' }}>
       <div className="yf-table-wrap">
@@ -264,6 +295,73 @@ export default function HoldingsTable({
               </tr>
             )}
           </tbody>
+          {totals && (
+            <tfoot style={{ borderTop: '2px solid var(--yf-border)', backgroundColor: 'var(--yf-header-bg)', fontWeight: 'bold' }}>
+              <tr>
+                {/* Chevron column */}
+                <td style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, backgroundColor: 'var(--yf-header-bg)' }}></td>
+
+                {/* Symbol */}
+                <td className="left" style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize, fontWeight: 700, backgroundColor: 'var(--yf-header-bg)' }}>
+                  Total
+                </td>
+
+                {/* Shares */}
+                <td style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}` }}></td>
+
+                {/* Last Price */}
+                <td style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}` }}></td>
+
+                {/* AC/Share */}
+                <td style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}` }}></td>
+
+                {/* Total Cost */}
+                <td style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize, fontWeight: 700 }}>
+                  {displayNum(totals.totalCost)}
+                </td>
+
+                {/* Market Value */}
+                <td style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize, fontWeight: 700 }}>
+                  {displayNum(totals.totalMarketValue)}
+                </td>
+
+                {/* Tot Div Income */}
+                <td style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize, fontWeight: 700 }}>
+                  {displayNum(totals.totalDividends)}
+                </td>
+
+                {/* Day Gain % */}
+                <td className={gainClass(totals.totalDayGainPct)} style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize, fontWeight: 700 }}>
+                  {displayPct(totals.totalDayGainPct)}
+                </td>
+
+                {/* Day Gain $ */}
+                <td className={gainClass(totals.totalDayGainAmt)} style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize, fontWeight: 700 }}>
+                  {displayNum(totals.totalDayGainAmt)}
+                </td>
+
+                {/* Tot Gain % */}
+                <td className={gainClass(totals.totalTotGainPct)} style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize, fontWeight: 700 }}>
+                  {displayPct(totals.totalTotGainPct)}
+                </td>
+
+                {/* Tot Gain $ */}
+                <td className={gainClass(totals.totalTotGainAmt)} style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize, fontWeight: 700 }}>
+                  {displayNum(totals.totalTotGainAmt)}
+                </td>
+
+                {/* Realized % */}
+                <td className={gainClass(totals.totalRealizedPct)} style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize, fontWeight: 700 }}>
+                  {displayPct(totals.totalRealizedPct)}
+                </td>
+
+                {/* Realized $ */}
+                <td className={gainClass(totals.totalRealizedAmt)} style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize, fontWeight: 700 }}>
+                  {displayNum(totals.totalRealizedAmt)}
+                </td>
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
     </Sheet>

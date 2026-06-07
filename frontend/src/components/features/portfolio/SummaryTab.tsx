@@ -52,6 +52,19 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
   const [brokers, setBrokers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const displayedBrokers = React.useMemo(() => {
+    return brokers.filter(b => b.broker_name !== 'Cash');
+  }, [brokers]);
+
+  const brokerTotals = React.useMemo(() => {
+    if (displayedBrokers.length === 0) return null;
+    const cost = displayedBrokers.reduce((sum, b) => sum + (b.cost || 0), 0);
+    const balance = displayedBrokers.reduce((sum, b) => sum + (b.balance || 0), 0);
+    const gain_amt = balance - cost;
+    const gain_pct = cost > 0 ? (gain_amt / cost) * 100 : 0;
+    return { cost, balance, gain_amt, gain_pct };
+  }, [displayedBrokers]);
+
   // Expanded years state for yearly history table
   const [expandedYears, setExpandedYears] = useState<Record<number, boolean>>({});
 
@@ -393,12 +406,6 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
                     </Typography>
                   </Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 4 }}>
-                    <Typography level="body-sm" sx={{ opacity: 0.7 }}>Day Change</Typography>
-                    <Typography level="body-sm" sx={{ fontWeight: 700 }} className={summary.day_change_amt >= 0 ? 'yf-positive' : 'yf-negative'}>
-                      {showMoneyValues ? formatCurrency(summary.day_change_amt, true, '฿') : '••••••••'} ({formatPct(summary.day_change_pct)})
-                    </Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 4 }}>
                     <Typography level="body-sm" sx={{ opacity: 0.7 }}>Realized Gain</Typography>
                     <Typography level="body-sm" sx={{ fontWeight: 700 }} className={summary.realized_gain_amt >= 0 ? 'yf-positive' : 'yf-negative'}>
                       {showMoneyValues ? formatCurrency(summary.realized_gain_amt, true, '฿') : '••••••••'}
@@ -611,7 +618,7 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
               </tr>
             </thead>
             <tbody>
-              {brokers.filter(b => b.broker_name !== 'Cash').map(broker => (
+              {displayedBrokers.map(broker => (
                 <tr key={broker.broker_name}>
                   <td style={{ fontWeight: 700 }}>{broker.broker_name}</td>
                   <td style={{ textAlign: 'right' }}>
@@ -665,6 +672,25 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
                 </tr>
               ))}
             </tbody>
+            {brokerTotals && (
+              <tfoot style={{ borderTop: '2px solid var(--yf-border)', backgroundColor: 'var(--yf-header-bg)', fontWeight: 'bold' }}>
+                <tr>
+                  <td style={{ fontWeight: 700, textAlign: 'left' }}>Total</td>
+                  <td style={{ textAlign: 'right', fontWeight: 700 }}>
+                    {showMoneyValues ? formatCurrency(brokerTotals.cost, false, '฿') : '••••••••'}
+                  </td>
+                  <td style={{ textAlign: 'right', fontWeight: 700 }}>
+                    {showMoneyValues ? formatCurrency(brokerTotals.balance, false, '฿') : '••••••••'}
+                  </td>
+                  <td style={{ textAlign: 'right', fontWeight: 700 }} className={brokerTotals.gain_amt >= 0 ? 'yf-positive' : 'yf-negative'}>
+                    {showMoneyValues ? formatCurrency(brokerTotals.gain_amt, true, '฿') : '••••••••'} ({brokerTotals.gain_pct.toFixed(2)}%)
+                  </td>
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            )}
           </Table>
         </Box>
       </Sheet>

@@ -805,7 +805,7 @@ app.get('/api/portfolio/summary', async (c) => {
   // 1. Fetch stocks
   const { results: stockResults } = await c.env.DB.prepare(`
     SELECT 
-      h.symbol, h.shares, h.avg_cost, h.total_cost,
+      h.symbol, h.shares, h.avg_cost, h.total_cost, h.broker_name,
       m.price as last_price, m.previous_close,
       COALESCE(d.total_dividends, 0) as tot_div_income
     FROM holdings h
@@ -821,99 +821,105 @@ app.get('/api/portfolio/summary', async (c) => {
   let stockDayChangeUsd = 0;
   let stockDividendsUsd = 0;
 
+  const brokerStocks = new Map<string, { costUsd: number; balanceUsd: number }>();
+
   for (const row of (stockResults || []) as any[]) {
     const shares = row.shares || 0;
     const price = row.last_price || 0;
     const prevClose = row.previous_close || price;
     const cost = row.total_cost || 0;
+    const broker = row.broker_name || 'Common Stock';
     
     stockMarketValueUsd += shares * price;
     stockCostUsd += cost;
     stockDayChangeUsd += shares * (price - prevClose);
     stockDividendsUsd += row.tot_div_income || 0;
+
+    const prev = brokerStocks.get(broker) || { costUsd: 0, balanceUsd: 0 };
+    prev.costUsd += cost;
+    prev.balanceUsd += shares * price;
+    brokerStocks.set(broker, prev);
   }
 
-  // 2. Fetch fund allocations total
+  // 2. Fetch fund allocations grouped by broker
   const { results: fundResults } = await c.env.DB.prepare(`
-    SELECT COALESCE(SUM(amount), 0) as total_funds FROM fund_allocations
-  `).all();
-  const totalFundsThb = (fundResults?.[0] as any)?.total_funds || 0;
-
-  // 3. Fetch manual broker overrides total cost & balance (excluding the main auto-calculated ones to avoid double counting)
-  const { results: manualResults } = await c.env.DB.prepare(`
     SELECT 
-      COALESCE(SUM(cost_override), 0) as total_cost_override,
-      COALESCE(SUM(balance_override), 0) as total_balance_override
-    FROM manual_broker_balances
-    WHERE broker_name NOT IN ('Common Stock', 'Finnomena', 'Krungsri')
+      f.broker_name,
+      SUM(a.amount) as balance_thb
+    FROM fund_allocations a
+    JOIN portfolio_funds f ON a.fund_id = f.id
+    GROUP BY f.broker_name
   `).all();
-  const manualCostThb = (manualResults?.[0] as any)?.total_cost_override || 0;
-  const manualBalanceThb = (manualResults?.[0] as any)?.total_balance_override || 0;
 
-  // Fetch all overrides to adjust main broker calculations if overridden
-  const { results: allOverrides } = await c.env.DB.prepare(`
+  // 3. Fetch manual broker overrides
+  const { results: overrideResults } = await c.env.DB.prepare(`
     SELECT * FROM manual_broker_balances
   `).all();
-  const overridesMap = new Map((allOverrides || []).map((row: any) => [row.broker_name, row]));
+  const overrides = new Map((overrideResults || []).map((row: any) => [row.broker_name, row]));
 
-  // Calculate final THB values
-  let totalMarketValueThb = (stockMarketValueUsd * rate) + totalFundsThb + manualBalanceThb;
-  let totalCostThb = (stockCostUsd * rate) + totalFundsThb + manualCostThb;
-  let totalDayChangeThb = stockDayChangeUsd * rate;
-  let totalDividendsThb = stockDividendsUsd * rate;
+  // 4. Combine brokers and apply overrides
+  const brokersMap = new Map<string, { cost: number; balance: number }>();
+  
+  // Process stocks (convert to THB)
+  for (const [broker, val] of brokerStocks.entries()) {
+    brokersMap.set(broker, {
+      cost: val.costUsd * rate,
+      balance: val.balanceUsd * rate
+    });
+  }
 
-  // Adjust for any overrides of the main brokers
-  const commonStockOverride = overridesMap.get('Common Stock') as any;
-  if (commonStockOverride) {
-    if (commonStockOverride.cost_override !== null && commonStockOverride.cost_override !== undefined) {
-      totalCostThb = totalCostThb - (stockCostUsd * rate) + commonStockOverride.cost_override;
-    }
-    if (commonStockOverride.balance_override !== null && commonStockOverride.balance_override !== undefined) {
-      totalMarketValueThb = totalMarketValueThb - (stockMarketValueUsd * rate) + commonStockOverride.balance_override;
+  // Process funds
+  for (const row of (fundResults || []) as any[]) {
+    const broker = row.broker_name;
+    const balance = row.balance_thb || 0;
+    const existing = brokersMap.get(broker);
+    if (existing) {
+      existing.balance += balance;
+      existing.cost += balance;
+    } else {
+      brokersMap.set(broker, { cost: balance, balance });
     }
   }
 
-  const krungsriOverride = overridesMap.get('Krungsri') as any;
-  if (krungsriOverride) {
-    const { results: kFunds } = await c.env.DB.prepare(`
-      SELECT COALESCE(SUM(a.amount), 0) as amt 
-      FROM fund_allocations a 
-      JOIN portfolio_funds f ON a.fund_id = f.id 
-      WHERE f.broker_name = 'Krungsri'
-    `).all();
-    const kAmt = (kFunds?.[0] as any)?.amt || 0;
-    if (krungsriOverride.cost_override !== null && krungsriOverride.cost_override !== undefined) {
-      totalCostThb = totalCostThb - kAmt + krungsriOverride.cost_override;
+  // Calculate total cost and market value by summing final broker values (with overrides applied)
+  const allBrokerNames = new Set([
+    ...brokersMap.keys(),
+    ...overrides.keys()
+  ]);
+
+  let totalCostThb = 0;
+  let totalMarketValueThb = 0;
+
+  for (const name of allBrokerNames) {
+    if (name === 'Cash') continue; // Skip Cash since it is already included in other brokers
+    const calculated = brokersMap.get(name) || { cost: 0, balance: 0 };
+    const override = overrides.get(name) as any;
+
+    let finalCost = calculated.cost;
+    let finalBalance = calculated.balance;
+
+    if (override) {
+      if (override.cost_override !== null && override.cost_override !== undefined) {
+        finalCost = override.cost_override;
+      }
+      if (override.balance_override !== null && override.balance_override !== undefined) {
+        finalBalance = override.balance_override;
+      }
     }
-    if (krungsriOverride.balance_override !== null && krungsriOverride.balance_override !== undefined) {
-      totalMarketValueThb = totalMarketValueThb - kAmt + krungsriOverride.balance_override;
-    }
+
+    totalCostThb += finalCost;
+    totalMarketValueThb += finalBalance;
   }
 
-  const finnomenaOverride = overridesMap.get('Finnomena') as any;
-  if (finnomenaOverride) {
-    const { results: fFunds } = await c.env.DB.prepare(`
-      SELECT COALESCE(SUM(a.amount), 0) as amt 
-      FROM fund_allocations a 
-      JOIN portfolio_funds f ON a.fund_id = f.id 
-      WHERE f.broker_name = 'Finnomena'
-    `).all();
-    const fAmt = (fFunds?.[0] as any)?.amt || 0;
-    if (finnomenaOverride.cost_override !== null && finnomenaOverride.cost_override !== undefined) {
-      totalCostThb = totalCostThb - fAmt + finnomenaOverride.cost_override;
-    }
-    if (finnomenaOverride.balance_override !== null && finnomenaOverride.balance_override !== undefined) {
-      totalMarketValueThb = totalMarketValueThb - fAmt + finnomenaOverride.balance_override;
-    }
-  }
-
-  // Get realized gains
+  // 5. Fetch realized gains
   const { results: txResults } = await c.env.DB.prepare(`
     SELECT COALESCE(SUM(realized_gain_amt), 0) as total_realized
     FROM transactions WHERE type = 'Sell'
   `).all();
   const totalRealizedUsd = (txResults?.[0] as any)?.total_realized || 0;
   const totalRealizedThb = totalRealizedUsd * rate;
+  const totalDayChangeThb = stockDayChangeUsd * rate;
+  const totalDividendsThb = stockDividendsUsd * rate;
 
   const unrealizedGainThb = totalMarketValueThb - totalCostThb;
   const unrealizedGainPct = totalCostThb > 0 ? (unrealizedGainThb / totalCostThb) * 100 : 0;
@@ -926,14 +932,7 @@ app.get('/api/portfolio/summary', async (c) => {
   const stockDayChangeUsdFinal = stockDayChangeUsd;
   const stockDividendsUsdFinal = stockDividendsUsd;
 
-  if (commonStockOverride) {
-    if (commonStockOverride.cost_override !== null && commonStockOverride.cost_override !== undefined) {
-      stockCostUsdFinal = commonStockOverride.cost_override / rate;
-    }
-    if (commonStockOverride.balance_override !== null && commonStockOverride.balance_override !== undefined) {
-      stockMarketValueUsdFinal = commonStockOverride.balance_override / rate;
-    }
-  }
+  // Stocks Only (USD) summary card should skip broker overrides and reflect raw holdings
 
   const stockUnrealizedGainUsd = stockMarketValueUsdFinal - stockCostUsdFinal;
   const stockUnrealizedGainPct = stockCostUsdFinal > 0 ? (stockUnrealizedGainUsd / stockCostUsdFinal) * 100 : 0;
