@@ -5,8 +5,9 @@ import { Camera } from './camera';
 import { InputManager } from './inputs';
 import { Player } from './player';
 import { generateTileMap, drawTileMap } from './tilemap';
-import { checkOverlap } from './collision';
-import type { NPC } from './types';
+import { checkOverlap, checkMapCollision } from './collision';
+import { TileType } from './types';
+import type { NPC, TileMap } from './types';
 
 const TILE_SIZE = 48;
 const MAP_COLS = 25;
@@ -68,7 +69,7 @@ const INITIAL_NPCS: NPC[] = [
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/dragonite.gif',
     dialogue: ['Cron: 0 * * * * (Every hour)', 'Job: Pull watchlist prices from Finnhub.', 'Updates price & valuation tables in D1.'],
-    isSolid: false, animationType: 'bounce',
+    isSolid: true, animationType: 'bounce',
     metadata: { type: 'scheduled-job', endpoint: '/api/test-market-stats', triggerLabel: 'Fetch Stats', schedule: 'Hourly' },
   },
   {
@@ -77,7 +78,7 @@ const INITIAL_NPCS: NPC[] = [
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/scyther.gif',
     dialogue: ['Cron: Every 6 hours', 'Job: Crawl Google News & Yahoo Finance.', 'Falls back to Puppeteer if RSS fails.'],
-    isSolid: false, animationType: 'waddle',
+    isSolid: true, animationType: 'waddle',
     metadata: { type: 'scheduled-job', endpoint: '/api/crawl', triggerLabel: 'Start Crawl', schedule: 'Every 6h' },
   },
   {
@@ -86,7 +87,7 @@ const INITIAL_NPCS: NPC[] = [
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/alakazam.gif',
     dialogue: ['Cron: Every 6 hours', 'Job: LLM synthesis of news for each symbol.', 'Gemma-4 26B model. Output in Thai.'],
-    isSolid: false, animationType: 'breathing',
+    isSolid: true, animationType: 'breathing',
     metadata: { type: 'scheduled-job', endpoint: '/api/summarize-all', triggerLabel: 'Summarize', schedule: 'Every 6h' },
   },
   {
@@ -95,7 +96,7 @@ const INITIAL_NPCS: NPC[] = [
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/farfetchd.gif',
     dialogue: ['Cron: 0 * * * * (Every hour)', 'Job: Poll Gmail via Google OAuth.', 'Ingests unread financial newsletters.'],
-    isSolid: false, animationType: 'waddle',
+    isSolid: true, animationType: 'waddle',
     metadata: { type: 'scheduled-job', endpoint: '/api/sync-emails', triggerLabel: 'Sync Emails', schedule: 'Hourly' },
   },
   {
@@ -104,7 +105,7 @@ const INITIAL_NPCS: NPC[] = [
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/chansey.gif',
     dialogue: ['Cron: Every 6 hours', 'Job: Fetch dividends, splits, earnings calendar.', 'Source: Finnhub API for watchlist symbols.'],
-    isSolid: false, animationType: 'bounce',
+    isSolid: true, animationType: 'bounce',
     metadata: { type: 'scheduled-job', endpoint: '/api/crawl-events', triggerLabel: 'Fetch Events', schedule: 'Every 6h' },
   },
   {
@@ -113,7 +114,7 @@ const INITIAL_NPCS: NPC[] = [
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/pidgeot.gif',
     dialogue: ['Cron: Every 6 hours', 'Job: Format reports as HTML email.', 'Sent via Cloudflare Email binding.'],
-    isSolid: false, animationType: 'bounce',
+    isSolid: true, animationType: 'bounce',
     metadata: { type: 'scheduled-job', endpoint: '/api/email-test', triggerLabel: 'Send Email', schedule: 'Every 6h' },
   },
   {
@@ -122,7 +123,7 @@ const INITIAL_NPCS: NPC[] = [
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/growlithe.gif',
     dialogue: ['Cron: 0 * * * * (Every hour)', 'Job: Evaluate price alert rules.', 'Stores triggered notifications in D1.'],
-    isSolid: false, animationType: 'breathing',
+    isSolid: true, animationType: 'breathing',
     metadata: { type: 'scheduled-job', endpoint: null, triggerLabel: 'Check Alerts', schedule: 'Hourly' },
   },
   {
@@ -131,7 +132,7 @@ const INITIAL_NPCS: NPC[] = [
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/muk.gif',
     dialogue: ['Cron: Every 6 hours', 'Job: Delete reports & news older than 3 days.', 'Deletes events > 30 days. Keeps D1 lean.'],
-    isSolid: false, animationType: 'squish',
+    isSolid: true, animationType: 'squish',
     metadata: { type: 'scheduled-job', endpoint: null, triggerLabel: 'Purge Data', schedule: 'Every 6h' },
   },
   {
@@ -140,7 +141,7 @@ const INITIAL_NPCS: NPC[] = [
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/psyduck.gif',
     dialogue: ['Cron: 0 * * * * (Every hour)', 'Job: Synthesize emails into theme-based digests.', 'Gemma-4 26B model. Capped at batch size 2.'],
-    isSolid: false, animationType: 'waddle',
+    isSolid: true, animationType: 'waddle',
     metadata: { type: 'scheduled-job', endpoint: '/api/test-email-digest', triggerLabel: 'Run Digest', schedule: 'Hourly' },
   },
   {
@@ -149,10 +150,40 @@ const INITIAL_NPCS: NPC[] = [
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/jigglypuff.gif',
     dialogue: ['Cron: 0 * * * * (Every hour)', 'Job: Format daily reports into FB posts.', 'Gemma-3 12B model. Capped at 1 post.'],
-    isSolid: false, animationType: 'bounce',
+    isSolid: true, animationType: 'bounce',
     metadata: { type: 'scheduled-job', endpoint: '/api/test-facebook-post', triggerLabel: 'Format Post', method: 'POST', schedule: 'Hourly' },
   },
 ];
+
+function initializeNPCs(map: TileMap): NPC[] {
+  const walkableTiles: { r: number; c: number }[] = [];
+  const startRow = 22;
+  const endRow = 40;
+  for (let r = startRow; r <= endRow; r++) {
+    for (let c = 0; c < map[r].length; c++) {
+      if (map[r][c] === TileType.GRASS) {
+        walkableTiles.push({ r, c });
+      }
+    }
+  }
+
+  // Shuffle walkableTiles
+  const shuffled = [...walkableTiles].sort(() => Math.random() - 0.5);
+
+  return INITIAL_NPCS.map((npc, index) => {
+    const tile = shuffled[index % shuffled.length];
+    return {
+      ...npc,
+      worldX: tile.c * TILE_SIZE,
+      worldY: tile.r * TILE_SIZE,
+      isWalking: false,
+      walkTimer: Math.random() * 3 + 1
+    };
+  });
+}
+
+const INITIAL_MAP = generateTileMap(MAP_ROWS, MAP_COLS);
+const INITIALIZED_NPCS = initializeNPCs(INITIAL_MAP);
 
 class ChiptuneAudio {
   private ctx: AudioContext | null = null;
@@ -217,7 +248,7 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
   const cameraRef = useRef<Camera | null>(null);
   const inputRef = useRef<InputManager | null>(null);
   const playerRef = useRef<Player | null>(null);
-  const npcsRef = useRef<NPC[]>(INITIAL_NPCS);
+  const npcsRef = useRef<NPC[]>(INITIALIZED_NPCS.map(npc => ({ ...npc })));
   const mapRef = useRef(generateTileMap(MAP_ROWS, MAP_COLS));
   const timeRef = useRef(0);
   const aJustPressedRef = useRef(false);
@@ -298,6 +329,155 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
     const { dx, dy } = input.getMovementVector();
     if ((dx !== 0 || dy !== 0) && !player.state.isMoving) sfx.step();
     player.move(dx, dy, dt, mapRef.current, npcsRef.current, TILE_SIZE);
+
+    // Update NPCs random walk
+    npcsRef.current.forEach(npc => {
+      if (npc.walkTimer === undefined) {
+        npc.walkTimer = Math.random() * 3 + 1;
+        npc.isWalking = false;
+      }
+
+      if (npc.isWalking) {
+        // Destination collision checks every frame while walking
+        const targetBox = {
+          x: npc.walkTargetX!,
+          y: npc.walkTargetY!,
+          width: npc.width,
+          height: npc.height
+        };
+
+        const pBox = {
+          x: player.state.worldX,
+          y: player.state.worldY,
+          width: player.state.width,
+          height: player.state.height
+        };
+
+        let collides = false;
+        // Check collision with player
+        if (npc.isSolid && checkOverlap(targetBox, pBox)) {
+          collides = true;
+        }
+
+        // Check collision with other solid NPCs
+        if (!collides) {
+          for (const other of npcsRef.current) {
+            if (other.id !== npc.id && other.isSolid) {
+              const otherBox = {
+                x: other.isWalking ? other.walkTargetX! : other.worldX,
+                y: other.isWalking ? other.walkTargetY! : other.worldY,
+                width: other.width,
+                height: other.height
+              };
+              if (checkOverlap(targetBox, otherBox)) {
+                collides = true;
+                break;
+              }
+            }
+          }
+        }
+
+        if (collides) {
+          // Cancel walking, snap back to closest tile coordinate
+          npc.isWalking = false;
+          npc.worldX = Math.round(npc.worldX / TILE_SIZE) * TILE_SIZE;
+          npc.worldY = Math.round(npc.worldY / TILE_SIZE) * TILE_SIZE;
+          npc.walkTimer = Math.random() * 2 + 1; // wait a bit
+        } else {
+          // Slide smoothly towards target
+          const dxNpc = npc.walkTargetX! - npc.worldX;
+          const dyNpc = npc.walkTargetY! - npc.worldY;
+          const dist = Math.sqrt(dxNpc * dxNpc + dyNpc * dyNpc);
+          const speed = 40; // walking speed (px/sec)
+          const moveStep = speed * dt;
+
+          if (dist <= moveStep) {
+            npc.worldX = npc.walkTargetX!;
+            npc.worldY = npc.walkTargetY!;
+            npc.isWalking = false;
+            npc.walkTimer = Math.random() * 4 + 2;
+          } else {
+            npc.worldX += (dxNpc / dist) * moveStep;
+            npc.worldY += (dyNpc / dist) * moveStep;
+          }
+        }
+      } else {
+        npc.walkTimer -= dt;
+        if (npc.walkTimer <= 0) {
+          const directions = [
+            { dx: 0, dy: -1 },
+            { dx: 0, dy: 1 },
+            { dx: -1, dy: 0 },
+            { dx: 1, dy: 0 }
+          ];
+          const shuffledDirs = [...directions].sort(() => Math.random() - 0.5);
+
+          let foundPath = false;
+          for (const dir of shuffledDirs) {
+            const currentGridX = Math.round(npc.worldX / TILE_SIZE);
+            const currentGridY = Math.round(npc.worldY / TILE_SIZE);
+            const nextGridX = currentGridX + dir.dx;
+            const nextGridY = currentGridY + dir.dy;
+
+            // Must stay in the walkable zone: rows 22 to 40
+            if (nextGridY >= 22 && nextGridY <= 40 && nextGridX >= 0 && nextGridX < MAP_COLS) {
+              const targetBox = {
+                x: nextGridX * TILE_SIZE,
+                y: nextGridY * TILE_SIZE,
+                width: npc.width,
+                height: npc.height
+              };
+
+              // Check map collision (fences, walls, trees)
+              const collidesMap = checkMapCollision(targetBox, mapRef.current, TILE_SIZE);
+
+              if (!collidesMap) {
+                // Collision with player
+                let collidesPlayer = false;
+                const pBox = {
+                  x: player.state.worldX,
+                  y: player.state.worldY,
+                  width: player.state.width,
+                  height: player.state.height
+                };
+                if (checkOverlap(targetBox, pBox)) {
+                  collidesPlayer = true;
+                }
+
+                // Collision with other NPCs
+                let collidesNPC = false;
+                for (const other of npcsRef.current) {
+                  if (other.id !== npc.id) {
+                    const otherBox = {
+                      x: other.isWalking ? other.walkTargetX! : other.worldX,
+                      y: other.isWalking ? other.walkTargetY! : other.worldY,
+                      width: other.width,
+                      height: other.height
+                    };
+                    if (checkOverlap(targetBox, otherBox)) {
+                      collidesNPC = true;
+                      break;
+                    }
+                  }
+                }
+
+                if (!collidesPlayer && !collidesNPC) {
+                  npc.walkTargetX = nextGridX * TILE_SIZE;
+                  npc.walkTargetY = nextGridY * TILE_SIZE;
+                  npc.isWalking = true;
+                  foundPath = true;
+                  break;
+                }
+              }
+            }
+          }
+
+          if (!foundPath) {
+            npc.walkTimer = Math.random() * 2 + 1;
+          }
+        }
+      }
+    });
     cameraRef.current?.update(player.state.worldX + player.state.width / 2, player.state.worldY + player.state.height / 2);
     if (input.inputs.a && !aJustPressedRef.current) { aJustPressedRef.current = true; checkInteraction(); }
     if (!input.inputs.a) aJustPressedRef.current = false;
@@ -593,7 +773,7 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
             />
 
             {/* NPC Sprites */}
-            {INITIAL_NPCS.map(npc => (
+            {INITIALIZED_NPCS.map(npc => (
               <Box
                 key={npc.id}
                 data-npc-id={npc.id}

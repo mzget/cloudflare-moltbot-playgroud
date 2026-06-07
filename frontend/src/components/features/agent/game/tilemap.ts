@@ -45,7 +45,7 @@ export function generateTileMap(rows: number, cols: number): TileMap {
       if (r === 31 && c >= 5 && c <= 11) isSolid = true;
       
       if (r === 6 && c >= 4 && c <= 8) isSolid = true;
-      if (r === 35 && c >= 14 && c <= 20) isSolid = true;
+      if (r === 31 && c >= 14 && c <= 20) isSolid = true;
 
       row.push(isSolid ? T : G);
     }

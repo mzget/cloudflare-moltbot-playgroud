@@ -50,6 +50,10 @@ export interface NPC {
   isSolid: boolean;
   animationType: 'breathing' | 'waddle' | 'bounce' | 'squish';
   metadata?: any;
+  walkTargetX?: number;
+  walkTargetY?: number;
+  isWalking?: boolean;
+  walkTimer?: number;
 }
 
 export interface CameraState {
