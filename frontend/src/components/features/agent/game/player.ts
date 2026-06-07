@@ -45,11 +45,14 @@ export class Player {
       }
       if (dy !== 0) {
         const nextY = this.state.worldY + dy * moveDist;
-        const hitboxY = this.getFeetHitbox(this.state.worldX, nextY);
-        const collidesMap = checkMapCollision(hitboxY, map, tileSize);
-        const collidesNPC = checkNPCCollision(hitboxY, npcs);
-        if (!collidesMap && !collidesNPC) {
-          this.state.worldY = nextY;
+        // Limit player: cannot walk past Y = 22 (worldY must be >= 22 * tileSize)
+        if (nextY >= 22 * tileSize) {
+          const hitboxY = this.getFeetHitbox(this.state.worldX, nextY);
+          const collidesMap = checkMapCollision(hitboxY, map, tileSize);
+          const collidesNPC = checkNPCCollision(hitboxY, npcs);
+          if (!collidesMap && !collidesNPC) {
+            this.state.worldY = nextY;
+          }
         }
       }
       this.state.animTime += dt;

@@ -369,6 +369,14 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
           npcEl.style.transform = `translate3d(${nsx}px, ${nsy}px, 0)`;
         }
       }
+
+      // 3. Update Coordinates element
+      const coordsEl = document.getElementById('player-coords');
+      if (coordsEl) {
+        const gridX = Math.round(player.state.worldX / TILE_SIZE);
+        const gridY = Math.round(player.state.worldY / TILE_SIZE);
+        coordsEl.textContent = `X: ${gridX}, Y: ${gridY}`;
+      }
     }
 
     // Hover check
