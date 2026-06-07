@@ -9,8 +9,8 @@ import { checkOverlap } from './collision';
 import type { NPC } from './types';
 
 const TILE_SIZE = 48;
-const MAP_COLS = 32;
-const MAP_ROWS = 28;
+const MAP_COLS = 25;
+const MAP_ROWS = 42;
 const GEN1_FRONT = (id: number) =>
   `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-i/red-blue/${id}.png`;
 const GEN1_BACK = (id: number) =>
@@ -19,16 +19,16 @@ const GEN1_BACK = (id: number) =>
 const INITIAL_NPCS: NPC[] = [
   {
     id: 'db-agent', name: 'Prof. Oak (DB Agent)', type: 'pokemon',
-    worldX: 11 * TILE_SIZE, worldY: 5 * TILE_SIZE,
+    worldX: 10 * TILE_SIZE, worldY: 35 * TILE_SIZE,
     width: TILE_SIZE * 1.5, height: TILE_SIZE * 1.5,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/snorlax.gif',
     dialogue: ['Welcome, trainer!', 'I am the Cloudflare DB Agent.', 'I can query D1 tables and inspect R2 buckets.', 'What would you like to know?'],
     isSolid: true, animationType: 'breathing',
-    metadata: { endpoint: 'database-chat', type: 'chat-agent' },
+    metadata: { endpoint: 'database-chat', type: 'db-agent' },
   },
   {
-    id: 'knowledge-agent', name: 'Sage (Knowledge Agent)', type: 'pokemon',
-    worldX: 4 * TILE_SIZE, worldY: 5 * TILE_SIZE,
+    id: 'knowledge-agent', name: 'Knowledge Agent', type: 'pokemon',
+    worldX: 14 * TILE_SIZE, worldY: 35 * TILE_SIZE,
     width: TILE_SIZE * 1.5, height: TILE_SIZE * 1.5,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/mewtwo.gif',
     dialogue: ['Greetings, young investor!', 'I hold the secrets of the Oaktree portfolio.', 'Ask me about your holdings, history, or investment frameworks.'],
@@ -37,7 +37,7 @@ const INITIAL_NPCS: NPC[] = [
   },
   {
     id: 'llm-summarizer', name: 'Stock Summarizer', type: 'pokemon',
-    worldX: 2 * TILE_SIZE, worldY: 12 * TILE_SIZE,
+    worldX: 16 * TILE_SIZE, worldY: 3 * TILE_SIZE,
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/alakazam.gif',
     dialogue: ['Model: @cf/google/gemma-4-26b-a4b-it', 'I synthesize stock news into Howard Marks memos.', 'Output: Thai JSON with summary, sentiment, key_takeaways.'],
@@ -46,7 +46,7 @@ const INITIAL_NPCS: NPC[] = [
   },
   {
     id: 'llm-email', name: 'Newsletter Digest', type: 'pokemon',
-    worldX: 4 * TILE_SIZE, worldY: 12 * TILE_SIZE,
+    worldX: 18 * TILE_SIZE, worldY: 3 * TILE_SIZE,
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/farfetchd.gif',
     dialogue: ['Model: @cf/google/gemma-4-26b-a4b-it', 'I group emails into macro themes.', 'Output: Thai Howard Marks paragraphs + 3-5 takeaways.'],
@@ -55,7 +55,7 @@ const INITIAL_NPCS: NPC[] = [
   },
   {
     id: 'llm-facebook', name: 'Facebook Assistant', type: 'pokemon',
-    worldX: 6 * TILE_SIZE, worldY: 12 * TILE_SIZE,
+    worldX: 17 * TILE_SIZE, worldY: 5 * TILE_SIZE,
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/clefairy.gif',
     dialogue: ['Model: @cf/google/gemma-3-12b-it', 'I format daily reports as engaging FB posts.', 'Rule: No hashtags mentioning investor names!'],
@@ -64,7 +64,7 @@ const INITIAL_NPCS: NPC[] = [
   },
   {
     id: 'job-market-stats', name: 'fetchMarketStats', type: 'pokemon',
-    worldX: 21 * TILE_SIZE, worldY: 8 * TILE_SIZE,
+    worldX: 12 * TILE_SIZE, worldY: 7 * TILE_SIZE,
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/dragonite.gif',
     dialogue: ['Cron: 0 * * * * (Every hour)', 'Job: Pull watchlist prices from Finnhub.', 'Updates price & valuation tables in D1.'],
@@ -73,7 +73,7 @@ const INITIAL_NPCS: NPC[] = [
   },
   {
     id: 'job-crawler', name: 'runCrawler', type: 'pokemon',
-    worldX: 24 * TILE_SIZE, worldY: 10 * TILE_SIZE,
+    worldX: 14 * TILE_SIZE, worldY: 8 * TILE_SIZE,
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/scyther.gif',
     dialogue: ['Cron: Every 6 hours', 'Job: Crawl Google News & Yahoo Finance.', 'Falls back to Puppeteer if RSS fails.'],
@@ -82,7 +82,7 @@ const INITIAL_NPCS: NPC[] = [
   },
   {
     id: 'job-summarizer', name: 'generateDailySummaries', type: 'pokemon',
-    worldX: 27 * TILE_SIZE, worldY: 8 * TILE_SIZE,
+    worldX: 13 * TILE_SIZE, worldY: 10 * TILE_SIZE,
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/alakazam.gif',
     dialogue: ['Cron: Every 6 hours', 'Job: LLM synthesis of news for each symbol.', 'Gemma-4 26B model. Output in Thai.'],
@@ -91,7 +91,7 @@ const INITIAL_NPCS: NPC[] = [
   },
   {
     id: 'job-emails', name: 'syncEmails', type: 'pokemon',
-    worldX: 22 * TILE_SIZE, worldY: 13 * TILE_SIZE,
+    worldX: 5 * TILE_SIZE, worldY: 17 * TILE_SIZE,
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/farfetchd.gif',
     dialogue: ['Cron: 0 * * * * (Every hour)', 'Job: Poll Gmail via Google OAuth.', 'Ingests unread financial newsletters.'],
@@ -100,7 +100,7 @@ const INITIAL_NPCS: NPC[] = [
   },
   {
     id: 'job-market-events', name: 'fetchMarketEvents', type: 'pokemon',
-    worldX: 26 * TILE_SIZE, worldY: 14 * TILE_SIZE,
+    worldX: 7 * TILE_SIZE, worldY: 18 * TILE_SIZE,
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/chansey.gif',
     dialogue: ['Cron: Every 6 hours', 'Job: Fetch dividends, splits, earnings calendar.', 'Source: Finnhub API for watchlist symbols.'],
@@ -109,7 +109,7 @@ const INITIAL_NPCS: NPC[] = [
   },
   {
     id: 'job-email-report', name: 'sendDailyEmailReport', type: 'pokemon',
-    worldX: 22 * TILE_SIZE, worldY: 18 * TILE_SIZE,
+    worldX: 6 * TILE_SIZE, worldY: 20 * TILE_SIZE,
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/pidgeot.gif',
     dialogue: ['Cron: Every 6 hours', 'Job: Format reports as HTML email.', 'Sent via Cloudflare Email binding.'],
@@ -118,7 +118,7 @@ const INITIAL_NPCS: NPC[] = [
   },
   {
     id: 'job-alerts', name: 'checkAlertRules', type: 'pokemon',
-    worldX: 27 * TILE_SIZE, worldY: 18 * TILE_SIZE,
+    worldX: 16 * TILE_SIZE, worldY: 24 * TILE_SIZE,
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/growlithe.gif',
     dialogue: ['Cron: 0 * * * * (Every hour)', 'Job: Evaluate price alert rules.', 'Stores triggered notifications in D1.'],
@@ -127,7 +127,7 @@ const INITIAL_NPCS: NPC[] = [
   },
   {
     id: 'job-purge', name: 'purgeOldData', type: 'pokemon',
-    worldX: 25 * TILE_SIZE, worldY: 21 * TILE_SIZE,
+    worldX: 18 * TILE_SIZE, worldY: 25 * TILE_SIZE,
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/muk.gif',
     dialogue: ['Cron: Every 6 hours', 'Job: Delete reports & news older than 3 days.', 'Deletes events > 30 days. Keeps D1 lean.'],
@@ -136,7 +136,7 @@ const INITIAL_NPCS: NPC[] = [
   },
   {
     id: 'job-email-digest', name: 'generateEmailDigests', type: 'pokemon',
-    worldX: 24 * TILE_SIZE, worldY: 16 * TILE_SIZE,
+    worldX: 5 * TILE_SIZE, worldY: 31 * TILE_SIZE,
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/psyduck.gif',
     dialogue: ['Cron: 0 * * * * (Every hour)', 'Job: Synthesize emails into theme-based digests.', 'Gemma-4 26B model. Capped at batch size 2.'],
@@ -145,7 +145,7 @@ const INITIAL_NPCS: NPC[] = [
   },
   {
     id: 'job-facebook', name: 'syncFacebookPosts', type: 'pokemon',
-    worldX: 28 * TILE_SIZE, worldY: 12 * TILE_SIZE,
+    worldX: 7 * TILE_SIZE, worldY: 32 * TILE_SIZE,
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/jigglypuff.gif',
     dialogue: ['Cron: 0 * * * * (Every hour)', 'Job: Format daily reports into FB posts.', 'Gemma-3 12B model. Capped at 1 post.'],
@@ -223,6 +223,15 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
   const aJustPressedRef = useRef(false);
   const mousePosRef = useRef({ x: -9999, y: -9999 });
   const hoverHudRef = useRef<HTMLDivElement>(null);
+  const mapBgImageRef = useRef<HTMLImageElement | null>(null);
+
+  useEffect(() => {
+    const img = new Image();
+    img.src = encodeURI("/Game Boy Advance - Pokemon FireRed _ LeafGreen - Maps (Caves, Forests, Oceans, Etc.) - Route 01.png");
+    img.onload = () => {
+      mapBgImageRef.current = img;
+    };
+  }, []);
 
   const [mode, setMode] = useState<GameMode>('MAP');
   const [dialogue, setDialogue] = useState<DialogueState | null>(null);
@@ -307,7 +316,7 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
     ctx.clearRect(0, 0, w, h);
 
     const t = timeRef.current;
-    drawTileMap(ctx, mapRef.current, cam.pos.x, cam.pos.y, w, h, TILE_SIZE, t);
+    drawTileMap(ctx, mapRef.current, cam.pos.x, cam.pos.y, w, h, TILE_SIZE, t, mapBgImageRef.current);
 
     // Zone labels
     ctx.save();
@@ -345,8 +354,10 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
       // 1. Update Player element
       const playerEl = container.querySelector('[data-player]') as HTMLElement;
       if (playerEl) {
-        const scaleX = player.state.direction === 2 ? -1 : 1; // Flip if facing right
-        playerEl.style.transform = `translate3d(${psx}px, ${psy}px, 0) scaleX(${scaleX})`;
+        playerEl.style.transform = `translate3d(${psx}px, ${psy}px, 0)`;
+        const bgX = -(player.state.frameIndex * 48);
+        const bgY = -(player.state.direction * 48);
+        playerEl.style.backgroundPosition = `${bgX}px ${bgY}px`;
       }
 
       // 2. Update NPC elements
@@ -413,7 +424,7 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
     const w = container.offsetWidth; const h = container.offsetHeight;
     canvas.width = w; canvas.height = h;
     setCanvasSize({ w, h });
-    const startX = 12 * TILE_SIZE; const startY = 20 * TILE_SIZE;
+    const startX = 12 * TILE_SIZE; const startY = 36 * TILE_SIZE;
     playerRef.current = new Player(startX, startY);
     cameraRef.current = new Camera(MAP_COLS * TILE_SIZE, MAP_ROWS * TILE_SIZE, w, h);
     cameraRef.current.update(startX, startY);
@@ -536,6 +547,7 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
       <Box sx={{ px: 2, py: 0.75, display: 'flex', alignItems: 'center', gap: 1.5, borderBottom: '2px solid rgba(16,185,129,0.2)', bgcolor: 'rgba(0,0,0,0.5)', flexShrink: 0 }}>
         <Typography sx={{ ...pixelFont, fontSize: '10px', color: '#10b981', letterSpacing: '0.1em' }}>OAKTREE WORLD v1.0</Typography>
         <Box sx={{ flex: 1 }} />
+        <Typography id="player-coords" sx={{ ...pixelFont, fontSize: '9px', color: '#eab308', mr: 1, letterSpacing: '0.05em' }}>X: 12, Y: 36</Typography>
         <Chip size="sm" variant="soft" color={isEnabled ? 'success' : 'danger'} sx={{ ...pixelFont, fontSize: '8px' }}>
           {isEnabled ? 'D1 ONLINE' : 'OFFLINE'}
         </Chip>
@@ -565,22 +577,12 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
                 top: 0,
                 left: 0,
                 transform: 'translate3d(-9999px, -9999px, 0)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                backgroundImage: 'url(/player_sprite.png)',
+                backgroundSize: `${TILE_SIZE * 4}px ${TILE_SIZE * 4}px`,
+                backgroundRepeat: 'no-repeat',
+                imageRendering: 'pixelated',
               }}
-            >
-              <img
-                src="https://img.pokemondb.net/sprites/black-white/anim/normal/bulbasaur.gif"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  objectFit: 'contain',
-                  imageRendering: 'pixelated',
-                }}
-                alt="Player"
-              />
-            </Box>
+            />
 
             {/* NPC Sprites */}
             {INITIAL_NPCS.map(npc => (
