@@ -65,15 +65,24 @@ export default function KnowledgeChat() {
                 {m.parts.map((part, i) =>
                   part.type === 'text' ? <span key={i}>{part.text}</span> : null
                 )}
-                {m.parts.map((part, i) =>
-                  part.type === 'tool-invocation' ? (
+                {m.parts.map((part, i) => {
+                  const isTool = part.type === 'tool-invocation' || part.type.startsWith('tool-');
+                  if (!isTool) return null;
+                  const toolInvocation = part.type === 'tool-invocation'
+                    ? (part as any).toolInvocation
+                    : {
+                        toolName: part.type.slice(5),
+                        result: (part as any).output,
+                        state: (part as any).state === 'output-available' ? 'result' : (part as any).state
+                      };
+                  return (
                     <Box key={i} sx={{ mt: 1, p: 1, bgcolor: 'background.surface', borderRadius: 'sm', opacity: 0.8 }}>
                       <Typography level="body-xs" color="primary">
-                        Calling: {(part as any).toolInvocation?.toolName}
+                        Calling: {toolInvocation?.toolName}
                       </Typography>
                     </Box>
-                  ) : null
-                )}
+                  );
+                })}
               </Typography>
             </Sheet>
           </Box>
