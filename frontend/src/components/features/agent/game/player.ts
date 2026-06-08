@@ -45,8 +45,8 @@ export class Player {
       }
       if (dy !== 0) {
         const nextY = this.state.worldY + dy * moveDist;
-        // Limit player: must stay between Y = 22 and Y = 40 inclusive (worldY must be >= 22 * tileSize and <= 40 * tileSize)
-        if (nextY >= 22 * tileSize && nextY <= 40 * tileSize) {
+        // Limit player: must stay between Y = 12 and Y = 41 inclusive (worldY must be >= 12 * tileSize and <= 41 * tileSize)
+        if (nextY >= 12 * tileSize && nextY <= 41 * tileSize) {
           const hitboxY = this.getFeetHitbox(this.state.worldX, nextY);
           const collidesMap = checkMapCollision(hitboxY, map, tileSize);
           const collidesNPC = checkNPCCollision(hitboxY, npcs);

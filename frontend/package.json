@@ -18,6 +18,7 @@
   },
   "dependencies": {
     "@ai-sdk/react": "^3.0.172",
+    "ai": "^6.0.193",
     "@astrojs/react": "^5.0.4",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
@@ -27,6 +28,7 @@
     "gsap": "^3.15.0",
     "i18next": "^26.3.0",
     "lucide-react": "^1.11.0",
+    "pngjs": "^7.0.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-i18next": "^17.0.8",

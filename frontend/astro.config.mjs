@@ -6,5 +6,10 @@ export default defineConfig({
   integrations: [react()],
   devToolbar: {
     enabled: false
-  }
+  },
+  vite: {
+    optimizeDeps: {
+      include: ['@ai-sdk/react', 'ai'],
+    },
+  },
 });

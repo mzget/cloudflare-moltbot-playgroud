@@ -20,7 +20,7 @@ const GEN1_BACK = (id: number) =>
 const INITIAL_NPCS: NPC[] = [
   {
     id: 'db-agent', name: 'Prof. Oak (DB Agent)', type: 'pokemon',
-    worldX: 10 * TILE_SIZE, worldY: 35 * TILE_SIZE,
+    worldX: 8.5 * TILE_SIZE, worldY: 17.5 * TILE_SIZE,
     width: TILE_SIZE * 1.5, height: TILE_SIZE * 1.5,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/snorlax.gif',
     dialogue: ['Welcome, trainer!', 'I am the Cloudflare DB Agent.', 'I can query D1 tables and inspect R2 buckets.', 'What would you like to know?'],
@@ -29,7 +29,7 @@ const INITIAL_NPCS: NPC[] = [
   },
   {
     id: 'knowledge-agent', name: 'Knowledge Agent', type: 'pokemon',
-    worldX: 14 * TILE_SIZE, worldY: 35 * TILE_SIZE,
+    worldX: 12.5 * TILE_SIZE, worldY: 17.5 * TILE_SIZE,
     width: TILE_SIZE * 1.5, height: TILE_SIZE * 1.5,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/mewtwo.gif',
     dialogue: ['Greetings, young investor!', 'I hold the secrets of the Oaktree portfolio.', 'Ask me about your holdings, history, or investment frameworks.'],
@@ -171,6 +171,13 @@ function initializeNPCs(map: TileMap): NPC[] {
   const shuffled = [...walkableTiles].sort(() => Math.random() - 0.5);
 
   return INITIAL_NPCS.map((npc, index) => {
+    if (npc.id === 'db-agent' || npc.id === 'knowledge-agent') {
+      return {
+        ...npc,
+        isWalking: false,
+        walkTimer: 0
+      };
+    }
     const tile = shuffled[index % shuffled.length];
     return {
       ...npc,
@@ -255,12 +262,19 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
   const mousePosRef = useRef({ x: -9999, y: -9999 });
   const hoverHudRef = useRef<HTMLDivElement>(null);
   const mapBgImageRef = useRef<HTMLImageElement | null>(null);
+  const pokemonCenterImageRef = useRef<HTMLImageElement | null>(null);
 
   useEffect(() => {
     const img = new Image();
-    img.src = encodeURI("/Game Boy Advance - Pokemon FireRed _ LeafGreen - Maps (Caves, Forests, Oceans, Etc.) - Route 01.png");
+    img.src = encodeURI("/game_assets/Game Boy Advance - Pokemon FireRed _ LeafGreen - Maps (Caves, Forests, Oceans, Etc.) - Route 01.png");
     img.onload = () => {
       mapBgImageRef.current = img;
+    };
+
+    const pcImg = new Image();
+    pcImg.src = encodeURI("/game_assets/pokemon-center-1F.png");
+    pcImg.onload = () => {
+      pokemonCenterImageRef.current = pcImg;
     };
   }, []);
 
@@ -496,7 +510,7 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
     ctx.clearRect(0, 0, w, h);
 
     const t = timeRef.current;
-    drawTileMap(ctx, mapRef.current, cam.pos.x, cam.pos.y, w, h, TILE_SIZE, t, mapBgImageRef.current);
+    drawTileMap(ctx, mapRef.current, cam.pos.x, cam.pos.y, w, h, TILE_SIZE, t, mapBgImageRef.current, pokemonCenterImageRef.current);
 
     // Zone labels
     ctx.save();
@@ -612,7 +626,7 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
     const w = container.offsetWidth; const h = container.offsetHeight;
     canvas.width = w; canvas.height = h;
     setCanvasSize({ w, h });
-    const startX = 12 * TILE_SIZE; const startY = 36 * TILE_SIZE;
+    const startX = 10 * TILE_SIZE; const startY = 22 * TILE_SIZE;
     playerRef.current = new Player(startX, startY);
     cameraRef.current = new Camera(MAP_COLS * TILE_SIZE, MAP_ROWS * TILE_SIZE, w, h);
     cameraRef.current.update(startX, startY);
@@ -765,7 +779,7 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
                 top: 0,
                 left: 0,
                 transform: 'translate3d(-9999px, -9999px, 0)',
-                backgroundImage: 'url(/player_sprite.png)',
+                backgroundImage: 'url(/game_assets/player_sprite.png)',
                 backgroundSize: `${TILE_SIZE * 4}px ${TILE_SIZE * 4}px`,
                 backgroundRepeat: 'no-repeat',
                 imageRendering: 'pixelated',
