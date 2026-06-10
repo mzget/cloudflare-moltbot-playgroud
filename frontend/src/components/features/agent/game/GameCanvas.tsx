@@ -323,7 +323,7 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
     sfx.confirm();
     const { type } = npc.metadata || {};
     if (type === 'scheduled-job' || type === 'llm-task') {
-      setBattle({ npc, playerHp: 100, enemyHp: 100, maxHp: 100, phase: 'MENU', log: [`A wild ${npc.name} appeared!`, ...npc.dialogue], isExecuting: false });
+      setBattle({ npc, playerHp: 100, enemyHp: 100, maxHp: 100, phase: 'MENU', log: [`A wild ${npc.name} appeared!`], isExecuting: false });
       setMode('BATTLE');
       sfx.battle();
     } else {
@@ -1141,29 +1141,71 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
         {mode === 'BATTLE' && battle && (
           <Box sx={{ position: 'absolute', inset: 0, zIndex: 20, bgcolor: 'rgba(6,10,20,0.98)', display: 'flex', flexDirection: 'column' }}>
             {/* Arena */}
-            <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-around', px: 4, pt: 2 }}>
-              {/* Enemy */}
-              <Box sx={{ textAlign: 'center' }}>
+            <Box sx={{ flex: 1, display: 'flex', alignItems: 'stretch', justifyContent: 'space-between', gap: 2, px: 3, pt: 3, pb: 1, minHeight: 0 }}>
+              {/* Left Side: Enemy / NPC Sprite and HP */}
+              <Box sx={{ width: '38%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRight: '1px solid rgba(255,255,255,0.08)', pr: 2 }}>
                 {battle.npc.spriteUrl ? (
-                  <Box component="img" src={battle.npc.spriteUrl} sx={{ width: 80, height: 80, imageRendering: 'pixelated' }}
+                  <Box component="img" src={battle.npc.spriteUrl} sx={{ width: 96, height: 96, imageRendering: 'pixelated', objectFit: 'contain' }}
                     onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
                   />
                 ) : (
-                  <Box sx={{ width: 80, height: 80, borderRadius: '50%', bgcolor: 'rgba(16,185,129,0.2)', border: '2px solid #10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '36px' }}>?</Box>
+                  <Box sx={{ width: 96, height: 96, borderRadius: '50%', bgcolor: 'rgba(16,185,129,0.2)', border: '2px solid #10b981', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '36px' }}>?</Box>
                 )}
-                <Typography sx={{ ...pixelFont, fontSize: '8px', color: '#10b981', mt: 1, mb: 0.5 }}>{battle.npc.name}</Typography>
-                <Box sx={{ width: 130 }}><HpBar hp={battle.enemyHp} max={battle.maxHp} color={battle.enemyHp > 50 ? '#10b981' : battle.enemyHp > 20 ? '#f59e0b' : '#ef4444'} /></Box>
-                <Typography sx={{ ...pixelFont, fontSize: '7px', color: 'rgba(255,255,255,0.4)', mt: 0.5 }}>{battle.enemyHp}/{battle.maxHp} HP</Typography>
+                <Typography sx={{ ...pixelFont, fontSize: '9px', color: '#10b981', mt: 2, mb: 1, textAlign: 'center' }}>{battle.npc.name}</Typography>
+                <Box sx={{ width: '100%', maxWidth: 160 }}><HpBar hp={battle.enemyHp} max={battle.maxHp} color={battle.enemyHp > 50 ? '#10b981' : battle.enemyHp > 20 ? '#f59e0b' : '#ef4444'} /></Box>
+                <Typography sx={{ ...pixelFont, fontSize: '7px', color: 'rgba(255,255,255,0.4)', mt: 1 }}>{battle.enemyHp}/{battle.maxHp} HP</Typography>
               </Box>
-              <Typography sx={{ ...pixelFont, fontSize: '20px', color: 'rgba(255,255,255,0.2)' }}>VS</Typography>
-              {/* Player */}
-              <Box sx={{ textAlign: 'center' }}>
-                <Box component="img" src="https://img.pokemondb.net/sprites/black-white/anim/back/normal/bulbasaur.gif" sx={{ width: 80, height: 80, imageRendering: 'pixelated' }}
-                  onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }}
-                />
-                <Typography sx={{ ...pixelFont, fontSize: '8px', color: '#fbbf24', mt: 1, mb: 0.5 }}>BULBASAUR</Typography>
-                <Box sx={{ width: 130 }}><HpBar hp={battle.playerHp} max={battle.maxHp} color="#10b981" /></Box>
-                <Typography sx={{ ...pixelFont, fontSize: '7px', color: 'rgba(255,255,255,0.4)', mt: 0.5 }}>{battle.playerHp}/{battle.maxHp} HP</Typography>
+
+              {/* Right Side: Retro Task Details Box */}
+              <Box sx={{ 
+                width: '60%', 
+                bgcolor: '#0b0f19', 
+                border: '6px double #e2e8f0', 
+                p: 2, 
+                display: 'flex', 
+                flexDirection: 'column',
+                minHeight: 0,
+                boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
+              }}>
+                <Typography sx={{ ...pixelFont, fontSize: '9px', color: '#fbbf24', borderBottom: '2px solid rgba(255,255,255,0.1)', pb: 1, mb: 1.5, letterSpacing: '0.05em' }}>
+                  TASK SPECIFICATION
+                </Typography>
+                
+                {/* Meta details */}
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 1.5, fontSize: '7px', color: '#e2e8f0', borderBottom: '1px dashed rgba(255,255,255,0.1)', pb: 1.5 }}>
+                  <Box sx={{ display: 'flex' }}><Typography component="span" sx={{ ...pixelFont, fontSize: '7px', color: '#10b981', width: 110 }}>TASK TYPE:</Typography> <Typography component="span" sx={{ ...pixelFont, fontSize: '7px' }}>{(battle.npc.metadata?.type || 'N/A').toUpperCase()}</Typography></Box>
+                  <Box sx={{ display: 'flex' }}><Typography component="span" sx={{ ...pixelFont, fontSize: '7px', color: '#10b981', width: 110 }}>MISSION:</Typography> <Typography component="span" sx={{ ...pixelFont, fontSize: '7px' }}>{battle.npc.responsibility || 'N/A'}</Typography></Box>
+                  <Box sx={{ display: 'flex' }}><Typography component="span" sx={{ ...pixelFont, fontSize: '7px', color: '#10b981', width: 110 }}>SCHEDULE:</Typography> <Typography component="span" sx={{ ...pixelFont, fontSize: '7px', color: '#eab308' }}>{battle.npc.metadata?.schedule || 'MANUAL ONLY'}</Typography></Box>
+                  {battle.npc.metadata?.endpoint && (
+                    <Box sx={{ display: 'flex' }}>
+                      <Typography component="span" sx={{ ...pixelFont, fontSize: '7px', color: '#10b981', width: 110 }}>ENDPOINT:</Typography>
+                      <Typography component="span" sx={{ ...pixelFont, fontSize: '7px', color: '#38bdf8', wordBreak: 'break-all' }}>
+                        {battle.npc.metadata?.method || 'GET'} {battle.npc.metadata?.endpoint}
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+
+                {/* Instructions / Dialogue lines */}
+                <Typography sx={{ ...pixelFont, fontSize: '7px', color: '#10b981', mb: 1 }}>REQUIREMENTS / SPECS:</Typography>
+                <Box sx={{ 
+                  flex: 1, 
+                  overflowY: 'auto', 
+                  pr: 0.5,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 1,
+                  '&::-webkit-scrollbar': { width: 6 },
+                  '&::-webkit-scrollbar-track': { background: 'rgba(0,0,0,0.3)' },
+                  '&::-webkit-scrollbar-thumb': { background: '#10b981', borderRadius: 0 },
+                }}>
+                  {battle.npc.dialogue.map((line, idx) => (
+                    <Box key={idx} sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+                      <Typography sx={{ ...pixelFont, fontSize: '7px', color: '#fbbf24', mt: 0.3 }}>&raquo;</Typography>
+                      <Typography sx={{ ...pixelFont, fontSize: '7.5px', color: '#f8fafc', lineHeight: 1.5 }}>{line}</Typography>
+                    </Box>
+                  ))}
+                </Box>
               </Box>
             </Box>
             {/* Log */}
@@ -1180,7 +1222,7 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
                 <>
                   {battle.npc.metadata?.endpoint && (
                     <Box component="button" onClick={triggerJob} disabled={battle.isExecuting} sx={btnSx('rgba(16,185,129,0.55)')}>
-                      <Typography sx={{ ...pixelFont, fontSize: '7px', color: '#fff' }}>? {battle.npc.metadata.triggerLabel || 'TRIGGER'}</Typography>
+                      <Typography sx={{ ...pixelFont, fontSize: '7px', color: '#fff' }}>FIGHT</Typography>
                     </Box>
                   )}
                   <Box component="button" onClick={exitMode} sx={btnSx('rgba(239,68,68,0.45)')}>
