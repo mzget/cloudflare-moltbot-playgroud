@@ -33,13 +33,18 @@ For all tasks, code changes, and analysis in this repository, you **MUST** load 
    - **Description**: Build ultra-fast web APIs and full-stack apps with Hono — runs on Cloudflare Workers, Deno, Bun, Node.js, and any WinterCG-compatible runtime.
    - **Key Requirement**: Use Hono's routing, middleware, Zod validation middleware (`zValidator`), and RPC client (`hc`) for building clean, type-safe API endpoints on Cloudflare Workers.
 
+5. **2D Games Skill** (Activated when working with canvas/game-related code):
+   - **File Path**: [SKILL.md](file:///c:/Users/natta/Documents/oaktree-agent/.agents/skills/2d-games/SKILL.md)
+   - **Description**: 2D game development principles including sprites, tilemaps, physics, and camera controls.
+   - **Key Requirement**: Apply structured game loops, coordinate systems, collision detection, and layout scaling rules for canvas games.
+
 ---
 
 ## Guidelines for execution
 
 ### 1. Verification of Skills
-- Read the instructions in all four skill files above before proposing any changes or modifications to the code.
-- Align code designs with Cloudflare Wrangler specifications, the simplified architecture guidelines from Andrej Karpathy, the Antigravity design principles, and Hono framework best practices.
+- Read the instructions in all relevant skill files above (including the 2D Games skill if the task involves the canvas game) before proposing any changes or modifications to the code.
+- Align code designs with Cloudflare Wrangler specifications, the simplified architecture guidelines from Andrej Karpathy, the Antigravity design principles, and Hono framework best practices, and 2D canvas game principles when applicable.
 
 ### 2. Stack Constraints (Precedence Rule)
 - **Backend**: Cloudflare Worker running in Node.js compatibility mode.
