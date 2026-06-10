@@ -212,7 +212,7 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
             </tr>
           ))}
 
-          {lots.length === 0 && !showForms.lot && (
+          {lots.length === 0 && (
             <tr>
               <td colSpan={13} className="left" style={{ padding: '16px 10px', opacity: 0.5 }}>
                 No share lots recorded.
@@ -220,47 +220,7 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
             </tr>
           )}
 
-          {showForms.lot && (
-            <tr className="yf-add-row">
-              <td className="left">
-                <Input size="sm" type="date" value={newLot.date}
-                  onChange={(e) => setNewLot({ ...newLot, date: e.target.value })} />
-              </td>
-              <td>
-                <Input size="sm" type="number" placeholder="0"
-                  value={newLot.shares}
-                  onChange={(e) => setNewLot({ ...newLot, shares: e.target.value })} />
-              </td>
-              <td>
-                <Input size="sm" type="number" placeholder="0.00"
-                  value={newLot.cost_per_share}
-                  onChange={(e) => setNewLot({ ...newLot, cost_per_share: e.target.value })} />
-              </td>
-              <td colSpan={4}>&nbsp;</td>
-              <td colSpan={2}>&nbsp;</td>
-              <td>
-                <Input size="sm" type="number" placeholder="Low"
-                  value={newLot.low_limit}
-                  onChange={(e) => setNewLot({ ...newLot, low_limit: e.target.value })} />
-              </td>
-              <td>
-                <Input size="sm" type="number" placeholder="High"
-                  value={newLot.high_limit}
-                  onChange={(e) => setNewLot({ ...newLot, high_limit: e.target.value })} />
-              </td>
-              <td className="left">
-                <Input size="sm" placeholder="Note"
-                  value={newLot.note}
-                  onChange={(e) => setNewLot({ ...newLot, note: e.target.value })} />
-              </td>
-              <td>
-                <Button size="sm" variant="solid" color="primary" onClick={handleAddLot}
-                  sx={{ minWidth: 0, px: 1 }}>
-                  ✓
-                </Button>
-              </td>
-            </tr>
-          )}
+          
         </tbody>
       </table>
 
@@ -285,37 +245,6 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
           </tr>
         </thead>
         <tbody>
-          {transactions.map((txn, i) => (
-            <tr key={txn.id ?? i}>
-              <td className="left">{txn.date}</td>
-              <td className="left">{txn.type}</td>
-              <td>{displayNum(txn.shares, 0)}</td>
-              <td>{displayNum(txn.cost_per_share)}</td>
-              <td>{displayNum(txn.commission)}</td>
-              <td>{displayNum(txn.total_cost)}</td>
-              <td className={gainClass(txn.realized_gain_pct)}>{displayPct(txn.realized_gain_pct)}</td>
-              <td className={gainClass(txn.realized_gain_amt)}>{displayNum(txn.realized_gain_amt)}</td>
-              <td className="left">{txn.note || '--'}</td>
-              <td>
-                <button
-                  className="yf-chevron"
-                  onClick={() => handleDeleteTxn(txn.id)}
-                  aria-label="Delete transaction"
-                >
-                  <Trash2 size={12} />
-                </button>
-              </td>
-            </tr>
-          ))}
-
-          {transactions.length === 0 && !showForms.txn && (
-            <tr>
-              <td colSpan={10} className="left" style={{ padding: '16px 10px', opacity: 0.5 }}>
-                No transactions recorded.
-              </td>
-            </tr>
-          )}
-
           {showForms.txn && (
             <tr className="yf-add-row">
               <td className="left">
@@ -358,7 +287,37 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
               </td>
             </tr>
           )}
-        </tbody>
+
+          {transactions.map((txn, i) => (
+            <tr key={txn.id ?? i}>
+              <td className="left">{txn.date}</td>
+              <td className="left">{txn.type}</td>
+              <td>{displayNum(txn.shares, 0)}</td>
+              <td>{displayNum(txn.cost_per_share)}</td>
+              <td>{displayNum(txn.commission)}</td>
+              <td>{displayNum(txn.total_cost)}</td>
+              <td className={gainClass(txn.realized_gain_pct)}>{displayPct(txn.realized_gain_pct)}</td>
+              <td className={gainClass(txn.realized_gain_amt)}>{displayNum(txn.realized_gain_amt)}</td>
+              <td className="left">{txn.note || '--'}</td>
+              <td>
+                <button
+                  className="yf-chevron"
+                  onClick={() => handleDeleteTxn(txn.id)}
+                  aria-label="Delete transaction"
+                >
+                  <Trash2 size={12} />
+                </button>
+              </td>
+            </tr>
+          ))}
+
+          {transactions.length === 0 && !showForms.txn && (
+            <tr>
+              <td colSpan={10} className="left" style={{ padding: '16px 10px', opacity: 0.5 }}>
+                No transactions recorded.
+              </td>
+            </tr>
+          )}</tbody>
       </table>
 
     </>
@@ -465,17 +424,7 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
         ))}
 
         <Box sx={{ marginLeft: 'auto', alignSelf: 'center', mb: 0.5 }}>
-          {activeTab === 'lots' && (
-            <Button
-              size="sm"
-              variant="plain"
-              color="primary"
-              startDecorator={<Plus size={14} />}
-              onClick={() => setShowForms(prev => ({ ...prev, lot: !prev.lot }))}
-            >
-              {showForms.lot ? 'Cancel' : 'Add Lot'}
-            </Button>
-          )}
+          
           {activeTab === 'transactions' && (
             <Button
               size="sm"
