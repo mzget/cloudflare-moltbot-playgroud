@@ -23,7 +23,7 @@ const INITIAL_NPCS: NPC[] = [
     worldX: 8.5 * TILE_SIZE, worldY: 17.5 * TILE_SIZE,
     width: TILE_SIZE * 1.5, height: TILE_SIZE * 1.5,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/snorlax.gif',
-    dialogue: ['Welcome, trainer!', 'I am the Cloudflare DB Agent.', 'I can query D1 tables and inspect R2 buckets.', 'What would you like to know?'],
+    responsibility: 'D1 & R2 Agent', dialogue: ['Welcome, trainer!', 'I am the Cloudflare DB Agent.', 'I can query D1 tables and inspect R2 buckets.', 'What would you like to know?'],
     isSolid: true, animationType: 'breathing',
     metadata: { endpoint: 'database-chat', type: 'db-agent' },
   },
@@ -32,7 +32,7 @@ const INITIAL_NPCS: NPC[] = [
     worldX: 12.5 * TILE_SIZE, worldY: 17.5 * TILE_SIZE,
     width: TILE_SIZE * 1.5, height: TILE_SIZE * 1.5,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/mewtwo.gif',
-    dialogue: ['Greetings, young investor!', 'I hold the secrets of the Oaktree portfolio.', 'Ask me about your holdings, history, or investment frameworks.'],
+    responsibility: 'Portfolio Advisor', dialogue: ['Greetings, young investor!', 'I hold the secrets of the Oaktree portfolio.', 'Ask me about your holdings, history, or investment frameworks.'],
     isSolid: true, animationType: 'breathing',
     metadata: { endpoint: 'chat', type: 'chat-agent' },
   },
@@ -41,7 +41,7 @@ const INITIAL_NPCS: NPC[] = [
     worldX: 16 * TILE_SIZE, worldY: 3 * TILE_SIZE,
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/alakazam.gif',
-    dialogue: ['Model: @cf/google/gemma-4-26b-a4b-it', 'I synthesize stock news into Howard Marks memos.', 'Output: Thai JSON with summary, sentiment, key_takeaways.'],
+    responsibility: 'Summarizes News', dialogue: ['Model: @cf/google/gemma-4-26b-a4b-it', 'I synthesize stock news into Howard Marks memos.', 'Output: Thai JSON with summary, sentiment, key_takeaways.'],
     isSolid: true, animationType: 'breathing',
     metadata: { type: 'llm-task', endpoint: '/api/summarize-all', triggerLabel: 'Run Synthesis', schedule: 'Every 6h' },
   },
@@ -50,7 +50,7 @@ const INITIAL_NPCS: NPC[] = [
     worldX: 18 * TILE_SIZE, worldY: 3 * TILE_SIZE,
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/farfetchd.gif',
-    dialogue: ['Model: @cf/google/gemma-4-26b-a4b-it', 'I group emails into macro themes.', 'Output: Thai Howard Marks paragraphs + 3-5 takeaways.'],
+    responsibility: 'Groups Emails', dialogue: ['Model: @cf/google/gemma-4-26b-a4b-it', 'I group emails into macro themes.', 'Output: Thai Howard Marks paragraphs + 3-5 takeaways.'],
     isSolid: true, animationType: 'waddle',
     metadata: { type: 'llm-task', endpoint: '/api/test-email-digest', triggerLabel: 'Run Digest', schedule: 'Hourly' },
   },
@@ -59,7 +59,7 @@ const INITIAL_NPCS: NPC[] = [
     worldX: 17 * TILE_SIZE, worldY: 5 * TILE_SIZE,
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/clefairy.gif',
-    dialogue: ['Model: @cf/google/gemma-3-12b-it', 'I format daily reports as engaging FB posts.', 'Rule: No hashtags mentioning investor names!'],
+    responsibility: 'Formats FB Posts', dialogue: ['Model: @cf/google/gemma-3-12b-it', 'I format daily reports as engaging FB posts.', 'Rule: No hashtags mentioning investor names!'],
     isSolid: true, animationType: 'bounce',
     metadata: { type: 'llm-task', endpoint: '/api/test-facebook-post', triggerLabel: 'Format Post', method: 'POST', schedule: 'Every 6h' },
   },
@@ -68,7 +68,7 @@ const INITIAL_NPCS: NPC[] = [
     worldX: 12 * TILE_SIZE, worldY: 7 * TILE_SIZE,
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/dragonite.gif',
-    dialogue: ['Cron: 0 * * * * (Every hour)', 'Job: Pull watchlist prices from Finnhub.', 'Updates price & valuation tables in D1.'],
+    responsibility: 'Pulls Watchlist Prices', dialogue: ['Cron: 0 * * * * (Every hour)', 'Job: Pull watchlist prices from Finnhub.', 'Updates price & valuation tables in D1.'],
     isSolid: true, animationType: 'bounce',
     metadata: { type: 'scheduled-job', endpoint: '/api/test-market-stats', triggerLabel: 'Fetch Stats', schedule: 'Hourly' },
   },
@@ -77,7 +77,7 @@ const INITIAL_NPCS: NPC[] = [
     worldX: 14 * TILE_SIZE, worldY: 8 * TILE_SIZE,
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/scyther.gif',
-    dialogue: ['Cron: Every 6 hours', 'Job: Crawl Google News & Yahoo Finance.', 'Falls back to Puppeteer if RSS fails.'],
+    responsibility: 'Crawls Google/Yahoo', dialogue: ['Cron: Every 6 hours', 'Job: Crawl Google News & Yahoo Finance.', 'Falls back to Puppeteer if RSS fails.'],
     isSolid: true, animationType: 'waddle',
     metadata: { type: 'scheduled-job', endpoint: '/api/crawl', triggerLabel: 'Start Crawl', schedule: 'Every 6h' },
   },
@@ -86,7 +86,7 @@ const INITIAL_NPCS: NPC[] = [
     worldX: 13 * TILE_SIZE, worldY: 10 * TILE_SIZE,
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/alakazam.gif',
-    dialogue: ['Cron: Every 6 hours', 'Job: LLM synthesis of news for each symbol.', 'Gemma-4 26B model. Output in Thai.'],
+    responsibility: 'Gemma Daily Summaries', dialogue: ['Cron: Every 6 hours', 'Job: LLM synthesis of news for each symbol.', 'Gemma-4 26B model. Output in Thai.'],
     isSolid: true, animationType: 'breathing',
     metadata: { type: 'scheduled-job', endpoint: '/api/summarize-all', triggerLabel: 'Summarize', schedule: 'Every 6h' },
   },
@@ -95,7 +95,7 @@ const INITIAL_NPCS: NPC[] = [
     worldX: 5 * TILE_SIZE, worldY: 17 * TILE_SIZE,
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/farfetchd.gif',
-    dialogue: ['Cron: 0 * * * * (Every hour)', 'Job: Poll Gmail via Google OAuth.', 'Ingests unread financial newsletters.'],
+    responsibility: 'Syncs Gmail Newsletters', dialogue: ['Cron: 0 * * * * (Every hour)', 'Job: Poll Gmail via Google OAuth.', 'Ingests unread financial newsletters.'],
     isSolid: true, animationType: 'waddle',
     metadata: { type: 'scheduled-job', endpoint: '/api/sync-emails', triggerLabel: 'Sync Emails', schedule: 'Hourly' },
   },
@@ -104,7 +104,7 @@ const INITIAL_NPCS: NPC[] = [
     worldX: 7 * TILE_SIZE, worldY: 18 * TILE_SIZE,
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/chansey.gif',
-    dialogue: ['Cron: Every 6 hours', 'Job: Fetch dividends, splits, earnings calendar.', 'Source: Finnhub API for watchlist symbols.'],
+    responsibility: 'Watchlist Events', dialogue: ['Cron: Every 6 hours', 'Job: Fetch dividends, splits, earnings calendar.', 'Source: Finnhub API for watchlist symbols.'],
     isSolid: true, animationType: 'bounce',
     metadata: { type: 'scheduled-job', endpoint: '/api/crawl-events', triggerLabel: 'Fetch Events', schedule: 'Every 6h' },
   },
@@ -113,7 +113,7 @@ const INITIAL_NPCS: NPC[] = [
     worldX: 6 * TILE_SIZE, worldY: 20 * TILE_SIZE,
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/pidgeot.gif',
-    dialogue: ['Cron: Every 6 hours', 'Job: Format reports as HTML email.', 'Sent via Cloudflare Email binding.'],
+    responsibility: 'Sends Email Reports', dialogue: ['Cron: Every 6 hours', 'Job: Format reports as HTML email.', 'Sent via Cloudflare Email binding.'],
     isSolid: true, animationType: 'bounce',
     metadata: { type: 'scheduled-job', endpoint: '/api/email-test', triggerLabel: 'Send Email', schedule: 'Every 6h' },
   },
@@ -122,7 +122,7 @@ const INITIAL_NPCS: NPC[] = [
     worldX: 16 * TILE_SIZE, worldY: 24 * TILE_SIZE,
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/growlithe.gif',
-    dialogue: ['Cron: 0 * * * * (Every hour)', 'Job: Evaluate price alert rules.', 'Stores triggered notifications in D1.'],
+    responsibility: 'Evaluates Alert Rules', dialogue: ['Cron: 0 * * * * (Every hour)', 'Job: Evaluate price alert rules.', 'Stores triggered notifications in D1.'],
     isSolid: true, animationType: 'breathing',
     metadata: { type: 'scheduled-job', endpoint: null, triggerLabel: 'Check Alerts', schedule: 'Hourly' },
   },
@@ -131,7 +131,7 @@ const INITIAL_NPCS: NPC[] = [
     worldX: 18 * TILE_SIZE, worldY: 25 * TILE_SIZE,
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/muk.gif',
-    dialogue: ['Cron: Every 6 hours', 'Job: Delete reports & news older than 3 days.', 'Deletes events > 30 days. Keeps D1 lean.'],
+    responsibility: 'Purges Old Data', dialogue: ['Cron: Every 6 hours', 'Job: Delete reports & news older than 3 days.', 'Deletes events > 30 days. Keeps D1 lean.'],
     isSolid: true, animationType: 'squish',
     metadata: { type: 'scheduled-job', endpoint: null, triggerLabel: 'Purge Data', schedule: 'Every 6h' },
   },
@@ -140,7 +140,7 @@ const INITIAL_NPCS: NPC[] = [
     worldX: 5 * TILE_SIZE, worldY: 31 * TILE_SIZE,
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/psyduck.gif',
-    dialogue: ['Cron: 0 * * * * (Every hour)', 'Job: Synthesize emails into theme-based digests.', 'Gemma-4 26B model. Capped at batch size 2.'],
+    responsibility: 'Gemma Email Summaries', dialogue: ['Cron: 0 * * * * (Every hour)', 'Job: Synthesize emails into theme-based digests.', 'Gemma-4 26B model. Capped at batch size 2.'],
     isSolid: true, animationType: 'waddle',
     metadata: { type: 'scheduled-job', endpoint: '/api/test-email-digest', triggerLabel: 'Run Digest', schedule: 'Hourly' },
   },
@@ -149,7 +149,7 @@ const INITIAL_NPCS: NPC[] = [
     worldX: 7 * TILE_SIZE, worldY: 32 * TILE_SIZE,
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/jigglypuff.gif',
-    dialogue: ['Cron: 0 * * * * (Every hour)', 'Job: Format daily reports into FB posts.', 'Gemma-3 12B model. Capped at 1 post.'],
+    responsibility: 'Post Daily FB Report', dialogue: ['Cron: 0 * * * * (Every hour)', 'Job: Format daily reports into FB posts.', 'Gemma-3 12B model. Capped at 1 post.'],
     isSolid: true, animationType: 'bounce',
     metadata: { type: 'scheduled-job', endpoint: '/api/test-facebook-post', triggerLabel: 'Format Post', method: 'POST', schedule: 'Hourly' },
   },
@@ -977,6 +977,7 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
             />
 
             {/* NPC Sprites */}
+                        {/* NPC Sprites & HUD */}
             {INITIALIZED_NPCS.map(npc => (
               <Box
                 key={npc.id}
@@ -993,6 +994,72 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
                   justifyContent: 'center',
                 }}
               >
+                {/* HUD bubble floating above the NPC sprite */}
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    bottom: '105%',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    zIndex: 10,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    whiteSpace: 'nowrap',
+                    pointerEvents: 'none',
+                  }}
+                >
+                  <Box
+                    sx={{
+                      bgcolor: 'rgba(6, 10, 20, 0.85)',
+                      border: '1.5px solid #10b981',
+                      borderRadius: '3px',
+                      px: 1,
+                      py: 0.5,
+                      boxShadow: '0 4px 10px rgba(0, 0, 0, 0.4)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 0.25,
+                      backdropFilter: 'blur(3px)',
+                    }}
+                  >
+                    <Typography
+                      sx={{
+                        fontFamily: "'Press Start 2P', monospace",
+                        fontSize: '7px',
+                        color: '#10b981',
+                        lineHeight: 1.2,
+                      }}
+                    >
+                      {npc.name}
+                    </Typography>
+                    {npc.responsibility && (
+                      <Typography
+                        sx={{
+                          fontFamily: "'Press Start 2P', monospace",
+                          fontSize: '5.5px',
+                          color: '#fbbf24',
+                          lineHeight: 1.2,
+                          opacity: 0.9,
+                        }}
+                      >
+                        {npc.responsibility}
+                      </Typography>
+                    )}
+                  </Box>
+                  <Box
+                    sx={{
+                      width: 0,
+                      height: 0,
+                      borderLeft: '4px solid transparent',
+                      borderRight: '4px solid transparent',
+                      borderTop: '4px solid #10b981',
+                      mt: '-1px',
+                    }}
+                  />
+                </Box>
+
                 <img
                   src={npc.spriteUrl}
                   style={{
@@ -1152,15 +1219,15 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
         {/* Mobile D-Pad */}
         <Box sx={{ display: { xs: 'flex', lg: 'none' }, position: 'absolute', bottom: 12, left: 12, right: 12, justifyContent: 'space-between', zIndex: 15, pointerEvents: 'none' }}>
           <Box sx={{ position: 'relative', width: 132, height: 132, pointerEvents: 'auto' }}>
-            {([['up','?',{top:0,left:44}],['down','?',{bottom:0,left:44}],['left','?',{top:44,left:0}],['right','?',{top:44,right:0}]] as [string,string,object][]).map(([dir,icon,pos]) => (
+            {([['up','W',{top:0,left:44}],['down','S',{bottom:0,left:44}],['left','A',{top:44,left:0}],['right','D',{top:44,right:0}]] as [string,string,object][]).map(([dir,icon,pos]) => (
               <Box key={dir} component="button"
                 onPointerDown={() => vd(dir as any)} onPointerUp={() => vu(dir as any)} onPointerLeave={() => vu(dir as any)}
-                sx={{ ...btnSx('rgba(16,185,129,0.3)'), position: 'absolute', fontSize: '14px', ...pos }}>{icon}</Box>
+                sx={{ ...btnSx('#475569', '#1e293b'), position: 'absolute', fontSize: '14px', ...pos }}>{icon}</Box>
             ))}
           </Box>
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end', pointerEvents: 'auto' }}>
-            <Box component="button" onPointerDown={() => vd('b')} onPointerUp={() => vu('b')} onPointerLeave={() => vu('b')} sx={btnSx('rgba(239,68,68,0.45)')}>B</Box>
-            <Box component="button" onPointerDown={() => vd('a')} onPointerUp={() => vu('a')} onPointerLeave={() => vu('a')} sx={btnSx('rgba(16,185,129,0.55)')}>A</Box>
+          <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-end', pointerEvents: 'auto' }}>
+            <Box component="button" onPointerDown={() => vd('b')} onPointerUp={() => vu('b')} onPointerLeave={() => vu('b')} sx={btnSx('#ef4444', '#b91c1c')}>B</Box>
+            <Box component="button" onPointerDown={() => vd('a')} onPointerUp={() => vu('a')} onPointerLeave={() => vu('a')} sx={btnSx('#10b981', '#047857')}>A</Box>
           </Box>
         </Box>
       </Box>

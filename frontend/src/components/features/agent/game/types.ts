@@ -54,6 +54,7 @@ export interface NPC {
   walkTargetY?: number;
   isWalking?: boolean;
   walkTimer?: number;
+  responsibility?: string;
 }
 
 export interface CameraState {
