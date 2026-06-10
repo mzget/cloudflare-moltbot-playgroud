@@ -23,9 +23,9 @@ export function generateTileMap(rows: number, cols: number): TileMap {
     for (let c = 0; c < actualCols; c++) {
       let isSolid = false;
       
-      // Set borders
-      if (c === 0) isSolid = true;
-      if (c === 24) isSolid = true;
+      // Set borders and Route 1 boundary forest trees
+      if (c <= 3) isSolid = true;
+      if (c >= 21) isSolid = true;
       
       // Top exit path
       if (r <= 2) {
@@ -38,6 +38,11 @@ export function generateTileMap(rows: number, cols: number): TileMap {
         if (c >= 11 && c <= 13) isSolid = false;
         else isSolid = true;
       }
+      
+      // Specific tree blocks/fences on Route 1
+      if (r < 10 && c <= 4) isSolid = true;
+      if (r > 32 && c <= 4) isSolid = true;
+      if (r > 15 && r < 20 && c >= 20) isSolid = true;
       
       if (r === 11 && c >= 5 && c <= 11) isSolid = true;
       if (r === 21 && c >= 13 && c <= 19) isSolid = true;
