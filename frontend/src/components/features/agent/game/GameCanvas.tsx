@@ -1027,26 +1027,13 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
                     <Typography
                       sx={{
                         fontFamily: "'Press Start 2P', monospace",
-                        fontSize: '7px',
+                        fontSize: '6.5px',
                         color: '#10b981',
                         lineHeight: 1.2,
                       }}
                     >
-                      {npc.name}
+                      {npc.responsibility || npc.name}
                     </Typography>
-                    {npc.responsibility && (
-                      <Typography
-                        sx={{
-                          fontFamily: "'Press Start 2P', monospace",
-                          fontSize: '5.5px',
-                          color: '#fbbf24',
-                          lineHeight: 1.2,
-                          opacity: 0.9,
-                        }}
-                      >
-                        {npc.responsibility}
-                      </Typography>
-                    )}
                   </Box>
                   <Box
                     sx={{
