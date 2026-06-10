@@ -157,10 +157,14 @@ const INITIAL_NPCS: NPC[] = [
 
 function initializeNPCs(map: TileMap): NPC[] {
   const walkableTiles: { r: number; c: number }[] = [];
-  const startRow = 22;
-  const endRow = 40;
+  const startRow = 12;
+  const endRow = 32;
   for (let r = startRow; r <= endRow; r++) {
     for (let c = 0; c < map[r].length; c++) {
+      // Exclude Pokemon Center interior (rows 15-24, cols 1-15)
+      if (r >= 15 && r <= 24 && c >= 1 && c <= 15) {
+        continue;
+      }
       if (map[r][c] === TileType.GRASS) {
         walkableTiles.push({ r, c });
       }
@@ -264,6 +268,12 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
   const mapBgImageRef = useRef<HTMLImageElement | null>(null);
   const pokemonCenterImageRef = useRef<HTMLImageElement | null>(null);
 
+  // Click-to-walk state refs
+  const walkTargetRef = useRef<{ x: number; y: number } | null>(null);
+  const walkTargetNpcRef = useRef<NPC | null>(null);
+  const walkTargetTimeRef = useRef<number>(0);
+  const stuckFramesRef = useRef<number>(0);
+
   useEffect(() => {
     const img = new Image();
     img.src = encodeURI("/game_assets/Game Boy Advance - Pokemon FireRed _ LeafGreen - Maps (Caves, Forests, Oceans, Etc.) - Route 01.png");
@@ -340,12 +350,73 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
     const input = inputRef.current;
     const player = playerRef.current;
     if (!input || !player || modeRef.current !== 'MAP') return;
-    const { dx, dy } = input.getMovementVector();
+    let { dx, dy } = input.getMovementVector();
+    
+    if (dx !== 0 || dy !== 0) {
+      walkTargetRef.current = null;
+      walkTargetNpcRef.current = null;
+    } else if (walkTargetRef.current) {
+      const currentX = player.state.worldX + player.state.width / 2;
+      const currentY = player.state.worldY + player.state.height * 0.8;
+      
+      const targetX = walkTargetRef.current.x;
+      const targetY = walkTargetRef.current.y;
+      
+      const diffX = targetX - currentX;
+      const diffY = targetY - currentY;
+      const distance = Math.sqrt(diffX * diffX + diffY * diffY);
+      
+      if (distance < 6) {
+        walkTargetRef.current = null;
+        walkTargetNpcRef.current = null;
+      } else {
+        dx = diffX / distance;
+        dy = diffY / distance;
+      }
+    }
+
     if ((dx !== 0 || dy !== 0) && !player.state.isMoving) sfx.step();
+
+    const lastWorldX = player.state.worldX;
+    const lastWorldY = player.state.worldY;
+
     player.move(dx, dy, dt, mapRef.current, npcsRef.current, TILE_SIZE);
+
+    if (walkTargetRef.current) {
+      // Check if player is adjacent to/overlapping clicked NPC's interaction range
+      if (walkTargetNpcRef.current) {
+        const npc = walkTargetNpcRef.current;
+        const { worldX, worldY, width, height } = player.state;
+        const box = { x: worldX + width * 0.1, y: worldY + height * 0.1, width: width * 0.8, height: height * 1.4 };
+        if (checkOverlap(box, { x: npc.worldX - 12, y: npc.worldY - 12, width: npc.width + 24, height: npc.height + 24 })) {
+          interactWithNPC(npc);
+          walkTargetRef.current = null;
+          walkTargetNpcRef.current = null;
+        }
+      }
+
+      // Stuck detection
+      const movedX = Math.abs(player.state.worldX - lastWorldX);
+      const movedY = Math.abs(player.state.worldY - lastWorldY);
+      if (movedX < 0.1 && movedY < 0.1) {
+        stuckFramesRef.current += 1;
+        if (stuckFramesRef.current > 15) {
+          walkTargetRef.current = null;
+          walkTargetNpcRef.current = null;
+          stuckFramesRef.current = 0;
+        }
+      } else {
+        stuckFramesRef.current = 0;
+      }
+    }
 
     // Update NPCs random walk
     npcsRef.current.forEach(npc => {
+      // Exclude agents inside the Pokemon Center from walking
+      if (npc.id === 'db-agent' || npc.id === 'knowledge-agent') {
+        return;
+      }
+
       if (npc.walkTimer === undefined) {
         npc.walkTimer = Math.random() * 3 + 1;
         npc.isWalking = false;
@@ -433,8 +504,9 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
             const nextGridX = currentGridX + dir.dx;
             const nextGridY = currentGridY + dir.dy;
 
-            // Must stay in the walkable zone: rows 22 to 40
-            if (nextGridY >= 22 && nextGridY <= 40 && nextGridX >= 0 && nextGridX < MAP_COLS) {
+            // Must stay in the walkable zone: rows 12 to 32, excluding Pokemon Center (rows 15-24, cols 1-15)
+            const isInsidePC = nextGridY >= 15 && nextGridY <= 24 && nextGridX >= 1 && nextGridX <= 15;
+            if (nextGridY >= 12 && nextGridY <= 32 && nextGridX >= 0 && nextGridX < MAP_COLS && !isInsidePC) {
               const targetBox = {
                 x: nextGridX * TILE_SIZE,
                 y: nextGridY * TILE_SIZE,
@@ -511,6 +583,44 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
 
     const t = timeRef.current;
     drawTileMap(ctx, mapRef.current, cam.pos.x, cam.pos.y, w, h, TILE_SIZE, t, mapBgImageRef.current, pokemonCenterImageRef.current);
+
+    // Draw click target indicators
+    if (walkTargetRef.current) {
+      const elapsed = timeRef.current - walkTargetTimeRef.current;
+      const targetCanvasX = walkTargetRef.current.x - cam.pos.x;
+      const targetCanvasY = walkTargetRef.current.y - cam.pos.y;
+      
+      ctx.save();
+      // Glowing outer ring
+      const baseRadius = 8;
+      const pulse = Math.sin(timeRef.current * 10) * 3;
+      const radius = baseRadius + pulse;
+      
+      ctx.strokeStyle = 'rgba(16, 185, 129, 0.8)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(targetCanvasX, targetCanvasY, radius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Core dot
+      ctx.fillStyle = 'rgba(16, 185, 129, 0.9)';
+      ctx.beginPath();
+      ctx.arc(targetCanvasX, targetCanvasY, 2, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Initial click expand ripple
+      if (elapsed < 0.4) {
+        const rippleRadius = (elapsed / 0.4) * 24;
+        const opacity = 1 - (elapsed / 0.4);
+        ctx.strokeStyle = `rgba(16, 185, 129, ${opacity})`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(targetCanvasX, targetCanvasY, rippleRadius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      
+      ctx.restore();
+    }
 
     // Zone labels
     ctx.save();
@@ -637,8 +747,46 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
       const rect = canvas.getBoundingClientRect();
       mousePosRef.current = { x: (e.clientX - rect.left) * (canvas.width / rect.width), y: (e.clientY - rect.top) * (canvas.height / rect.height) };
     };
+    const onCanvasClick = (e: MouseEvent) => {
+      if (modeRef.current !== 'MAP') return;
+      const rect = canvas.getBoundingClientRect();
+      const clickX = (e.clientX - rect.left) * (canvas.width / rect.width);
+      const clickY = (e.clientY - rect.top) * (canvas.height / rect.height);
+      const cam = cameraRef.current;
+      if (!cam) return;
+      
+      const targetX = clickX + cam.pos.x;
+      const targetY = Math.max(12 * TILE_SIZE, Math.min(41 * TILE_SIZE, clickY + cam.pos.y));
+      
+      // Check if we clicked on an NPC
+      let clickedNPC: NPC | null = null;
+      for (const npc of npcsRef.current) {
+        if (
+          targetX >= npc.worldX &&
+          targetX <= npc.worldX + npc.width &&
+          targetY >= npc.worldY &&
+          targetY <= npc.worldY + npc.height
+        ) {
+          clickedNPC = npc;
+          break;
+        }
+      }
+      
+      walkTargetRef.current = { x: targetX, y: targetY };
+      walkTargetNpcRef.current = clickedNPC;
+      walkTargetTimeRef.current = timeRef.current;
+      stuckFramesRef.current = 0;
+      sfx.select();
+    };
+
     canvas.addEventListener('mousemove', onMouseMove);
-    return () => { gameLoopRef.current?.stop(); inputRef.current?.cleanup(); canvas.removeEventListener('mousemove', onMouseMove); };
+    canvas.addEventListener('click', onCanvasClick);
+    return () => {
+      gameLoopRef.current?.stop();
+      inputRef.current?.cleanup();
+      canvas.removeEventListener('mousemove', onMouseMove);
+      canvas.removeEventListener('click', onCanvasClick);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -722,18 +870,60 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
   }, [battle, apiBaseUrl, authToken]);
 
   const exitMode = () => { setMode('MAP'); setDialogue(null); setBattle(null); sfx.select(); };
-  const vd = (k: 'up'|'down'|'left'|'right'|'a'|'b') => inputRef.current?.setVirtualInput(k, true);
+  const vd = (k: 'up'|'down'|'left'|'right'|'a'|'b') => {
+    if (['up', 'down', 'left', 'right'].includes(k)) {
+      walkTargetRef.current = null;
+      walkTargetNpcRef.current = null;
+    }
+    inputRef.current?.setVirtualInput(k, true);
+  };
   const vu = (k: 'up'|'down'|'left'|'right'|'a'|'b') => inputRef.current?.setVirtualInput(k, false);
 
-  const btnSx = (bg: string) => ({
-    width: 44, height: 44, borderRadius: '8px', background: bg,
-    border: '2px solid rgba(255,255,255,0.25)', cursor: 'pointer',
+  const btnSx = (bg: string, shadowColor: string = 'rgba(0,0,0,0.35)') => ({
+    width: 44, height: 44, borderRadius: '0px', background: bg,
+    border: '4px solid #111118', cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    color: '#fff', fontSize: '16px', fontWeight: 700,
-    fontFamily: "'Press Start 2P', monospace",
-    boxShadow: '0 4px 0 rgba(0,0,0,0.5)', userSelect: 'none' as const,
-    '&:active': { transform: 'translateY(3px)', boxShadow: '0 1px 0 rgba(0,0,0,0.5)' },
+    color: '#fff',
+    boxShadow: `
+      inset 2px 2px 0px rgba(255,255,255,0.45),
+      inset -2px -2px 0px rgba(0,0,0,0.35),
+      0 4px 0px ${shadowColor}
+    `,
+    userSelect: 'none' as const,
+    transition: 'all 0.05s steps(2)',
+    '&:hover': {
+      filter: 'brightness(1.1)',
+    },
+    '&:active': {
+      transform: 'translateY(3px)',
+      boxShadow: `
+        inset 2px 2px 0px rgba(255,255,255,0.45),
+        inset -2px -2px 0px rgba(0,0,0,0.35),
+        0 1px 0px ${shadowColor}
+      `,
+    },
   });
+
+  const VolumeIcon = () => (
+    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" style={{ shapeRendering: 'crispEdges' }}>
+      <path d="M2 5h3v6H2z M5 4h1v8H5z M6 3h1v10H6z M7 2h2v12H7z" />
+      <path d="M11 5h1v6h-1z M13 3h1v10h-1z" />
+    </svg>
+  );
+
+  const MuteIcon = () => (
+    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" style={{ shapeRendering: 'crispEdges' }}>
+      <path d="M2 5h3v6H2z M5 4h1v8H5z M6 3h1v10H6z M7 2h2v12H7z" />
+      <path d="M11 5h1v1h-1z M15 5h-1v1h1z M12 6h1v1h-1z M14 6h-1v1h1z M13 7h1v2h-1z M12 9h1v1h-1z M14 9h-1v1h1z M11 10h1v1h-1z M15 10h-1v1h1z" />
+    </svg>
+  );
+
+  const BackIcon = () => (
+    <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor" style={{ shapeRendering: 'crispEdges' }}>
+      <path d="M7 3h1v10H7z M6 4h1v8H6z M5 5h1v6H5z M4 6h1v4H4z M3 7h1v2H3z" />
+      <path d="M8 6h6v4H8z" />
+    </svg>
+  );
 
   const HpBar = ({ hp, max, color }: { hp: number; max: number; color: string }) => (
     <Box sx={{ width: '100%', height: 8, bgcolor: 'rgba(0,0,0,0.5)', borderRadius: 4, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.12)' }}>
@@ -753,10 +943,10 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
         <Chip size="sm" variant="soft" color={isEnabled ? 'success' : 'danger'} sx={{ ...pixelFont, fontSize: '8px' }}>
           {isEnabled ? 'D1 ONLINE' : 'OFFLINE'}
         </Chip>
-        <Box component="button" onClick={() => setIsMuted(m => !m)} sx={btnSx(isMuted ? 'rgba(239,68,68,0.4)' : 'rgba(16,185,129,0.35)')}>
-          {isMuted ? '??' : '??'}
+        <Box component="button" onClick={() => setIsMuted(m => !m)} sx={btnSx(isMuted ? '#ef4444' : '#10b981', isMuted ? '#b91c1c' : '#047857')}>
+          {isMuted ? <MuteIcon /> : <VolumeIcon />}
         </Box>
-        {mode !== 'MAP' && <Box component="button" onClick={exitMode} sx={btnSx('rgba(100,100,140,0.5)')}>?</Box>}
+        {mode !== 'MAP' && <Box component="button" onClick={exitMode} sx={btnSx('#475569', '#1e293b')}><BackIcon /></Box>}
       </Box>
 
       {/* Canvas wrapper */}
