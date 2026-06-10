@@ -38,7 +38,7 @@ const INITIAL_NPCS: NPC[] = [
   },
   {
     id: 'llm-summarizer', name: 'Stock Summarizer', type: 'pokemon',
-    worldX: 16 * TILE_SIZE, worldY: 3 * TILE_SIZE,
+    worldX: 3.5 * TILE_SIZE, worldY: 17 * TILE_SIZE,
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/bulbasaur.gif',
     responsibility: 'Summarizes News', dialogue: ['Model: @cf/google/gemma-4-26b-a4b-it', 'I synthesize stock news into Howard Marks memos.', 'Output: Thai JSON with summary, sentiment, key_takeaways.'],
@@ -47,7 +47,7 @@ const INITIAL_NPCS: NPC[] = [
   },
   {
     id: 'llm-email', name: 'Newsletter Digest', type: 'pokemon',
-    worldX: 18 * TILE_SIZE, worldY: 3 * TILE_SIZE,
+    worldX: 3.5 * TILE_SIZE, worldY: 19 * TILE_SIZE,
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/charmander.gif',
     responsibility: 'Groups Emails', dialogue: ['Model: @cf/google/gemma-4-26b-a4b-it', 'I group emails into macro themes.', 'Output: Thai Howard Marks paragraphs + 3-5 takeaways.'],
@@ -56,7 +56,7 @@ const INITIAL_NPCS: NPC[] = [
   },
   {
     id: 'llm-facebook', name: 'Facebook Assistant', type: 'pokemon',
-    worldX: 17 * TILE_SIZE, worldY: 5 * TILE_SIZE,
+    worldX: 3.5 * TILE_SIZE, worldY: 21 * TILE_SIZE,
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/squirtle.gif',
     responsibility: 'Formats FB Posts', dialogue: ['Model: @cf/google/gemma-3-12b-it', 'I format daily reports as engaging FB posts.', 'Rule: No hashtags mentioning investor names!'],
@@ -175,7 +175,7 @@ function initializeNPCs(map: TileMap): NPC[] {
   const shuffled = [...walkableTiles].sort(() => Math.random() - 0.5);
 
   return INITIAL_NPCS.map((npc, index) => {
-    if (npc.id === 'db-agent' || npc.id === 'knowledge-agent') {
+    if (npc.id === 'db-agent' || npc.id === 'knowledge-agent' || npc.id.startsWith('llm-')) {
       return {
         ...npc,
         isWalking: false,
@@ -413,7 +413,7 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
     // Update NPCs random walk
     npcsRef.current.forEach(npc => {
       // Exclude agents inside the Pokemon Center from walking
-      if (npc.id === 'db-agent' || npc.id === 'knowledge-agent') {
+      if (npc.id === 'db-agent' || npc.id === 'knowledge-agent' || npc.id.startsWith('llm-')) {
         return;
       }
 
@@ -627,7 +627,7 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
     ctx.font = 'bold 10px monospace';
     ctx.textAlign = 'center';
     ctx.fillStyle = 'rgba(255,255,255,0.15)';
-    ctx.fillText('Workers AI Lab', 4 * TILE_SIZE - cam.pos.x, 10 * TILE_SIZE - cam.pos.y);
+    ctx.fillText('Workers AI Lab', 8 * TILE_SIZE - cam.pos.x, 14 * TILE_SIZE - cam.pos.y);
     ctx.fillText('Workflow Safari Zone', 24 * TILE_SIZE - cam.pos.x, 6 * TILE_SIZE - cam.pos.y);
     ctx.restore();
 
