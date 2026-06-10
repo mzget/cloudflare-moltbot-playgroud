@@ -1,4 +1,4 @@
-ï»¿import { TileType } from './types';
+import { TileType } from './types';
 import type { TileMap, TileConfig } from './types';
 
 export const TILE_RULES: Record<TileType, TileConfig> = {
@@ -46,13 +46,13 @@ export function generateTileMap(rows: number, cols: number): TileMap {
       
       if (r === 11 && c >= 5 && c <= 11) isSolid = true;
       if (r === 21 && c >= 13 && c <= 19) isSolid = true;
-      if (r === 31 && c >= 5 && c <= 11) isSolid = true;
+      
       
       if (r === 6 && c >= 4 && c <= 8) isSolid = true;
-      if (r === 31 && c >= 14 && c <= 20) isSolid = true;
+      
 
-      // Override with PokÃ©mon Center 1F interior collisions
-      // PokÃ©mon Center is placed at X0.5, Y14.5 (columns 1 to 15, rows 15 to 24)
+      // Override with Pokémon Center 1F interior collisions
+      // Pokémon Center is placed at X0.5, Y14.5 (columns 1 to 15, rows 15 to 24)
       if (c >= 1 && c <= 15 && r >= 15 && r <= 24) {
         const relC = Math.floor(c - 0.5);
         const relR = Math.floor(r - 14.5);
@@ -106,6 +106,7 @@ export function generateTileMap(rows: number, cols: number): TileMap {
         }
       }
 
+      if (c >= 3 && c <= 22 && r >= 22 && r <= 32) { isSolid = false; }
       row.push(isSolid ? T : G);
     }
     map.push(row);
@@ -186,7 +187,7 @@ export function drawTileMap(
     }
   }
 
-  // Draw PokÃ©mon Center overlay on top of background image or standard tiles
+  // Draw Pokémon Center overlay on top of background image or standard tiles
   if (pokemonCenterImage) {
     ctx.imageSmoothingEnabled = false;
     const destX = 0.5 * tileSize - cameraX;

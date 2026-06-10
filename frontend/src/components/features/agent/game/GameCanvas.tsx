@@ -157,10 +157,12 @@ const INITIAL_NPCS: NPC[] = [
 
 function initializeNPCs(map: TileMap): NPC[] {
   const walkableTiles: { r: number; c: number }[] = [];
-  const startRow = 12;
+  const startRow = 22;
   const endRow = 32;
+  const startCol = 3;
+  const endCol = 22;
   for (let r = startRow; r <= endRow; r++) {
-    for (let c = 0; c < map[r].length; c++) {
+    for (let c = startCol; c <= endCol; c++) {
       // Exclude Pokemon Center interior (rows 15-24, cols 1-15)
       if (r >= 15 && r <= 24 && c >= 1 && c <= 15) {
         continue;
@@ -504,9 +506,9 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
             const nextGridX = currentGridX + dir.dx;
             const nextGridY = currentGridY + dir.dy;
 
-            // Must stay in the walkable zone: rows 12 to 32, excluding Pokemon Center (rows 15-24, cols 1-15)
+            // Must stay in the walkable zone: rows 22 to 32, columns 3 to 22, excluding Pokemon Center (rows 15-24, cols 1-15)
             const isInsidePC = nextGridY >= 15 && nextGridY <= 24 && nextGridX >= 1 && nextGridX <= 15;
-            if (nextGridY >= 12 && nextGridY <= 32 && nextGridX >= 0 && nextGridX < MAP_COLS && !isInsidePC) {
+            if (nextGridY >= 22 && nextGridY <= 32 && nextGridX >= 3 && nextGridX <= 22 && !isInsidePC) {
               const targetBox = {
                 x: nextGridX * TILE_SIZE,
                 y: nextGridY * TILE_SIZE,
