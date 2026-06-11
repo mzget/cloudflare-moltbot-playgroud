@@ -85,6 +85,7 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
   const [allocForm, setAllocForm] = useState<Record<string, string>>({});
 
   // Broker overrides state
+  const [isEditingBrokers, setIsEditingBrokers] = useState(false);
   const [brokerOverrideForm, setBrokerOverrideForm] = useState<Record<string, { cost: string; balance: string }>>({});
   const [submittingBroker, setSubmittingBroker] = useState<string | null>(null);
 
@@ -234,24 +235,50 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
     } catch (e) { console.error(e); }
   };
 
-  // Broker Overrides save
-  const handleSaveBrokerOverride = async (brokerName: string) => {
-    setSubmittingBroker(brokerName);
-    const cost = brokerOverrideForm[brokerName]?.cost;
-    const balance = brokerOverrideForm[brokerName]?.balance;
+  // Broker Overrides operations
+  const handleStartEditingBrokers = () => {
+    const formInit: Record<string, { cost: string; balance: string }> = {};
+    brokers.forEach((b: any) => {
+      formInit[b.broker_name] = {
+        cost: b.cost_override !== null ? b.cost_override.toString() : '',
+        balance: b.balance_override !== null ? b.balance_override.toString() : ''
+      };
+    });
+    setBrokerOverrideForm(formInit);
+    setIsEditingBrokers(true);
+  };
+
+  const handleCancelEditingBrokers = () => {
+    const formInit: Record<string, { cost: string; balance: string }> = {};
+    brokers.forEach((b: any) => {
+      formInit[b.broker_name] = {
+        cost: b.cost_override !== null ? b.cost_override.toString() : '',
+        balance: b.balance_override !== null ? b.balance_override.toString() : ''
+      };
+    });
+    setBrokerOverrideForm(formInit);
+    setIsEditingBrokers(false);
+  };
+
+  const handleSaveBrokerOverrides = async () => {
+    setSubmittingBroker('all');
     try {
-      const res = await fetch(`${API_BASE_URL}/api/portfolio/brokers/override`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          broker_name: brokerName,
-          cost_override: cost === '' ? null : parseFloat(cost),
-          balance_override: balance === '' ? null : parseFloat(balance)
-        })
+      const promises = displayedBrokers.map(broker => {
+        const cost = brokerOverrideForm[broker.broker_name]?.cost;
+        const balance = brokerOverrideForm[broker.broker_name]?.balance;
+        return fetch(`${API_BASE_URL}/api/portfolio/brokers/override`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            broker_name: broker.broker_name,
+            cost_override: cost === '' ? null : parseFloat(cost),
+            balance_override: balance === '' ? null : parseFloat(balance)
+          })
+        });
       });
-      if (res.ok) {
-        fetchData();
-      }
+      await Promise.all(promises);
+      setIsEditingBrokers(false);
+      fetchData();
     } catch (e) {
       console.error(e);
     } finally {
@@ -596,13 +623,47 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
 
       {/* Broker Balances Table */}
       <Sheet sx={{ ...glassStyle, p: 3 }}>
-        <Box>
-          <Typography level="title-lg" sx={{ fontWeight: 800, mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Coins size={20} color="#10b981" /> Broker & Platform (THB)
-          </Typography>
-          <Typography level="body-xs" sx={{ opacity: 0.6, mb: 2.5 }}>
-            Consolidated balances by platform. Cost/Balances are auto-derived from stock prices and fund allocations, or overridden manually.
-          </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
+          <Box>
+            <Typography level="title-lg" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Coins size={20} color="#10b981" /> Broker & Platform (THB)
+            </Typography>
+            <Typography level="body-xs" sx={{ opacity: 0.6, mt: 0.5 }}>
+              Consolidated balances by platform. Cost/Balances are auto-derived from stock prices and fund allocations, or overridden manually.
+            </Typography>
+          </Box>
+          {isEditingBrokers ? (
+            <Stack direction="row" spacing={1}>
+              <Button
+                variant="solid"
+                color="success"
+                startDecorator={<Save size={16} />}
+                loading={submittingBroker === 'all'}
+                onClick={handleSaveBrokerOverrides}
+                sx={{ borderRadius: '12px', fontWeight: 700 }}
+              >
+                Save
+              </Button>
+              <Button
+                variant="outlined"
+                color="neutral"
+                onClick={handleCancelEditingBrokers}
+                sx={{ borderRadius: '12px', fontWeight: 700 }}
+              >
+                Cancel
+              </Button>
+            </Stack>
+          ) : (
+            <Button
+              variant="soft"
+              color="primary"
+              startDecorator={<Edit size={16} />}
+              onClick={handleStartEditingBrokers}
+              sx={{ borderRadius: '12px', fontWeight: 700 }}
+            >
+              Edit Overrides
+            </Button>
+          )}
         </Box>
         <Box sx={{ overflowX: 'auto' }}>
           <Table aria-label="broker balances table" sx={{ '& th': { fontWeight: 700 } }}>
@@ -614,7 +675,6 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
                 <th style={{ textAlign: 'right' }}>Gains</th>
                 <th style={{ textAlign: 'right', width: 140 }}>Cost Override</th>
                 <th style={{ textAlign: 'right', width: 140 }}>Value Override</th>
-                <th style={{ textAlign: 'center', width: 100 }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -630,44 +690,45 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
                   <td style={{ textAlign: 'right', fontWeight: 700 }} className={broker.gain_amt >= 0 ? 'yf-positive' : 'yf-negative'}>
                     {showMoneyValues ? formatCurrency(broker.gain_amt, true, '฿') : '••••••••'} ({broker.gain_pct.toFixed(2)}%)
                   </td>
-                  {/* Cost Override Input */}
-                  <td>
-                    <Input
-                      size="sm"
-                      placeholder="Manual Cost"
-                      value={brokerOverrideForm[broker.broker_name]?.cost || ''}
-                      onChange={e => setBrokerOverrideForm(prev => ({
-                        ...prev,
-                        [broker.broker_name]: { ...prev[broker.broker_name], cost: e.target.value }
-                      }))}
-                      sx={{ borderRadius: '8px' }}
-                    />
+                  {/* Cost Override */}
+                  <td style={{ textAlign: 'right' }}>
+                    {isEditingBrokers ? (
+                      <Input
+                        size="sm"
+                        placeholder="Manual Cost"
+                        value={brokerOverrideForm[broker.broker_name]?.cost || ''}
+                        onChange={e => setBrokerOverrideForm(prev => ({
+                          ...prev,
+                          [broker.broker_name]: { ...prev[broker.broker_name], cost: e.target.value }
+                        }))}
+                        slotProps={{ input: { style: { textAlign: 'right' } } }}
+                        sx={{ borderRadius: '8px' }}
+                      />
+                    ) : (
+                      broker.cost_override !== null ? (
+                        showMoneyValues ? formatCurrency(broker.cost_override, false, '฿') : '••••••••'
+                      ) : '--'
+                    )}
                   </td>
-                  {/* Value Override Input */}
-                  <td>
-                    <Input
-                      size="sm"
-                      placeholder="Manual Value"
-                      value={brokerOverrideForm[broker.broker_name]?.balance || ''}
-                      onChange={e => setBrokerOverrideForm(prev => ({
-                        ...prev,
-                        [broker.broker_name]: { ...prev[broker.broker_name], balance: e.target.value }
-                      }))}
-                      sx={{ borderRadius: '8px' }}
-                    />
-                  </td>
-                  <td style={{ textAlign: 'center' }}>
-                    <Button
-                      size="sm"
-                      variant="soft"
-                      color="primary"
-                      loading={submittingBroker === broker.broker_name}
-                      onClick={() => handleSaveBrokerOverride(broker.broker_name)}
-                      startDecorator={<Save size={14} />}
-                      sx={{ borderRadius: '8px', fontWeight: 700 }}
-                    >
-                      Save
-                    </Button>
+                  {/* Value Override */}
+                  <td style={{ textAlign: 'right' }}>
+                    {isEditingBrokers ? (
+                      <Input
+                        size="sm"
+                        placeholder="Manual Value"
+                        value={brokerOverrideForm[broker.broker_name]?.balance || ''}
+                        onChange={e => setBrokerOverrideForm(prev => ({
+                          ...prev,
+                          [broker.broker_name]: { ...prev[broker.broker_name], balance: e.target.value }
+                        }))}
+                        slotProps={{ input: { style: { textAlign: 'right' } } }}
+                        sx={{ borderRadius: '8px' }}
+                      />
+                    ) : (
+                      broker.balance_override !== null ? (
+                        showMoneyValues ? formatCurrency(broker.balance_override, false, '฿') : '••••••••'
+                      ) : '--'
+                    )}
                   </td>
                 </tr>
               ))}
@@ -685,7 +746,6 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
                   <td style={{ textAlign: 'right', fontWeight: 700 }} className={brokerTotals.gain_amt >= 0 ? 'yf-positive' : 'yf-negative'}>
                     {showMoneyValues ? formatCurrency(brokerTotals.gain_amt, true, '฿') : '••••••••'} ({brokerTotals.gain_pct.toFixed(2)}%)
                   </td>
-                  <td></td>
                   <td></td>
                   <td></td>
                 </tr>
