@@ -2,7 +2,7 @@ import { Env } from './index';
 
 interface FacebookPostRow {
 	id: number;
-	source_type: 'daily_report' | 'email_digest';
+	source_type: 'daily_report' | 'email_digest' | 'notebook_article';
 	source_id: number;
 	thai_title: string | null;
 	thai_content: string | null;
@@ -74,6 +74,18 @@ export async function processPendingFacebookPosts(env: Env): Promise<number> {
 				const takeaways = JSON.parse(digest.key_takeaways || '[]');
 				thaiContent = `Category: ${digest.category}\nDigest Summary: ${digest.summary}\nKey Takeaways:\n${takeaways.map((t: string) => `- ${t}`).join('\n')}`;
 				subjectInfo = `Market Digest: ${digest.category}`;
+			} else if (post.source_type === 'notebook_article') {
+				const article = await env.DB.prepare(
+					'SELECT title, symbol, summary, key_takeaways FROM notebook_articles WHERE id = ?'
+				).bind(post.source_id).first() as { title: string, symbol: string | null, summary: string | null, key_takeaways: string } | null;
+
+				if (!article) {
+					throw new Error(`Notebook article ID ${post.source_id} not found`);
+				}
+
+				const takeaways = JSON.parse(article.key_takeaways || '[]');
+				thaiContent = `Title: ${article.title}\nStock Symbol: ${article.symbol || 'N/A'}\nArticle Summary: ${article.summary || ''}\nKey Takeaways:\n${takeaways.map((t: string) => `- ${t}`).join('\n')}`;
+				subjectInfo = `Notebook Article: ${article.title}`;
 			} else {
 				throw new Error(`Invalid source_type: ${post.source_type}`);
 			}
@@ -161,15 +173,24 @@ export async function syncAndProcessFacebookPosts(env: Env): Promise<number> {
 			  AND id NOT IN (SELECT source_id FROM facebook_posts WHERE source_type = 'email_digest')
 		`).run();
 
+		// 3. Discover and queue new notebook articles from the last 24h
+		await env.DB.prepare(`
+			INSERT OR IGNORE INTO facebook_posts (source_type, source_id, status)
+			SELECT 'notebook_article', id, 'pending'
+			FROM notebook_articles
+			WHERE created_at > datetime('now', '-1 day')
+			  AND id NOT IN (SELECT source_id FROM facebook_posts WHERE source_type = 'notebook_article')
+		`).run();
+
 	} catch (e) {
-		console.error('Failed to sync new daily reports/digests into facebook_posts queue:', e);
+		console.error('Failed to sync new daily reports/digests/notebook articles into facebook_posts queue:', e);
 	}
 
 	// 3. Process the queue
 	return await processPendingFacebookPosts(env);
 }
 
-async function formatAndStyleFacebookPost(env: Env, content: string, type: 'daily_report' | 'email_digest'): Promise<string> {
+async function formatAndStyleFacebookPost(env: Env, content: string, type: 'daily_report' | 'email_digest' | 'notebook_article'): Promise<string> {
 	const systemPrompt = `
 You are the Oaktree Agent, a premium financial analyst preparing investment intelligence for a Thai audience on Facebook.
 Your job is to format and rewrite the Thai report content into a premium, engaging Facebook post.

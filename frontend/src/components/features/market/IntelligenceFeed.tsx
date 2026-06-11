@@ -2,28 +2,34 @@ import * as React from 'react';
 import { Box, Typography, Sheet, Stack, Button, ButtonGroup, Badge } from '@mui/joy';
 import DailyReportCard from './DailyReportCard';
 import EmailDigestCard from './EmailDigestCard';
+import NotebookArticleCard from './NotebookArticleCard';
 import { glassStyle } from '../../../styles/glass';
 import MarketEventsTimeline from './MarketEventsTimeline';
 
 export default function IntelligenceFeed({
   reports,
   digests = [],
+  notebookArticles = [],
   loading,
   onDigestRead
 }: {
   reports: any[];
   digests?: any[];
+  notebookArticles?: any[];
   loading: boolean;
   onDigestRead?: (id: number) => void;
 }) {
-  const [filter, setFilter] = React.useState<'all' | 'reports' | 'digests'>('all');
+  const [filter, setFilter] = React.useState<'all' | 'reports' | 'digests' | 'articles'>('all');
 
   const unreadCount = React.useMemo(() => {
     return digests.filter(d => d.is_readed !== 1).length;
   }, [digests]);
 
   const getReportTime = (item: any) => {
-    if (item.symbol) {
+    if (item.title || item.facebook_status !== undefined) {
+      // Notebook article (created_at is a timestamp in seconds)
+      return item.created_at ? item.created_at * 1000 : 0;
+    } else if (item.symbol) {
       // Symbol report (created_at is a string "YYYY-MM-DD HH:MM:SS" in UTC)
       const utcStr = item.created_at ? item.created_at.replace(' ', 'T') + 'Z' : '';
       return utcStr ? new Date(utcStr).getTime() : 0;
@@ -35,15 +41,16 @@ export default function IntelligenceFeed({
 
   // Combine and sort chronologically (newest first)
   const combinedFeed = React.useMemo(() => {
-    const items = [...reports, ...digests];
+    const items = [...reports, ...digests, ...notebookArticles];
     return items.sort((a, b) => getReportTime(b) - getReportTime(a));
-  }, [reports, digests]);
+  }, [reports, digests, notebookArticles]);
 
   // Filter items
   const filteredFeed = React.useMemo(() => {
     return combinedFeed.filter(item => {
-      if (filter === 'reports') return !!item.symbol;
+      if (filter === 'reports') return !!item.symbol && !item.title && item.facebook_status === undefined;
       if (filter === 'digests') return !!item.category;
+      if (filter === 'articles') return !!item.title || item.facebook_status !== undefined;
       return true;
     });
   }, [combinedFeed, filter]);
@@ -59,7 +66,7 @@ export default function IntelligenceFeed({
         <Box>
           <Typography level="h2" sx={{ fontWeight: 800, mb: 1 }}>Market Intelligence</Typography>
           <Typography sx={{ color: 'text.secondary' }}>
-            Synthesis of recent market movements, news signals, and email newsletter digests.
+            Synthesis of recent market movements, news signals, and synced NotebookLM articles.
           </Typography>
         </Box>
       </Stack>
@@ -136,6 +143,18 @@ export default function IntelligenceFeed({
               Email Digests
             </Badge>
           </Button>
+          <Button
+            onClick={() => setFilter('articles')}
+            sx={{
+              fontWeight: 600,
+              bgcolor: filter === 'articles' ? 'background.surface' : 'transparent',
+              color: filter === 'articles' ? 'primary.plainColor' : 'text.secondary',
+              boxShadow: filter === 'articles' ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
+              '&:hover': { bgcolor: filter === 'articles' ? 'background.surface' : 'background.level2' }
+            }}
+          >
+            Articles
+          </Button>
         </ButtonGroup>
       </Stack>
 
@@ -151,13 +170,17 @@ export default function IntelligenceFeed({
               ? 'No symbol reports generated yet.'
               : filter === 'digests'
               ? 'No email digests generated yet. Make sure your Gmail is connected.'
-              : 'No intelligence reports or email digests generated yet.'}
+              : filter === 'articles'
+              ? 'No NotebookLM articles synced yet.'
+              : 'No intelligence reports, email digests, or articles generated yet.'}
           </Typography>
         </Sheet>
       ) : (
         <Stack spacing={4}>
           {filteredFeed.map((item) => {
-            if (item.symbol) {
+            if (item.title || item.facebook_status !== undefined) {
+              return <NotebookArticleCard key={`article-${item.id}`} article={item} />;
+            } else if (item.symbol) {
               return <DailyReportCard key={`report-${item.id}`} report={item} />;
             } else {
               return <EmailDigestCard key={`digest-${item.id}`} digest={item} onMarkAsRead={onDigestRead} />;
