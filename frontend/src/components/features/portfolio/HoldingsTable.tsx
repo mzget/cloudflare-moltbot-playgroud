@@ -1,3 +1,4 @@
+import { fmtNum, fmtPct, fmtShares, gainClass } from '../../../utils/format';
 import * as React from 'react';
 import { Box, Typography, Sheet } from '@mui/joy';
 import { ChevronDown, ChevronRight } from 'lucide-react';
@@ -64,26 +65,6 @@ const TOTAL_COL_SPAN = COLUMNS.length + 1; // +1 for chevron column
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 
-function fmtNum(v: number | null, decimals = 2): string {
-  if (v === null || v === undefined) return '--';
-  return v.toLocaleString('en-US', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  });
-}
-
-function fmtPct(v: number | null): string {
-  if (v === null || v === undefined) return '--';
-  const sign = v > 0 ? '+' : '';
-  return `${sign}${v.toFixed(2)}%`;
-}
-
-function gainClass(v: number | null): string {
-  if (v === null || v === undefined) return '';
-  if (v > 0) return 'yf-positive';
-  if (v < 0) return 'yf-negative';
-  return '';
-}
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -99,6 +80,7 @@ export default function HoldingsTable({
 }: HoldingsTableProps) {
   const showMoneyValues = useSettingsStore(state => state.showMoneyValues);
   const displayNum = (v: number | null, decimals = 2) => showMoneyValues ? fmtNum(v, decimals) : '•••••';
+  const displayShares = (v: number | null) => showMoneyValues ? fmtShares(v) : '•••••';
   const displayPct = (v: number | null) => fmtPct(v);
 
   const sortArrow = (col: string) => {
@@ -230,7 +212,7 @@ export default function HoldingsTable({
                   </td>
 
                   {/* Shares */}
-                  <td style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{displayNum(h.shares, 0)}</td>
+                  <td style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{displayShares(h.shares)}</td>
 
                   {/* Last Price */}
                   <td style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>{displayNum(h.last_price)}</td>
