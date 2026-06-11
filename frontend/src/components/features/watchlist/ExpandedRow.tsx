@@ -1,3 +1,4 @@
+import { fmtNum, fmtPct, fmtShares, gainClass } from '../../../utils/format';
 import * as React from 'react';
 import { Box, Typography, Input, Select, Option, Button } from '@mui/joy';
 import { Plus, Trash2, Check } from 'lucide-react';
@@ -19,26 +20,6 @@ type SubTab = 'lots' | 'transactions' | 'dividends';
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 
-function fmtNum(v: number | null | undefined, decimals = 2): string {
-  if (v === null || v === undefined) return '--';
-  return v.toLocaleString('en-US', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  });
-}
-
-function fmtPct(v: number | null | undefined): string {
-  if (v === null || v === undefined) return '--';
-  const sign = v > 0 ? '+' : '';
-  return sign + v.toFixed(2) + '%';
-}
-
-function gainClass(v: number | null | undefined): string {
-  if (v === null || v === undefined) return '';
-  if (v > 0) return 'yf-positive';
-  if (v < 0) return 'yf-negative';
-  return '';
-}
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -47,7 +28,8 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
   const [activeTab, setActiveTab] = React.useState<SubTab>('lots');
   const showMoneyValues = useSettingsStore(state => state.showMoneyValues);
 
-  const displayNum = (v: number | null | undefined, decimals = 2) => showMoneyValues ? fmtNum(v, decimals) : '•••••';
+  const displayNum = (v: number | null | undefined, decimals = 2) => showMoneyValues ? fmtNum(v, decimals) : '••••••';
+  const displayShares = (v: number | null | undefined) => showMoneyValues ? fmtShares(v) : '••••••';
   const displayPct = (v: number | null | undefined) => fmtPct(v);
 
   const {
@@ -218,7 +200,7 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
           {lots.map((lot, i) => (
             <tr key={lot.id ?? i}>
               <td className="left">{lot.date}</td>
-              <td>{displayNum(lot.shares, 0)}</td>
+              <td>{displayShares(lot.shares)}</td>
               <td>{displayNum(lot.cost_per_share)}</td>
               <td>{displayNum(lot.total_cost)}</td>
               <td>{displayNum(lot.market_value)}</td>
@@ -321,7 +303,7 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
             <tr key={txn.id ?? i}>
               <td className="left">{txn.date}</td>
               <td className="left">{txn.type}</td>
-              <td>{displayNum(txn.shares, 0)}</td>
+              <td>{displayShares(txn.shares)}</td>
               <td>{displayNum(txn.cost_per_share)}</td>
               <td>{displayNum(txn.commission)}</td>
               <td>{displayNum(txn.total_cost)}</td>
