@@ -26,3 +26,9 @@ crons = ["0 * * * *"] # Every hour
 name = "oaktree-sync-workflow"
 binding = "OAKTREE_SYNC_WORKFLOW"
 class_name = "OaktreeSyncWorkflow"
+
+[vars]
+NOTEBOOKLM_BRIDGE_URL = "http://localhost:3100"
+BRIDGE_SECRET = ""
+NOTEBOOKLM_DEFAULT_NOTEBOOK_ID = "ai-datacenter"
+

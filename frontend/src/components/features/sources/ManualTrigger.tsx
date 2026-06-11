@@ -7,19 +7,36 @@ export default function ManualTrigger() {
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
 
-  const handleTrigger = async (type: 'crawl' | 'run-all') => {
+  const handleTrigger = async (type: 'crawl' | 'run-all' | 'sync-notebook') => {
     setStatus('loading');
     setMessage('');
 
     try {
-      const endpoint = type === 'crawl' ? '/api/crawl' : '/api/summarize-all';
+      let endpoint = '';
+      let method = 'GET';
+      
+      if (type === 'crawl') {
+        endpoint = '/api/crawl';
+      } else if (type === 'run-all') {
+        endpoint = '/api/summarize-all';
+      } else if (type === 'sync-notebook') {
+        endpoint = '/api/test-notebook-sync';
+        method = 'POST';
+      }
+      
       const url = `${API_BASE_URL}${endpoint}`;
       
-      const response = await fetch(url);
+      const response = await fetch(url, { method });
 
       if (response.ok) {
         setStatus('success');
-        setMessage(type === 'crawl' ? 'Crawler & Reports started' : 'Summaries regenerating...');
+        if (type === 'crawl') {
+          setMessage('Crawler & Reports started');
+        } else if (type === 'run-all') {
+          setMessage('Summaries regenerating...');
+        } else if (type === 'sync-notebook') {
+          setMessage('NotebookLM sync completed successfully');
+        }
         setTimeout(() => {
           setStatus('idle');
           setMessage('');
@@ -37,7 +54,7 @@ export default function ManualTrigger() {
 
   return (
     <Stack spacing={1}>
-      <Stack direction="row" spacing={1.5}>
+      <Stack direction="row" spacing={1.5} flexWrap="wrap" sx={{ gap: 1 }}>
         <Tooltip title="Trigger manual news crawl" variant="soft">
           <Button
             variant="soft"
@@ -83,6 +100,30 @@ export default function ManualTrigger() {
             }}
           >
             Generate Reports
+          </Button>
+        </Tooltip>
+
+        <Tooltip title="Sync NotebookLM Articles & Post to Facebook" variant="soft">
+          <Button
+            variant="soft"
+            onClick={() => handleTrigger('sync-notebook')}
+            loading={status === 'loading' && message === 'NotebookLM sync completed successfully'}
+            disabled={status === 'loading'}
+            startDecorator={<RefreshCw size={16} />}
+            size="sm"
+            sx={{ 
+              borderRadius: '12px',
+              fontWeight: 600,
+              border: '1px solid rgba(24, 119, 242, 0.2)',
+              transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+              '&:hover': { 
+                bgcolor: 'rgba(24, 119, 242, 0.2)',
+                transform: 'translateY(-1px)',
+                boxShadow: '0 4px 12px rgba(24, 119, 242, 0.15)'
+              }
+            }}
+          >
+            Sync NotebookLM
           </Button>
         </Tooltip>
       </Stack>

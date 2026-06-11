@@ -12,6 +12,7 @@ import { syncAndProcessFacebookPosts } from './facebook';
 import { recordDailyPortfolioHistory, getPortfolioHistory } from './portfolioHistory';
 import { sortTransactions } from './portfolioUtils';
 import { calculatePerformanceComparison } from './historicalPrices';
+import { syncNotebookArticles } from './notebookSync';
 
 
 import { Hono } from 'hono';
@@ -36,6 +37,9 @@ export interface Env {
 	FACEBOOK_PAGE_ACCESS_TOKEN?: string;
 	OAKTREE_SYNC_WORKFLOW: Workflow;
 	IS_LOCAL?: string;
+	NOTEBOOKLM_BRIDGE_URL?: string;
+	BRIDGE_SECRET?: string;
+	NOTEBOOKLM_DEFAULT_NOTEBOOK_ID?: string;
 }
 
 const app = new Hono<{
@@ -59,7 +63,8 @@ app.use('/api/*', async (c, next) => {
 	const isUnprotectedRoute = path === '/' || 
 							   path === '/api/auth/user/login-url' || 
 							   path === '/api/auth/user/callback' || 
-							   path === '/api/test-facebook-post';
+							   path === '/api/test-facebook-post' ||
+							   path === '/api/test-notebook-sync';
 	
 	if (!isUnprotectedRoute) {
 		const jwtSecret = c.env.JWT_SECRET || 'dev-secret-key-123456';
@@ -661,6 +666,51 @@ app.post('/api/test-facebook-post', async (c) => {
 			success: false,
 			error: (e as any).message
 		}, 500);
+	}
+});
+
+// API: Test NotebookLM Sync & Facebook Post
+app.post('/api/test-notebook-sync', async (c) => {
+	try {
+		console.log('Manually triggering NotebookLM sync & Facebook posting...');
+		const syncedCount = await syncNotebookArticles(c.env);
+		console.log(`Synced ${syncedCount} articles. Processing Facebook posts queue...`);
+		const postedCount = await syncAndProcessFacebookPosts(c.env);
+		return c.json({
+			success: true,
+			message: `NotebookLM sync completed. Synced ${syncedCount} new articles. Processed ${postedCount} Facebook posts.`
+		});
+	} catch (e) {
+		return c.json({
+			success: false,
+			error: (e as any).message
+		}, 500);
+	}
+});
+
+// API: Get Synced NotebookLM Articles & Facebook Post Status
+app.get('/api/notebook-articles', async (c) => {
+	try {
+		const { results } = await c.env.DB.prepare(`
+			SELECT 
+				a.id,
+				a.title,
+				a.symbol,
+				a.summary,
+				a.key_takeaways,
+				CAST(strftime('%s', a.created_at) as INTEGER) as created_at,
+				fp.status as facebook_status,
+				fp.facebook_post_id,
+				fp.error_message as facebook_error
+			FROM notebook_articles a
+			LEFT JOIN facebook_posts fp ON fp.source_type = 'notebook_article' AND fp.source_id = a.id
+			ORDER BY a.created_at DESC
+			LIMIT 50
+		`).all();
+		
+		return c.json(results || []);
+	} catch (e) {
+		return c.json({ error: (e as any).message }, 500);
 	}
 });
 
@@ -1713,6 +1763,7 @@ export default {
 						sendDailyEmailReport: isSixHourly,
 						purgeOldData: isSixHourly,
 						syncFacebookPosts: true,
+						syncNotebookArticles: hour === 0,
 					}
 				});
 				console.log("Workflow instance triggered successfully.");
