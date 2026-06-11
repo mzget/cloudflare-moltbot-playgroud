@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { Box, Typography, Input, Select, Option, Button } from '@mui/joy';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Check } from 'lucide-react';
 import { useHoldingDetails } from '../portfolio/hooks/useHoldingDetails';
 import type { Lot, Transaction, Dividend } from '../portfolio/hooks/useHoldingDetails';
 import '../../../styles/yahooPortfolio.css';
@@ -43,6 +43,7 @@ function gainClass(v: number | null | undefined): string {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }: ExpandedRowProps) {
+  const getTodayDate = () => new Date().toISOString().split('T')[0];
   const [activeTab, setActiveTab] = React.useState<SubTab>('lots');
   const showMoneyValues = useSettingsStore(state => state.showMoneyValues);
 
@@ -74,10 +75,10 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
     date: '', shares: '', cost_per_share: '', low_limit: '', high_limit: '', note: '',
   });
   const [newTxn, setNewTxn] = React.useState({
-    date: '', type: 'Buy' as 'Buy' | 'Sell', shares: '', cost_per_share: '', commission: '', note: '',
+    date: getTodayDate(), type: 'Buy' as 'Buy' | 'Sell', shares: '', cost_per_share: '', commission: '', note: '',
   });
   const [newDiv, setNewDiv] = React.useState({
-    date: '', amount: '', per_share: '', note: '',
+    date: getTodayDate(), amount: '', per_share: '', note: '',
   });
 
   // ── Add handlers ────────────────────────────────────────────────────────────
@@ -102,6 +103,18 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
   };
 
   const handleAddTxn = async () => {
+    if (!newTxn.date) {
+      alert('Please select a Date.');
+      return;
+    }
+    if (!newTxn.shares || parseFloat(newTxn.shares) <= 0) {
+      alert('Please enter a valid number of Shares.');
+      return;
+    }
+    if (!newTxn.cost_per_share || parseFloat(newTxn.cost_per_share) <= 0) {
+      alert('Please enter a valid Cost/Share.');
+      return;
+    }
     try {
       const res = await addTxn({
         date: newTxn.date,
@@ -112,15 +125,27 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
         note: newTxn.note,
       });
       if (res.ok) {
-        setNewTxn({ date: '', type: 'Buy', shares: '', cost_per_share: '', commission: '', note: '' });
+        setNewTxn({ date: getTodayDate(), type: 'Buy', shares: '', cost_per_share: '', commission: '', note: '' });
         setShowForms(prev => ({ ...prev, txn: false }));
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        alert(`Failed to add transaction: ${errData.error || res.statusText}`);
       }
     } catch (e) {
       console.error('Failed to add transaction', e);
+      alert('Failed to add transaction. Please check console.');
     }
   };
 
   const handleAddDiv = async () => {
+    if (!newDiv.date) {
+      alert('Please select a Date.');
+      return;
+    }
+    if (!newDiv.amount || parseFloat(newDiv.amount) <= 0) {
+      alert('Please enter a valid Amount.');
+      return;
+    }
     try {
       const res = await addDiv({
         date: newDiv.date,
@@ -129,11 +154,15 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
         note: newDiv.note,
       });
       if (res.ok) {
-        setNewDiv({ date: '', amount: '', per_share: '', note: '' });
+        setNewDiv({ date: getTodayDate(), amount: '', per_share: '', note: '' });
         setShowForms(prev => ({ ...prev, div: false }));
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        alert(`Failed to add dividend: ${errData.error || res.statusText}`);
       }
     } catch (e) {
       console.error('Failed to add dividend', e);
+      alert('Failed to add dividend. Please check console.');
     }
   };
 
@@ -280,9 +309,9 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
                   onChange={(e) => setNewTxn({ ...newTxn, note: e.target.value })} />
               </td>
               <td>
-                <Button size="sm" variant="solid" color="primary" onClick={handleAddTxn}
+                <Button size="sm" variant="solid" color="success" onClick={handleAddTxn}
                   sx={{ minWidth: 0, px: 1 }}>
-                  ✓
+                  <Check size={14} />
                 </Button>
               </td>
             </tr>
@@ -384,9 +413,9 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
                   onChange={(e) => setNewDiv({ ...newDiv, note: e.target.value })} />
               </td>
               <td>
-                <Button size="sm" variant="solid" color="primary" onClick={handleAddDiv}
+                <Button size="sm" variant="solid" color="success" onClick={handleAddDiv}
                   sx={{ minWidth: 0, px: 1 }}>
-                  ✓
+                  <Check size={14} />
                 </Button>
               </td>
             </tr>
