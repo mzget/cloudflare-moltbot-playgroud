@@ -153,7 +153,7 @@ app.get('/api/email-test', async (c) => {
 	try {
 		const instance = await c.env.OAKTREE_SYNC_WORKFLOW.create({
 			id: `manual-email-test-${Date.now()}`,
-			params: { sendDailyEmailReport: true }
+			params: { sendDailyEmailReport: false } // Disabled for this phase
 		});
 		return c.text(`Email trigger started via Workflow: ${instance.id}`);
 	} catch (e) {
@@ -1726,7 +1726,7 @@ export default {
 						runCrawler: isSixHourly,
 						generateDailySummaries: isSixHourly,
 						fetchMarketEvents: isSixHourly,
-						sendDailyEmailReport: isSixHourly,
+						sendDailyEmailReport: false, // Disabled for this phase
 						purgeOldData: isSixHourly,
 						syncFacebookPosts: true,
 					}

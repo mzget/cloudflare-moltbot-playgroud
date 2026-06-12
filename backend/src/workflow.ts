@@ -82,7 +82,8 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 
 		if (params.sendDailyEmailReport) {
 			await step.do('send-daily-email-report', async () => {
-				return await sendDailyEmailReport(this.env);
+				console.log("sendDailyEmailReport is disabled for this phase.");
+				return { status: "disabled", message: "sendDailyEmailReport is disabled for this phase." };
 			});
 		}
 
