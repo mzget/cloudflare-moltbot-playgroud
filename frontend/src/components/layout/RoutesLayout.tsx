@@ -278,6 +278,23 @@ export default function RoutesLayout() {
                   await fetchReports();
                 }
               }}
+              onReportRead={async (id) => {
+                // Optimistic UI: mark as read locally
+                setReports(prev => prev.map(r => r.id === id ? { ...r, is_readed: 1 } : r));
+                try {
+                  const res = await fetch(`${API_BASE_URL}/api/reports/mark-read`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id })
+                  });
+                  if (!res.ok) {
+                    throw new Error(await res.text());
+                  }
+                } catch (e) {
+                  console.error("Failed to mark report as read:", e);
+                  await fetchReports();
+                }
+              }}
             />
           )}
 

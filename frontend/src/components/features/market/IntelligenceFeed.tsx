@@ -9,12 +9,14 @@ export default function IntelligenceFeed({
   reports,
   digests = [],
   loading,
-  onDigestRead
+  onDigestRead,
+  onReportRead
 }: {
   reports: any[];
   digests?: any[];
   loading: boolean;
   onDigestRead?: (id: number) => void;
+  onReportRead?: (id: number) => void;
 }) {
   const [filter, setFilter] = React.useState<'all' | 'reports' | 'digests'>('all');
 
@@ -33,10 +35,15 @@ export default function IntelligenceFeed({
     }
   };
 
-  // Combine and sort chronologically (newest first)
+  // Combine and sort: unread first (newest), then read items last
   const combinedFeed = React.useMemo(() => {
     const items = [...reports, ...digests];
-    return items.sort((a, b) => getReportTime(b) - getReportTime(a));
+    return items.sort((a, b) => {
+      const aRead = (a.is_readed === 1) ? 1 : 0;
+      const bRead = (b.is_readed === 1) ? 1 : 0;
+      if (aRead !== bRead) return aRead - bRead; // unread first
+      return getReportTime(b) - getReportTime(a); // then newest first
+    });
   }, [reports, digests]);
 
   // Filter items
@@ -158,7 +165,7 @@ export default function IntelligenceFeed({
         <Stack spacing={4}>
           {filteredFeed.map((item) => {
             if (item.symbol) {
-              return <DailyReportCard key={`report-${item.id}`} report={item} />;
+              return <DailyReportCard key={`report-${item.id}`} report={item} onMarkAsRead={onReportRead} />;
             } else {
               return <EmailDigestCard key={`digest-${item.id}`} digest={item} onMarkAsRead={onDigestRead} />;
             }

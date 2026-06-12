@@ -172,9 +172,25 @@ app.get('/api/reports', async (c) => {
 			ORDER BY created_at DESC
 			LIMIT 1
 		)
-		ORDER BY m.created_at DESC
+		ORDER BY m.is_readed ASC, m.created_at DESC
 	`).all();
 	return c.json(results);
+});
+
+// API: Mark Daily Report as Read
+app.post('/api/reports/mark-read', async (c) => {
+	try {
+		const { id } = await c.req.json() as any;
+		if (!id) {
+			return c.json({ error: 'Missing report ID' }, 400);
+		}
+		await c.env.DB.prepare(
+			'UPDATE daily_reports SET is_readed = 1 WHERE id = ?'
+		).bind(id).run();
+		return c.json({ success: true, message: 'Report marked as read' });
+	} catch (e) {
+		return c.json({ error: (e as any).message }, 500);
+	}
 });
 
 app.delete('/api/reports', async (c) => {
