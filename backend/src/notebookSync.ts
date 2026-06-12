@@ -42,7 +42,7 @@ Format the response strictly as a JSON array of objects, where each object has f
 				question: prompt,
 				notebookId: notebookId,
 			}),
-			signal: AbortSignal.timeout(120000), // 2 minutes timeout for headless browser research
+			signal: AbortSignal.timeout(180000), // 2 minutes timeout for headless browser research
 		});
 
 		if (!response.ok) {
@@ -55,10 +55,29 @@ Format the response strictly as a JSON array of objects, where each object has f
 			throw new Error(`Bridge returned error: ${data.error}`);
 		}
 
-		const answer = data.answer;
+		let answer = data.answer;
 		if (!answer) {
 			console.log('No answer returned from NotebookLM bridge.');
 			return 0;
+		}
+
+		// Check if the bridge response text itself is a wrapped JSON from notebooklm-mcp
+		try {
+			const parsedAnswer = JSON.parse(answer);
+			if (parsedAnswer && typeof parsedAnswer === 'object') {
+				// Case 1: MCP returned an error { success: false, error: "..." }
+				if (parsedAnswer.success === false && parsedAnswer.error) {
+					throw new Error(`NotebookLM MCP error: ${parsedAnswer.error}`);
+				}
+				// Case 2: Wrapped success { success: true, data: { answer: "..." } }
+				if (parsedAnswer.success && parsedAnswer.data && parsedAnswer.data.answer) {
+					console.log('Detected wrapped JSON response. Extracting nested answer...');
+					answer = parsedAnswer.data.answer;
+				}
+			}
+		} catch (e: any) {
+			// Re-throw MCP errors; ignore JSON parse errors (answer is raw text)
+			if (e.message?.startsWith('NotebookLM MCP error:')) throw e;
 		}
 
 		// Clean up markdown block if present
@@ -73,11 +92,34 @@ Format the response strictly as a JSON array of objects, where each object has f
 		console.log('Cleaned text from NotebookLM:', cleanText);
 
 		let articles: SyncedArticle[] = [];
+		let parsed = false;
+
+		// 1. Try parsing direct cleanText
 		try {
 			articles = JSON.parse(cleanText) as SyncedArticle[];
+			parsed = true;
 		} catch (parseErr) {
+			// 2. If it fails, search for the JSON array starting with '[' followed by '{'
+			const match = cleanText.match(/\[\s*\{/);
+			if (match && match.index !== undefined) {
+				const startIdx = match.index;
+				const lastBracket = cleanText.lastIndexOf(']');
+				if (lastBracket !== -1 && lastBracket > startIdx) {
+					const potentialJson = cleanText.substring(startIdx, lastBracket + 1).trim();
+					try {
+						articles = JSON.parse(potentialJson) as SyncedArticle[];
+						parsed = true;
+						console.log('Successfully extracted and parsed JSON array using regex start marker.');
+					} catch (e2) {
+						// Fall through to error logging
+					}
+				}
+			}
+		}
+
+		if (!parsed) {
 			console.error('Failed to parse clean text as JSON array. Raw answer text:', answer);
-			throw new Error(`JSON parsing failed: ${(parseErr as any).message}`);
+			throw new Error('JSON parsing failed');
 		}
 
 		if (!Array.isArray(articles)) {

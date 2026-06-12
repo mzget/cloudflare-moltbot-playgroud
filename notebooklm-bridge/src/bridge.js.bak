@@ -31,8 +31,8 @@ async function connectMCP() {
   console.log("[bridge] Connecting to notebooklm-mcp...");
 
   const transport = new StdioClientTransport({
-    command: "node",
-    args: ["node_modules/notebooklm-mcp/dist/index.js"],
+    command: "npx",
+    args: ["-y", "notebooklm-mcp@latest"],
     env: { ...process.env },
   });
 
@@ -42,7 +42,7 @@ async function connectMCP() {
       capabilities: {},
       // notebooklm-mcp boots a headless Chrome (~40s). Set a long global
       // timeout so the initialize handshake doesn't fail before Chrome is ready.
-      requestTimeout: 300_000,
+      requestTimeout: 120_000,
     }
   );
 
@@ -159,7 +159,7 @@ const server = http.createServer(async (req, res) => {
       const result = await mcpClient.callTool({
         name: "ask_question",
         arguments: toolArgs,
-      }, undefined, { timeout: 300_000 }); // 120s — browser tab takes time
+      }, undefined, { timeout: 120_000 }); // 120s — browser tab takes time
 
       // Extract text content from the MCP response
       const content = result.content || [];
@@ -201,26 +201,6 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-
-  // POST /call-tool - Generic MCP tool caller
-  if (req.method === "POST" && url.pathname === "/call-tool") {
-    if (!checkAuth(req)) return sendJSON(res, 401, { error: "Unauthorized" });
-    if (!mcpReady) return sendJSON(res, 503, { error: "MCP not ready" });
-
-    let body;
-    try { body = await readBody(req); } catch { return sendJSON(res, 400, { error: "Invalid JSON" }); }
-
-    const { tool, args } = body;
-    if (!tool) return sendJSON(res, 400, { error: "Missing tool name" });
-
-    try {
-      const result = await mcpClient.callTool({ name: tool, arguments: args || {} }, undefined, { timeout: 60_000 });
-      const text = (result.content || []).filter(c => c.type === "text").map(c => c.text).join("\n");
-      return sendJSON(res, 200, { result: text, raw: result });
-    } catch (err) {
-      return sendJSON(res, 500, { error: err.message });
-    }
-  }
   // 404 fallback
   sendJSON(res, 404, { error: "Not found", availableEndpoints: ["/health", "/tools", "/ask", "/add_source"] });
 });

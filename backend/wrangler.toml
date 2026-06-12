@@ -28,7 +28,9 @@ binding = "OAKTREE_SYNC_WORKFLOW"
 class_name = "OaktreeSyncWorkflow"
 
 [vars]
+# The URL where your NotebookLM bridge API is running
 NOTEBOOKLM_BRIDGE_URL = "http://localhost:3100"
+# The specific ID of the Notebook in NotebookLM you want to sync
+NOTEBOOKLM_DEFAULT_NOTEBOOK_ID = "sync-articles-notebook"
+# Optional: Secret token if your bridge requires authentication
 BRIDGE_SECRET = ""
-NOTEBOOKLM_DEFAULT_NOTEBOOK_ID = "ai-datacenter"
-
