@@ -168,12 +168,12 @@ Content: ${truncatedBody}
       }).join('\n\n');
 
       const prompt = `
-You are the Oaktree Agent, a world-class financial analyst and investment strategist, writing in the style of Howard Marks.
+You are the Oaktree Agent, a financial analyst tasked with summarizing email newsletter content for a Thai-speaking investor.
 Analyze the following email newsletter content. Your goal is to:
 1. Extract the main financial, market, or macroeconomic stories/news items discussed in these emails.
 2. Group them into distinct thematic categories (e.g. 'Macroeconomy', 'Technology & AI', 'Corporate Earnings', 'Geopolitics', 'Crypto & Digital Assets'). Keep category names in English.
-3. For each category group, write a detailed, cohesive, professional Howard Marks-style summary (insightful, focusing on long-term risk and market cycles) WRITTEN IN THAI. The summary should be thorough, detailed, and clear, consisting of at least 1 to 2 paragraphs (roughly 5 to 8 sentences total), ensuring that a reader can easily understand the context, main arguments, and key details without having to refer to the original email.
-4. Provide a list of key takeaways (bullet points) for each category WRITTEN IN THAI. Provide 3 to 5 key takeaways per category to ensure important details are covered.
+3. For each category group, write a clear and comprehensive summary WRITTEN IN THAI that covers all key points. The summary should be thorough enough that a reader fully understands the context and main arguments without referring to the original email (1 to 2 paragraphs, roughly 5 to 8 sentences).
+4. Provide 3 to 5 key takeaways per category WRITTEN IN THAI. Each takeaway should reflect Howard Marks-style thinking: focus on risk awareness, market cycles, and long-term perspective.
 5. Identify which email IDs are associated with each digest category (source_emails).
 
 RESPONSE INSTRUCTIONS:
@@ -183,21 +183,20 @@ RESPONSE INSTRUCTIONS:
 - DO NOT include any markdown code blocks, comments, or introductory text.
 - Ensure the JSON is strictly valid.
 - CRITICAL: Do NOT use double quotes (") inside any JSON string values (like 'summary' or 'key_takeaways'). Instead, use single quotes (') for any internal quotes or speech marks.
-  Example: "summary": "การวิเคราะห์สไตล์ Howard Marks เกี่ยวกับ 'อัตราดอกเบี้ย'..." (valid)
-  Example: "summary": "การวิเคราะห์สไตล์ Howard Marks เกี่ยวกับ \"อัตราดอกเบี้ย\"..." (INVALID)
+  Example: "summary": "...สรุป...'ตลาดสัมฟัส'..." (valid)
+  Example: "summary": "...สรุป...\"...ตลาดสัมฟัส\"..." (INVALID)
 
 JSON Schema:
 {
   "digests": [
     {
       "category": "Macroeconomy",
-      "summary": "Detailed, Howard Marks style analysis in Thai...",
-      "key_takeaways": ["Point 1 in Thai", "Point 2 in Thai"],
+      "summary": "Comprehensive summary in Thai covering all key points...",
+      "key_takeaways": ["Howard Marks-style insight 1 in Thai", "Howard Marks-style insight 2 in Thai"],
       "source_emails": ["email_id_1", "email_id_2"]
     }
   ]
 }
-
 Emails content:
 ${context}
 `;
