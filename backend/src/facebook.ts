@@ -46,8 +46,10 @@ export async function processPendingFacebookPosts(env: Env): Promise<number> {
 		).bind(post.id).run();
 
 		try {
-			// 2. Fetch original Thai content
-			let thaiContent = '';
+						// 2. Fetch original Thai content
+			let summary = '';
+			let takeaways: string[] = [];
+			let symbolOrCategory = '';
 			let subjectInfo = '';
 
 			if (post.source_type === 'daily_report') {
@@ -59,8 +61,9 @@ export async function processPendingFacebookPosts(env: Env): Promise<number> {
 					throw new Error(`Daily report ID ${post.source_id} not found`);
 				}
 
-				const takeaways = JSON.parse(report.key_takeaways || '[]');
-				thaiContent = `Stock Symbol: ${report.symbol}\nDaily Summary: ${report.summary}\nKey Takeaways:\n${takeaways.map((t: string) => `- ${t}`).join('\n')}`;
+				takeaways = JSON.parse(report.key_takeaways || '[]');
+				summary = report.summary;
+				symbolOrCategory = report.symbol;
 				subjectInfo = `Stock Report: ${report.symbol}`;
 			} else if (post.source_type === 'email_digest') {
 				const digest = await env.DB.prepare(
@@ -71,8 +74,9 @@ export async function processPendingFacebookPosts(env: Env): Promise<number> {
 					throw new Error(`Email digest ID ${post.source_id} not found`);
 				}
 
-				const takeaways = JSON.parse(digest.key_takeaways || '[]');
-				thaiContent = `Category: ${digest.category}\nDigest Summary: ${digest.summary}\nKey Takeaways:\n${takeaways.map((t: string) => `- ${t}`).join('\n')}`;
+				takeaways = JSON.parse(digest.key_takeaways || '[]');
+				summary = digest.summary;
+				symbolOrCategory = digest.category;
 				subjectInfo = `Market Digest: ${digest.category}`;
 			} else {
 				throw new Error(`Invalid source_type: ${post.source_type}`);
@@ -80,7 +84,12 @@ export async function processPendingFacebookPosts(env: Env): Promise<number> {
 
 			// 3. Format and style Thai content for Facebook using Workers AI
 			console.log(`Formatting and styling Facebook post for Thai: ${subjectInfo}`);
-			const thaiPost = await formatAndStyleFacebookPost(env, thaiContent, post.source_type);
+			const thaiPost = await formatAndStyleFacebookPost(env, {
+				type: post.source_type,
+				symbolOrCategory,
+				summary,
+				takeaways,
+			});
 
 			if (!thaiPost) {
 				throw new Error('AI failed to generate Thai translation content');
@@ -174,61 +183,113 @@ export async function syncAndProcessFacebookPosts(env: Env): Promise<number> {
 	return await processPendingFacebookPosts(env);
 }
 
-async function formatAndStyleFacebookPost(env: Env, content: string, type: 'daily_report' | 'email_digest'): Promise<string> {
+async function formatAndStyleFacebookPost(
+	env: Env, 
+	params: {
+		type: 'daily_report' | 'email_digest';
+		symbolOrCategory: string;
+		summary: string;
+		takeaways: string[];
+	}
+): Promise<string> {
+	const { type, symbolOrCategory, summary, takeaways } = params;
+
+	// Build context for LLM
+	const contextContent = `
+Symbol/Category: ${symbolOrCategory}
+Summary: ${summary}
+Key Takeaways:
+${takeaways.map((t: string) => `- ${t}`).join('\n')}
+`;
+
 	const systemPrompt = `
-You are the Oaktree Agent, a premium financial analyst preparing investment intelligence for a Thai audience on Facebook.
-Your job is to format and rewrite the Thai report content into a premium, engaging Facebook post.
+You are the Oaktree Agent, a premium financial analyst preparing investment intelligence.
+Your task is to write a short 2-3 sentence commentary (an "Oaktree Memo") in Thai based on the provided report details.
 
-CLASSIFICATION RULE:
-- You must dynamically analyze the content and classify it into one of these three categories:
-  1. Stock Report (รายงานหุ้น): If the content is primarily about a specific stock, company financial report, or stock-specific analysis.
-  2. Article (บทความ): If the content is an educational piece, market analysis, general financial/economic article, or macro digest.
-  3. Company Event (ข่าวสาร/กิจกรรมบริษัท): If the content is about a corporate action, earnings call event, shareholder meeting, or company event/announcement.
-- You MUST begin the post with a clear, bracketed header declaring this classification in both Thai and English. For example:
-  - "[รายงานหุ้น / Stock Report]"
-  - "[บทความ / Article]"
-  - "[ข่าวสารและกิจกรรมบริษัท / Corporate News & Event]"
-
-TONE & STYLE RULES:
-- Stick strictly to the raw facts, key takeaways, and data points provided in the source content.
-- Do NOT add any personal opinions, ideas, predictions, interpretations, or subjective commentary. Avoid the style of a market commentary memo or opinion piece.
-- Keep the writing highly professional, clear, objective, and engaging for a social media audience.
-- Use clear spacing, bold headings (without markdown if possible, or use standard emojis for headings), and clean bullet points to organize the information.
-- Use subtle, professional emojis (e.g. 📊, 🔑, 💡, ⚠️, 🔍, 📌) to separate sections and highlight key points.
-- End the post with relevant hashtags (e.g. #OaktreeAgent #สรุปรายงาน #ข้อมูลการลงทุน) and any relevant stock symbol.
-- CRITICAL HASHTAG RULE: Do NOT use or allow any hashtags that refer to investor names (e.g. do NOT use #HowardMarks, #Marks, #Howard, #Buffett, #Munger, etc.).
-- Output ONLY the final Thai Facebook post message content. Do not include any introductory meta text or markdown code block surrounds.
+COMMENTARY STYLE & RULES:
+- Write in the philosophical style of Howard Marks' memos: focus on risk awareness, market cycles, second-level thinking, and long-term perspective.
+- Keep it concise: exactly 2 to 3 sentences in Thai.
+- Wrap the generated commentary in double quotes (e.g. "...").
+- Do NOT add any introductory text, explanation, meta-labels, or other markdown sections. Output ONLY the commentary text itself.
+- Do NOT use or allow any hashtags that refer to investor names (e.g., do NOT use #HowardMarks, #Marks, #Howard, #Buffett, #Munger, etc.).
 `;
 
 	const userPrompt = `
-Format and polish the following Thai content for Facebook:
+Write a Howard Marks-style memo commentary in Thai for:
 ---
-${content}
+${contextContent}
 ---
 `;
 
+	let memoCommentary = '';
 	try {
-		const response = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
+		const response = await env.AI.run('@cf/meta/llama-3.1-8b-instruct-fp8', {
 			messages: [
 				{ role: 'system', content: systemPrompt },
 				{ role: 'user', content: userPrompt }
 			],
-			max_tokens: 4096,
+			max_tokens: 1024,
 		} as any);
 
-		const responseText = (response as any).choices?.[0]?.message?.content || response.response || "";
-		return responseText.trim();
+		memoCommentary = (response as any).choices?.[0]?.message?.content || response.response || "";
+		memoCommentary = memoCommentary.trim();
 	} catch (e) {
 		console.error('Workers AI formatting failed, trying fallback prompt style:', e);
 		// Simple fallback in case system prompt isn't supported by the model structure
-		const response = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
+		const response = await env.AI.run('@cf/meta/llama-3.1-8b-instruct-fp8', {
 			messages: [
-				{ role: 'user', content: `${systemPrompt}\n\nContent to format:\n${content}` }
+				{ role: 'user', content: `${systemPrompt}\n\nContent to analyze:\n${contextContent}` }
 			],
-			max_tokens: 4096,
+			max_tokens: 1024,
 		} as any);
 		
-		const responseText = (response as any).choices?.[0]?.message?.content || response.response || "";
-		return responseText.trim();
+		memoCommentary = (response as any).choices?.[0]?.message?.content || response.response || "";
+		memoCommentary = memoCommentary.trim();
 	}
+
+	if (!memoCommentary) {
+		throw new Error('AI failed to generate Thai memo commentary');
+	}
+
+	// Make sure the commentary is wrapped in quotes
+	if (!memoCommentary.startsWith('"')) {
+		memoCommentary = `"${memoCommentary}`;
+	}
+	if (!memoCommentary.endsWith('"')) {
+		memoCommentary = `${memoCommentary}"`;
+	}
+
+	// Assemble the final Facebook post programmatically
+	const summaryLabel = type === 'daily_report' ? `สรุปรายวัน: ${symbolOrCategory}` : `สรุปตลาด: ${symbolOrCategory}`;
+	const divider = '━━━━━━━━━━━━━━━━━━━━━━━━━━';
+	
+	// Create hashtags
+	const defaultHashtags = ['#OaktreeAgent', '#วิเคราะห์หุ้น', '#การลงทุนระยะยาว'];
+	if (type === 'daily_report') {
+		defaultHashtags.push(`#${symbolOrCategory.toUpperCase()}`);
+	} else {
+		// Clean category name to make a valid hashtag (remove spaces, special characters)
+		const cleanCategory = symbolOrCategory.replace(/[^a-zA-Z0-9\u0e00-\u0e7f]/g, '');
+		if (cleanCategory) {
+			defaultHashtags.push(`#${cleanCategory}`);
+		}
+	}
+	const hashtagsLine = defaultHashtags.join(' ');
+
+	const finalPost = [
+		`🔍 ${summaryLabel}`,
+		summary,
+		'',
+		'💡 ประเด็นสำคัญ (Key Takeaways):',
+		...takeaways.map((t: string) => `• ${t}`),
+		'',
+		divider,
+		'',
+		'📝 Oaktree Memo:',
+		memoCommentary,
+		'',
+		hashtagsLine
+	].join('\n');
+
+	return finalPost;
 }
