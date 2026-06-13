@@ -1,4 +1,4 @@
-import puppeteer, { BrowserWorker } from '@cloudflare/puppeteer';
+﻿import puppeteer, { BrowserWorker } from '@cloudflare/puppeteer';
 import { runCrawler } from './crawler';
 import { generateDailySummary } from './summarizer';
 import { sendDailyEmailReport } from './email';
@@ -1709,7 +1709,29 @@ export default {
 	fetch: app.fetch,
 
 	async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
-		console.log("Running scheduled worker tasks via Workflow...");
+		const isFacebookOnlyCron = event.cron === "*/30 * * * *";
+
+		if (isFacebookOnlyCron) {
+			// Every 30 minutes: only publish pending Facebook posts
+			console.log("Running Facebook-only sync (30-min cron)...");
+			ctx.waitUntil((async () => {
+				try {
+					await env.OAKTREE_SYNC_WORKFLOW.create({
+						id: `cron-fb-${Date.now()}`,
+						params: {
+							syncFacebookPosts: true,
+						}
+					});
+					console.log("Facebook-only workflow instance triggered successfully.");
+				} catch (e) {
+					console.error("Failed to trigger Facebook-only Workflow instance:", e);
+				}
+			})());
+			return;
+		}
+
+		// Every hour: full sync (market data, emails, alerts, etc.)
+		console.log("Running full scheduled worker tasks via Workflow...");
 		const hour = new Date().getUTCHours();
 		const isSixHourly = hour % 6 === 0;
 
@@ -1728,7 +1750,7 @@ export default {
 						fetchMarketEvents: isSixHourly,
 						sendDailyEmailReport: false, // Disabled for this phase
 						purgeOldData: isSixHourly,
-						syncFacebookPosts: true,
+						syncFacebookPosts: false, // Facebook handled by 30-min cron
 					}
 				});
 				console.log("Workflow instance triggered successfully.");
