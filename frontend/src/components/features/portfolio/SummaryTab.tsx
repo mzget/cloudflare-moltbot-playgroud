@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box, Typography, Sheet, Chip, Divider, Stack, IconButton, Table,
   Button, Input, Modal, ModalDialog, DialogTitle, DialogContent, ModalClose,
@@ -670,27 +670,16 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
             <thead>
               <tr>
                 <th>Broker/Account</th>
-                <th style={{ textAlign: 'right' }}>Calculated Cost</th>
-                <th style={{ textAlign: 'right' }}>Calculated Value</th>
-                <th style={{ textAlign: 'right' }}>Gains</th>
-                <th style={{ textAlign: 'right', width: 140 }}>Cost Override</th>
-                <th style={{ textAlign: 'right', width: 140 }}>Value Override</th>
+                <th style={{ textAlign: 'right' }}>Cost</th>
+                <th style={{ textAlign: 'right' }}>Value</th>
+                <th style={{ textAlign: 'right' }}>Gain</th>
               </tr>
             </thead>
             <tbody>
               {displayedBrokers.map(broker => (
                 <tr key={broker.broker_name}>
                   <td style={{ fontWeight: 700 }}>{broker.broker_name}</td>
-                  <td style={{ textAlign: 'right' }}>
-                    {showMoneyValues ? formatCurrency(broker.cost, false, '฿') : '••••••••'}
-                  </td>
-                  <td style={{ textAlign: 'right' }}>
-                    {showMoneyValues ? formatCurrency(broker.balance, false, '฿') : '••••••••'}
-                  </td>
-                  <td style={{ textAlign: 'right', fontWeight: 700 }} className={broker.gain_amt >= 0 ? 'yf-positive' : 'yf-negative'}>
-                    {showMoneyValues ? formatCurrency(broker.gain_amt, true, '฿') : '••••••••'} ({broker.gain_pct.toFixed(2)}%)
-                  </td>
-                  {/* Cost Override */}
+                  {/* Cost: edit input when editing, override when set, else calculated */}
                   <td style={{ textAlign: 'right' }}>
                     {isEditingBrokers ? (
                       <Input
@@ -700,17 +689,13 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
                         onChange={e => setBrokerOverrideForm(prev => ({
                           ...prev,
                           [broker.broker_name]: { ...prev[broker.broker_name], cost: e.target.value }
-                        }))}
+                        }))}  
                         slotProps={{ input: { style: { textAlign: 'right' } } }}
                         sx={{ borderRadius: '8px' }}
                       />
-                    ) : (
-                      broker.cost_override !== null ? (
-                        showMoneyValues ? formatCurrency(broker.cost_override, false, '฿') : '••••••••'
-                      ) : '--'
-                    )}
+                    ) : showMoneyValues ? formatCurrency(broker.cost_override ?? broker.cost, false, '฿') : '••••••••'}
                   </td>
-                  {/* Value Override */}
+                  {/* Value: edit input when editing, override when set, else calculated */}
                   <td style={{ textAlign: 'right' }}>
                     {isEditingBrokers ? (
                       <Input
@@ -720,15 +705,14 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
                         onChange={e => setBrokerOverrideForm(prev => ({
                           ...prev,
                           [broker.broker_name]: { ...prev[broker.broker_name], balance: e.target.value }
-                        }))}
+                        }))}  
                         slotProps={{ input: { style: { textAlign: 'right' } } }}
                         sx={{ borderRadius: '8px' }}
                       />
-                    ) : (
-                      broker.balance_override !== null ? (
-                        showMoneyValues ? formatCurrency(broker.balance_override, false, '฿') : '••••••••'
-                      ) : '--'
-                    )}
+                    ) : showMoneyValues ? formatCurrency(broker.balance_override ?? broker.balance, false, '฿') : '••••••••'}
+                  </td>
+                  <td style={{ textAlign: 'right', fontWeight: 700 }} className={broker.gain_amt >= 0 ? 'yf-positive' : 'yf-negative'}>
+                    {showMoneyValues ? formatCurrency(broker.gain_amt, true, '฿') : '••••••••'} ({broker.gain_pct.toFixed(2)}%)
                   </td>
                 </tr>
               ))}
@@ -746,8 +730,7 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
                   <td style={{ textAlign: 'right', fontWeight: 700 }} className={brokerTotals.gain_amt >= 0 ? 'yf-positive' : 'yf-negative'}>
                     {showMoneyValues ? formatCurrency(brokerTotals.gain_amt, true, '฿') : '••••••••'} ({brokerTotals.gain_pct.toFixed(2)}%)
                   </td>
-                  <td></td>
-                  <td></td>
+
                 </tr>
               </tfoot>
             )}

@@ -129,7 +129,12 @@ export async function processPendingFacebookPosts(env: Env): Promise<number> {
 			await new Promise(resolve => setTimeout(resolve, 2000));
 
 		} catch (err: any) {
-			console.error(`Error processing Facebook post ID ${post.id}:`, err);
+			const isPurgedError = err.message && err.message.includes('not found') && (err.message.includes('Daily report') || err.message.includes('Email digest'));
+			if (isPurgedError) {
+				console.warn(`Facebook post ID ${post.id} source was purged: ${err.message}`);
+			} else {
+				console.error(`Error processing Facebook post ID ${post.id}:`, err);
+			}
 			await env.DB.prepare(
 				"UPDATE facebook_posts SET status = 'failed', error_message = ?, updated_at = (strftime('%Y-%m-%d %H:%M:%S', 'now')) WHERE id = ?"
 			).bind(err.message || 'Unknown error', post.id).run();
