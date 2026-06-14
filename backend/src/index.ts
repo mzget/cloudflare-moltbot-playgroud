@@ -320,9 +320,13 @@ app.get('/api/crawl', async (c) => {
 // API: Summarize All Symbols
 app.get('/api/summarize-all', async (c) => {
 	try {
+		const force = c.req.query('force') === 'true';
 		const instance = await c.env.OAKTREE_SYNC_WORKFLOW.create({
 			id: `manual-summarize-all-${Date.now()}`,
-			params: { generateDailySummaries: true }
+			params: { 
+				generateDailySummaries: true,
+				generateDailySummariesForce: force
+			}
 		});
 		return c.text(`Summarization started via Workflow: ${instance.id}`);
 	} catch (e) {

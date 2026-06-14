@@ -19,6 +19,7 @@ export interface OaktreeWorkflowParams {
 	emailDigestsManual?: boolean;
 	runCrawler?: boolean;
 	generateDailySummaries?: boolean;
+	generateDailySummariesForce?: boolean;
 	fetchMarketEvents?: boolean;
 	sendDailyEmailReport?: boolean;
 	purgeOldData?: boolean;
@@ -65,8 +66,9 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 		if (params.generateDailySummaries) {
 			await step.do('generate-daily-summaries', async () => {
 				const { results } = await this.env.DB.prepare('SELECT symbol FROM watchlist WHERE is_active = 1').all();
+				const force = !!params.generateDailySummariesForce;
 				const summaryPromises = results.map(row =>
-					generateDailySummary(this.env, row.symbol as string)
+					generateDailySummary(this.env, row.symbol as string, force)
 						.catch(e => console.error(`Workflow summary failed for ${row.symbol}:`, e))
 				);
 				await Promise.all(summaryPromises);

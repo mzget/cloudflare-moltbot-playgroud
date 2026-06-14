@@ -1,6 +1,18 @@
 import { Env } from './index';
 
-export async function generateDailySummary(env: Env, symbol: string) {
+export async function generateDailySummary(env: Env, symbol: string, force = false) {
+	// Check if a daily report already exists for this symbol today
+	if (!force) {
+		const existing = await env.DB.prepare(
+			'SELECT id FROM daily_reports WHERE symbol = ? AND report_date = DATE("now")'
+		).bind(symbol).first() as { id: number } | null;
+
+		if (existing) {
+			console.log(`Daily report for ${symbol} already exists today. Skipping.`);
+			return;
+		}
+	}
+
 	// Fetch news from the last 24h
 	const { results: news } = await env.DB.prepare(
 		'SELECT title, summary, published_at FROM news WHERE symbol = ? AND created_at > datetime("now", "-1 day")'
