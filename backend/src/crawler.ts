@@ -71,22 +71,6 @@ export async function runCrawler(env: Env) {
 						.replace(/&amp;/g, '&')
 						.replace(/&nbsp;/g, ' ');
 
-					// If summary is missing, too short, or contains HTML links (like Google News RSS)
-					if (!finalSummary || finalSummary.length < 50 || finalSummary.includes('<a href=')) {
-						try {
-							console.log(`Fetching article content via Jina for: ${article.url}`);
-							const jinaRes = await fetch(`https://r.jina.ai/${article.url}`);
-							if (jinaRes.ok) {
-								const text = await jinaRes.text();
-								finalSummary = text.replace(/\n+/g, '\n').slice(0, 1500); // keep it reasonable
-							} else {
-								console.error(`Jina fetch failed: ${jinaRes.status} ${jinaRes.statusText}`);
-							}
-						} catch (e) {
-							console.error(`Jina fetch exception for ${article.url}`, e);
-						}
-					}
-
 					// Fallback cleanup: strip any remaining HTML tags from the summary
 					finalSummary = finalSummary.replace(/<[^>]*>?/gm, '').trim();
 					// If after stripping it's empty, fallback to title
