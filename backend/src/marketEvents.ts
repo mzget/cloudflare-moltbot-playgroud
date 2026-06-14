@@ -54,58 +54,73 @@ export async function fetchAndStoreMarketEvents(env: Env): Promise<void> {
 
 	for (const symbol of symbols) {
 		try {
-			// B. Dividends
-			const divUrl = `https://finnhub.io/api/v1/stock/dividend?symbol=${symbol}&from=${fromDateStrGeneral}&to=${toDateStrGeneral}&token=${apiKey}`;
-			const divRes = await fetch(divUrl);
-			if (divRes.ok) {
-				const divItems = await divRes.json() as any[];
-				for (const item of divItems) {
-					const eventId = `div-${symbol}-${item.date}`;
-					const eventDate = item.date;
-					const title = `Dividend Declared: $${item.amount}`;
-					const description = `Record date: ${item.recordDate || 'N/A'}, Pay date: ${item.payDate || 'N/A'}`;
-					const metadata = JSON.stringify({
-						amount: item.amount,
-						recordDate: item.recordDate,
-						payDate: item.payDate,
-						declarationDate: item.declarationDate
-					});
+			// B. Yahoo Finance: Dividends and Splits
+			const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=3mo&events=div,split`;
+			try {
+				const yahooRes = await fetch(yahooUrl, {
+					headers: {
+						'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+					}
+				});
+				if (yahooRes.ok) {
+					const data = await yahooRes.json() as any;
+					const events = data?.chart?.result?.[0]?.events;
+					if (events) {
+						// Process dividends
+						if (events.dividends) {
+							for (const key of Object.keys(events.dividends)) {
+								const item = events.dividends[key];
+								const eventDate = new Date(item.date * 1000).toISOString().split('T')[0];
+								if (eventDate >= fromDateStrGeneral && eventDate <= toDateStrGeneral) {
+									const eventId = `div-${symbol}-${eventDate}`;
+									const title = `Dividend Declared: $${item.amount}`;
+									const description = `Ex-Dividend Date: ${eventDate}`;
+									const metadata = JSON.stringify({
+										amount: item.amount,
+										exDate: eventDate
+									});
 
-					await env.DB.prepare(`
-						INSERT INTO market_events (id, symbol, event_type, event_date, title, description, url, metadata)
-						VALUES (?, ?, 'dividend', ?, ?, ?, NULL, ?)
-						ON CONFLICT(id) DO UPDATE SET
-							title=excluded.title,
-							description=excluded.description,
-							metadata=excluded.metadata
-					`).bind(eventId, symbol, eventDate, title, description, metadata).run();
+									await env.DB.prepare(`
+										INSERT INTO market_events (id, symbol, event_type, event_date, title, description, url, metadata)
+										VALUES (?, ?, 'dividend', ?, ?, ?, NULL, ?)
+										ON CONFLICT(id) DO UPDATE SET
+											title=excluded.title,
+											description=excluded.description,
+											metadata=excluded.metadata
+									`).bind(eventId, symbol, eventDate, title, description, metadata).run();
+								}
+							}
+						}
+
+						// Process splits
+						if (events.splits) {
+							for (const key of Object.keys(events.splits)) {
+								const item = events.splits[key];
+								const eventDate = new Date(item.date * 1000).toISOString().split('T')[0];
+								if (eventDate >= fromDateStrGeneral && eventDate <= toDateStrGeneral) {
+									const eventId = `split-${symbol}-${eventDate}`;
+									const title = `Stock Split: ${item.numerator} for ${item.denominator}`;
+									const description = `Execution date: ${eventDate}`;
+									const metadata = JSON.stringify({
+										fromFactor: item.numerator,
+										toFactor: item.denominator
+									});
+
+									await env.DB.prepare(`
+										INSERT INTO market_events (id, symbol, event_type, event_date, title, description, url, metadata)
+										VALUES (?, ?, 'split', ?, ?, ?, NULL, ?)
+										ON CONFLICT(id) DO UPDATE SET
+											title=excluded.title,
+											description=excluded.description,
+											metadata=excluded.metadata
+									`).bind(eventId, symbol, eventDate, title, description, metadata).run();
+								}
+							}
+						}
+					}
 				}
-			}
-
-			// C. Splits
-			const splitUrl = `https://finnhub.io/api/v1/stock/split?symbol=${symbol}&from=${fromDateStrGeneral}&to=${toDateStrGeneral}&token=${apiKey}`;
-			const splitRes = await fetch(splitUrl);
-			if (splitRes.ok) {
-				const splitItems = await splitRes.json() as any[];
-				for (const item of splitItems) {
-					const eventId = `split-${symbol}-${item.date}`;
-					const eventDate = item.date;
-					const title = `Stock Split: ${item.fromFactor} for ${item.toFactor}`;
-					const description = `Execution date: ${item.date}`;
-					const metadata = JSON.stringify({
-						fromFactor: item.fromFactor,
-						toFactor: item.toFactor
-					});
-
-					await env.DB.prepare(`
-						INSERT INTO market_events (id, symbol, event_type, event_date, title, description, url, metadata)
-						VALUES (?, ?, 'split', ?, ?, ?, NULL, ?)
-						ON CONFLICT(id) DO UPDATE SET
-							title=excluded.title,
-							description=excluded.description,
-							metadata=excluded.metadata
-					`).bind(eventId, symbol, eventDate, title, description, metadata).run();
-				}
+			} catch (yahooError) {
+				console.error(`Error fetching/storing dividends & splits from Yahoo for ${symbol}:`, yahooError);
 			}
 
 			// D. Earnings Calendar
