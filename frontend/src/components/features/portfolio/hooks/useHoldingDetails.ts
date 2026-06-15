@@ -122,6 +122,26 @@ export function useHoldingDetails(symbol: string, onDataChange?: () => void) {
     return res;
   };
 
+  const updateTxn = async (id: number, txn: {
+    date: string;
+    type: 'Buy' | 'Sell';
+    shares: number;
+    cost_per_share: number;
+    commission: number;
+    note: string;
+  }) => {
+    const res = await fetch(`${API_BASE_URL}/api/portfolio/transactions/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(txn),
+    });
+    if (res.ok) {
+      await fetchTransactions();
+      if (onDataChange) onDataChange();
+    }
+    return res;
+  };
+
   const addDiv = async (div: {
     date: string;
     amount: number;
@@ -177,6 +197,7 @@ export function useHoldingDetails(symbol: string, onDataChange?: () => void) {
     loading,
     addLot,
     addTxn,
+    updateTxn,
     addDiv,
     deleteLot,
     deleteTxn,

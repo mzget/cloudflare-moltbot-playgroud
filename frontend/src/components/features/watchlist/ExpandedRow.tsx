@@ -1,7 +1,7 @@
 import { fmtNum, fmtPct, fmtShares, gainClass } from '../../../utils/format';
 import * as React from 'react';
 import { Box, Typography, Input, Select, Option, Button } from '@mui/joy';
-import { Plus, Trash2, Check } from 'lucide-react';
+import { Plus, Trash2, Check, Pencil, X } from 'lucide-react';
 import { useHoldingDetails } from '../portfolio/hooks/useHoldingDetails';
 import type { Lot, Transaction, Dividend } from '../portfolio/hooks/useHoldingDetails';
 import '../../../styles/yahooPortfolio.css';
@@ -39,6 +39,7 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
     loading,
     addLot,
     addTxn,
+    updateTxn,
     addDiv,
     deleteLot,
     deleteTxn,
@@ -61,6 +62,12 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
   });
   const [newDiv, setNewDiv] = React.useState({
     date: getTodayDate(), amount: '', per_share: '', note: '',
+  });
+
+  // Edit-transaction state
+  const [editingTxnId, setEditingTxnId] = React.useState<number | null>(null);
+  const [editingTxn, setEditingTxn] = React.useState({
+    date: '', type: 'Buy' as 'Buy' | 'Sell', shares: '', cost_per_share: '', commission: '', note: '',
   });
 
   // ── Add handlers ────────────────────────────────────────────────────────────
@@ -116,6 +123,62 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
     } catch (e) {
       console.error('Failed to add transaction', e);
       alert('Failed to add transaction. Please check console.');
+    }
+  };
+
+  const startEditTxn = (txn: Transaction) => {
+    if (txn.id !== undefined) {
+      setEditingTxnId(txn.id);
+      setEditingTxn({
+        date: txn.date,
+        type: txn.type,
+        shares: txn.shares.toString(),
+        cost_per_share: txn.cost_per_share.toString(),
+        commission: (txn.commission || 0).toString(),
+        note: txn.note || '',
+      });
+    }
+  };
+
+  const cancelEditTxn = () => {
+    setEditingTxnId(null);
+    setEditingTxn({
+      date: '', type: 'Buy', shares: '', cost_per_share: '', commission: '', note: '',
+    });
+  };
+
+  const handleUpdateTxn = async () => {
+    if (editingTxnId === null) return;
+    if (!editingTxn.date) {
+      alert('Please select a Date.');
+      return;
+    }
+    if (!editingTxn.shares || parseFloat(editingTxn.shares) <= 0) {
+      alert('Please enter a valid number of Shares.');
+      return;
+    }
+    if (!editingTxn.cost_per_share || parseFloat(editingTxn.cost_per_share) <= 0) {
+      alert('Please enter a valid Cost/Share.');
+      return;
+    }
+    try {
+      const res = await updateTxn(editingTxnId, {
+        date: editingTxn.date,
+        type: editingTxn.type,
+        shares: parseFloat(editingTxn.shares) || 0,
+        cost_per_share: parseFloat(editingTxn.cost_per_share) || 0,
+        commission: parseFloat(editingTxn.commission) || 0,
+        note: editingTxn.note,
+      });
+      if (res.ok) {
+        setEditingTxnId(null);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        alert(`Failed to update transaction: ${errData.error || res.statusText}`);
+      }
+    } catch (e) {
+      console.error('Failed to update transaction', e);
+      alert('Failed to update transaction. Please check console.');
     }
   };
 
@@ -252,7 +315,7 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
             <th>Realized (%)</th>
             <th>Realized ($)</th>
             <th className="left">Note</th>
-            <th style={{ width: 36 }}>&nbsp;</th>
+            <th style={{ width: 72 }}>&nbsp;</th>
           </tr>
         </thead>
         <tbody>
@@ -299,28 +362,88 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
             </tr>
           )}
 
-          {transactions.map((txn, i) => (
-            <tr key={txn.id ?? i}>
-              <td className="left">{txn.date}</td>
-              <td className="left">{txn.type}</td>
-              <td>{displayShares(txn.shares)}</td>
-              <td>{displayNum(txn.cost_per_share)}</td>
-              <td>{displayNum(txn.commission)}</td>
-              <td>{displayNum(txn.total_cost)}</td>
-              <td className={gainClass(txn.realized_gain_pct)}>{displayPct(txn.realized_gain_pct)}</td>
-              <td className={gainClass(txn.realized_gain_amt)}>{displayNum(txn.realized_gain_amt)}</td>
-              <td className="left">{txn.note || '--'}</td>
-              <td>
-                <button
-                  className="yf-chevron"
-                  onClick={() => handleDeleteTxn(txn.id)}
-                  aria-label="Delete transaction"
-                >
-                  <Trash2 size={12} />
-                </button>
-              </td>
-            </tr>
-          ))}
+          {transactions.map((txn, i) => {
+            const isEditing = txn.id === editingTxnId;
+            if (isEditing) {
+              return (
+                <tr className="yf-add-row" key={txn.id ?? i}>
+                  <td className="left">
+                    <Input size="sm" type="date" value={editingTxn.date}
+                      onChange={(e) => setEditingTxn({ ...editingTxn, date: e.target.value })} />
+                  </td>
+                  <td className="left">
+                    <Select size="sm" value={editingTxn.type}
+                      onChange={(_e, val) => setEditingTxn({ ...editingTxn, type: (val as 'Buy' | 'Sell') || 'Buy' })}>
+                      <Option value="Buy">Buy</Option>
+                      <Option value="Sell">Sell</Option>
+                    </Select>
+                  </td>
+                  <td>
+                    <Input size="sm" type="number" placeholder="0"
+                      value={editingTxn.shares}
+                      onChange={(e) => setEditingTxn({ ...editingTxn, shares: e.target.value })} />
+                  </td>
+                  <td>
+                    <Input size="sm" type="number" placeholder="0.00"
+                      value={editingTxn.cost_per_share}
+                      onChange={(e) => setEditingTxn({ ...editingTxn, cost_per_share: e.target.value })} />
+                  </td>
+                  <td>
+                    <Input size="sm" type="number" placeholder="0.00"
+                      value={editingTxn.commission}
+                      onChange={(e) => setEditingTxn({ ...editingTxn, commission: e.target.value })} />
+                  </td>
+                  <td colSpan={3}>&nbsp;</td>
+                  <td className="left">
+                    <Input size="sm" placeholder="Note"
+                      value={editingTxn.note}
+                      onChange={(e) => setEditingTxn({ ...editingTxn, note: e.target.value })} />
+                  </td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    <Button size="sm" variant="solid" color="success" onClick={handleUpdateTxn}
+                      sx={{ minWidth: 0, px: 1, mr: 0.5 }}>
+                      <Check size={14} />
+                    </Button>
+                    <Button size="sm" variant="outlined" color="neutral" onClick={cancelEditTxn}
+                      sx={{ minWidth: 0, px: 1 }}>
+                      <X size={14} />
+                    </Button>
+                  </td>
+                </tr>
+              );
+            }
+
+            return (
+              <tr key={txn.id ?? i}>
+                <td className="left">{txn.date}</td>
+                <td className="left">{txn.type}</td>
+                <td>{displayShares(txn.shares)}</td>
+                <td>{displayNum(txn.cost_per_share)}</td>
+                <td>{displayNum(txn.commission)}</td>
+                <td>{displayNum(txn.total_cost)}</td>
+                <td className={gainClass(txn.realized_gain_pct)}>{displayPct(txn.realized_gain_pct)}</td>
+                <td className={gainClass(txn.realized_gain_amt)}>{displayNum(txn.realized_gain_amt)}</td>
+                <td className="left">{txn.note || '--'}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  <button
+                    className="yf-chevron"
+                    onClick={() => startEditTxn(txn)}
+                    style={{ marginRight: 4 }}
+                    aria-label="Edit transaction"
+                  >
+                    <Pencil size={12} />
+                  </button>
+                  <button
+                    className="yf-chevron"
+                    onClick={() => handleDeleteTxn(txn.id)}
+                    aria-label="Delete transaction"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
 
           {transactions.length === 0 && !showForms.txn && (
             <tr>

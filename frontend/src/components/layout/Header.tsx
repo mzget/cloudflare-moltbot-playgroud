@@ -388,6 +388,9 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
                 ref={notificationsRef}
                 sx={{
                   ...glassStyle,
+                  background: mode === 'dark' ? 'rgba(15, 20, 28, 0.88)' : 'rgba(255, 255, 255, 0.92)',
+                  border: mode === 'dark' ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid rgba(0, 0, 0, 0.08)',
+                  backdropFilter: 'blur(20px) saturate(190%)',
                   position: 'absolute',
                   top: '100%',
                   right: 0,
@@ -397,8 +400,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
                   display: 'flex',
                   flexDirection: 'column',
                   borderRadius: '16px',
-                  boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
                   zIndex: 1000,
                   overflow: 'hidden'
                 }}
@@ -515,9 +517,12 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
               placement="bottom-end"
               sx={{
                 ...glassStyle,
+                background: mode === 'dark' ? 'rgba(15, 20, 28, 0.88)' : 'rgba(255, 255, 255, 0.92)',
+                border: mode === 'dark' ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid rgba(0, 0, 0, 0.08)',
+                backdropFilter: 'blur(20px) saturate(190%)',
                 mt: 1,
                 minWidth: 180,
-                boxShadow: '0 12px 30px rgba(0,0,0,0.15)',
+                boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
                 zIndex: 1200,
                 p: 1.5,
                 borderRadius: '16px',
@@ -646,9 +651,12 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
               placement="bottom-end"
               sx={{
                 ...glassStyle,
+                background: mode === 'dark' ? 'rgba(15, 20, 28, 0.88)' : 'rgba(255, 255, 255, 0.92)',
+                border: mode === 'dark' ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid rgba(0, 0, 0, 0.08)',
+                backdropFilter: 'blur(20px) saturate(190%)',
                 mt: 1,
                 minWidth: 160,
-                boxShadow: '0 12px 30px rgba(0,0,0,0.15)',
+                boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
                 zIndex: 1200,
                 p: 1,
                 borderRadius: '16px',

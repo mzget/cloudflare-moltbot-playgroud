@@ -1523,6 +1523,41 @@ app.post('/api/portfolio/transactions', async (c) => {
   return c.json({ success: true });
 });
 
+// PUT /api/portfolio/transactions/:id
+app.put('/api/portfolio/transactions/:id', async (c) => {
+  const id = c.req.param('id');
+  const body = await c.req.json();
+  const { date, type, shares, cost_per_share, commission, note } = body;
+
+  if (!date || !shares || !cost_per_share) {
+    return c.json({ error: 'date, shares, cost_per_share are required' }, 400);
+  }
+
+  // 1. Get the transaction to find its symbol
+  const tx = await c.env.DB.prepare('SELECT symbol FROM transactions WHERE id = ?').bind(id).first();
+  if (!tx) {
+    return c.json({ error: 'Transaction not found' }, 404);
+  }
+  const symbol = tx.symbol as string;
+
+  // 2. Compute total cost
+  const totalCost = type === 'Sell'
+    ? (shares * cost_per_share) - (commission || 0)
+    : (shares * cost_per_share) + (commission || 0);
+
+  // 3. Update transaction details
+  await c.env.DB.prepare(`
+    UPDATE transactions
+    SET date = ?, type = ?, shares = ?, cost_per_share = ?, commission = ?, total_cost = ?, note = ?
+    WHERE id = ?
+  `).bind(date, type || 'Buy', shares, cost_per_share, commission || 0, totalCost, note || null, id).run();
+
+  // 4. Rebuild share lots and update realized gains FIFO-style
+  await rebuildLotsAndRealizedGains(c.env.DB, symbol);
+
+  return c.json({ success: true });
+});
+
 // DELETE /api/portfolio/transactions/:id
 app.delete('/api/portfolio/transactions/:id', async (c) => {
   const id = c.req.param('id');
