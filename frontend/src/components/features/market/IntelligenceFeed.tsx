@@ -76,74 +76,102 @@ export default function IntelligenceFeed({
       </Box>
 
       {/* Premium Tab Filter Group */}
-      <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between" sx={{ mt: 1 }}>
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        spacing={{ xs: 1.5, sm: 2 }}
+        alignItems={{ xs: 'flex-start', sm: 'center' }}
+        justifyContent="space-between"
+        sx={{ mt: 1, gap: { xs: 1, sm: 0 } }}
+      >
         <Typography level="h3" sx={{ fontWeight: 800 }}>Howard's Take & Analysis</Typography>
         
-        <ButtonGroup
-          variant="soft"
-          color="neutral"
-          size="sm"
+        <Box
           sx={{
-            p: 0.5,
-            borderRadius: '12px',
-            bgcolor: 'background.level1',
-            boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.2)',
-            '--ButtonGroup-radius': '8px',
-            border: '1px solid rgba(255, 255, 255, 0.05)'
+            width: { xs: '100%', sm: 'auto' },
+            overflowX: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            '&::-webkit-scrollbar': { display: 'none' },
+            msOverflowStyle: 'none',
+            scrollbarWidth: 'none',
+            py: 0.5,
+            px: 0.5,
+            m: -0.5,
           }}
         >
-          <Button
-            onClick={() => setFilter('all')}
+          <ButtonGroup
+            variant="soft"
+            color="neutral"
+            size="sm"
             sx={{
-              fontWeight: 600,
-              bgcolor: filter === 'all' ? 'background.surface' : 'transparent',
-              color: filter === 'all' ? 'primary.plainColor' : 'text.secondary',
-              boxShadow: filter === 'all' ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
-              '&:hover': { bgcolor: filter === 'all' ? 'background.surface' : 'background.level2' }
+              p: 0.5,
+              borderRadius: '12px',
+              bgcolor: 'background.level1',
+              boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.2)',
+              '--ButtonGroup-radius': '8px',
+              border: '1px solid rgba(255, 255, 255, 0.05)',
+              width: { xs: '100%', sm: 'auto' },
+              minWidth: 'max-content'
             }}
           >
-            All
-          </Button>
-          <Button
-            onClick={() => setFilter('reports')}
-            sx={{
-              fontWeight: 600,
-              bgcolor: filter === 'reports' ? 'background.surface' : 'transparent',
-              color: filter === 'reports' ? 'primary.plainColor' : 'text.secondary',
-              boxShadow: filter === 'reports' ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
-              '&:hover': { bgcolor: filter === 'reports' ? 'background.surface' : 'background.level2' }
-            }}
-          >
-            Symbol Reports
-          </Button>
-          <Button
-            onClick={() => setFilter('digests')}
-            sx={{
-              fontWeight: 600,
-              bgcolor: filter === 'digests' ? 'background.surface' : 'transparent',
-              color: filter === 'digests' ? 'primary.plainColor' : 'text.secondary',
-              boxShadow: filter === 'digests' ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
-              '&:hover': { bgcolor: filter === 'digests' ? 'background.surface' : 'background.level2' }
-            }}
-          >
-            <Badge
-              badgeContent={unreadCount}
-              color="danger"
-              variant="solid"
-              size="sm"
-              invisible={unreadCount === 0}
+            <Button
+              onClick={() => setFilter('all')}
               sx={{
-                '& .MuiBadge-badge': {
-                  right: -15,
-                  top: -2,
-                  boxShadow: '0 0 8px rgba(225, 29, 72, 0.5)',
-                }
+                fontWeight: 600,
+                flex: { xs: 1, sm: 'initial' },
+                whiteSpace: 'nowrap',
+                bgcolor: filter === 'all' ? 'background.surface' : 'transparent',
+                color: filter === 'all' ? 'primary.plainColor' : 'text.secondary',
+                boxShadow: filter === 'all' ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
+                '&:hover': { bgcolor: filter === 'all' ? 'background.surface' : 'background.level2' }
               }}
             >
-              Email Digests
-            </Badge>
-          </Button>
-        </ButtonGroup>
+              All
+            </Button>
+            <Button
+              onClick={() => setFilter('reports')}
+              sx={{
+                fontWeight: 600,
+                flex: { xs: 1, sm: 'initial' },
+                whiteSpace: 'nowrap',
+                bgcolor: filter === 'reports' ? 'background.surface' : 'transparent',
+                color: filter === 'reports' ? 'primary.plainColor' : 'text.secondary',
+                boxShadow: filter === 'reports' ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
+                '&:hover': { bgcolor: filter === 'reports' ? 'background.surface' : 'background.level2' }
+              }}
+            >
+              Symbol Reports
+            </Button>
+            <Button
+              onClick={() => setFilter('digests')}
+              sx={{
+                fontWeight: 600,
+                flex: { xs: 1, sm: 'initial' },
+                whiteSpace: 'nowrap',
+                bgcolor: filter === 'digests' ? 'background.surface' : 'transparent',
+                color: filter === 'digests' ? 'primary.plainColor' : 'text.secondary',
+                boxShadow: filter === 'digests' ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
+                '&:hover': { bgcolor: filter === 'digests' ? 'background.surface' : 'background.level2' }
+              }}
+            >
+              <Badge
+                badgeContent={unreadCount}
+                color="danger"
+                variant="solid"
+                size="sm"
+                invisible={unreadCount === 0}
+                sx={{
+                  '& .MuiBadge-badge': {
+                    right: -15,
+                    top: -2,
+                    boxShadow: '0 0 8px rgba(225, 29, 72, 0.5)',
+                  }
+                }}
+              >
+                Email Digests
+              </Badge>
+            </Button>
+          </ButtonGroup>
+        </Box>
       </Stack>
 
       {loading ? (

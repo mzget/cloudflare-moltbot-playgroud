@@ -11,9 +11,15 @@ export function DailyReportCard({ report, onMarkAsRead }: { report: any; onMarkA
   return (
     <Card sx={{ ...glassStyle, p: 1, opacity: isRead ? 0.6 : 1, transition: 'opacity 0.3s ease' }}>
       <CardContent sx={{ p: 3 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 3 }}>
-          <Box>
-            <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 1 }}>
+        <Stack 
+          direction={{ xs: 'column', sm: 'row' }} 
+          justifyContent="space-between" 
+          alignItems={{ xs: 'flex-start', sm: 'flex-start' }} 
+          spacing={2} 
+          sx={{ mb: 3 }}
+        >
+          <Box sx={{ width: { xs: '100%', sm: 'auto' } }}>
+            <Stack direction="row" spacing={2} useFlexGap flexWrap="wrap" alignItems="center" sx={{ mb: 1 }}>
               <Typography level="h3" sx={{ fontWeight: 800 }}>{report.symbol}</Typography>
               <Chip
                 variant="soft"

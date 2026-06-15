@@ -252,8 +252,8 @@ export default function YahooPortfolio() {
               width: 'fit-content',
               '& .MuiTab-root': {
                 fontWeight: 600,
-                fontSize: '0.875rem',
-                px: 3,
+                fontSize: { xs: '0.8rem', md: '0.875rem' },
+                px: { xs: 1.5, sm: 2, md: 3 },
                 py: 1,
                 minHeight: 36,
                 borderRadius: '8px',

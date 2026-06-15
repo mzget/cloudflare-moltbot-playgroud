@@ -183,9 +183,9 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
     let intervalId: ReturnType<typeof setInterval> | null = null;
 
     const getInterval = () => {
-      if (showNotifications) return 5 * 60 * 1000; // 5 min – user is viewing panel
-      if (unreadCount === 0) return 2 * 60 * 1000;  // 2 min – nothing unread
-      return 30_000;                                  // 30 s  – has unread items
+      if (showNotifications) return 5 * 60 * 1000; // 5 min ï¿½ user is viewing panel
+      if (unreadCount === 0) return 2 * 60 * 1000;  // 2 min ï¿½ nothing unread
+      return 30_000;                                  // 30 s  ï¿½ has unread items
     };
 
     const start = () => {
@@ -218,8 +218,8 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
       sx={{
         ...glassStyle,
         mb: 4,
-        px: 4,
-        py: 2.5,
+        px: { xs: 1.5, sm: 3, md: 4 },
+        py: { xs: 1.5, md: 2.5 },
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -232,7 +232,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
         },
       }}
     >
-      <Stack direction="row" spacing={3} alignItems="center">
+      <Stack direction="row" spacing={{ xs: 1.5, md: 3 }} alignItems="center">
         {onOpenSidebar && (
           <Tooltip title={t('header.menu')} placement="bottom">
             <IconButton
@@ -246,7 +246,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
           </Tooltip>
         )}
         
-        <Stack direction="row" spacing={2.5} alignItems="center">
+        <Stack direction="row" spacing={{ xs: 1.5, md: 2.5 }} alignItems="center">
           <Tooltip title={sidebarCollapsed ? t('header.expand_sidebar') : t('header.collapse_sidebar')} placement="bottom">
             <IconButton
               variant="plain"
@@ -268,7 +268,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
             ref={logoRef}
             sx={{ 
               background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
-              p: 1.5, 
+              p: { xs: 1, md: 1.5 }, 
               borderRadius: '16px',
               display: 'flex',
               alignItems: 'center',
@@ -283,7 +283,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
             <Typography 
               level="h2" 
               sx={{ 
-                fontSize: '1.5rem',
+                fontSize: { xs: '1.2rem', md: '1.5rem' },
                 fontWeight: 800, 
                 letterSpacing: '-0.03em',
                 color: 'text.primary',
@@ -291,7 +291,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
             >
               {t('app.title')}
             </Typography>
-            <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 0.5 }}>
+            <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: { xs: 0.25, md: 0.5 } }}>
               <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Box 
                   className="status-dot"
@@ -331,8 +331,8 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
         </Stack>
       </Stack>
 
-      <Stack direction="row" spacing={2} alignItems="center">
-        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+      <Stack direction="row" spacing={{ xs: 1, md: 2 }} alignItems="center">
+        <Box sx={{ display: 'flex', gap: { xs: 1, md: 1.5 }, alignItems: 'center' }}>
           {/* Notifications Panel */}
           <Box ref={bellContainerRef} sx={{ position: 'relative' }}>
             <Tooltip title={t('header.notifications')} placement="bottom">
@@ -375,7 +375,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
                   top: '100%',
                   right: 0,
                   mt: 1.5,
-                  width: 360,
+                  width: { xs: 280, sm: 360 },
                   maxHeight: 480,
                   display: 'flex',
                   flexDirection: 'column',
@@ -546,7 +546,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
               variant="plain"
               sx={{
                 ...glassStyle,
-                display: 'flex',
+                display: { xs: 'none', md: 'flex' },
                 alignItems: 'center',
                 px: { xs: 1, sm: 2 },
                 py: 0.75,

@@ -47,9 +47,15 @@ export function EmailDigestCard({
   return (
     <Card sx={{ ...glassStyle, p: 1 }}>
       <CardContent sx={{ p: 3 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 3 }}>
-          <Box>
-            <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 1 }}>
+        <Stack 
+          direction={{ xs: 'column', sm: 'row' }} 
+          justifyContent="space-between" 
+          alignItems={{ xs: 'flex-start', sm: 'flex-start' }} 
+          spacing={2} 
+          sx={{ mb: 3 }}
+        >
+          <Box sx={{ width: { xs: '100%', sm: 'auto' } }}>
+            <Stack direction="row" spacing={2} useFlexGap flexWrap="wrap" alignItems="center" sx={{ mb: 1 }}>
               <Typography level="h3" sx={{ fontWeight: 800, color: 'text.primary' }}>
                 {digest.category}
               </Typography>
@@ -118,11 +124,11 @@ export function EmailDigestCard({
         </Box>
 
         {sources.length > 0 && (
-          <Box>
+          <Box sx={{ maxWidth: '100%' }}>
             <Typography level="body-xs" sx={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'text.tertiary', mb: 1.5 }}>
               Source Newsletters ({sources.length})
             </Typography>
-            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+            <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ maxWidth: '100%' }}>
               {sources.map((src, i) => (
                 <Chip
                   key={i}
@@ -133,11 +139,24 @@ export function EmailDigestCard({
                     bgcolor: 'rgba(255, 255, 255, 0.02)',
                     borderColor: 'rgba(255, 255, 255, 0.05)',
                     py: 0.75,
-                    px: 1.5
+                    px: 1.5,
+                    maxWidth: '100%',
+                    '& .MuiChip-label': {
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }
                   }}
                   title={`From: ${src.sender}`}
                 >
-                  <Typography level="body-xs" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                  <Typography 
+                    level="body-xs" 
+                    noWrap 
+                    sx={{ 
+                      fontWeight: 600, 
+                      color: 'text.secondary',
+                    }}
+                  >
                     {src.subject}
                   </Typography>
                 </Chip>
