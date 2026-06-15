@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useContext } from 'react';
-import { Box, Typography, Stack, Sheet, IconButton, Tooltip, Button, Dropdown, Menu as JoyMenu, MenuButton, MenuItem, Divider } from '@mui/joy';
+import { Box, Typography, Stack, Sheet, IconButton, Tooltip, Button, Dropdown, Menu as JoyMenu, MenuButton, MenuItem, Divider, Input } from '@mui/joy';
 import { Newspaper, Bell, Settings, User, Menu, Moon, Sun, LogOut, Check } from 'lucide-react';
 import { useColorScheme } from '@mui/joy/styles';
 import { useTranslation } from 'react-i18next';
@@ -38,10 +38,27 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
   const bellContainerRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
 
-  const { density, setDensity } = useSettingsStore();
+  const { theme, setTheme, density, setDensity, usdThbRate, setUsdThbRate } = useSettingsStore();
+  const [rateInput, setRateInput] = useState(usdThbRate.toString());
+
+  useEffect(() => {
+    setRateInput(usdThbRate.toString());
+  }, [usdThbRate]);
 
   const handleDensitySelect = (newDensity: DensityMode) => {
     setDensity(newDensity);
+  };
+
+  const handleThemeToggle = () => {
+    setTheme(mode === 'dark' ? 'light' : 'dark');
+  };
+
+  const handleRateUpdate = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const rate = parseFloat(rateInput);
+    if (!isNaN(rate) && rate > 0) {
+      setUsdThbRate(rate);
+    }
   };
 
   const fetchNotifications = async () => {
@@ -464,7 +481,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
             <IconButton 
               variant="plain" 
               color="neutral"
-              onClick={() => setMode(mode === 'dark' ? 'light' : 'dark')}
+              onClick={handleThemeToggle}
               sx={{ 
                 borderRadius: '12px',
                 '&:hover': { bgcolor: 'rgba(0,0,0,0.04)', transform: 'scale(1.05)' },
@@ -510,7 +527,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
                 Table Density
               </Typography>
               <Divider sx={{ my: 1, opacity: 0.15 }} />
-              {(['compact', 'cozy', 'comfort'] as const).map((d) => (
+              {([ 'compact', 'cozy', 'comfort' ] as const).map((d) => (
                 <MenuItem
                   key={d}
                   selected={density === d}
@@ -536,6 +553,33 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
                   {density === d && <Check size={16} />}
                 </MenuItem>
               ))}
+              <Divider sx={{ my: 1.5, opacity: 0.15 }} />
+              <Typography level="body-xs" sx={{ px: 1, py: 0.5, fontWeight: 700, color: 'text.tertiary', textTransform: 'uppercase', letterSpacing: '0.05em', mb: 1 }}>
+                USD/THB Rate
+              </Typography>
+              <Box 
+                onClick={(e) => e.stopPropagation()} 
+                sx={{ px: 1, pb: 0.5, display: 'flex', gap: 1, alignItems: 'center' }}
+              >
+                <Input
+                  size="sm"
+                  type="number"
+                  placeholder="36.5"
+                  value={rateInput}
+                  onChange={e => setRateInput(e.target.value)}
+                  startDecorator={<Typography level="body-xs" sx={{ fontWeight: 700 }}>฿</Typography>}
+                  sx={{ borderRadius: '8px', width: '90px' }}
+                />
+                <Button 
+                  size="sm" 
+                  variant="solid" 
+                  color="primary" 
+                  onClick={handleRateUpdate} 
+                  sx={{ borderRadius: '8px', px: 1.5, fontWeight: 700 }}
+                >
+                  Save
+                </Button>
+              </Box>
             </JoyMenu>
           </Dropdown>
           

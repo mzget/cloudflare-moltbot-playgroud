@@ -188,6 +188,94 @@ app.get('/api/auth/user/me', async (c) => {
   return c.json({ user });
 });
 
+// API: Get User Preferences
+app.get('/api/user/preferences', async (c) => {
+  const user = c.get('user');
+  if (!user || !user.email) {
+    return c.text('Unauthorized', 401);
+  }
+
+  try {
+    const row = await c.env.DB.prepare(
+      'SELECT theme, table_density, currency, exchange_rate FROM user_preferences WHERE email = ?'
+    ).bind(user.email).first();
+
+    if (row) {
+      return c.json(row);
+    } else {
+      return c.json({
+        theme: 'system',
+        table_density: 'cozy',
+        currency: 'USD',
+        exchange_rate: 1.0
+      });
+    }
+  } catch (e) {
+    return c.json({ error: (e as any).message }, 500);
+  }
+});
+
+// API: Update User Preferences
+app.put('/api/user/preferences', async (c) => {
+  const user = c.get('user');
+  if (!user || !user.email) {
+    return c.text('Unauthorized', 401);
+  }
+
+  try {
+    const body = await c.req.json() as any;
+    const { theme, table_density, currency, exchange_rate } = body;
+
+    // Validation
+    if (theme && !['light', 'dark', 'system'].includes(theme)) {
+      return c.text('Invalid theme setting', 400);
+    }
+    if (table_density && !['compact', 'cozy', 'comfort'].includes(table_density)) {
+      return c.text('Invalid table density setting', 400);
+    }
+    if (exchange_rate !== undefined && (typeof exchange_rate !== 'number' || exchange_rate <= 0)) {
+      return c.text('Invalid exchange rate', 400);
+    }
+
+    const current = await c.env.DB.prepare(
+      'SELECT theme, table_density, currency, exchange_rate FROM user_preferences WHERE email = ?'
+    ).bind(user.email).first() || {
+      theme: 'system',
+      table_density: 'cozy',
+      currency: 'USD',
+      exchange_rate: 1.0
+    };
+
+    const newTheme = theme !== undefined ? theme : current.theme;
+    const newDensity = table_density !== undefined ? table_density : current.table_density;
+    const newCurrency = currency !== undefined ? currency : current.currency;
+    const newRate = exchange_rate !== undefined ? exchange_rate : current.exchange_rate;
+
+    await c.env.DB.prepare(`
+      INSERT INTO user_preferences (email, theme, table_density, currency, exchange_rate, updated_at)
+      VALUES (?, ?, ?, ?, ?, strftime('%s', 'now'))
+      ON CONFLICT(email) DO UPDATE SET
+        theme = excluded.theme,
+        table_density = excluded.table_density,
+        currency = excluded.currency,
+        exchange_rate = excluded.exchange_rate,
+        updated_at = excluded.updated_at
+    `).bind(user.email, newTheme, newDensity, newCurrency, newRate).run();
+
+    return c.json({
+      success: true,
+      preferences: {
+        theme: newTheme,
+        table_density: newDensity,
+        currency: newCurrency,
+        exchange_rate: newRate
+      }
+    });
+  } catch (e) {
+    return c.json({ error: (e as any).message }, 500);
+  }
+});
+
 // API: Trigger Email Manually (Test)
 app.get('/api/email-test', async (c) => {
   try {

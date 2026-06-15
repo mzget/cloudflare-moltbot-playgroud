@@ -3,6 +3,7 @@ import { Box, Grid, Sheet, Typography, Divider, Drawer, Stack, Button } from '@m
 import { useSearch, useNavigate } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import gsap from 'gsap';
+import { useColorScheme } from '@mui/joy/styles';
 import Header from './Header';
 import Sidebar from './Sidebar';
 import SourceManager from '../features/sources/SourceManager';
@@ -17,6 +18,7 @@ import MarketEventsTimeline from '../features/market/MarketEventsTimeline';
 import OaktreeIcon from '../common/OaktreeIcon';
 import { LogOut, User } from 'lucide-react';
 import { AuthContext } from '../common/AuthContext';
+import { useSettingsStore } from '../../store/settingsStore';
 
 export default function RoutesLayout() {
   const { t } = useTranslation();
@@ -25,6 +27,14 @@ export default function RoutesLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(true);
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const { user, logout } = React.useContext(AuthContext);
+  const theme = useSettingsStore(state => state.theme);
+  const { mode, setMode } = useColorScheme();
+
+  React.useEffect(() => {
+    if (theme && theme !== mode) {
+      setMode(theme);
+    }
+  }, [theme, mode, setMode]);
 
   const setActiveTab = (tab: string) => {
     navigate({

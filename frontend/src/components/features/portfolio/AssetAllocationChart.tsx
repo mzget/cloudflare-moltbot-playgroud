@@ -203,7 +203,7 @@ export default function AssetAllocationChart({
           flexDirection: { xs: 'column', lg: 'row' },
           alignItems: 'center',
           justifyContent: 'center',
-          gap: { xs: 3, lg: 4 },
+          gap: { xs: 2, lg: 2 },
           flexGrow: 1,
           width: '100%',
         }}
@@ -323,14 +323,12 @@ export default function AssetAllocationChart({
         <Box
           sx={{
             display: 'flex',
-            flexDirection: { xs: 'row', lg: 'column' },
-            flexWrap: 'wrap',
+            flexDirection: 'column',
             gap: 1,
-            flexGrow: 1,
-            width: '100%',
+            width: { xs: '100%', lg: '220px' },
             maxHeight: { xs: 180, lg: 280 },
             overflowY: 'auto',
-            justifyContent: { xs: 'center', lg: 'flex-start' },
+            justifyContent: 'flex-start',
             px: { xs: 1, lg: 0 },
             py: 0.5,
           }}
@@ -356,7 +354,7 @@ export default function AssetAllocationChart({
                   transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                   border: '1px solid',
                   borderColor: isHovered ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                  minWidth: { xs: 'calc(50% - 8px)', sm: 'calc(33.33% - 8px)', lg: '100%' },
+                  width: '100%',
                   boxSizing: 'border-box',
                 }}
               >

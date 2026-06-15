@@ -15,6 +15,7 @@ import LoginScreen from './features/auth/LoginScreen';
 import { API_BASE_URL } from '../config';
 import { AuthContext } from './common/AuthContext';
 import type { User } from './common/AuthContext';
+import { useSettingsStore } from '../store/settingsStore';
 
 // Global Fetch Interceptor to inject JWT token
 if (typeof window !== 'undefined') {
@@ -121,6 +122,8 @@ export default function App() {
         picture: ''
       });
       setCheckingAuth(false);
+      // Fetch user preferences
+      useSettingsStore.getState().fetchPreferences().catch(console.error);
       return;
     }
 
@@ -135,6 +138,8 @@ export default function App() {
         if (res.ok) {
           const data = await res.json();
           setUser(data.user);
+          // Fetch user preferences
+          useSettingsStore.getState().fetchPreferences().catch(console.error);
         } else {
           localStorage.removeItem('auth_token');
         }
@@ -171,6 +176,8 @@ export default function App() {
             localStorage.setItem('auth_token', data.token);
             setUser(data.user);
             setAuthError(null);
+            // Fetch user preferences
+            useSettingsStore.getState().fetchPreferences().catch(console.error);
           } else {
             const errText = await res.text();
             setAuthError(errText || 'Failed to authenticate with Google');

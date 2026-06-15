@@ -27,7 +27,6 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
   const showMoneyValues = useSettingsStore(state => state.showMoneyValues);
   const setShowMoneyValues = useSettingsStore(state => state.setShowMoneyValues);
   const usdThbRate = useSettingsStore(state => state.usdThbRate);
-  const setUsdThbRate = useSettingsStore(state => state.setUsdThbRate);
 
   // Summary state (dynamically fetched with rate)
   const [summary, setSummary] = useState<PortfolioSummary>(initialSummary);
@@ -76,7 +75,7 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
   };
 
   // Edit states
-  const [rateInput, setRateInput] = useState(usdThbRate.toString());
+
   const [editingYear, setEditingYear] = useState<any>(null);
   const [yearlyModalOpen, setYearlyModalOpen] = useState(false);
   const [editingTax, setEditingTax] = useState<any>(null);
@@ -133,13 +132,6 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
     fetchData();
   }, [fetchData]);
 
-  // Rate Update
-  const handleRateUpdate = () => {
-    const rate = parseFloat(rateInput);
-    if (!isNaN(rate) && rate > 0) {
-      setUsdThbRate(rate);
-    }
-  };
 
   const handleSaveYearly = async () => {
     if (!editingYear || !editingYear.year) return;
@@ -330,7 +322,7 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
       {/* Top Metrics Cards (THB) */}
       <Grid container spacing={2}>
         {/* Stocks Only Card */}
-        <Grid xs={12} sm={6} lg={4}>
+        <Grid xs={12} md={4}>
           <Sheet sx={{ ...glassStyle, p: 3, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 3 }}>
               <Box sx={{ width: '100%' }}>
@@ -387,8 +379,162 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
           </Sheet>
         </Grid>
 
+        {/* Pie chart to see percent of all assets */}
+        <Grid xs={12} md={4}>
+          <Sheet sx={{ ...glassStyle, p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <Typography level="title-md" sx={{ fontWeight: 800, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Landmark size={18} color="#10b981" /> Asset Allocation
+            </Typography>
+            <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <AssetAllocationChart
+                brokers={brokers}
+                categories={categories}
+                allocations={allocations}
+                summary={summary}
+                rate={usdThbRate}
+                holdings={holdings}
+              />
+            </Box>
+          </Sheet>
+        </Grid>
+
+        {/* Daily TWR Performance vs S&P 500 (holdings stock) */}
+        <Grid xs={12} md={4}>
+          <Sheet sx={{ ...glassStyle, p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
+            <Typography level="title-md" sx={{ fontWeight: 800, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <BarChart2 size={18} color="#10b981" /> Daily TWR Performance vs S&P 500 (holdings stock)
+            </Typography>
+            <Box sx={{ minHeight: 260, height: 'auto', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <PortfolioChart />
+            </Box>
+          </Sheet>
+        </Grid>
+      </Grid>
+
+      {/* Portfolio Performance & Asset Allocation Grid */}
+      <Grid container spacing={2}>
+
+        {/* Broker Balances Table */}
+        <Grid xs={12} md={8}>
+          <Sheet sx={{ ...glassStyle, p: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
+              <Box>
+                <Typography level="title-lg" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Coins size={20} color="#10b981" /> Broker & Platform (THB)
+                </Typography>
+                <Typography level="body-xs" sx={{ opacity: 0.6, mt: 0.5 }}>
+                  Consolidated balances by platform.
+                </Typography>
+              </Box>
+              {isEditingBrokers ? (
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    variant="solid"
+                    color="success"
+                    startDecorator={<Save size={16} />}
+                    loading={submittingBroker === 'all'}
+                    onClick={handleSaveBrokerOverrides}
+                    sx={{ borderRadius: '12px', fontWeight: 700 }}
+                  >
+                    Save
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    color="neutral"
+                    onClick={handleCancelEditingBrokers}
+                    sx={{ borderRadius: '12px', fontWeight: 700 }}
+                  >
+                    Cancel
+                  </Button>
+                </Stack>
+              ) : (
+                <Button
+                  variant="soft"
+                  color="primary"
+                  startDecorator={<Edit size={16} />}
+                  onClick={handleStartEditingBrokers}
+                  sx={{ borderRadius: '12px', fontWeight: 700 }}
+                >
+                  Edit Overrides
+                </Button>
+              )}
+            </Box>
+            <Box sx={{ overflowX: 'auto' }}>
+              <Table aria-label="broker balances table" sx={{ '& th': { fontWeight: 700 } }}>
+                <thead>
+                  <tr>
+                    <th>Broker/Account</th>
+                    <th style={{ textAlign: 'right' }}>Cost</th>
+                    <th style={{ textAlign: 'right' }}>Value</th>
+                    <th style={{ textAlign: 'right' }}>Gain</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {displayedBrokers.map(broker => (
+                    <tr key={broker.broker_name}>
+                      <td style={{ fontWeight: 700 }}>{broker.broker_name}</td>
+                      {/* Cost: edit input when editing, override when set, else calculated */}
+                      <td style={{ textAlign: 'right' }}>
+                        {isEditingBrokers ? (
+                          <Input
+                            size="sm"
+                            placeholder="Manual Cost"
+                            value={brokerOverrideForm[broker.broker_name]?.cost || ''}
+                            onChange={e => setBrokerOverrideForm(prev => ({
+                              ...prev,
+                              [broker.broker_name]: { ...prev[broker.broker_name], cost: e.target.value }
+                            }))}
+                            slotProps={{ input: { style: { textAlign: 'right' } } }}
+                            sx={{ borderRadius: '8px' }}
+                          />
+                        ) : showMoneyValues ? formatCurrency(broker.cost_override ?? broker.cost, false, '฿') : '••••••••'}
+                      </td>
+                      {/* Value: edit input when editing, override when set, else calculated */}
+                      <td style={{ textAlign: 'right' }}>
+                        {isEditingBrokers ? (
+                          <Input
+                            size="sm"
+                            placeholder="Manual Value"
+                            value={brokerOverrideForm[broker.broker_name]?.balance || ''}
+                            onChange={e => setBrokerOverrideForm(prev => ({
+                              ...prev,
+                              [broker.broker_name]: { ...prev[broker.broker_name], balance: e.target.value }
+                            }))}
+                            slotProps={{ input: { style: { textAlign: 'right' } } }}
+                            sx={{ borderRadius: '8px' }}
+                          />
+                        ) : showMoneyValues ? formatCurrency(broker.balance_override ?? broker.balance, false, '฿') : '••••••••'}
+                      </td>
+                      <td style={{ textAlign: 'right', fontWeight: 700 }} className={broker.gain_amt >= 0 ? 'yf-positive' : 'yf-negative'}>
+                        {showMoneyValues ? formatCurrency(broker.gain_amt, true, '฿') : '••••••••'} ({broker.gain_pct.toFixed(2)}%)
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                {brokerTotals && (
+                  <tfoot style={{ borderTop: '2px solid var(--yf-border)', backgroundColor: 'var(--yf-header-bg)', fontWeight: 'bold' }}>
+                    <tr>
+                      <td style={{ fontWeight: 700, textAlign: 'left' }}>Total</td>
+                      <td style={{ textAlign: 'right', fontWeight: 700 }}>
+                        {showMoneyValues ? formatCurrency(brokerTotals.cost, false, '฿') : '••••••••'}
+                      </td>
+                      <td style={{ textAlign: 'right', fontWeight: 700 }}>
+                        {showMoneyValues ? formatCurrency(brokerTotals.balance, false, '฿') : '••••••••'}
+                      </td>
+                      <td style={{ textAlign: 'right', fontWeight: 700 }} className={brokerTotals.gain_amt >= 0 ? 'yf-positive' : 'yf-negative'}>
+                        {showMoneyValues ? formatCurrency(brokerTotals.gain_amt, true, '฿') : '••••••••'} ({brokerTotals.gain_pct.toFixed(2)}%)
+                      </td>
+
+                    </tr>
+                  </tfoot>
+                )}
+              </Table>
+            </Box>
+          </Sheet>
+        </Grid>
+
         {/* All Assets Card */}
-        <Grid xs={12} sm={6} lg={5}>
+        <Grid xs={12} md={4}>
           <Sheet sx={{ ...glassStyle, p: 3, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 3 }}>
               <Box sx={{ width: '100%' }}>
@@ -448,73 +594,6 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
           </Sheet>
         </Grid>
 
-        {/* Static Settings (Exchange Rate) Card */}
-        <Grid xs={12} sm={12} lg={3}>
-          <Sheet sx={{ ...glassStyle, p: 3, display: 'flex', flexDirection: 'column', gap: 2, height: '100%' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-              <Settings size={20} color="#10b981" />
-              <Typography level="title-md" sx={{ fontWeight: 700 }}>Settings</Typography>
-            </Box>
-            <Typography level="body-xs" sx={{ opacity: 0.6 }}>
-              Configure parameters to convert US investments to THB and adjust dashboard representation.
-            </Typography>
-            <FormControl>
-              <FormLabel sx={{ fontWeight: 600, fontSize: '0.8rem' }}>USD / THB Static Exchange Rate</FormLabel>
-              <Stack direction="row" spacing={1} sx={{ mt: 0.5 }}>
-                <Input
-                  type="number"
-                  placeholder="e.g. 36.5"
-                  value={rateInput}
-                  onChange={e => setRateInput(e.target.value)}
-                  startDecorator={<Typography level="body-xs" sx={{ fontWeight: 700 }}>฿</Typography>}
-                  sx={{ flex: 1, borderRadius: '10px' }}
-                />
-                <Button variant="solid" color="primary" onClick={handleRateUpdate} sx={{ borderRadius: '10px', px: 2, fontWeight: 700 }}>
-                  Save
-                </Button>
-              </Stack>
-            </FormControl>
-            <Box sx={{ mt: 'auto', p: 1.5, borderRadius: '10px', bgcolor: 'rgba(16, 185, 129, 0.05)', border: '1px dashed rgba(16, 185, 129, 0.15)' }}>
-              <Typography level="body-xs" sx={{ opacity: 0.8, fontWeight: 500 }}>
-                💡 Rate of <strong>฿{usdThbRate}/USD</strong> is currently applied to convert stock costs, values, and dividends.
-              </Typography>
-            </Box>
-          </Sheet>
-        </Grid>
-      </Grid>
-
-      {/* Portfolio Performance & Asset Allocation Grid */}
-      <Grid container spacing={2}>
-        {/* Daily TWR Performance vs S&P 500 (holdings stock) */}
-        <Grid xs={12} md={6}>
-          <Sheet sx={{ ...glassStyle, p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <Typography level="title-md" sx={{ fontWeight: 800, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <BarChart2 size={18} color="#10b981" /> Daily TWR Performance vs S&P 500 (holdings stock)
-            </Typography>
-            <Box sx={{ minHeight: 260, height: 'auto', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <PortfolioChart />
-            </Box>
-          </Sheet>
-        </Grid>
-
-        {/* Pie chart to see percent of all assets */}
-        <Grid xs={12} md={6}>
-          <Sheet sx={{ ...glassStyle, p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <Typography level="title-md" sx={{ fontWeight: 800, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Landmark size={18} color="#10b981" /> Asset Allocation
-            </Typography>
-            <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <AssetAllocationChart
-                brokers={brokers}
-                categories={categories}
-                allocations={allocations}
-                summary={summary}
-                rate={usdThbRate}
-                holdings={holdings}
-              />
-            </Box>
-          </Sheet>
-        </Grid>
       </Grid>
 
       {/* Fund Allocations Grid (Matrix) */}
@@ -621,122 +700,6 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
         </Box>
       </Sheet>
 
-      {/* Broker Balances Table */}
-      <Sheet sx={{ ...glassStyle, p: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
-          <Box>
-            <Typography level="title-lg" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Coins size={20} color="#10b981" /> Broker & Platform (THB)
-            </Typography>
-            <Typography level="body-xs" sx={{ opacity: 0.6, mt: 0.5 }}>
-              Consolidated balances by platform. Cost/Balances are auto-derived from stock prices and fund allocations, or overridden manually.
-            </Typography>
-          </Box>
-          {isEditingBrokers ? (
-            <Stack direction="row" spacing={1}>
-              <Button
-                variant="solid"
-                color="success"
-                startDecorator={<Save size={16} />}
-                loading={submittingBroker === 'all'}
-                onClick={handleSaveBrokerOverrides}
-                sx={{ borderRadius: '12px', fontWeight: 700 }}
-              >
-                Save
-              </Button>
-              <Button
-                variant="outlined"
-                color="neutral"
-                onClick={handleCancelEditingBrokers}
-                sx={{ borderRadius: '12px', fontWeight: 700 }}
-              >
-                Cancel
-              </Button>
-            </Stack>
-          ) : (
-            <Button
-              variant="soft"
-              color="primary"
-              startDecorator={<Edit size={16} />}
-              onClick={handleStartEditingBrokers}
-              sx={{ borderRadius: '12px', fontWeight: 700 }}
-            >
-              Edit Overrides
-            </Button>
-          )}
-        </Box>
-        <Box sx={{ overflowX: 'auto' }}>
-          <Table aria-label="broker balances table" sx={{ '& th': { fontWeight: 700 } }}>
-            <thead>
-              <tr>
-                <th>Broker/Account</th>
-                <th style={{ textAlign: 'right' }}>Cost</th>
-                <th style={{ textAlign: 'right' }}>Value</th>
-                <th style={{ textAlign: 'right' }}>Gain</th>
-              </tr>
-            </thead>
-            <tbody>
-              {displayedBrokers.map(broker => (
-                <tr key={broker.broker_name}>
-                  <td style={{ fontWeight: 700 }}>{broker.broker_name}</td>
-                  {/* Cost: edit input when editing, override when set, else calculated */}
-                  <td style={{ textAlign: 'right' }}>
-                    {isEditingBrokers ? (
-                      <Input
-                        size="sm"
-                        placeholder="Manual Cost"
-                        value={brokerOverrideForm[broker.broker_name]?.cost || ''}
-                        onChange={e => setBrokerOverrideForm(prev => ({
-                          ...prev,
-                          [broker.broker_name]: { ...prev[broker.broker_name], cost: e.target.value }
-                        }))}  
-                        slotProps={{ input: { style: { textAlign: 'right' } } }}
-                        sx={{ borderRadius: '8px' }}
-                      />
-                    ) : showMoneyValues ? formatCurrency(broker.cost_override ?? broker.cost, false, '฿') : '••••••••'}
-                  </td>
-                  {/* Value: edit input when editing, override when set, else calculated */}
-                  <td style={{ textAlign: 'right' }}>
-                    {isEditingBrokers ? (
-                      <Input
-                        size="sm"
-                        placeholder="Manual Value"
-                        value={brokerOverrideForm[broker.broker_name]?.balance || ''}
-                        onChange={e => setBrokerOverrideForm(prev => ({
-                          ...prev,
-                          [broker.broker_name]: { ...prev[broker.broker_name], balance: e.target.value }
-                        }))}  
-                        slotProps={{ input: { style: { textAlign: 'right' } } }}
-                        sx={{ borderRadius: '8px' }}
-                      />
-                    ) : showMoneyValues ? formatCurrency(broker.balance_override ?? broker.balance, false, '฿') : '••••••••'}
-                  </td>
-                  <td style={{ textAlign: 'right', fontWeight: 700 }} className={broker.gain_amt >= 0 ? 'yf-positive' : 'yf-negative'}>
-                    {showMoneyValues ? formatCurrency(broker.gain_amt, true, '฿') : '••••••••'} ({broker.gain_pct.toFixed(2)}%)
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            {brokerTotals && (
-              <tfoot style={{ borderTop: '2px solid var(--yf-border)', backgroundColor: 'var(--yf-header-bg)', fontWeight: 'bold' }}>
-                <tr>
-                  <td style={{ fontWeight: 700, textAlign: 'left' }}>Total</td>
-                  <td style={{ textAlign: 'right', fontWeight: 700 }}>
-                    {showMoneyValues ? formatCurrency(brokerTotals.cost, false, '฿') : '••••••••'}
-                  </td>
-                  <td style={{ textAlign: 'right', fontWeight: 700 }}>
-                    {showMoneyValues ? formatCurrency(brokerTotals.balance, false, '฿') : '••••••••'}
-                  </td>
-                  <td style={{ textAlign: 'right', fontWeight: 700 }} className={brokerTotals.gain_amt >= 0 ? 'yf-positive' : 'yf-negative'}>
-                    {showMoneyValues ? formatCurrency(brokerTotals.gain_amt, true, '฿') : '••••••••'} ({brokerTotals.gain_pct.toFixed(2)}%)
-                  </td>
-
-                </tr>
-              </tfoot>
-            )}
-          </Table>
-        </Box>
-      </Sheet>
 
       {/* Yearly History and Tax Savings Tabs Group */}
       <Grid container spacing={2}>
@@ -779,14 +742,14 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
                     const calculatedReturn = row.capital > 0 ? (row.balance - row.capital) / row.capital : 0;
                     return (
                       <React.Fragment key={row.year}>
-                        <tr 
+                        <tr
                           onClick={() => toggleYearExpanded(row.year)}
                           style={{ cursor: 'pointer', backgroundColor: isExpanded ? 'rgba(16, 185, 129, 0.02)' : 'transparent' }}
                         >
                           <td>
-                            <IconButton 
-                              size="sm" 
-                              variant="plain" 
+                            <IconButton
+                              size="sm"
+                              variant="plain"
                               color="neutral"
                               onClick={(e) => {
                                 e.stopPropagation();
