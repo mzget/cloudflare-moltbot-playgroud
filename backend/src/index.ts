@@ -20,190 +20,190 @@ import { cors } from 'hono/cors';
 export { OaktreeSyncWorkflow } from './workflow';
 
 export interface Env {
-	DB: D1Database;
-	AI: any;
-	BROWSER: BrowserWorker;
-	EMAIL: {
-		send: (raw: string) => Promise<void>;
-		destination_address: string;
-	};
-	FINNHUB_API_KEY?: string;
-	GOOGLE_CLIENT_ID?: string;
-	GOOGLE_CLIENT_SECRET?: string;
-	JWT_SECRET?: string;
-	ALLOWED_EMAILS?: string;
-	FACEBOOK_PAGE_ID?: string;
-	FACEBOOK_PAGE_ACCESS_TOKEN?: string;
-	OAKTREE_SYNC_WORKFLOW: Workflow;
-	IS_LOCAL?: string;
+  DB: D1Database;
+  AI: any;
+  BROWSER: BrowserWorker;
+  EMAIL: {
+    send: (raw: string) => Promise<void>;
+    destination_address: string;
+  };
+  FINNHUB_API_KEY?: string;
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+  JWT_SECRET?: string;
+  ALLOWED_EMAILS?: string;
+  FACEBOOK_PAGE_ID?: string;
+  FACEBOOK_PAGE_ACCESS_TOKEN?: string;
+  OAKTREE_SYNC_WORKFLOW: Workflow;
+  IS_LOCAL?: string;
 }
 
 const app = new Hono<{
-	Bindings: Env;
-	Variables: {
-		user: any;
-	};
+  Bindings: Env;
+  Variables: {
+    user: any;
+  };
 }>();
 
 // Enable CORS
 app.use('*', async (c, next) => {
-	const origin = c.env.IS_LOCAL === 'true' ? '*' : 'https://oaktree-agent.pages.dev'; // Replace with your production domain as appropriate
-	const corsMiddleware = cors({
-		origin: origin,
-		allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-		allowHeaders: ['Content-Type', 'Authorization'],
-		maxAge: 86400,
-	});
-	return corsMiddleware(c, next);
+  const origin = c.env.IS_LOCAL === 'true' ? '*' : 'https://oaktree-agent-frontend.pages.dev'; // Replace with your production domain as appropriate
+  const corsMiddleware = cors({
+    origin: origin,
+    allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowHeaders: ['Content-Type', 'Authorization'],
+    maxAge: 86400,
+  });
+  return corsMiddleware(c, next);
 });
 
 // Authentication Middleware
 app.use('/api/*', async (c, next) => {
-	const path = c.req.path;
-	const isUnprotectedRoute = path === '/' || 
-							   path === '/api/auth/user/login-url' || 
-							   path === '/api/auth/user/callback';
-	
-	if (!isUnprotectedRoute) {
-		const jwtSecret = c.env.JWT_SECRET;
-		if (!jwtSecret && c.env.IS_LOCAL !== 'true') {
-			return c.text('JWT Secret is not configured', 500);
-		}
-		
-		let user = await checkAuth(c.req.raw, jwtSecret || '');
-		
-		// Bypass authentication in local development mode
-		if (!user && c.env.IS_LOCAL === 'true') {
-			user = {
-				email: 'local@example.com',
-				name: 'Local User',
-				picture: ''
-			};
-		}
-		
-		if (!user) {
-			return c.text('Unauthorized', 401);
-		}
-		c.set('user', user);
-	}
-	await next();
+  const path = c.req.path;
+  const isUnprotectedRoute = path === '/' ||
+    path === '/api/auth/user/login-url' ||
+    path === '/api/auth/user/callback';
+
+  if (!isUnprotectedRoute) {
+    const jwtSecret = c.env.JWT_SECRET;
+    if (!jwtSecret && c.env.IS_LOCAL !== 'true') {
+      return c.text('JWT Secret is not configured', 500);
+    }
+
+    let user = await checkAuth(c.req.raw, jwtSecret || '');
+
+    // Bypass authentication in local development mode
+    if (!user && c.env.IS_LOCAL === 'true') {
+      user = {
+        email: 'local@example.com',
+        name: 'Local User',
+        picture: ''
+      };
+    }
+
+    if (!user) {
+      return c.text('Unauthorized', 401);
+    }
+    c.set('user', user);
+  }
+  await next();
 });
 
 // Admin & Test Trigger Rate Limiting Middleware
 const rateLimitCache = new Map<string, number>();
 app.use('/api/*', async (c, next) => {
-	const path = c.req.path;
-	const isTriggerRoute = path === '/api/email-test' ||
-						   path === '/api/crawl' ||
-						   path === '/api/summarize-all' ||
-						   path === '/api/test-market-stats' ||
-						   path === '/api/crawl-events' ||
-						   path === '/api/alerts/check-test' ||
-						   path === '/api/email-sync' ||
-						   path === '/api/test-email-digest' ||
-						   path === '/api/test-facebook-post';
-	
-	if (isTriggerRoute && c.env.IS_LOCAL !== 'true') {
-		const user = c.get('user');
-		const key = `${user?.email || 'anonymous'}:${path}`;
-		const lastRequestTime = rateLimitCache.get(key) || 0;
-		const now = Date.now();
-		const limitMs = 60 * 1000; // 1 minute limit per trigger endpoint
-		
-		if (now - lastRequestTime < limitMs) {
-			const waitSec = Math.ceil((limitMs - (now - lastRequestTime)) / 1000);
-			return c.text(`Rate limit exceeded. Please wait ${waitSec} seconds.`, 429);
-		}
-		rateLimitCache.set(key, now);
-	}
-	await next();
+  const path = c.req.path;
+  const isTriggerRoute = path === '/api/email-test' ||
+    path === '/api/crawl' ||
+    path === '/api/summarize-all' ||
+    path === '/api/test-market-stats' ||
+    path === '/api/crawl-events' ||
+    path === '/api/alerts/check-test' ||
+    path === '/api/email-sync' ||
+    path === '/api/test-email-digest' ||
+    path === '/api/test-facebook-post';
+
+  if (isTriggerRoute && c.env.IS_LOCAL !== 'true') {
+    const user = c.get('user');
+    const key = `${user?.email || 'anonymous'}:${path}`;
+    const lastRequestTime = rateLimitCache.get(key) || 0;
+    const now = Date.now();
+    const limitMs = 60 * 1000; // 1 minute limit per trigger endpoint
+
+    if (now - lastRequestTime < limitMs) {
+      const waitSec = Math.ceil((limitMs - (now - lastRequestTime)) / 1000);
+      return c.text(`Rate limit exceeded. Please wait ${waitSec} seconds.`, 429);
+    }
+    rateLimitCache.set(key, now);
+  }
+  await next();
 });
 
 // API: Google OAuth for User Login URL
 app.get('/api/auth/user/login-url', async (c) => {
-	const clientId = c.env.GOOGLE_CLIENT_ID;
-	const redirectUri = c.req.query('redirect_uri');
-	if (!clientId || !redirectUri) {
-		return c.text('Missing client_id configuration or redirect_uri parameter', 400);
-	}
-	const authUrl = getUserLoginAuthUrl(clientId, redirectUri);
-	return c.json({ url: authUrl });
+  const clientId = c.env.GOOGLE_CLIENT_ID;
+  const redirectUri = c.req.query('redirect_uri');
+  if (!clientId || !redirectUri) {
+    return c.text('Missing client_id configuration or redirect_uri parameter', 400);
+  }
+  const authUrl = getUserLoginAuthUrl(clientId, redirectUri);
+  return c.json({ url: authUrl });
 });
 
 // API: Google OAuth Callback for User Login
 app.post('/api/auth/user/callback', async (c) => {
-	try {
-		const { code, redirect_uri } = await c.req.json() as any;
-		const clientId = c.env.GOOGLE_CLIENT_ID;
-		const clientSecret = c.env.GOOGLE_CLIENT_SECRET;
-		const jwtSecret = c.env.JWT_SECRET;
-		if (!jwtSecret && c.env.IS_LOCAL !== 'true') {
-			return c.text('JWT Secret is not configured', 500);
-		}
-		if (!clientId || !clientSecret || !code || !redirect_uri) {
-			return c.text('Missing configuration, code, or redirect_uri', 400);
-		}
-		const tokens = await exchangeCodeForTokens(code, clientId, clientSecret, redirect_uri);
-		const profile = await fetchGoogleUserProfile(tokens.access_token);
-		
-		if (!profile.email) {
-			return c.text('Failed to retrieve email from Google profile', 400);
-		}
-		
-		// Email check
-		const allowedEmails = c.env.ALLOWED_EMAILS;
-		if (!isEmailAuthorized(profile.email, allowedEmails)) {
-			return c.text('Forbidden: Your email is not authorized to access this site', 403);
-		}
-		
-		// Generate session JWT (valid for 7 days)
-		const sessionPayload = {
-			email: profile.email,
-			name: profile.name,
-			picture: profile.picture,
-			exp: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60)
-		};
-		
-		const token = await signJwt(sessionPayload, jwtSecret || '');
-		return c.json({
-			success: true,
-			token,
-			user: {
-				email: profile.email,
-				name: profile.name,
-				picture: profile.picture
-			}
-		});
-	} catch (e) {
-		return c.text(`User authentication failed: ${(e as any).message}`, 500);
-	}
+  try {
+    const { code, redirect_uri } = await c.req.json() as any;
+    const clientId = c.env.GOOGLE_CLIENT_ID;
+    const clientSecret = c.env.GOOGLE_CLIENT_SECRET;
+    const jwtSecret = c.env.JWT_SECRET;
+    if (!jwtSecret && c.env.IS_LOCAL !== 'true') {
+      return c.text('JWT Secret is not configured', 500);
+    }
+    if (!clientId || !clientSecret || !code || !redirect_uri) {
+      return c.text('Missing configuration, code, or redirect_uri', 400);
+    }
+    const tokens = await exchangeCodeForTokens(code, clientId, clientSecret, redirect_uri);
+    const profile = await fetchGoogleUserProfile(tokens.access_token);
+
+    if (!profile.email) {
+      return c.text('Failed to retrieve email from Google profile', 400);
+    }
+
+    // Email check
+    const allowedEmails = c.env.ALLOWED_EMAILS;
+    if (!isEmailAuthorized(profile.email, allowedEmails)) {
+      return c.text('Forbidden: Your email is not authorized to access this site', 403);
+    }
+
+    // Generate session JWT (valid for 7 days)
+    const sessionPayload = {
+      email: profile.email,
+      name: profile.name,
+      picture: profile.picture,
+      exp: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60)
+    };
+
+    const token = await signJwt(sessionPayload, jwtSecret || '');
+    return c.json({
+      success: true,
+      token,
+      user: {
+        email: profile.email,
+        name: profile.name,
+        picture: profile.picture
+      }
+    });
+  } catch (e) {
+    return c.text(`User authentication failed: ${(e as any).message}`, 500);
+  }
 });
 
 // API: Get Current Authenticated User Info
 app.get('/api/auth/user/me', async (c) => {
-	const user = c.get('user');
-	if (!user) {
-		return c.text('Unauthorized', 401);
-	}
-	return c.json({ user });
+  const user = c.get('user');
+  if (!user) {
+    return c.text('Unauthorized', 401);
+  }
+  return c.json({ user });
 });
 
 // API: Trigger Email Manually (Test)
 app.get('/api/email-test', async (c) => {
-	try {
-		const instance = await c.env.OAKTREE_SYNC_WORKFLOW.create({
-			id: `manual-email-test-${Date.now()}`,
-			params: { sendDailyEmailReport: false } // Disabled for this phase
-		});
-		return c.text(`Email trigger started via Workflow: ${instance.id}`);
-	} catch (e) {
-		return c.text(`Failed to start email trigger workflow: ${(e as any).message}`, 500);
-	}
+  try {
+    const instance = await c.env.OAKTREE_SYNC_WORKFLOW.create({
+      id: `manual-email-test-${Date.now()}`,
+      params: { sendDailyEmailReport: false } // Disabled for this phase
+    });
+    return c.text(`Email trigger started via Workflow: ${instance.id}`);
+  } catch (e) {
+    return c.text(`Failed to start email trigger workflow: ${(e as any).message}`, 500);
+  }
 });
 
 // API: Get Latest Reports (One per symbol) / Purge Old Reports
 app.get('/api/reports', async (c) => {
-	const { results } = await c.env.DB.prepare(`
+  const { results } = await c.env.DB.prepare(`
 		SELECT m.*
 		FROM (SELECT DISTINCT symbol FROM daily_reports) s
 		JOIN daily_reports m ON m.id IN (
@@ -214,199 +214,199 @@ app.get('/api/reports', async (c) => {
 		)
 		ORDER BY m.is_readed ASC, m.created_at DESC
 	`).all();
-	return c.json(results);
+  return c.json(results);
 });
 
 // API: Mark Daily Report as Read
 app.post('/api/reports/mark-read', async (c) => {
-	try {
-		const { id } = await c.req.json() as any;
-		if (!id) {
-			return c.json({ error: 'Missing report ID' }, 400);
-		}
-		await c.env.DB.prepare(
-			'UPDATE daily_reports SET is_readed = 1 WHERE id = ?'
-		).bind(id).run();
-		return c.json({ success: true, message: 'Report marked as read' });
-	} catch (e) {
-		return c.json({ error: (e as any).message }, 500);
-	}
+  try {
+    const { id } = await c.req.json() as any;
+    if (!id) {
+      return c.json({ error: 'Missing report ID' }, 400);
+    }
+    await c.env.DB.prepare(
+      'UPDATE daily_reports SET is_readed = 1 WHERE id = ?'
+    ).bind(id).run();
+    return c.json({ success: true, message: 'Report marked as read' });
+  } catch (e) {
+    return c.json({ error: (e as any).message }, 500);
+  }
 });
 
 app.delete('/api/reports', async (c) => {
-	try {
-		await c.env.DB.prepare("DELETE FROM daily_reports WHERE created_at < datetime('now', '-3 days')").run();
-		return c.text('Purged old daily reports');
-	} catch (e) {
-		return c.text(`Failed to purge daily reports: ${(e as any).message}`, 500);
-	}
+  try {
+    await c.env.DB.prepare("DELETE FROM daily_reports WHERE created_at < datetime('now', '-3 days')").run();
+    return c.text('Purged old daily reports');
+  } catch (e) {
+    return c.text(`Failed to purge daily reports: ${(e as any).message}`, 500);
+  }
 });
 
 // API: Get Latest News / Purge Old News
 app.get('/api/news', async (c) => {
-	const { results } = await c.env.DB.prepare(
-		"SELECT id, symbol, title, summary, sentiment, url, CAST(strftime('%s', created_at) as INTEGER) as created_at FROM news ORDER BY created_at DESC LIMIT 50"
-	).all();
-	return c.json(results);
+  const { results } = await c.env.DB.prepare(
+    "SELECT id, symbol, title, summary, sentiment, url, CAST(strftime('%s', created_at) as INTEGER) as created_at FROM news ORDER BY created_at DESC LIMIT 50"
+  ).all();
+  return c.json(results);
 });
 
 app.delete('/api/news', async (c) => {
-	try {
-		await c.env.DB.prepare("DELETE FROM news WHERE created_at < datetime('now', '-3 days')").run();
-		return c.text('Purged old news items');
-	} catch (e) {
-		return c.text(`Failed to purge news: ${(e as any).message}`, 500);
-	}
+  try {
+    await c.env.DB.prepare("DELETE FROM news WHERE created_at < datetime('now', '-3 days')").run();
+    return c.text('Purged old news items');
+  } catch (e) {
+    return c.text(`Failed to purge news: ${(e as any).message}`, 500);
+  }
 });
 
 // API: Watchlist Operations
 app.get('/api/watchlist', async (c) => {
-	const { results } = await c.env.DB.prepare(`
+  const { results } = await c.env.DB.prepare(`
 		SELECT w.*, 
 		       (CASE WHEN p.symbol IS NOT NULL THEN 1 ELSE 0 END) as in_portfolio,
 		       (SELECT COUNT(*) FROM alert_rules ar WHERE ar.symbol = w.symbol AND ar.is_active = 1) as active_alerts_count
 		FROM watchlist w
 		LEFT JOIN portfolio_holdings p ON w.symbol = p.symbol
 	`).all();
-	return c.json(results);
+  return c.json(results);
 });
 
 app.post('/api/watchlist', async (c) => {
-	const { symbol, name } = await c.req.json() as any;
-	await c.env.DB.prepare('INSERT OR IGNORE INTO watchlist (symbol, name) VALUES (?, ?)')
-		.bind(symbol, name).run();
-	return c.text('Symbol added');
+  const { symbol, name } = await c.req.json() as any;
+  await c.env.DB.prepare('INSERT OR IGNORE INTO watchlist (symbol, name) VALUES (?, ?)')
+    .bind(symbol, name).run();
+  return c.text('Symbol added');
 });
 
 app.put('/api/watchlist', async (c) => {
-	const { symbol, is_active, in_portfolio } = await c.req.json() as any;
-	if (is_active !== undefined) {
-		await c.env.DB.prepare('UPDATE watchlist SET is_active = ? WHERE symbol = ?')
-			.bind(is_active ? 1 : 0, symbol).run();
-	}
-	if (in_portfolio !== undefined) {
-		if (in_portfolio) {
-			await c.env.DB.prepare("INSERT OR IGNORE INTO portfolio_holdings (symbol, weight, thesis, category) VALUES (?, 0.0, 'Added from Watchlist', 'Stock')")
-				.bind(symbol).run();
-		} else {
-			await c.env.DB.prepare('DELETE FROM portfolio_holdings WHERE symbol = ?')
-				.bind(symbol).run();
-		}
-	}
-	return c.text('Symbol updated');
+  const { symbol, is_active, in_portfolio } = await c.req.json() as any;
+  if (is_active !== undefined) {
+    await c.env.DB.prepare('UPDATE watchlist SET is_active = ? WHERE symbol = ?')
+      .bind(is_active ? 1 : 0, symbol).run();
+  }
+  if (in_portfolio !== undefined) {
+    if (in_portfolio) {
+      await c.env.DB.prepare("INSERT OR IGNORE INTO portfolio_holdings (symbol, weight, thesis, category) VALUES (?, 0.0, 'Added from Watchlist', 'Stock')")
+        .bind(symbol).run();
+    } else {
+      await c.env.DB.prepare('DELETE FROM portfolio_holdings WHERE symbol = ?')
+        .bind(symbol).run();
+    }
+  }
+  return c.text('Symbol updated');
 });
 
 app.delete('/api/watchlist', async (c) => {
-	const symbol = c.req.query('symbol');
-	if (!symbol) {
-		return c.text('Missing symbol parameter', 400);
-	}
-	const symbolUpper = symbol.toUpperCase();
-	try {
-		await c.env.DB.batch([
-			c.env.DB.prepare('DELETE FROM daily_reports WHERE symbol = ?').bind(symbolUpper),
-			c.env.DB.prepare('DELETE FROM news WHERE symbol = ?').bind(symbolUpper),
-			c.env.DB.prepare('DELETE FROM market_events WHERE symbol = ?').bind(symbolUpper),
-			c.env.DB.prepare('DELETE FROM market_stats WHERE symbol = ?').bind(symbolUpper),
-			c.env.DB.prepare('DELETE FROM alert_rules WHERE symbol = ?').bind(symbolUpper),
-			c.env.DB.prepare('DELETE FROM in_app_notifications WHERE symbol = ?').bind(symbolUpper),
-			c.env.DB.prepare('DELETE FROM watchlist WHERE symbol = ?').bind(symbolUpper)
-		]);
-		return c.text('Symbol removed');
-	} catch (e) {
-		return c.text(`Failed to remove symbol from watchlist: ${(e as any).message}`, 500);
-	}
+  const symbol = c.req.query('symbol');
+  if (!symbol) {
+    return c.text('Missing symbol parameter', 400);
+  }
+  const symbolUpper = symbol.toUpperCase();
+  try {
+    await c.env.DB.batch([
+      c.env.DB.prepare('DELETE FROM daily_reports WHERE symbol = ?').bind(symbolUpper),
+      c.env.DB.prepare('DELETE FROM news WHERE symbol = ?').bind(symbolUpper),
+      c.env.DB.prepare('DELETE FROM market_events WHERE symbol = ?').bind(symbolUpper),
+      c.env.DB.prepare('DELETE FROM market_stats WHERE symbol = ?').bind(symbolUpper),
+      c.env.DB.prepare('DELETE FROM alert_rules WHERE symbol = ?').bind(symbolUpper),
+      c.env.DB.prepare('DELETE FROM in_app_notifications WHERE symbol = ?').bind(symbolUpper),
+      c.env.DB.prepare('DELETE FROM watchlist WHERE symbol = ?').bind(symbolUpper)
+    ]);
+    return c.text('Symbol removed');
+  } catch (e) {
+    return c.text(`Failed to remove symbol from watchlist: ${(e as any).message}`, 500);
+  }
 });
 
 // API: Source Operations
 app.get('/api/sources', async (c) => {
-	const { results } = await c.env.DB.prepare('SELECT * FROM news_sources').all();
-	return c.json(results);
+  const { results } = await c.env.DB.prepare('SELECT * FROM news_sources').all();
+  return c.json(results);
 });
 
 app.post('/api/sources', async (c) => {
-	const source = await c.req.json() as any;
-	await c.env.DB.prepare('INSERT INTO news_sources (name, url_pattern, selector, type, enabled) VALUES (?, ?, ?, ?, ?)')
-		.bind(source.name, source.url_pattern, source.selector, source.type, source.enabled ? 1 : 0).run();
-	return c.text('Source updated');
+  const source = await c.req.json() as any;
+  await c.env.DB.prepare('INSERT INTO news_sources (name, url_pattern, selector, type, enabled) VALUES (?, ?, ?, ?, ?)')
+    .bind(source.name, source.url_pattern, source.selector, source.type, source.enabled ? 1 : 0).run();
+  return c.text('Source updated');
 });
 
 app.put('/api/sources', async (c) => {
-	const source = await c.req.json() as any;
-	await c.env.DB.prepare('UPDATE news_sources SET name=?, url_pattern=?, selector=?, type=?, enabled=? WHERE id=?')
-		.bind(source.name, source.url_pattern, source.selector, source.type, source.enabled ? 1 : 0, source.id).run();
-	return c.text('Source updated');
+  const source = await c.req.json() as any;
+  await c.env.DB.prepare('UPDATE news_sources SET name=?, url_pattern=?, selector=?, type=?, enabled=? WHERE id=?')
+    .bind(source.name, source.url_pattern, source.selector, source.type, source.enabled ? 1 : 0, source.id).run();
+  return c.text('Source updated');
 });
 
 app.delete('/api/sources', async (c) => {
-	const id = c.req.query('id');
-	await c.env.DB.prepare('DELETE FROM news_sources WHERE id = ?').bind(id).run();
-	return c.text('Source removed');
+  const id = c.req.query('id');
+  await c.env.DB.prepare('DELETE FROM news_sources WHERE id = ?').bind(id).run();
+  return c.text('Source removed');
 });
 
 // API: Trigger Crawler (Chains to Summarizer)
 app.get('/api/crawl', async (c) => {
-	try {
-		const instance = await c.env.OAKTREE_SYNC_WORKFLOW.create({
-			id: `manual-crawl-${Date.now()}`,
-			params: { runCrawler: true }
-		});
-		return c.text(`Crawler sequence started via Workflow: ${instance.id}`);
-	} catch (e) {
-		return c.text(`Failed to start crawler workflow: ${(e as any).message}`, 500);
-	}
+  try {
+    const instance = await c.env.OAKTREE_SYNC_WORKFLOW.create({
+      id: `manual-crawl-${Date.now()}`,
+      params: { runCrawler: true }
+    });
+    return c.text(`Crawler sequence started via Workflow: ${instance.id}`);
+  } catch (e) {
+    return c.text(`Failed to start crawler workflow: ${(e as any).message}`, 500);
+  }
 });
 
 // API: Summarize All Symbols
 app.get('/api/summarize-all', async (c) => {
-	try {
-		const force = c.req.query('force') === 'true';
-		const instance = await c.env.OAKTREE_SYNC_WORKFLOW.create({
-			id: `manual-summarize-all-${Date.now()}`,
-			params: { 
-				generateDailySummaries: true,
-				generateDailySummariesForce: force
-			}
-		});
-		return c.text(`Summarization started via Workflow: ${instance.id}`);
-	} catch (e) {
-		return c.text(`Failed to start summarization workflow: ${(e as any).message}`, 500);
-	}
+  try {
+    const force = c.req.query('force') === 'true';
+    const instance = await c.env.OAKTREE_SYNC_WORKFLOW.create({
+      id: `manual-summarize-all-${Date.now()}`,
+      params: {
+        generateDailySummaries: true,
+        generateDailySummariesForce: force
+      }
+    });
+    return c.text(`Summarization started via Workflow: ${instance.id}`);
+  } catch (e) {
+    return c.text(`Failed to start summarization workflow: ${(e as any).message}`, 500);
+  }
 });
 
 // API: Trigger Full Daily Sequence Manually (Legacy/Combined)
 app.get('/api/run-all', (c) => {
-	return c.redirect(`/api/crawl`, 307);
+  return c.redirect(`/api/crawl`, 307);
 });
 
 // API: Trigger Market Stats Update Manually (Test)
 app.get('/api/test-market-stats', async (c) => {
-	try {
-		const results = await fetchAndStoreMarketStats(c.env);
-		return c.json(results);
-	} catch (e) {
-		return c.json({ error: (e as any).message }, 500);
-	}
+  try {
+    const results = await fetchAndStoreMarketStats(c.env);
+    return c.json(results);
+  } catch (e) {
+    return c.json({ error: (e as any).message }, 500);
+  }
 });
 
 // API: Trigger Market Events Update Manually (Test)
 app.get('/api/crawl-events', async (c) => {
-	try {
-		const instance = await c.env.OAKTREE_SYNC_WORKFLOW.create({
-			id: `manual-crawl-events-${Date.now()}`,
-			params: { fetchMarketEvents: true }
-		});
-		return c.text(`Market events fetch started via Workflow: ${instance.id}`);
-	} catch (e) {
-		return c.text(`Failed to start market events fetch workflow: ${(e as any).message}`, 500);
-	}
+  try {
+    const instance = await c.env.OAKTREE_SYNC_WORKFLOW.create({
+      id: `manual-crawl-events-${Date.now()}`,
+      params: { fetchMarketEvents: true }
+    });
+    return c.text(`Market events fetch started via Workflow: ${instance.id}`);
+  } catch (e) {
+    return c.text(`Failed to start market events fetch workflow: ${(e as any).message}`, 500);
+  }
 });
 
 // API: Get Market Events / Purge Old Market Events
 app.get('/api/market-events', async (c) => {
-	// Ensure table is created
-	try {
-		await c.env.DB.prepare(`
+  // Ensure table is created
+  try {
+    await c.env.DB.prepare(`
 			CREATE TABLE IF NOT EXISTS market_events (
 				id TEXT PRIMARY KEY,
 				symbol TEXT NOT NULL,
@@ -419,27 +419,27 @@ app.get('/api/market-events', async (c) => {
 				created_at INTEGER DEFAULT (strftime('%s', 'now'))
 			)
 		`).run();
-	} catch (e) {
-		console.error("Failed to ensure market_events table exists", e);
-	}
+  } catch (e) {
+    console.error("Failed to ensure market_events table exists", e);
+  }
 
-	const symbol = c.req.query('symbol');
-	const eventType = c.req.query('event_type');
-	const params: any[] = [];
-	let query: string;
+  const symbol = c.req.query('symbol');
+  const eventType = c.req.query('event_type');
+  const params: any[] = [];
+  let query: string;
 
-	if (symbol) {
-		const conditions: string[] = ['symbol = ?'];
-		params.push(symbol.toUpperCase());
-		if (eventType) {
-			conditions.push('event_type = ?');
-			params.push(eventType);
-		}
-		query = `SELECT * FROM market_events WHERE ${conditions.join(' AND ')} ORDER BY event_date DESC LIMIT 100`;
-	} else {
-		if (eventType) {
-			params.push(eventType, eventType);
-			query = `
+  if (symbol) {
+    const conditions: string[] = ['symbol = ?'];
+    params.push(symbol.toUpperCase());
+    if (eventType) {
+      conditions.push('event_type = ?');
+      params.push(eventType);
+    }
+    query = `SELECT * FROM market_events WHERE ${conditions.join(' AND ')} ORDER BY event_date DESC LIMIT 100`;
+  } else {
+    if (eventType) {
+      params.push(eventType, eventType);
+      query = `
 				SELECT m.id, m.symbol, m.event_type, m.event_date, m.title, m.description, m.url, m.metadata, m.created_at
 				FROM (SELECT DISTINCT symbol FROM market_events WHERE event_type = ?) s
 				JOIN market_events m ON m.id IN (
@@ -450,8 +450,8 @@ app.get('/api/market-events', async (c) => {
 				)
 				ORDER BY m.event_date DESC
 			`;
-		} else {
-			query = `
+    } else {
+      query = `
 				SELECT m.id, m.symbol, m.event_type, m.event_date, m.title, m.description, m.url, m.metadata, m.created_at
 				FROM (SELECT DISTINCT symbol FROM market_events) s
 				JOIN market_events m ON m.id IN (
@@ -462,29 +462,29 @@ app.get('/api/market-events', async (c) => {
 				)
 				ORDER BY m.event_date DESC
 			`;
-		}
-	}
+    }
+  }
 
-	try {
-		const { results } = await c.env.DB.prepare(query).bind(...params).all();
-		return c.json(results);
-	} catch (e) {
-		return c.json({ error: (e as any).message }, 500);
-	}
+  try {
+    const { results } = await c.env.DB.prepare(query).bind(...params).all();
+    return c.json(results);
+  } catch (e) {
+    return c.json({ error: (e as any).message }, 500);
+  }
 });
 
 app.delete('/api/market-events', async (c) => {
-	try {
-		await c.env.DB.prepare("DELETE FROM market_events WHERE created_at < strftime('%s', 'now', '-30 days')").run();
-		return c.text('Purged old market events');
-	} catch (e) {
-		return c.text(`Failed to purge market events: ${(e as any).message}`, 500);
-	}
+  try {
+    await c.env.DB.prepare("DELETE FROM market_events WHERE created_at < strftime('%s', 'now', '-30 days')").run();
+    return c.text('Purged old market events');
+  } catch (e) {
+    return c.text(`Failed to purge market events: ${(e as any).message}`, 500);
+  }
 });
 
 // API: Market Intelligence (Watchlist + Stats)
 app.get('/api/market-intelligence', async (c) => {
-	const { results } = await c.env.DB.prepare(`
+  const { results } = await c.env.DB.prepare(`
 		SELECT 
 			w.symbol, 
 			w.name, 
@@ -499,263 +499,263 @@ app.get('/api/market-intelligence', async (c) => {
 		WHERE w.is_active = 1
 	`).all();
 
-	return c.json(results);
+  return c.json(results);
 });
 
 // API: Alert Rules Operations
 app.get('/api/alerts', async (c) => {
-	const symbol = c.req.query('symbol');
-	let results;
-	if (symbol) {
-		results = await c.env.DB.prepare('SELECT * FROM alert_rules WHERE symbol = ? ORDER BY created_at DESC')
-			.bind(symbol.toUpperCase()).all();
-	} else {
-		results = await c.env.DB.prepare('SELECT * FROM alert_rules ORDER BY symbol ASC, created_at DESC').all();
-	}
-	return c.json(results.results || []);
+  const symbol = c.req.query('symbol');
+  let results;
+  if (symbol) {
+    results = await c.env.DB.prepare('SELECT * FROM alert_rules WHERE symbol = ? ORDER BY created_at DESC')
+      .bind(symbol.toUpperCase()).all();
+  } else {
+    results = await c.env.DB.prepare('SELECT * FROM alert_rules ORDER BY symbol ASC, created_at DESC').all();
+  }
+  return c.json(results.results || []);
 });
 
 app.post('/api/alerts', async (c) => {
-	const { symbol, metric, condition_type, target_value } = await c.req.json() as any;
-	if (!symbol || !metric || !condition_type || target_value === undefined) {
-		return c.text('Missing required fields', 400);
-	}
-	await c.env.DB.prepare(
-		'INSERT INTO alert_rules (symbol, metric, condition_type, target_value, is_active) VALUES (?, ?, ?, ?, 1)'
-	).bind(symbol.toUpperCase(), metric, condition_type, target_value).run();
-	return c.text('Alert rule created');
+  const { symbol, metric, condition_type, target_value } = await c.req.json() as any;
+  if (!symbol || !metric || !condition_type || target_value === undefined) {
+    return c.text('Missing required fields', 400);
+  }
+  await c.env.DB.prepare(
+    'INSERT INTO alert_rules (symbol, metric, condition_type, target_value, is_active) VALUES (?, ?, ?, ?, 1)'
+  ).bind(symbol.toUpperCase(), metric, condition_type, target_value).run();
+  return c.text('Alert rule created');
 });
 
 app.put('/api/alerts', async (c) => {
-	const { id, is_active, target_value } = await c.req.json() as any;
-	if (id === undefined) {
-		return c.text('Missing rule ID', 400);
-	}
-	if (is_active !== undefined) {
-		await c.env.DB.prepare('UPDATE alert_rules SET is_active = ?, last_checked_state = NULL WHERE id = ?')
-			.bind(is_active ? 1 : 0, id).run();
-	}
-	if (target_value !== undefined) {
-		await c.env.DB.prepare('UPDATE alert_rules SET target_value = ?, last_checked_state = NULL WHERE id = ?')
-			.bind(target_value, id).run();
-	}
-	return c.text('Alert rule updated');
+  const { id, is_active, target_value } = await c.req.json() as any;
+  if (id === undefined) {
+    return c.text('Missing rule ID', 400);
+  }
+  if (is_active !== undefined) {
+    await c.env.DB.prepare('UPDATE alert_rules SET is_active = ?, last_checked_state = NULL WHERE id = ?')
+      .bind(is_active ? 1 : 0, id).run();
+  }
+  if (target_value !== undefined) {
+    await c.env.DB.prepare('UPDATE alert_rules SET target_value = ?, last_checked_state = NULL WHERE id = ?')
+      .bind(target_value, id).run();
+  }
+  return c.text('Alert rule updated');
 });
 
 app.delete('/api/alerts', async (c) => {
-	const id = c.req.query('id');
-	if (!id) {
-		return c.text('Missing rule ID', 400);
-	}
-	await c.env.DB.prepare('DELETE FROM alert_rules WHERE id = ?').bind(id).run();
-	return c.text('Alert rule deleted');
+  const id = c.req.query('id');
+  if (!id) {
+    return c.text('Missing rule ID', 400);
+  }
+  await c.env.DB.prepare('DELETE FROM alert_rules WHERE id = ?').bind(id).run();
+  return c.text('Alert rule deleted');
 });
 
 // API: In-App Notifications
 app.get('/api/notifications', async (c) => {
-	const { results } = await c.env.DB.prepare(
-		'SELECT * FROM in_app_notifications ORDER BY created_at DESC LIMIT 50'
-	).all();
-	return c.json(results || []);
+  const { results } = await c.env.DB.prepare(
+    'SELECT * FROM in_app_notifications ORDER BY created_at DESC LIMIT 50'
+  ).all();
+  return c.json(results || []);
 });
 
 app.put('/api/notifications', async (c) => {
-	const body = await c.req.json().catch(() => ({})) as any;
-	const id = body?.id;
-	if (id) {
-		await c.env.DB.prepare('UPDATE in_app_notifications SET is_read = 1 WHERE id = ?').bind(id).run();
-	} else {
-		await c.env.DB.prepare('UPDATE in_app_notifications SET is_read = 1 WHERE is_read = 0').run();
-	}
-	return c.text('Notifications updated');
+  const body = await c.req.json().catch(() => ({})) as any;
+  const id = body?.id;
+  if (id) {
+    await c.env.DB.prepare('UPDATE in_app_notifications SET is_read = 1 WHERE id = ?').bind(id).run();
+  } else {
+    await c.env.DB.prepare('UPDATE in_app_notifications SET is_read = 1 WHERE is_read = 0').run();
+  }
+  return c.text('Notifications updated');
 });
 
 // API: Trigger Alert Checks Manually (Test)
 app.get('/api/alerts/check-test', async (c) => {
-	try {
-		const results = await checkAlertRules(c.env);
-		return c.json(results);
-	} catch (e) {
-		return c.json({ error: (e as any).message }, 500);
-	}
+  try {
+    const results = await checkAlertRules(c.env);
+    return c.json(results);
+  } catch (e) {
+    return c.json({ error: (e as any).message }, 500);
+  }
 });
 
 // API: Get Google OAuth URL
 app.get('/api/auth/google/url', async (c) => {
-	const clientId = c.env.GOOGLE_CLIENT_ID;
-	const redirectUri = c.req.query('redirect_uri');
-	if (!clientId || !redirectUri) {
-		return c.text('Missing client_id configuration or redirect_uri parameter', 400);
-	}
-	const authUrl = getAuthUrl(clientId, redirectUri);
-	return c.json({ url: authUrl });
+  const clientId = c.env.GOOGLE_CLIENT_ID;
+  const redirectUri = c.req.query('redirect_uri');
+  if (!clientId || !redirectUri) {
+    return c.text('Missing client_id configuration or redirect_uri parameter', 400);
+  }
+  const authUrl = getAuthUrl(clientId, redirectUri);
+  return c.json({ url: authUrl });
 });
 
 // API: Google OAuth Callback (Code Exchange)
 app.post('/api/auth/google/callback', async (c) => {
-	try {
-		const { code, redirect_uri } = await c.req.json() as any;
-		const clientId = c.env.GOOGLE_CLIENT_ID;
-		const clientSecret = c.env.GOOGLE_CLIENT_SECRET;
-		if (!clientId || !clientSecret || !code || !redirect_uri) {
-			return c.text('Missing configuration, code, or redirect_uri', 400);
-		}
-		const tokens = await exchangeCodeForTokens(code, clientId, clientSecret, redirect_uri);
-		const expiryDate = Date.now() + tokens.expires_in * 1000;
-		const jwtSecret = c.env.JWT_SECRET;
-		if (!jwtSecret && c.env.IS_LOCAL !== 'true') {
-			return c.text('JWT Secret is not configured', 500);
-		}
-		const encAccessToken = await encryptToken(tokens.access_token, jwtSecret || '');
-		const encRefreshToken = await encryptToken(tokens.refresh_token, jwtSecret || '');
-		await c.env.DB.prepare(
-			'INSERT INTO gmail_oauth (id, access_token, refresh_token, expiry_date) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET access_token = excluded.access_token, refresh_token = excluded.refresh_token, expiry_date = excluded.expiry_date, updated_at = (strftime(\'%s\', \'now\'))'
-		).bind('default', encAccessToken, encRefreshToken, expiryDate).run();
-		return c.json({ success: true });
-	} catch (e) {
-		return c.text(`OAuth callback exchange failed: ${(e as any).message}`, 500);
-	}
+  try {
+    const { code, redirect_uri } = await c.req.json() as any;
+    const clientId = c.env.GOOGLE_CLIENT_ID;
+    const clientSecret = c.env.GOOGLE_CLIENT_SECRET;
+    if (!clientId || !clientSecret || !code || !redirect_uri) {
+      return c.text('Missing configuration, code, or redirect_uri', 400);
+    }
+    const tokens = await exchangeCodeForTokens(code, clientId, clientSecret, redirect_uri);
+    const expiryDate = Date.now() + tokens.expires_in * 1000;
+    const jwtSecret = c.env.JWT_SECRET;
+    if (!jwtSecret && c.env.IS_LOCAL !== 'true') {
+      return c.text('JWT Secret is not configured', 500);
+    }
+    const encAccessToken = await encryptToken(tokens.access_token, jwtSecret || '');
+    const encRefreshToken = await encryptToken(tokens.refresh_token, jwtSecret || '');
+    await c.env.DB.prepare(
+      'INSERT INTO gmail_oauth (id, access_token, refresh_token, expiry_date) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET access_token = excluded.access_token, refresh_token = excluded.refresh_token, expiry_date = excluded.expiry_date, updated_at = (strftime(\'%s\', \'now\'))'
+    ).bind('default', encAccessToken, encRefreshToken, expiryDate).run();
+    return c.json({ success: true });
+  } catch (e) {
+    return c.text(`OAuth callback exchange failed: ${(e as any).message}`, 500);
+  }
 });
 
 // API: Get Google Auth Status
 app.get('/api/auth/google/status', async (c) => {
-	const row = await c.env.DB.prepare('SELECT 1 FROM gmail_oauth WHERE id = ?').bind('default').first();
-	return c.json({ connected: !!row });
+  const row = await c.env.DB.prepare('SELECT 1 FROM gmail_oauth WHERE id = ?').bind('default').first();
+  return c.json({ connected: !!row });
 });
 
 // API: Google Disconnect
 app.post('/api/auth/google/disconnect', async (c) => {
-	await c.env.DB.prepare('DELETE FROM gmail_oauth WHERE id = ?').bind('default').run();
-	return c.text('Disconnected');
+  await c.env.DB.prepare('DELETE FROM gmail_oauth WHERE id = ?').bind('default').run();
+  return c.text('Disconnected');
 });
 
 // API: Subscriptions CRUD
 app.get('/api/subscriptions', async (c) => {
-	const { results } = await c.env.DB.prepare('SELECT * FROM email_subscriptions ORDER BY created_at DESC').all();
-	return c.json(results || []);
+  const { results } = await c.env.DB.prepare('SELECT * FROM email_subscriptions ORDER BY created_at DESC').all();
+  return c.json(results || []);
 });
 
 app.post('/api/subscriptions', async (c) => {
-	try {
-		const { name, sender, subject_filter, label_filter, raw_query, frequency } = await c.req.json() as any;
-		await c.env.DB.prepare(
-			'INSERT INTO email_subscriptions (name, sender, subject_filter, label_filter, raw_query, frequency) VALUES (?, ?, ?, ?, ?, ?)'
-		).bind(name, sender || null, subject_filter || null, label_filter || null, raw_query || null, frequency || 'hourly').run();
-		return c.text('Subscription created');
-	} catch (e) {
-		return c.text(`Failed to create subscription: ${(e as any).message}`, 500);
-	}
+  try {
+    const { name, sender, subject_filter, label_filter, raw_query, frequency } = await c.req.json() as any;
+    await c.env.DB.prepare(
+      'INSERT INTO email_subscriptions (name, sender, subject_filter, label_filter, raw_query, frequency) VALUES (?, ?, ?, ?, ?, ?)'
+    ).bind(name, sender || null, subject_filter || null, label_filter || null, raw_query || null, frequency || 'hourly').run();
+    return c.text('Subscription created');
+  } catch (e) {
+    return c.text(`Failed to create subscription: ${(e as any).message}`, 500);
+  }
 });
 
 app.put('/api/subscriptions', async (c) => {
-	try {
-		const { id, name, sender, subject_filter, label_filter, raw_query, frequency, is_active } = await c.req.json() as any;
-		await c.env.DB.prepare(
-			'UPDATE email_subscriptions SET name=?, sender=?, subject_filter=?, label_filter=?, raw_query=?, frequency=?, is_active=? WHERE id=?'
-		).bind(name, sender || null, subject_filter || null, label_filter || null, raw_query || null, frequency, is_active !== undefined ? (is_active ? 1 : 0) : 1, id).run();
-		return c.text('Subscription updated');
-	} catch (e) {
-		return c.text(`Failed to update subscription: ${(e as any).message}`, 500);
-	}
+  try {
+    const { id, name, sender, subject_filter, label_filter, raw_query, frequency, is_active } = await c.req.json() as any;
+    await c.env.DB.prepare(
+      'UPDATE email_subscriptions SET name=?, sender=?, subject_filter=?, label_filter=?, raw_query=?, frequency=?, is_active=? WHERE id=?'
+    ).bind(name, sender || null, subject_filter || null, label_filter || null, raw_query || null, frequency, is_active !== undefined ? (is_active ? 1 : 0) : 1, id).run();
+    return c.text('Subscription updated');
+  } catch (e) {
+    return c.text(`Failed to update subscription: ${(e as any).message}`, 500);
+  }
 });
 
 app.delete('/api/subscriptions', async (c) => {
-	try {
-		const id = c.req.query('id');
-		if (!id) {
-			return c.text('Missing subscription ID', 400);
-		}
-		await c.env.DB.prepare('DELETE FROM email_subscriptions WHERE id = ?').bind(id).run();
-		return c.text('Subscription deleted');
-	} catch (e) {
-		return c.text(`Failed to delete subscription: ${(e as any).message}`, 500);
-	}
+  try {
+    const id = c.req.query('id');
+    if (!id) {
+      return c.text('Missing subscription ID', 400);
+    }
+    await c.env.DB.prepare('DELETE FROM email_subscriptions WHERE id = ?').bind(id).run();
+    return c.text('Subscription deleted');
+  } catch (e) {
+    return c.text(`Failed to delete subscription: ${(e as any).message}`, 500);
+  }
 });
 
 // API: Manual Sync & Summarize
 app.get('/api/email-sync', async (c) => {
-	try {
-		const instance = await c.env.OAKTREE_SYNC_WORKFLOW.create({
-			id: `manual-email-sync-${Date.now()}`,
-			params: {
-				syncEmails: true,
-				generateEmailDigests: true,
-				emailDigestsManual: true,
-				syncFacebookPosts: true,
-			}
-		});
-		return c.text(`Email sync started via Workflow: ${instance.id}`);
-	} catch (e) {
-		return c.text(`Failed to start email sync workflow: ${(e as any).message}`, 500);
-	}
+  try {
+    const instance = await c.env.OAKTREE_SYNC_WORKFLOW.create({
+      id: `manual-email-sync-${Date.now()}`,
+      params: {
+        syncEmails: true,
+        generateEmailDigests: true,
+        emailDigestsManual: true,
+        syncFacebookPosts: true,
+      }
+    });
+    return c.text(`Email sync started via Workflow: ${instance.id}`);
+  } catch (e) {
+    return c.text(`Failed to start email sync workflow: ${(e as any).message}`, 500);
+  }
 });
 
 // API: Test Email Sync & Digest (Synchronous)
 app.get('/api/test-email-digest', async (c) => {
-	try {
-		console.log('Starting manual test email digest...');
-		await generateEmailDigests(c.env, true);
-		console.log('Syncing and processing Facebook posts...');
-		const postedCount = await syncAndProcessFacebookPosts(c.env);
-		return c.json({
-			success: true,
-			message: `Email digest generation completed successfully. Processed ${postedCount} Facebook posts.`
-		});
-	} catch (e) {
-		return c.json({
-			success: false,
-			error: (e as any).message
-		}, 500);
-	}
+  try {
+    console.log('Starting manual test email digest...');
+    await generateEmailDigests(c.env, true);
+    console.log('Syncing and processing Facebook posts...');
+    const postedCount = await syncAndProcessFacebookPosts(c.env);
+    return c.json({
+      success: true,
+      message: `Email digest generation completed successfully. Processed ${postedCount} Facebook posts.`
+    });
+  } catch (e) {
+    return c.json({
+      success: false,
+      error: (e as any).message
+    }, 500);
+  }
 });
 
 // API: Test Facebook Posting (Manual Trigger)
 app.post('/api/test-facebook-post', async (c) => {
-	try {
-		console.log('Manually triggering Facebook post sync & process...');
-		// Auto-reset failed posts in the last 24 hours for easy testing
-		await c.env.DB.prepare(
-			"UPDATE facebook_posts SET status = 'pending', error_message = NULL WHERE status = 'failed' AND created_at > datetime('now', '-1 day')"
-		).run();
-		const count = await syncAndProcessFacebookPosts(c.env);
-		return c.json({
-			success: true,
-			message: `Sync and process completed. Processed ${count} posts.`
-		});
-	} catch (e) {
-		return c.json({
-			success: false,
-			error: (e as any).message
-		}, 500);
-	}
+  try {
+    console.log('Manually triggering Facebook post sync & process...');
+    // Auto-reset failed posts in the last 24 hours for easy testing
+    await c.env.DB.prepare(
+      "UPDATE facebook_posts SET status = 'pending', error_message = NULL WHERE status = 'failed' AND created_at > datetime('now', '-1 day')"
+    ).run();
+    const count = await syncAndProcessFacebookPosts(c.env);
+    return c.json({
+      success: true,
+      message: `Sync and process completed. Processed ${count} posts.`
+    });
+  } catch (e) {
+    return c.json({
+      success: false,
+      error: (e as any).message
+    }, 500);
+  }
 });
 
 // API: Mark Email Digest as Read
 app.post('/api/email-digests/mark-read', async (c) => {
-	try {
-		const { id } = await c.req.json() as any;
-		if (!id) {
-			return c.json({ error: 'Missing digest ID' }, 400);
-		}
-		await c.env.DB.prepare(
-			'UPDATE email_digests SET is_readed = 1 WHERE id = ?'
-		).bind(id).run();
-		return c.json({ success: true, message: 'Digest marked as read' });
-	} catch (e) {
-		return c.json({ error: (e as any).message }, 500);
-	}
+  try {
+    const { id } = await c.req.json() as any;
+    if (!id) {
+      return c.json({ error: 'Missing digest ID' }, 400);
+    }
+    await c.env.DB.prepare(
+      'UPDATE email_digests SET is_readed = 1 WHERE id = ?'
+    ).bind(id).run();
+    return c.json({ success: true, message: 'Digest marked as read' });
+  } catch (e) {
+    return c.json({ error: (e as any).message }, 500);
+  }
 });
 
 // API: Get Email Digests
 app.get('/api/email-digests', async (c) => {
-	try {
-		const { results } = await c.env.DB.prepare(
-			'SELECT id, category, summary, key_takeaways, source_emails, digest_date, is_readed, CAST(strftime(\'%s\', created_at) as INTEGER) as created_at FROM email_digests WHERE is_readed = 0 ORDER BY created_at DESC LIMIT 50'
-		).all();
-		return c.json(results || []);
-	} catch (e) {
-		return c.json({ error: (e as any).message }, 500);
-	}
+  try {
+    const { results } = await c.env.DB.prepare(
+      'SELECT id, category, summary, key_takeaways, source_emails, digest_date, is_readed, CAST(strftime(\'%s\', created_at) as INTEGER) as created_at FROM email_digests WHERE is_readed = 0 ORDER BY created_at DESC LIMIT 50'
+    ).all();
+    return c.json(results || []);
+  } catch (e) {
+    return c.json({ error: (e as any).message }, 500);
+  }
 });
 
 
@@ -769,7 +769,7 @@ async function recalcHoldings(db: any, symbol: string) {
   const totalCost = row?.total_cost || 0;
   const avgCost = totalShares > 0 ? totalCost / totalShares : 0;
   const status = totalShares > 0 ? 'Open' : 'Closed';
-  
+
   await db.prepare(`
     INSERT INTO holdings (symbol, shares, avg_cost, total_cost, status)
     VALUES (?, ?, ?, ?, ?)
@@ -793,16 +793,16 @@ async function recalcHoldings(db: any, symbol: string) {
 // Helper: Rebuild all share lots and recalculate realized gains for a symbol
 async function rebuildLotsAndRealizedGains(db: any, symbol: string) {
   const sym = symbol.toUpperCase();
-  
+
   // 1. Delete all existing share lots for this symbol
   await db.prepare('DELETE FROM share_lots WHERE symbol = ?').bind(sym).run();
-  
+
   // 2. Clear realized gains on Sell transactions for this symbol (we will recalculate them)
   await db.prepare('UPDATE transactions SET realized_gain_amt = NULL, realized_gain_pct = NULL WHERE symbol = ? AND type = "Sell"').bind(sym).run();
-  
+
   // 3. Fetch all transactions for this symbol sorted chronologically (using date ASC, id ASC)
   const { results: txs } = await db.prepare('SELECT * FROM transactions WHERE symbol = ? ORDER BY date ASC, id ASC').bind(sym).all();
-  
+
   for (const tx of (txs || []) as any[]) {
     const type = tx.type || 'Buy';
     const shares = parseFloat(tx.shares);
@@ -811,7 +811,7 @@ async function rebuildLotsAndRealizedGains(db: any, symbol: string) {
     const totalCost = tx.total_cost;
     const date = tx.date;
     const note = tx.note || null;
-    
+
     if (type === 'Buy') {
       await db.prepare(`
         INSERT INTO share_lots (symbol, date, shares, cost_per_share, total_cost, note)
@@ -910,23 +910,23 @@ app.get('/api/portfolio/holdings', async (c) => {
     const totalCost = row.total_cost || (shares * (avgCost || 0));
     const marketValue = lastPrice ? shares * lastPrice : null;
     const prevClose = row.previous_close;
-    
+
     // Day gain
-    const dayGainPct = (lastPrice && prevClose && prevClose > 0) 
+    const dayGainPct = (lastPrice && prevClose && prevClose > 0)
       ? ((lastPrice - prevClose) / prevClose) * 100 : null;
-    const dayGainAmt = (lastPrice && prevClose) 
+    const dayGainAmt = (lastPrice && prevClose)
       ? shares * (lastPrice - prevClose) : null;
-    
+
     // Total unrealized gain
-    const totGainAmt = (marketValue !== null && totalCost) 
+    const totGainAmt = (marketValue !== null && totalCost)
       ? marketValue - totalCost : null;
-    const totGainPct = (totGainAmt !== null && totalCost && totalCost > 0) 
+    const totGainPct = (totGainAmt !== null && totalCost && totalCost > 0)
       ? (totGainAmt / totalCost) * 100 : null;
-    
+
     // Realized gain percentage
     const realizedGainAmt = row.realized_gain_amt || 0;
     const realizedCostBasis = row.realized_cost_basis || 0;
-    const realizedGainPct = realizedCostBasis > 0 
+    const realizedGainPct = realizedCostBasis > 0
       ? (realizedGainAmt / realizedCostBasis) * 100 : null;
 
     return {
@@ -954,7 +954,7 @@ app.get('/api/portfolio/holdings', async (c) => {
 // GET /api/portfolio/summary - Portfolio totals
 app.get('/api/portfolio/summary', async (c) => {
   const rate = parseFloat(c.req.query('rate') || '36.5');
-  
+
   // 1. Fetch stocks
   const { results: stockResults } = await c.env.DB.prepare(`
     SELECT 
@@ -982,7 +982,7 @@ app.get('/api/portfolio/summary', async (c) => {
     const prevClose = row.previous_close || price;
     const cost = row.total_cost || 0;
     const broker = row.broker_name || 'Common Stock';
-    
+
     stockMarketValueUsd += shares * price;
     stockCostUsd += cost;
     stockDayChangeUsd += shares * (price - prevClose);
@@ -1012,7 +1012,7 @@ app.get('/api/portfolio/summary', async (c) => {
 
   // 4. Combine brokers and apply overrides
   const brokersMap = new Map<string, { cost: number; balance: number }>();
-  
+
   // Process stocks (convert to THB)
   for (const [broker, val] of brokerStocks.entries()) {
     brokersMap.set(broker, {
@@ -1076,7 +1076,7 @@ app.get('/api/portfolio/summary', async (c) => {
 
   const unrealizedGainThb = totalMarketValueThb - totalCostThb;
   const unrealizedGainPct = totalCostThb > 0 ? (unrealizedGainThb / totalCostThb) * 100 : 0;
-  const dayChangePct = (totalMarketValueThb - totalDayChangeThb) > 0 
+  const dayChangePct = (totalMarketValueThb - totalDayChangeThb) > 0
     ? (totalDayChangeThb / (totalMarketValueThb - totalDayChangeThb)) * 100 : 0;
 
   // Calculate stock-only values (in USD)
@@ -1089,7 +1089,7 @@ app.get('/api/portfolio/summary', async (c) => {
 
   const stockUnrealizedGainUsd = stockMarketValueUsdFinal - stockCostUsdFinal;
   const stockUnrealizedGainPct = stockCostUsdFinal > 0 ? (stockUnrealizedGainUsd / stockCostUsdFinal) * 100 : 0;
-  const stockDayChangePct = (stockMarketValueUsdFinal - stockDayChangeUsdFinal) > 0 
+  const stockDayChangePct = (stockMarketValueUsdFinal - stockDayChangeUsdFinal) > 0
     ? (stockDayChangeUsdFinal / (stockMarketValueUsdFinal - stockDayChangeUsdFinal)) * 100 : 0;
 
   // Record history snapshot in background
@@ -1347,7 +1347,7 @@ app.put('/api/portfolio/holdings/:symbol', async (c) => {
   const body = await c.req.json();
   const { shares, avg_cost, status } = body;
   const totalCost = (shares || 0) * (avg_cost || 0);
-  
+
   await c.env.DB.prepare(`
     UPDATE holdings SET shares = ?, avg_cost = ?, total_cost = ?, status = ?, updated_at = strftime('%s', 'now')
     WHERE symbol = ?
@@ -1383,7 +1383,7 @@ app.post('/api/portfolio/lots', async (c) => {
     return c.json({ error: 'symbol, date, shares, cost_per_share are required' }, 400);
   }
   const totalCost = shares * cost_per_share;
-  
+
   await c.env.DB.prepare(`
     INSERT INTO share_lots (symbol, date, shares, cost_per_share, total_cost, low_limit, high_limit, note)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -1424,7 +1424,7 @@ app.post('/api/portfolio/transactions', async (c) => {
   const totalCost = type === 'Sell'
     ? (shares * cost_per_share) - (commission || 0)
     : (shares * cost_per_share) + (commission || 0);
-  
+
   await c.env.DB.prepare(`
     INSERT INTO transactions (symbol, date, type, shares, cost_per_share, commission, total_cost, realized_gain_pct, realized_gain_amt, note)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -1465,7 +1465,7 @@ app.post('/api/portfolio/dividends', async (c) => {
   if (!symbol || !date || !amount) {
     return c.json({ error: 'symbol, date, amount are required' }, 400);
   }
-  
+
   await c.env.DB.prepare(`
     INSERT INTO dividends (symbol, date, amount, per_share, note)
     VALUES (?, ?, ?, ?, ?)
@@ -1494,7 +1494,7 @@ app.post('/api/portfolio/history/yearly', async (c) => {
   const body = await c.req.json();
   const { year, capital, balance, total_gain_pct, remark } = body;
   if (!year) return c.json({ error: 'Year is required' }, 400);
-  
+
   await c.env.DB.prepare(`
     INSERT INTO portfolio_history (year, capital, balance, total_gain_pct, remark)
     VALUES (?, ?, ?, ?, ?)
@@ -1504,7 +1504,7 @@ app.post('/api/portfolio/history/yearly', async (c) => {
       total_gain_pct = excluded.total_gain_pct,
       remark = excluded.remark
   `).bind(year, capital || 0, balance || 0, total_gain_pct || 0, remark || '').run();
-  
+
   return c.json({ success: true });
 });
 
@@ -1528,7 +1528,7 @@ app.post('/api/portfolio/tax-savings', async (c) => {
   const body = await c.req.json();
   const { year, ltf, rmf, ssf } = body;
   if (!year) return c.json({ error: 'Year is required' }, 400);
-  
+
   await c.env.DB.prepare(`
     INSERT INTO tax_savings (year, ltf, rmf, ssf)
     VALUES (?, ?, ?, ?)
@@ -1537,7 +1537,7 @@ app.post('/api/portfolio/tax-savings', async (c) => {
       rmf = excluded.rmf,
       ssf = excluded.ssf
   `).bind(year, ltf || 0, rmf || 0, ssf || 0).run();
-  
+
   return c.json({ success: true });
 });
 
@@ -1561,7 +1561,7 @@ app.post('/api/portfolio/funds', async (c) => {
   const body = await c.req.json();
   const { id, name, broker_name } = body;
   if (!name || !broker_name) return c.json({ error: 'name and broker_name are required' }, 400);
-  
+
   if (id) {
     await c.env.DB.prepare(`
       UPDATE portfolio_funds SET name = ?, broker_name = ? WHERE id = ?
@@ -1594,7 +1594,7 @@ app.post('/api/portfolio/categories', async (c) => {
   const body = await c.req.json();
   const { id, name, target_weight } = body;
   if (!name) return c.json({ error: 'name is required' }, 400);
-  
+
   if (id) {
     await c.env.DB.prepare(`
       UPDATE asset_categories SET name = ?, target_weight = ? WHERE id = ?
@@ -1626,9 +1626,9 @@ app.get('/api/portfolio/fund-allocations', async (c) => {
 app.post('/api/portfolio/fund-allocations', async (c) => {
   const allocations = await c.req.json();
   if (!Array.isArray(allocations)) return c.json({ error: 'Expected array of allocations' }, 400);
-  
+
   // Clear existing allocations first or do insert or replace
-  const statements = allocations.map(a => 
+  const statements = allocations.map(a =>
     c.env.DB.prepare('INSERT OR REPLACE INTO fund_allocations (category_id, fund_id, amount) VALUES (?, ?, ?)')
       .bind(a.category_id, a.fund_id, a.amount)
   );
@@ -1639,7 +1639,7 @@ app.post('/api/portfolio/fund-allocations', async (c) => {
 // GET /api/portfolio/brokers
 app.get('/api/portfolio/brokers', async (c) => {
   const rate = parseFloat(c.req.query('rate') || '36.5');
-  
+
   // 1. Fetch auto-calculated stock balances per broker from holdings table
   const { results: stockResults } = await c.env.DB.prepare(`
     SELECT 
@@ -1651,7 +1651,7 @@ app.get('/api/portfolio/brokers', async (c) => {
     WHERE h.status != 'Closed'
     GROUP BY h.broker_name
   `).all();
-  
+
   // 2. Fetch fund balances per broker
   const { results: fundResults } = await c.env.DB.prepare(`
     SELECT 
@@ -1661,17 +1661,17 @@ app.get('/api/portfolio/brokers', async (c) => {
     JOIN portfolio_funds f ON a.fund_id = f.id
     GROUP BY f.broker_name
   `).all();
-  
+
   // 3. Fetch manual overrides
   const { results: overrideResults } = await c.env.DB.prepare(`
     SELECT * FROM manual_broker_balances
   `).all();
-  
+
   const overrides = new Map((overrideResults || []).map((row: any) => [row.broker_name, row]));
-  
+
   // 4. Combine all brokers
   const brokersMap = new Map<string, { broker_name: string; cost: number; balance: number }>();
-  
+
   // Process stocks (convert USD to THB)
   for (const row of (stockResults || []) as any[]) {
     const broker = row.broker_name || 'Common Stock';
@@ -1679,7 +1679,7 @@ app.get('/api/portfolio/brokers', async (c) => {
     const balance = (row.balance_usd || 0) * rate;
     brokersMap.set(broker, { broker_name: broker, cost, balance });
   }
-  
+
   // Process funds (balances are in THB; cost defaults to balance unless overridden)
   for (const row of (fundResults || []) as any[]) {
     const broker = row.broker_name;
@@ -1692,20 +1692,20 @@ app.get('/api/portfolio/brokers', async (c) => {
       brokersMap.set(broker, { broker_name: broker, cost: balance, balance });
     }
   }
-  
+
   // Apply overrides and ensure manual-only brokers are included
   const allBrokerNames = new Set([
     ...brokersMap.keys(),
     ...overrides.keys()
   ]);
-  
+
   const output = Array.from(allBrokerNames).map(name => {
     const calculated = brokersMap.get(name) || { broker_name: name, cost: 0, balance: 0 };
     const override = overrides.get(name) as any;
-    
+
     let finalCost = calculated.cost;
     let finalBalance = calculated.balance;
-    
+
     if (override) {
       if (override.cost_override !== null && override.cost_override !== undefined) {
         finalCost = override.cost_override;
@@ -1714,10 +1714,10 @@ app.get('/api/portfolio/brokers', async (c) => {
         finalBalance = override.balance_override;
       }
     }
-    
+
     const gain_amt = finalBalance - finalCost;
     const gain_pct = finalCost > 0 ? (gain_amt / finalCost) * 100 : 0;
-    
+
     return {
       broker_name: name,
       cost: finalCost,
@@ -1728,7 +1728,7 @@ app.get('/api/portfolio/brokers', async (c) => {
       balance_override: override?.balance_override ?? null
     };
   });
-  
+
   return c.json(output);
 });
 
@@ -1737,7 +1737,7 @@ app.post('/api/portfolio/brokers/override', async (c) => {
   const body = await c.req.json();
   const { broker_name, cost_override, balance_override } = body;
   if (!broker_name) return c.json({ error: 'broker_name is required' }, 400);
-  
+
   await c.env.DB.prepare(`
     INSERT INTO manual_broker_balances (broker_name, cost_override, balance_override)
     VALUES (?, ?, ?)
@@ -1745,71 +1745,71 @@ app.post('/api/portfolio/brokers/override', async (c) => {
       cost_override = excluded.cost_override,
       balance_override = excluded.balance_override
   `).bind(
-    broker_name, 
-    (cost_override === undefined || cost_override === null || cost_override === '') ? null : parseFloat(cost_override), 
+    broker_name,
+    (cost_override === undefined || cost_override === null || cost_override === '') ? null : parseFloat(cost_override),
     (balance_override === undefined || balance_override === null || balance_override === '') ? null : parseFloat(balance_override)
   ).run();
-  
+
   return c.json({ success: true });
 });
 
 // Fallback for non-matching API routes
 app.notFound((c) => {
-	return c.text("Oaktree Agent Backend Running");
+  return c.text("Oaktree Agent Backend Running");
 });
 
 export default {
-	fetch: app.fetch,
+  fetch: app.fetch,
 
-	async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
-		const isFacebookOnlyCron = event.cron === "*/30 * * * *";
+  async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
+    const isFacebookOnlyCron = event.cron === "*/30 * * * *";
 
-		if (isFacebookOnlyCron) {
-			// Every 30 minutes: only publish pending Facebook posts
-			console.log("Running Facebook-only sync (30-min cron)...");
-			ctx.waitUntil((async () => {
-				try {
-					await env.OAKTREE_SYNC_WORKFLOW.create({
-						id: `cron-fb-${Date.now()}`,
-						params: {
-							syncFacebookPosts: true,
-						}
-					});
-					console.log("Facebook-only workflow instance triggered successfully.");
-				} catch (e) {
-					console.error("Failed to trigger Facebook-only Workflow instance:", e);
-				}
-			})());
-			return;
-		}
+    if (isFacebookOnlyCron) {
+      // Every 30 minutes: only publish pending Facebook posts
+      console.log("Running Facebook-only sync (30-min cron)...");
+      ctx.waitUntil((async () => {
+        try {
+          await env.OAKTREE_SYNC_WORKFLOW.create({
+            id: `cron-fb-${Date.now()}`,
+            params: {
+              syncFacebookPosts: true,
+            }
+          });
+          console.log("Facebook-only workflow instance triggered successfully.");
+        } catch (e) {
+          console.error("Failed to trigger Facebook-only Workflow instance:", e);
+        }
+      })());
+      return;
+    }
 
-		// Every hour: full sync (market data, emails, alerts, etc.)
-		console.log("Running full scheduled worker tasks via Workflow...");
-		const hour = new Date().getUTCHours();
-		const isSixHourly = hour % 6 === 0;
+    // Every hour: full sync (market data, emails, alerts, etc.)
+    console.log("Running full scheduled worker tasks via Workflow...");
+    const hour = new Date().getUTCHours();
+    const isSixHourly = hour % 6 === 0;
 
-		ctx.waitUntil((async () => {
-			try {
-				await env.OAKTREE_SYNC_WORKFLOW.create({
-					id: `cron-${Date.now()}`,
-					params: {
-						fetchMarketStats: true,
-						checkAlertRules: true,
-						syncEmails: true,
-						generateEmailDigests: true,
-						emailDigestsManual: false,
-						runCrawler: isSixHourly,
-						generateDailySummaries: isSixHourly,
-						fetchMarketEvents: isSixHourly,
-						sendDailyEmailReport: false, // Disabled for this phase
-						purgeOldData: isSixHourly,
-						syncFacebookPosts: false, // Facebook handled by 30-min cron
-					}
-				});
-				console.log("Workflow instance triggered successfully.");
-			} catch (e) {
-				console.error("Failed to trigger Workflow instance:", e);
-			}
-		})());
-	},
+    ctx.waitUntil((async () => {
+      try {
+        await env.OAKTREE_SYNC_WORKFLOW.create({
+          id: `cron-${Date.now()}`,
+          params: {
+            fetchMarketStats: true,
+            checkAlertRules: true,
+            syncEmails: true,
+            generateEmailDigests: true,
+            emailDigestsManual: false,
+            runCrawler: isSixHourly,
+            generateDailySummaries: isSixHourly,
+            fetchMarketEvents: isSixHourly,
+            sendDailyEmailReport: false, // Disabled for this phase
+            purgeOldData: isSixHourly,
+            syncFacebookPosts: false, // Facebook handled by 30-min cron
+          }
+        });
+        console.log("Workflow instance triggered successfully.");
+      } catch (e) {
+        console.error("Failed to trigger Workflow instance:", e);
+      }
+    })());
+  },
 };
