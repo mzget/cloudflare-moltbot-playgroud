@@ -1,4 +1,4 @@
-﻿import puppeteer, { BrowserWorker } from '@cloudflare/puppeteer';
+import puppeteer, { BrowserWorker } from '@cloudflare/puppeteer';
 import { runCrawler } from './crawler';
 import { generateDailySummary } from './summarizer';
 import { sendDailyEmailReport } from './email';
@@ -7,7 +7,7 @@ import { fetchAndStoreMarketEvents } from './marketEvents';
 import { checkAlertRules } from './alerts';
 import { getAuthUrl, exchangeCodeForTokens } from './gmail';
 import { syncAndIngestEmails, generateEmailDigests } from './emailSummarizer';
-import { checkAuth, fetchGoogleUserProfile, isEmailAuthorized, signJwt, getUserLoginAuthUrl } from './auth';
+import { checkAuth, fetchGoogleUserProfile, isEmailAuthorized, signJwt, getUserLoginAuthUrl, encryptToken } from './auth';
 import { syncAndProcessFacebookPosts } from './facebook';
 import { recordDailyPortfolioHistory, getPortfolioHistory } from './portfolioHistory';
 import { sortTransactions } from './portfolioUtils';
@@ -46,24 +46,31 @@ const app = new Hono<{
 }>();
 
 // Enable CORS
-app.use('*', cors({
-	origin: '*',
-	allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-	allowHeaders: ['Content-Type', 'Authorization'],
-	maxAge: 86400,
-}));
+app.use('*', async (c, next) => {
+	const origin = c.env.IS_LOCAL === 'true' ? '*' : 'https://oaktree-agent.pages.dev'; // Replace with your production domain as appropriate
+	const corsMiddleware = cors({
+		origin: origin,
+		allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+		allowHeaders: ['Content-Type', 'Authorization'],
+		maxAge: 86400,
+	});
+	return corsMiddleware(c, next);
+});
 
 // Authentication Middleware
 app.use('/api/*', async (c, next) => {
 	const path = c.req.path;
 	const isUnprotectedRoute = path === '/' || 
 							   path === '/api/auth/user/login-url' || 
-							   path === '/api/auth/user/callback' || 
-							   path === '/api/test-facebook-post';
+							   path === '/api/auth/user/callback';
 	
 	if (!isUnprotectedRoute) {
-		const jwtSecret = c.env.JWT_SECRET || 'dev-secret-key-123456';
-		let user = await checkAuth(c.req.raw, jwtSecret);
+		const jwtSecret = c.env.JWT_SECRET;
+		if (!jwtSecret && c.env.IS_LOCAL !== 'true') {
+			return c.text('JWT Secret is not configured', 500);
+		}
+		
+		let user = await checkAuth(c.req.raw, jwtSecret || '');
 		
 		// Bypass authentication in local development mode
 		if (!user && c.env.IS_LOCAL === 'true') {
@@ -78,6 +85,36 @@ app.use('/api/*', async (c, next) => {
 			return c.text('Unauthorized', 401);
 		}
 		c.set('user', user);
+	}
+	await next();
+});
+
+// Admin & Test Trigger Rate Limiting Middleware
+const rateLimitCache = new Map<string, number>();
+app.use('/api/*', async (c, next) => {
+	const path = c.req.path;
+	const isTriggerRoute = path === '/api/email-test' ||
+						   path === '/api/crawl' ||
+						   path === '/api/summarize-all' ||
+						   path === '/api/test-market-stats' ||
+						   path === '/api/crawl-events' ||
+						   path === '/api/alerts/check-test' ||
+						   path === '/api/email-sync' ||
+						   path === '/api/test-email-digest' ||
+						   path === '/api/test-facebook-post';
+	
+	if (isTriggerRoute && c.env.IS_LOCAL !== 'true') {
+		const user = c.get('user');
+		const key = `${user?.email || 'anonymous'}:${path}`;
+		const lastRequestTime = rateLimitCache.get(key) || 0;
+		const now = Date.now();
+		const limitMs = 60 * 1000; // 1 minute limit per trigger endpoint
+		
+		if (now - lastRequestTime < limitMs) {
+			const waitSec = Math.ceil((limitMs - (now - lastRequestTime)) / 1000);
+			return c.text(`Rate limit exceeded. Please wait ${waitSec} seconds.`, 429);
+		}
+		rateLimitCache.set(key, now);
 	}
 	await next();
 });
@@ -99,7 +136,10 @@ app.post('/api/auth/user/callback', async (c) => {
 		const { code, redirect_uri } = await c.req.json() as any;
 		const clientId = c.env.GOOGLE_CLIENT_ID;
 		const clientSecret = c.env.GOOGLE_CLIENT_SECRET;
-		const jwtSecret = c.env.JWT_SECRET || 'dev-secret-key-123456';
+		const jwtSecret = c.env.JWT_SECRET;
+		if (!jwtSecret && c.env.IS_LOCAL !== 'true') {
+			return c.text('JWT Secret is not configured', 500);
+		}
 		if (!clientId || !clientSecret || !code || !redirect_uri) {
 			return c.text('Missing configuration, code, or redirect_uri', 400);
 		}
@@ -124,7 +164,7 @@ app.post('/api/auth/user/callback', async (c) => {
 			exp: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60)
 		};
 		
-		const token = await signJwt(sessionPayload, jwtSecret);
+		const token = await signJwt(sessionPayload, jwtSecret || '');
 		return c.json({
 			success: true,
 			token,
@@ -562,9 +602,15 @@ app.post('/api/auth/google/callback', async (c) => {
 		}
 		const tokens = await exchangeCodeForTokens(code, clientId, clientSecret, redirect_uri);
 		const expiryDate = Date.now() + tokens.expires_in * 1000;
+		const jwtSecret = c.env.JWT_SECRET;
+		if (!jwtSecret && c.env.IS_LOCAL !== 'true') {
+			return c.text('JWT Secret is not configured', 500);
+		}
+		const encAccessToken = await encryptToken(tokens.access_token, jwtSecret || '');
+		const encRefreshToken = await encryptToken(tokens.refresh_token, jwtSecret || '');
 		await c.env.DB.prepare(
 			'INSERT INTO gmail_oauth (id, access_token, refresh_token, expiry_date) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET access_token = excluded.access_token, refresh_token = excluded.refresh_token, expiry_date = excluded.expiry_date, updated_at = (strftime(\'%s\', \'now\'))'
-		).bind('default', tokens.access_token, tokens.refresh_token, expiryDate).run();
+		).bind('default', encAccessToken, encRefreshToken, expiryDate).run();
 		return c.json({ success: true });
 	} catch (e) {
 		return c.text(`OAuth callback exchange failed: ${(e as any).message}`, 500);
@@ -1100,6 +1146,9 @@ app.post('/api/portfolio/import', async (c) => {
     const transactions = await c.req.json() as any[];
     if (!Array.isArray(transactions)) {
       return c.json({ error: 'Invalid payload, expected array of transactions' }, 400);
+    }
+    if (transactions.length > 1000) {
+      return c.json({ error: 'Payload too large, maximum 1000 transactions allowed' }, 400);
     }
 
     // Sort transactions chronologically to ensure FIFO lot matching behaves correctly

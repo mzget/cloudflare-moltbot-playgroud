@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box, Typography, Sheet, Chip, Divider, Stack, IconButton, Table,
   Button, Input, Modal, ModalDialog, DialogTitle, DialogContent, ModalClose,
@@ -330,7 +330,7 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
       {/* Top Metrics Cards (THB) */}
       <Grid container spacing={2}>
         {/* Stocks Only Card */}
-        <Grid xs={12} md={4}>
+        <Grid xs={12} sm={6} lg={4}>
           <Sheet sx={{ ...glassStyle, p: 3, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 3 }}>
               <Box sx={{ width: '100%' }}>
@@ -388,7 +388,7 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
         </Grid>
 
         {/* All Assets Card */}
-        <Grid xs={12} md={5}>
+        <Grid xs={12} sm={6} lg={5}>
           <Sheet sx={{ ...glassStyle, p: 3, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 3 }}>
               <Box sx={{ width: '100%' }}>
@@ -449,7 +449,7 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
         </Grid>
 
         {/* Static Settings (Exchange Rate) Card */}
-        <Grid xs={12} md={3}>
+        <Grid xs={12} sm={12} lg={3}>
           <Sheet sx={{ ...glassStyle, p: 3, display: 'flex', flexDirection: 'column', gap: 2, height: '100%' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
               <Settings size={20} color="#10b981" />
@@ -761,8 +761,8 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
                 Add Year
               </Button>
             </Box>
-            <Box sx={{ flexGrow: 1, overflowY: 'auto', maxHeight: 340 }}>
-              <Table aria-label="yearly history table">
+            <Box sx={{ flexGrow: 1, overflowY: 'auto', overflowX: 'auto', maxHeight: 340 }}>
+              <Table aria-label="yearly history table" sx={{ minWidth: 500 }}>
                 <thead>
                   <tr>
                     <th style={{ width: 40 }}></th>
@@ -910,8 +910,8 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
               </Box>
             )}
 
-            <Box sx={{ flexGrow: 1, overflowY: 'auto', maxHeight: 240 }}>
-              <Table aria-label="tax savings table">
+            <Box sx={{ flexGrow: 1, overflowY: 'auto', overflowX: 'auto', maxHeight: 240 }}>
+              <Table aria-label="tax savings table" sx={{ minWidth: 500 }}>
                 <thead>
                   <tr>
                     <th>Year</th>

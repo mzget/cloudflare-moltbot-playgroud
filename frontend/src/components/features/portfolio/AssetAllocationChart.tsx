@@ -144,7 +144,7 @@ export default function AssetAllocationChart({
     });
   }, [chartData, totalValue]);
 
-  // SVG parameters
+  // SVG parameters (used for viewBox internal coordinate system)
   const size = 320;
   const cx = size / 2;
   const cy = size / 2;
@@ -200,18 +200,24 @@ export default function AssetAllocationChart({
       <Box
         sx={{
           display: 'flex',
-          flexDirection: { xs: 'column', sm: 'row' },
+          flexDirection: { xs: 'column', lg: 'row' },
           alignItems: 'center',
           justifyContent: 'center',
-          gap: { xs: 2, sm: 3 },
+          gap: { xs: 3, lg: 4 },
           flexGrow: 1,
+          width: '100%',
         }}
       >
         {/* SVG Donut Chart */}
-        <Box sx={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+        <Box sx={{ 
+          position: 'relative', 
+          width: { xs: 200, sm: 240 }, 
+          height: { xs: 200, sm: 240 }, 
+          flexShrink: 0 
+        }}>
           <svg
-            width={size}
-            height={size}
+            width="100%"
+            height="100%"
             viewBox={`0 0 ${size} ${size}`}
             style={{ transform: 'rotate(-90deg)', overflow: 'visible' }}
           >
@@ -291,7 +297,7 @@ export default function AssetAllocationChart({
                 fontWeight: 700,
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em',
-                maxWidth: 160,
+                maxWidth: '80%',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
@@ -305,6 +311,7 @@ export default function AssetAllocationChart({
                 fontWeight: 800,
                 color: activeSlice ? activeSlice.color : 'text.primary',
                 mt: 0.5,
+                fontSize: { xs: '1.25rem', sm: '1.5rem' },
               }}
             >
               {activeSlice ? `${activeSlice.percentage.toFixed(1)}%` : '100%'}
@@ -313,7 +320,21 @@ export default function AssetAllocationChart({
         </Box>
 
         {/* Legend Panel */}
-        <Stack spacing={0.5} sx={{ flexGrow: 1, width: '100%', maxWidth: { sm: '38%', md: '33%' }, maxHeight: 280, overflowY: 'auto', pr: 0.5 }}>
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: { xs: 'row', lg: 'column' },
+            flexWrap: 'wrap',
+            gap: 1,
+            flexGrow: 1,
+            width: '100%',
+            maxHeight: { xs: 180, lg: 280 },
+            overflowY: 'auto',
+            justifyContent: { xs: 'center', lg: 'flex-start' },
+            px: { xs: 1, lg: 0 },
+            py: 0.5,
+          }}
+        >
           {slices.map((slice, index) => {
             const isHovered = hoveredIndex === index;
             return (
@@ -325,21 +346,25 @@ export default function AssetAllocationChart({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  px: 1.25,
-                  py: 0.4,
-                  borderRadius: '8px',
+                  px: 1.5,
+                  py: 0.75,
+                  borderRadius: '10px',
                   cursor: 'pointer',
-                  bgcolor: isHovered ? 'rgba(0, 0, 0, 0.03)' : 'transparent',
-                  transition: 'all 0.2s ease',
+                  bgcolor: isHovered 
+                    ? 'rgba(16, 185, 129, 0.08)' 
+                    : 'rgba(255, 255, 255, 0.02)',
+                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                   border: '1px solid',
-                  borderColor: isHovered ? 'divider' : 'transparent',
+                  borderColor: isHovered ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                  minWidth: { xs: 'calc(50% - 8px)', sm: 'calc(33.33% - 8px)', lg: '100%' },
+                  boxSizing: 'border-box',
                 }}
               >
                 <Stack direction="row" alignItems="center" spacing={1.5} sx={{ minWidth: 0 }}>
                   <Box
                     sx={{
-                      width: 10,
-                      height: 10,
+                      width: 8,
+                      height: 8,
                       borderRadius: '50%',
                       bgcolor: slice.color,
                       flexShrink: 0,
@@ -358,13 +383,13 @@ export default function AssetAllocationChart({
                     {slice.name}
                   </Typography>
                 </Stack>
-                <Typography level="body-xs" sx={{ fontWeight: 700, opacity: 0.8 }}>
+                <Typography level="body-xs" sx={{ fontWeight: 800, color: 'text.primary', ml: 1, flexShrink: 0 }}>
                   {slice.percentage.toFixed(1)}%
                 </Typography>
               </Box>
             );
           })}
-        </Stack>
+        </Box>
       </Box>
     </Box>
   );

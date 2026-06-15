@@ -31,7 +31,8 @@ export async function syncAndIngestEmails(env: Env): Promise<number> {
     return 0;
   }
 
-  const accessToken = await getOrRefreshAccessToken(env.DB, clientId, clientSecret);
+  const jwtSecret = env.JWT_SECRET || 'dev-secret-key-123456';
+  const accessToken = await getOrRefreshAccessToken(env.DB, clientId, clientSecret, jwtSecret);
   if (!accessToken) {
     console.warn('Gmail not connected. Please authenticate via OAuth.');
     return 0;
