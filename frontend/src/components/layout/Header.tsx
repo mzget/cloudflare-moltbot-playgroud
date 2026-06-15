@@ -500,7 +500,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
                     variant: 'plain',
                     color: 'neutral',
                     sx: {
-                      display: { xs: 'none', md: 'inline-flex' },
+                      display: 'inline-flex',
                       borderRadius: '12px',
                       '&:hover': { bgcolor: 'rgba(0,0,0,0.04)', transform: 'scale(1.05)' },
                       transition: 'all 0.2s'
