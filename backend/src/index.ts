@@ -321,7 +321,8 @@ async function ensureSystemSettingsTable(db: D1Database) {
 	await db.prepare(`
 		INSERT OR IGNORE INTO system_settings (key, value) VALUES 
 		('pause_daily_report_facebook', '0'),
-		('pause_email_digest_facebook', '0')
+		('pause_email_digest_facebook', '0'),
+		('pause_custom_facebook', '0')
 	`).run();
 }
 
@@ -734,6 +735,143 @@ app.post('/api/test-facebook-post', async (c) => {
 		}, 500);
 	}
 });
+
+// API: Get Facebook Custom Posts
+app.get('/api/facebook/posts', async (c) => {
+	try {
+		const { results } = await c.env.DB.prepare(`
+			SELECT id, source_type, source_id, thai_title, thai_content, status, facebook_post_id, error_message, 
+			       CAST(strftime('%s', created_at) as INTEGER) as created_at 
+			FROM facebook_posts 
+			WHERE source_type = 'custom'
+			ORDER BY created_at DESC 
+			LIMIT 50
+		`).all();
+		return c.json(results || []);
+	} catch (e) {
+		return c.json({ error: (e as any).message }, 500);
+	}
+});
+
+// API: Create Custom Post Draft
+app.post('/api/facebook/posts', async (c) => {
+	try {
+		const { title, content } = await c.req.json() as any;
+		await c.env.DB.prepare(
+			"INSERT INTO facebook_posts (source_type, source_id, thai_title, thai_content, status) VALUES ('custom', 0, ?, ?, 'draft')"
+		).bind(title || '', content || '').run();
+		return c.json({ success: true, message: 'Custom post draft created' });
+	} catch (e) {
+		return c.json({ error: (e as any).message }, 500);
+	}
+});
+
+// API: Update Custom Post
+app.put('/api/facebook/posts/:id', async (c) => {
+	try {
+		const id = c.req.param('id');
+		const { title, content, status } = await c.req.json() as any;
+		
+		// Build dynamic update query
+		const fields: string[] = [];
+		const values: any[] = [];
+		
+		if (title !== undefined) {
+			fields.push('thai_title = ?');
+			values.push(title);
+		}
+		if (content !== undefined) {
+			fields.push('thai_content = ?');
+			values.push(content);
+		}
+		if (status !== undefined) {
+			fields.push('status = ?');
+			values.push(status);
+		}
+		
+		if (fields.length === 0) {
+			return c.json({ error: 'No fields to update' }, 400);
+		}
+		
+		fields.push("updated_at = (strftime('%Y-%m-%d %H:%M:%S', 'now'))");
+		values.push(id);
+		
+		const sql = `UPDATE facebook_posts SET ${fields.join(', ')} WHERE id = ?`;
+		await c.env.DB.prepare(sql).bind(...values).run();
+		
+		return c.json({ success: true, message: 'Custom post updated' });
+	} catch (e) {
+		return c.json({ error: (e as any).message }, 500);
+	}
+});
+
+// API: Delete Custom Post
+app.delete('/api/facebook/posts/:id', async (c) => {
+	try {
+		const id = c.req.param('id');
+		await c.env.DB.prepare('DELETE FROM facebook_posts WHERE id = ? AND source_type = \'custom\'').bind(id).run();
+		return c.json({ success: true, message: 'Custom post deleted' });
+	} catch (e) {
+		return c.json({ error: (e as any).message }, 500);
+	}
+});
+
+// API: Publish Custom Post Immediately
+app.post('/api/facebook/posts/:id/post-now', async (c) => {
+	try {
+		const id = c.req.param('id');
+		const { content } = await c.req.json() as any;
+		
+		// Verify post exists and is custom
+		const post = await c.env.DB.prepare(
+			"SELECT * FROM facebook_posts WHERE id = ? AND source_type = 'custom'"
+		).bind(id).first() as { id: number; thai_title: string; thai_content: string } | null;
+		
+		if (!post) {
+			return c.json({ error: 'Post not found or is not a custom post' }, 404);
+		}
+		
+		const thaiPost = content !== undefined ? content : post.thai_content;
+		
+		if (!c.env.FACEBOOK_PAGE_ID || !c.env.FACEBOOK_PAGE_ACCESS_TOKEN) {
+			return c.json({ error: 'Facebook Page configurations (ID or token) are missing' }, 400);
+		}
+		
+		console.log(`Manually publishing custom post ID ${id} directly to Facebook Page: ${c.env.FACEBOOK_PAGE_ID}`);
+		const fbResponse = await fetch(`https://graph.facebook.com/v20.0/${c.env.FACEBOOK_PAGE_ID}/feed`, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				message: thaiPost,
+				access_token: c.env.FACEBOOK_PAGE_ACCESS_TOKEN,
+			}),
+		});
+		
+		const fbResult = await fbResponse.json() as any;
+		
+		if (!fbResponse.ok || fbResult.error) {
+			const errorMsg = fbResult.error?.message || JSON.stringify(fbResult);
+			await c.env.DB.prepare(
+				"UPDATE facebook_posts SET thai_content = ?, status = 'failed', error_message = ?, updated_at = (strftime('%Y-%m-%d %H:%M:%S', 'now')) WHERE id = ?"
+			).bind(thaiPost, errorMsg, id).run();
+			return c.json({ success: false, error: errorMsg }, 400);
+		}
+		
+		const facebookPostId = fbResult.id;
+		console.log(`Successfully posted custom post manually. Post ID: ${facebookPostId}`);
+		
+		await c.env.DB.prepare(
+			"UPDATE facebook_posts SET thai_content = ?, status = 'posted', facebook_post_id = ?, error_message = NULL, updated_at = (strftime('%Y-%m-%d %H:%M:%S', 'now')) WHERE id = ?"
+		).bind(thaiPost, facebookPostId, id).run();
+		
+		return c.json({ success: true, facebookPostId });
+	} catch (e) {
+		return c.json({ error: (e as any).message }, 500);
+	}
+});
+
 
 // API: Mark Email Digest as Read
 app.post('/api/email-digests/mark-read', async (c) => {

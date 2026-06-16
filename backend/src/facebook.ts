@@ -2,7 +2,7 @@ import { Env } from './index';
 
 interface FacebookPostRow {
 	id: number;
-	source_type: 'daily_report' | 'email_digest';
+	source_type: 'daily_report' | 'email_digest' | 'custom';
 	source_id: number;
 	thai_title: string | null;
 	thai_content: string | null;
@@ -28,11 +28,14 @@ export async function processPendingFacebookPosts(env: Env): Promise<number> {
 	// Check pause settings
 	let dailyReportPaused = false;
 	let emailDigestPaused = false;
+	let customPaused = false;
 	try {
 		const dailyRow = await env.DB.prepare("SELECT value FROM system_settings WHERE key = 'pause_daily_report_facebook'").first() as { value: string } | null;
 		const emailRow = await env.DB.prepare("SELECT value FROM system_settings WHERE key = 'pause_email_digest_facebook'").first() as { value: string } | null;
+		const customRow = await env.DB.prepare("SELECT value FROM system_settings WHERE key = 'pause_custom_facebook'").first() as { value: string } | null;
 		dailyReportPaused = dailyRow?.value === '1';
 		emailDigestPaused = emailRow?.value === '1';
+		customPaused = customRow?.value === '1';
 	} catch (e) {
 		console.warn('Failed to fetch Facebook pause settings in processPendingFacebookPosts, defaulting to unpaused:', e);
 	}
@@ -45,6 +48,9 @@ export async function processPendingFacebookPosts(env: Env): Promise<number> {
 	}
 	if (emailDigestPaused) {
 		conditions.push("source_type != 'email_digest'");
+	}
+	if (customPaused) {
+		conditions.push("source_type != 'custom'");
 	}
 	if (conditions.length > 0) {
 		query += " AND " + conditions.join(" AND ");
@@ -69,53 +75,61 @@ export async function processPendingFacebookPosts(env: Env): Promise<number> {
 		).bind(post.id).run();
 
 		try {
-						// 2. Fetch original Thai content
-			let summary = '';
-			let takeaways: string[] = [];
-			let symbolOrCategory = '';
+			let thaiPost = '';
 			let subjectInfo = '';
 
-			if (post.source_type === 'daily_report') {
-				const report = await env.DB.prepare(
-					'SELECT symbol, summary, key_takeaways FROM daily_reports WHERE id = ?'
-				).bind(post.source_id).first() as { symbol: string, summary: string, key_takeaways: string } | null;
-
-				if (!report) {
-					throw new Error(`Daily report ID ${post.source_id} not found`);
-				}
-
-				takeaways = JSON.parse(report.key_takeaways || '[]');
-				summary = report.summary;
-				symbolOrCategory = report.symbol;
-				subjectInfo = `Stock Report: ${report.symbol}`;
-			} else if (post.source_type === 'email_digest') {
-				const digest = await env.DB.prepare(
-					'SELECT category, summary, key_takeaways FROM email_digests WHERE id = ?'
-				).bind(post.source_id).first() as { category: string, summary: string, key_takeaways: string } | null;
-
-				if (!digest) {
-					throw new Error(`Email digest ID ${post.source_id} not found`);
-				}
-
-				takeaways = JSON.parse(digest.key_takeaways || '[]');
-				summary = digest.summary;
-				symbolOrCategory = digest.category;
-				subjectInfo = `Market Digest: ${digest.category}`;
+			if (post.source_type === 'custom') {
+				thaiPost = post.thai_content || '';
+				subjectInfo = `Custom Post: ${post.thai_title || 'No Title'}`;
 			} else {
-				throw new Error(`Invalid source_type: ${post.source_type}`);
-			}
+				// 2. Fetch original Thai content
+				let summary = '';
+				let takeaways: string[] = [];
+				let symbolOrCategory = '';
 
-			// 3. Format and style Thai content for Facebook using Workers AI
-			console.log(`Formatting and styling Facebook post for Thai: ${subjectInfo}`);
-			const thaiPost = await formatAndStyleFacebookPost(env, {
-				type: post.source_type,
-				symbolOrCategory,
-				summary,
-				takeaways,
-			});
+				if (post.source_type === 'daily_report') {
+					const report = await env.DB.prepare(
+						'SELECT symbol, summary, key_takeaways FROM daily_reports WHERE id = ?'
+					).bind(post.source_id).first() as { symbol: string, summary: string, key_takeaways: string } | null;
 
-			if (!thaiPost) {
-				throw new Error('AI failed to generate Thai translation content');
+					if (!report) {
+						throw new Error(`Daily report ID ${post.source_id} not found`);
+					}
+
+					takeaways = JSON.parse(report.key_takeaways || '[]');
+					summary = report.summary;
+					symbolOrCategory = report.symbol;
+					subjectInfo = `Stock Report: ${report.symbol}`;
+				} else if (post.source_type === 'email_digest') {
+					const digest = await env.DB.prepare(
+						'SELECT category, summary, key_takeaways FROM email_digests WHERE id = ?'
+					).bind(post.source_id).first() as { category: string, summary: string, key_takeaways: string } | null;
+
+					if (!digest) {
+						throw new Error(`Email digest ID ${post.source_id} not found`);
+					}
+
+					takeaways = JSON.parse(digest.key_takeaways || '[]');
+					summary = digest.summary;
+					symbolOrCategory = digest.category;
+					subjectInfo = `Market Digest: ${digest.category}`;
+				} else {
+					throw new Error(`Invalid source_type: ${post.source_type}`);
+				}
+
+				// 3. Format and style Thai content for Facebook using Workers AI
+				console.log(`Formatting and styling Facebook post for Thai: ${subjectInfo}`);
+				const generatedContent = await formatAndStyleFacebookPost(env, {
+					type: post.source_type,
+					symbolOrCategory,
+					summary,
+					takeaways,
+				});
+
+				if (!generatedContent) {
+					throw new Error('AI failed to generate Thai translation content');
+				}
+				thaiPost = generatedContent;
 			}
 
 			// 4. Publish to Facebook Graph API

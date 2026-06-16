@@ -44,6 +44,7 @@ import {
 } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
+import OaktreeIcon from '../../common/OaktreeIcon';
 import ManualTrigger from './ManualTrigger';
 
 // Custom Facebook Icon component using standard Lucide SVG path
@@ -91,15 +92,17 @@ export default function SourceManager() {
     testDigest
   } = useGmailSubscriptions();
 
-  // Modal forms visibility states
-  const [showSourceForm, setShowSourceForm] = useState(false);
-  const [editingSource, setEditingSource] = useState<NewsSource | null>(null);
-  const [showSubForm, setShowSubForm] = useState(false);
-  const [editingSub, setEditingSub] = useState<EmailSubscription | null>(null);
+  // Consolidated active form states
+  // 'new' represents creating, NewsSource/EmailSubscription represents editing, null represents closed modal
+  const [editingSource, setEditingSource] = useState<NewsSource | 'new' | null>(null);
+  const [editingSub, setEditingSub] = useState<EmailSubscription | 'new' | null>(null);
 
   // Facebook Posting settings
-  const [pauseDailyReportFacebook, setPauseDailyReportFacebook] = useState(false);
-  const [pauseEmailDigestFacebook, setPauseEmailDigestFacebook] = useState(false);
+  const [facebookSettings, setFacebookSettings] = useState({
+    pauseDailyReportFacebook: false,
+    pauseEmailDigestFacebook: false,
+    pauseCustomFacebook: false,
+  });
   const [updatingSettings, setUpdatingSettings] = useState(false);
 
   const fetchSettings = async () => {
@@ -107,21 +110,26 @@ export default function SourceManager() {
       const res = await fetch(`${API_BASE_URL}/api/settings`);
       if (res.ok) {
         const settings = await res.json();
-        setPauseDailyReportFacebook(settings.pause_daily_report_facebook === '1');
-        setPauseEmailDigestFacebook(settings.pause_email_digest_facebook === '1');
+        setFacebookSettings({
+          pauseDailyReportFacebook: settings.pause_daily_report_facebook === '1',
+          pauseEmailDigestFacebook: settings.pause_email_digest_facebook === '1',
+          pauseCustomFacebook: settings.pause_custom_facebook === '1',
+        });
       }
     } catch (e) {
       console.error('Failed to fetch system settings', e);
     }
   };
 
-  const handleSettingToggle = async (key: string, currentValue: boolean) => {
+  const handleSettingToggle = async (key: 'pause_daily_report_facebook' | 'pause_email_digest_facebook' | 'pause_custom_facebook', currentValue: boolean) => {
     const newValue = !currentValue;
-    if (key === 'pause_daily_report_facebook') {
-      setPauseDailyReportFacebook(newValue);
-    } else if (key === 'pause_email_digest_facebook') {
-      setPauseEmailDigestFacebook(newValue);
-    }
+    const stateKey = key === 'pause_daily_report_facebook' 
+      ? 'pauseDailyReportFacebook' 
+      : key === 'pause_email_digest_facebook' 
+      ? 'pauseEmailDigestFacebook' 
+      : 'pauseCustomFacebook';
+
+    setFacebookSettings(prev => ({ ...prev, [stateKey]: newValue }));
 
     try {
       setUpdatingSettings(true);
@@ -132,20 +140,12 @@ export default function SourceManager() {
       });
       if (!res.ok) {
         // Revert on failure
-        if (key === 'pause_daily_report_facebook') {
-          setPauseDailyReportFacebook(currentValue);
-        } else if (key === 'pause_email_digest_facebook') {
-          setPauseEmailDigestFacebook(currentValue);
-        }
+        setFacebookSettings(prev => ({ ...prev, [stateKey]: currentValue }));
         alert('Failed to update system setting');
       }
     } catch (e) {
       // Revert on failure
-      if (key === 'pause_daily_report_facebook') {
-        setPauseDailyReportFacebook(currentValue);
-      } else if (key === 'pause_email_digest_facebook') {
-        setPauseEmailDigestFacebook(currentValue);
-      }
+      setFacebookSettings(prev => ({ ...prev, [stateKey]: currentValue }));
       console.error(e);
       alert('Failed to update system setting');
     } finally {
@@ -169,11 +169,147 @@ export default function SourceManager() {
     };
   }, [fetchSources, checkGmailStatus, fetchSubscriptions]);
 
+  // Facebook Custom Posts Management States
+  const [customPosts, setCustomPosts] = useState<any[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
+  const [editorState, setEditorState] = useState<{
+    isOpen: boolean;
+    post: any | null;
+    title: string;
+    content: string;
+  }>({
+    isOpen: false,
+    post: null,
+    title: '',
+    content: ''
+  });
+  const [submittingPost, setSubmittingPost] = useState(false);
+
+  const fetchCustomPosts = async () => {
+    try {
+      setLoadingPosts(true);
+      const res = await fetch(`${API_BASE_URL}/api/facebook/posts`);
+      if (res.ok) {
+        const data = await res.json();
+        setCustomPosts(data);
+      }
+    } catch (e) {
+      console.error('Failed to fetch custom posts', e);
+    } finally {
+      setLoadingPosts(false);
+    }
+  };
+
+  const handleOpenCreatePost = () => {
+    setEditorState({
+      isOpen: true,
+      post: null,
+      title: '',
+      content: ''
+    });
+  };
+
+  const handleOpenEditPost = (post: any) => {
+    setEditorState({
+      isOpen: true,
+      post,
+      title: post.thai_title || '',
+      content: post.thai_content || ''
+    });
+  };
+
+  const handleSavePost = async (status: 'draft' | 'pending') => {
+    if (!editorState.content.trim()) {
+      alert('Post content cannot be empty');
+      return;
+    }
+    try {
+      setSubmittingPost(true);
+      const payload = {
+        title: editorState.title,
+        content: editorState.content,
+        status
+      };
+      
+      let url = `${API_BASE_URL}/api/facebook/posts`;
+      let method = 'POST';
+      
+      if (editorState.post) {
+        url = `${API_BASE_URL}/api/facebook/posts/${editorState.post.id}`;
+        method = 'PUT';
+      }
+      
+      const res = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      
+      if (res.ok) {
+        setEditorState(prev => ({ ...prev, isOpen: false }));
+        fetchCustomPosts();
+      } else {
+        alert('Failed to save custom post');
+      }
+    } catch (e) {
+      console.error('Failed to save custom post', e);
+      alert('Error saving custom post');
+    } finally {
+      setSubmittingPost(false);
+    }
+  };
+
+  const handleDeletePost = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this custom post?')) return;
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/facebook/posts/${id}`, {
+        method: 'DELETE'
+      });
+      if (res.ok) {
+        fetchCustomPosts();
+      } else {
+        alert('Failed to delete custom post');
+      }
+    } catch (e) {
+      console.error('Failed to delete custom post', e);
+    }
+  };
+
+  const handlePostNow = async (id: number, contentOverride?: string) => {
+    if (!confirm('Post this immediately to Facebook?')) return;
+    try {
+      setSubmittingPost(true);
+      const res = await fetch(`${API_BASE_URL}/api/facebook/posts/${id}/post-now`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: contentOverride || editorState.content }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Successfully posted to Facebook Page!');
+        setEditorState(prev => ({ ...prev, isOpen: false }));
+        fetchCustomPosts();
+      } else {
+        alert(`Failed to post to Facebook: ${data.error}`);
+      }
+    } catch (e) {
+      console.error('Failed to post custom post immediately', e);
+      alert('Error posting to Facebook');
+    } finally {
+      setSubmittingPost(false);
+    }
+  };
+
+  useEffect(() => {
+    if (index === 2) {
+      fetchCustomPosts();
+    }
+  }, [index]);
+
   // Web/RSS actions
   const handleSaveSource = async (source: any) => {
     try {
       await saveSource(source);
-      setShowSourceForm(false);
       setEditingSource(null);
     } catch (e) {
       console.error('Failed to save source', e);
@@ -210,7 +346,6 @@ export default function SourceManager() {
   const handleSaveSub = async (sub: any) => {
     try {
       await saveSubscription(sub);
-      setShowSubForm(false);
       setEditingSub(null);
     } catch (e) {
       console.error('Failed to save subscription', e);
@@ -335,7 +470,7 @@ export default function SourceManager() {
               variant="soft"
               color="primary"
               startDecorator={<Plus size={18} />}
-              onClick={() => setShowSourceForm(true)}
+              onClick={() => setEditingSource('new')}
               sx={{ borderRadius: '12px' }}
             >
               Add Source
@@ -500,7 +635,7 @@ export default function SourceManager() {
                 color="primary"
                 disabled={!gmailConnected}
                 startDecorator={<Plus size={18} />}
-                onClick={() => setShowSubForm(true)}
+                onClick={() => setEditingSub('new')}
                 sx={{ borderRadius: '12px' }}
               >
                 Add Newsletter Rule
@@ -584,103 +719,391 @@ export default function SourceManager() {
         </TabPanel>
 
         <TabPanel value={2} sx={{ p: 0 }}>
-          {/* Tab 3: Facebook Page Settings */}
-          <Sheet
-            variant="outlined"
-            sx={{
-              p: 3,
-              borderRadius: '16px',
-              bgcolor: 'background.surface',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
-              mb: 4,
-              maxWidth: '600px'
-            }}
-          >
-            <Stack spacing={3}>
-              <Stack direction="row" spacing={2} alignItems="center">
-                <Box
-                  sx={{
-                    p: 1.5,
-                    borderRadius: '12px',
-                    bgcolor: 'rgba(24, 119, 242, 0.15)',
-                    color: '#1877f2',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <Facebook size={24} />
-                </Box>
+          {/* Tab 3: Facebook Page Settings & Custom Content Queue */}
+          <Stack spacing={4}>
+            <Sheet
+              variant="outlined"
+              sx={{
+                p: 3,
+                borderRadius: '16px',
+                bgcolor: 'background.surface',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+                maxWidth: '600px'
+              }}
+            >
+              <Stack spacing={3}>
+                <Stack direction="row" spacing={2} alignItems="center">
+                  <Box
+                    sx={{
+                      p: 1.5,
+                      borderRadius: '12px',
+                      bgcolor: 'rgba(24, 119, 242, 0.15)',
+                      color: '#1877f2',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center'
+                    }}
+                  >
+                    <Facebook size={24} />
+                  </Box>
+                  <Box>
+                    <Typography level="title-md">Facebook Auto-Posting Controls</Typography>
+                    <Typography level="body-sm" sx={{ opacity: 0.6 }}>
+                      Manage auto-publishing of summaries, digests, and custom posts to the Facebook page.
+                    </Typography>
+                  </Box>
+                </Stack>
+
+                <Divider sx={{ opacity: 0.1 }} />
+
+                <Stack spacing={2}>
+                  <FormControl orientation="horizontal" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Box>
+                      <FormLabel sx={{ fontWeight: 700 }}>Pause Daily Reports Posting</FormLabel>
+                      <Typography level="body-xs" sx={{ opacity: 0.5 }}>
+                        When enabled, daily stock reports will not be queued or published to Facebook.
+                      </Typography>
+                    </Box>
+                    <Switch
+                      checked={facebookSettings.pauseDailyReportFacebook}
+                      onChange={() => handleSettingToggle('pause_daily_report_facebook', facebookSettings.pauseDailyReportFacebook)}
+                      disabled={updatingSettings}
+                      color={facebookSettings.pauseDailyReportFacebook ? "danger" : "neutral"}
+                    />
+                  </FormControl>
+
+                  <Divider sx={{ opacity: 0.05 }} />
+
+                  <FormControl orientation="horizontal" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Box>
+                      <FormLabel sx={{ fontWeight: 700 }}>Pause Email Digests Posting</FormLabel>
+                      <Typography level="body-xs" sx={{ opacity: 0.5 }}>
+                        When enabled, category email digests will not be queued or published to Facebook.
+                      </Typography>
+                    </Box>
+                    <Switch
+                      checked={facebookSettings.pauseEmailDigestFacebook}
+                      onChange={() => handleSettingToggle('pause_email_digest_facebook', facebookSettings.pauseEmailDigestFacebook)}
+                      disabled={updatingSettings}
+                      color={facebookSettings.pauseEmailDigestFacebook ? "danger" : "neutral"}
+                    />
+                  </FormControl>
+
+                  <Divider sx={{ opacity: 0.05 }} />
+
+                  <FormControl orientation="horizontal" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Box>
+                      <FormLabel sx={{ fontWeight: 700 }}>Pause Custom Posts Posting</FormLabel>
+                      <Typography level="body-xs" sx={{ opacity: 0.5 }}>
+                        When enabled, manual custom posts will not be auto-published to Facebook.
+                      </Typography>
+                    </Box>
+                    <Switch
+                      checked={facebookSettings.pauseCustomFacebook}
+                      onChange={() => handleSettingToggle('pause_custom_facebook', facebookSettings.pauseCustomFacebook)}
+                      disabled={updatingSettings}
+                      color={facebookSettings.pauseCustomFacebook ? "danger" : "neutral"}
+                    />
+                  </FormControl>
+                </Stack>
+              </Stack>
+            </Sheet>
+
+            {/* Custom Posts Queue */}
+            <Stack spacing={2}>
+              <Stack direction="row" justifyContent="space-between" alignItems="center">
                 <Box>
-                  <Typography level="title-md">Facebook Auto-Posting Controls</Typography>
-                  <Typography level="body-sm" sx={{ opacity: 0.6 }}>
-                    Manage auto-publishing of summaries and digests to the Facebook page.
+                  <Typography level="title-md">Custom Standalone Posts</Typography>
+                  <Typography level="body-xs" sx={{ opacity: 0.6 }}>
+                    Draft and manage standalone posts to be published on the Facebook page.
                   </Typography>
                 </Box>
+                <Button
+                  variant="soft"
+                  color="primary"
+                  startDecorator={<Plus size={18} />}
+                  onClick={handleOpenCreatePost}
+                  sx={{ borderRadius: '12px' }}
+                >
+                  Create Custom Post
+                </Button>
               </Stack>
 
-              <Divider sx={{ opacity: 0.1 }} />
-
-              <Stack spacing={2}>
-                <FormControl orientation="horizontal" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Box>
-                    <FormLabel sx={{ fontWeight: 700 }}>Pause Daily Reports Posting</FormLabel>
-                    <Typography level="body-xs" sx={{ opacity: 0.5 }}>
-                      When enabled, daily stock reports will not be queued or published to Facebook.
-                    </Typography>
-                  </Box>
-                  <Switch
-                    checked={pauseDailyReportFacebook}
-                    onChange={() => handleSettingToggle('pause_daily_report_facebook', pauseDailyReportFacebook)}
-                    disabled={updatingSettings}
-                    color={pauseDailyReportFacebook ? "danger" : "neutral"}
-                  />
-                </FormControl>
-
-                <Divider sx={{ opacity: 0.05 }} />
-
-                <FormControl orientation="horizontal" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Box>
-                    <FormLabel sx={{ fontWeight: 700 }}>Pause Email Digests Posting</FormLabel>
-                    <Typography level="body-xs" sx={{ opacity: 0.5 }}>
-                      When enabled, category email digests will not be queued or published to Facebook.
-                    </Typography>
-                  </Box>
-                  <Switch
-                    checked={pauseEmailDigestFacebook}
-                    onChange={() => handleSettingToggle('pause_email_digest_facebook', pauseEmailDigestFacebook)}
-                    disabled={updatingSettings}
-                    color={pauseEmailDigestFacebook ? "danger" : "neutral"}
-                  />
-                </FormControl>
-              </Stack>
+              <Sheet sx={{ ...glassStyle, overflow: 'hidden' }}>
+                <Table sx={{ '& tr > *': { borderBottom: '1px solid var(--joy-palette-divider)' } }}>
+                  <thead>
+                    <tr>
+                      <th style={{ background: 'transparent' }}>Title</th>
+                      <th style={{ background: 'transparent', width: '120px' }}>Status</th>
+                      <th style={{ background: 'transparent', width: '180px' }}>Created At</th>
+                      <th style={{ background: 'transparent', textAlign: 'right', width: '120px' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loadingPosts ? (
+                      <tr>
+                        <td colSpan={4} style={{ textAlign: 'center', padding: '24px' }}>
+                          <Typography sx={{ opacity: 0.6 }}>Loading custom posts...</Typography>
+                        </td>
+                      </tr>
+                    ) : customPosts.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} style={{ textAlign: 'center', padding: '24px' }}>
+                          <Typography sx={{ opacity: 0.6 }}>No custom posts configured.</Typography>
+                        </td>
+                      </tr>
+                    ) : (
+                      customPosts.map((post) => (
+                        <tr key={post.id}>
+                          <td>
+                            <Typography level="title-sm" sx={{ cursor: 'pointer' }} onClick={() => handleOpenEditPost(post)}>
+                              {post.thai_title || '(Untitled Custom Post)'}
+                            </Typography>
+                            <Typography level="body-xs" sx={{ opacity: 0.5 }} noWrap>
+                              {post.thai_content ? (post.thai_content.substring(0, 80) + (post.thai_content.length > 80 ? '...' : '')) : 'No content'}
+                            </Typography>
+                          </td>
+                          <td>
+                            <Chip
+                              size="sm"
+                              variant="soft"
+                              color={
+                                post.status === 'posted'
+                                  ? 'success'
+                                  : post.status === 'pending'
+                                  ? 'warning'
+                                  : post.status === 'failed'
+                                  ? 'danger'
+                                  : 'neutral'
+                              }
+                            >
+                              {post.status === 'posted'
+                                ? 'Posted'
+                                : post.status === 'pending'
+                                ? 'Queued'
+                                : post.status === 'failed'
+                                ? 'Failed'
+                                : 'Draft'}
+                            </Chip>
+                          </td>
+                          <td>
+                            <Typography level="body-xs">
+                              {post.created_at ? new Date(post.created_at * 1000).toLocaleString() : 'N/A'}
+                            </Typography>
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            <IconButton size="sm" variant="plain" color="neutral" onClick={() => handleOpenEditPost(post)}>
+                              <Edit size={16} />
+                            </IconButton>
+                            <IconButton size="sm" variant="plain" color="danger" onClick={() => handleDeletePost(post.id)}>
+                              <Trash2 size={16} />
+                            </IconButton>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </Table>
+              </Sheet>
             </Stack>
-          </Sheet>
+          </Stack>
         </TabPanel>
       </Tabs>
 
       {/* Web Source Modal */}
       <SourceModal
-        open={showSourceForm || !!editingSource}
-        onClose={() => {
-          setShowSourceForm(false);
-          setEditingSource(null);
-        }}
-        source={editingSource}
+        open={!!editingSource}
+        onClose={() => setEditingSource(null)}
+        source={editingSource === 'new' ? null : editingSource}
         onSave={handleSaveSource}
       />
 
       {/* Email Subscription Modal */}
       <SubscriptionModal
-        open={showSubForm || !!editingSub}
-        onClose={() => {
-          setShowSubForm(false);
-          setEditingSub(null);
-        }}
-        subscription={editingSub}
+        open={!!editingSub}
+        onClose={() => setEditingSub(null)}
+        subscription={editingSub === 'new' ? null : editingSub}
         onSave={handleSaveSub}
       />
+
+      {/* Custom Facebook Post Modal */}
+      <Modal open={editorState.isOpen} onClose={() => setEditorState(prev => ({ ...prev, isOpen: false }))}>
+        <ModalDialog
+          sx={{
+            ...glassStyle,
+            minWidth: { xs: '90%', md: '850px' },
+            maxWidth: '95vw',
+            p: 3,
+            borderRadius: '20px'
+          }}
+        >
+          <DialogTitle sx={{ mb: 2 }}>
+            {editorState.post ? 'Edit Custom Post' : 'Create Custom Post'}
+          </DialogTitle>
+          <DialogContent>
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={3} sx={{ mt: 1 }}>
+              {/* Left Side: Editor */}
+              <Stack spacing={2} sx={{ flex: 1 }}>
+                <FormControl required>
+                  <FormLabel>Post Title (for management reference)</FormLabel>
+                  <Input
+                    value={editorState.title}
+                    onChange={(e) => setEditorState(prev => ({ ...prev, title: e.target.value }))}
+                    placeholder="e.g., Tesla Q2 Earnings Analysis"
+                    sx={{ borderRadius: '8px' }}
+                  />
+                </FormControl>
+                
+                <FormControl required>
+                  <FormLabel>Post Content (will be published to Facebook)</FormLabel>
+                  <textarea
+                    value={editorState.content}
+                    onChange={(e) => setEditorState(prev => ({ ...prev, content: e.target.value }))}
+                    placeholder="Write your Facebook post here..."
+                    rows={12}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      borderRadius: '8px',
+                      border: '1px solid rgba(255, 255, 255, 0.15)',
+                      backgroundColor: 'rgba(0, 0, 0, 0.2)',
+                      color: 'inherit',
+                      fontFamily: 'inherit',
+                      fontSize: '14px',
+                      resize: 'vertical',
+                      outline: 'none',
+                    }}
+                  />
+                  <Typography level="body-xs" sx={{ mt: 0.5, opacity: 0.6, alignSelf: 'flex-end' }}>
+                    Characters: {editorState.content.length}
+                  </Typography>
+                </FormControl>
+              </Stack>
+
+              {/* Right Side: Facebook Preview Simulation */}
+              <Box sx={{ width: { xs: '100%', md: '360px' } }}>
+                <FormLabel sx={{ mb: 1 }}>Facebook Post Preview</FormLabel>
+                <Sheet
+                  variant="outlined"
+                  sx={{
+                    borderRadius: '12px',
+                    bgcolor: 'background.surface',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
+                    p: 2,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    height: '100%',
+                    minHeight: '320px',
+                  }}
+                >
+                  {/* Header: Page Info */}
+                  <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1.5 }}>
+                    <Box
+                      sx={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: '50%',
+                        bgcolor: '#1877f2',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'white',
+                        boxShadow: '0 2px 8px rgba(24, 119, 242, 0.3)'
+                      }}
+                    >
+                      <OaktreeIcon size={24} color="white" />
+                    </Box>
+                    <Box>
+                      <Typography level="title-sm" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                        Oaktree Agent
+                      </Typography>
+                      <Stack direction="row" spacing={0.5} alignItems="center" sx={{ opacity: 0.5 }}>
+                        <Typography level="body-xs">Just now</Typography>
+                        <Typography level="body-xs">•</Typography>
+                        <Globe size={12} />
+                      </Stack>
+                    </Box>
+                  </Stack>
+
+                  {/* Body Content */}
+                  <Box
+                    sx={{
+                      flex: 1,
+                      overflowY: 'auto',
+                      maxHeight: '220px',
+                      whiteSpace: 'pre-wrap',
+                      fontSize: '14px',
+                      lineHeight: '1.5',
+                      color: 'text.primary',
+                      px: 0.5,
+                      mb: 2,
+                      '&::-webkit-scrollbar': { width: '4px' },
+                      '&::-webkit-scrollbar-thumb': { backgroundColor: 'rgba(255,255,255,0.1)', borderRadius: '4px' }
+                    }}
+                  >
+                    {editorState.content || <Typography sx={{ opacity: 0.3, fontStyle: 'italic' }}>Post content preview will appear here...</Typography>}
+                  </Box>
+
+                  <Divider sx={{ opacity: 0.08, mb: 1 }} />
+
+                  {/* Action Bar (Like, Comment, Share) */}
+                  <Stack direction="row" justifyContent="space-between" sx={{ opacity: 0.6, px: 1 }}>
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ cursor: 'default' }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" /></svg>
+                      <Typography level="body-xs">Like</Typography>
+                    </Stack>
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ cursor: 'default' }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>
+                      <Typography level="body-xs">Comment</Typography>
+                    </Stack>
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ cursor: 'default' }}>
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" /><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" /><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" /></svg>
+                      <Typography level="body-xs">Share</Typography>
+                    </Stack>
+                  </Stack>
+                </Sheet>
+              </Box>
+            </Stack>
+
+            <Stack direction="row" spacing={1.5} justifyContent="flex-end" sx={{ mt: 3 }}>
+              <Button variant="plain" color="neutral" onClick={() => setEditorState(prev => ({ ...prev, isOpen: false }))}>
+                Cancel
+              </Button>
+              <Button
+                variant="soft"
+                color="neutral"
+                onClick={() => handleSavePost('draft')}
+                loading={submittingPost}
+                sx={{ borderRadius: '8px' }}
+              >
+                Save Draft
+              </Button>
+              <Button
+                variant="solid"
+                color="warning"
+                onClick={() => handleSavePost('pending')}
+                loading={submittingPost}
+                sx={{ borderRadius: '8px' }}
+              >
+                Save & Queue
+              </Button>
+              {editorState.post && (
+                <Button
+                  variant="solid"
+                  color="success"
+                  onClick={() => handlePostNow(editorState.post.id)}
+                  loading={submittingPost}
+                  sx={{ borderRadius: '8px' }}
+                >
+                  Post Now
+                </Button>
+              )}
+            </Stack>
+          </DialogContent>
+        </ModalDialog>
+      </Modal>
     </Box>
   );
 }
