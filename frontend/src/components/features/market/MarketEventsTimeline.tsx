@@ -114,22 +114,35 @@ export default function MarketEventsTimeline({ inSidebar = false }: { inSidebar?
     if (!evt.metadata) return null;
     try {
       const meta = JSON.parse(evt.metadata);
+
+      const formatDateStr = (dateStr: string) => {
+        if (!dateStr) return '';
+        const dateObj = new Date(dateStr);
+        return isNaN(dateObj.getTime())
+          ? dateStr
+          : dateObj.toLocaleDateString(undefined, {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric'
+            });
+      };
+
       if (evt.event_type === 'dividend') {
         return (
           <Stack direction="row" spacing={2} sx={{ mt: 1.5, flexWrap: 'wrap', gap: 1 }}>
             {meta.payDate && (
               <Typography level="body-xs" sx={{ bgcolor: 'rgba(46, 204, 113, 0.1)', px: 1, py: 0.5, borderRadius: '4px', color: 'success.dark' }}>
-                Pay Date: <strong>{meta.payDate}</strong>
+                Pay Date: <strong>{formatDateStr(meta.payDate)}</strong>
               </Typography>
             )}
             {meta.recordDate && (
               <Typography level="body-xs" sx={{ bgcolor: 'rgba(0, 0, 0, 0.04)', px: 1, py: 0.5, borderRadius: '4px', color: 'text.secondary' }}>
-                Record Date: <strong>{meta.recordDate}</strong>
+                Record Date: <strong>{formatDateStr(meta.recordDate)}</strong>
               </Typography>
             )}
             {meta.declarationDate && (
               <Typography level="body-xs" sx={{ bgcolor: 'rgba(0, 0, 0, 0.04)', px: 1, py: 0.5, borderRadius: '4px', color: 'text.secondary' }}>
-                Declared: <strong>{meta.declarationDate}</strong>
+                Declared: <strong>{formatDateStr(meta.declarationDate)}</strong>
               </Typography>
             )}
           </Stack>

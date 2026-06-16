@@ -54,7 +54,69 @@ export async function fetchAndStoreMarketEvents(env: Env): Promise<void> {
 
 	for (const symbol of symbols) {
 		try {
-			// B. Yahoo Finance: Dividends and Splits
+			// B. Dividends from Nasdaq (with fallback to Yahoo Finance if Nasdaq fails)
+			let dividendsFetched = false;
+			try {
+				const nasdaqUrl = `https://api.nasdaq.com/api/quote/${encodeURIComponent(symbol)}/dividends?assetclass=stocks`;
+				const nasdaqRes = await fetch(nasdaqUrl, {
+					headers: {
+						'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+						'Accept': 'application/json, text/plain, */*'
+					}
+				});
+				if (nasdaqRes.ok) {
+					const nasdaqData = await nasdaqRes.json() as any;
+					const dividendRows = nasdaqData?.data?.dividends?.rows || [];
+					if (dividendRows.length > 0) {
+						const parseDate = (dStr: string) => {
+							if (!dStr || dStr === 'N/A') return null;
+							const parts = dStr.split('/');
+							if (parts.length === 3) {
+								return `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+							}
+							return null;
+						};
+
+						for (const row of dividendRows) {
+							const eventDate = parseDate(row.exOrEffDate);
+							if (eventDate && eventDate >= fromDateStrGeneral && eventDate <= toDateStrGeneral) {
+								const eventId = `div-${symbol}-${eventDate}`;
+								const cleanAmount = row.amount ? row.amount.replace('$', '') : '';
+								const title = `Dividend Declared: $${cleanAmount}`;
+								
+								const payDate = parseDate(row.paymentDate);
+								const recordDate = parseDate(row.recordDate);
+								const declarationDate = parseDate(row.declarationDate);
+								
+								let description = `Ex-Dividend Date: ${eventDate}`;
+								if (payDate) description += `, Pay Date: ${payDate}`;
+
+								const metadata = JSON.stringify({
+									amount: parseFloat(cleanAmount) || cleanAmount,
+									exDate: eventDate,
+									payDate: payDate,
+									recordDate: recordDate,
+									declarationDate: declarationDate
+								});
+
+								await env.DB.prepare(`
+									INSERT INTO market_events (id, symbol, event_type, event_date, title, description, url, metadata)
+									VALUES (?, ?, 'dividend', ?, ?, ?, NULL, ?)
+									ON CONFLICT(id) DO UPDATE SET
+										title=excluded.title,
+										description=excluded.description,
+										metadata=excluded.metadata
+								`).bind(eventId, symbol, eventDate, title, description, metadata).run();
+							}
+						}
+						dividendsFetched = true;
+					}
+				}
+			} catch (nasdaqError) {
+				console.error(`Error fetching dividends from Nasdaq for ${symbol}:`, nasdaqError);
+			}
+
+			// C. Yahoo Finance: Splits (and Dividends if Nasdaq fallback needed)
 			const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=3mo&events=div,split`;
 			try {
 				const yahooRes = await fetch(yahooUrl, {
@@ -66,8 +128,8 @@ export async function fetchAndStoreMarketEvents(env: Env): Promise<void> {
 					const data = await yahooRes.json() as any;
 					const events = data?.chart?.result?.[0]?.events;
 					if (events) {
-						// Process dividends
-						if (events.dividends) {
+						// Process dividends ONLY if not fetched from Nasdaq
+						if (events.dividends && !dividendsFetched) {
 							for (const key of Object.keys(events.dividends)) {
 								const item = events.dividends[key];
 								const eventDate = new Date(item.date * 1000).toISOString().split('T')[0];
@@ -120,7 +182,7 @@ export async function fetchAndStoreMarketEvents(env: Env): Promise<void> {
 					}
 				}
 			} catch (yahooError) {
-				console.error(`Error fetching/storing dividends & splits from Yahoo for ${symbol}:`, yahooError);
+				console.error(`Error fetching/storing splits (or dividends fallback) from Yahoo for ${symbol}:`, yahooError);
 			}
 
 			// D. Earnings Calendar
