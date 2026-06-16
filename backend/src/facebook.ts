@@ -2,7 +2,7 @@ import { Env } from './index';
 
 interface FacebookPostRow {
 	id: number;
-	source_type: 'daily_report' | 'email_digest';
+	source_type: 'daily_report' | 'email_digest' | 'custom';
 	source_id: number;
 	thai_title: string | null;
 	thai_content: string | null;
@@ -25,10 +25,39 @@ export async function queueFacebookPost(env: Env, sourceType: 'daily_report' | '
 export async function processPendingFacebookPosts(env: Env): Promise<number> {
 	console.log('Processing pending Facebook posts...');
 	
-	// 1. Get all pending posts
-	const { results: pendingPosts } = await env.DB.prepare(
-		"SELECT * FROM facebook_posts WHERE status = 'pending' ORDER BY created_at ASC LIMIT 3"
-	).all() as { results: unknown[] };
+	// Check pause settings
+	let dailyReportPaused = false;
+	let emailDigestPaused = false;
+	let customPaused = false;
+	try {
+		const dailyRow = await env.DB.prepare("SELECT value FROM system_settings WHERE key = 'pause_daily_report_facebook'").first() as { value: string } | null;
+		const emailRow = await env.DB.prepare("SELECT value FROM system_settings WHERE key = 'pause_email_digest_facebook'").first() as { value: string } | null;
+		const customRow = await env.DB.prepare("SELECT value FROM system_settings WHERE key = 'pause_custom_facebook'").first() as { value: string } | null;
+		dailyReportPaused = dailyRow?.value === '1';
+		emailDigestPaused = emailRow?.value === '1';
+		customPaused = customRow?.value === '1';
+	} catch (e) {
+		console.warn('Failed to fetch Facebook pause settings in processPendingFacebookPosts, defaulting to unpaused:', e);
+	}
+
+	// 1. Get all pending posts, filtering out paused types
+	let query = "SELECT * FROM facebook_posts WHERE status = 'pending'";
+	const conditions: string[] = [];
+	if (dailyReportPaused) {
+		conditions.push("source_type != 'daily_report'");
+	}
+	if (emailDigestPaused) {
+		conditions.push("source_type != 'email_digest'");
+	}
+	if (customPaused) {
+		conditions.push("source_type != 'custom'");
+	}
+	if (conditions.length > 0) {
+		query += " AND " + conditions.join(" AND ");
+	}
+	query += " ORDER BY created_at ASC LIMIT 3";
+
+	const { results: pendingPosts } = await env.DB.prepare(query).all() as { results: unknown[] };
 
 	const posts = pendingPosts as FacebookPostRow[];
 	if (posts.length === 0) {
@@ -46,53 +75,61 @@ export async function processPendingFacebookPosts(env: Env): Promise<number> {
 		).bind(post.id).run();
 
 		try {
-						// 2. Fetch original Thai content
-			let summary = '';
-			let takeaways: string[] = [];
-			let symbolOrCategory = '';
+			let thaiPost = '';
 			let subjectInfo = '';
 
-			if (post.source_type === 'daily_report') {
-				const report = await env.DB.prepare(
-					'SELECT symbol, summary, key_takeaways FROM daily_reports WHERE id = ?'
-				).bind(post.source_id).first() as { symbol: string, summary: string, key_takeaways: string } | null;
-
-				if (!report) {
-					throw new Error(`Daily report ID ${post.source_id} not found`);
-				}
-
-				takeaways = JSON.parse(report.key_takeaways || '[]');
-				summary = report.summary;
-				symbolOrCategory = report.symbol;
-				subjectInfo = `Stock Report: ${report.symbol}`;
-			} else if (post.source_type === 'email_digest') {
-				const digest = await env.DB.prepare(
-					'SELECT category, summary, key_takeaways FROM email_digests WHERE id = ?'
-				).bind(post.source_id).first() as { category: string, summary: string, key_takeaways: string } | null;
-
-				if (!digest) {
-					throw new Error(`Email digest ID ${post.source_id} not found`);
-				}
-
-				takeaways = JSON.parse(digest.key_takeaways || '[]');
-				summary = digest.summary;
-				symbolOrCategory = digest.category;
-				subjectInfo = `Market Digest: ${digest.category}`;
+			if (post.source_type === 'custom') {
+				thaiPost = post.thai_content || '';
+				subjectInfo = `Custom Post: ${post.thai_title || 'No Title'}`;
 			} else {
-				throw new Error(`Invalid source_type: ${post.source_type}`);
-			}
+				// 2. Fetch original Thai content
+				let summary = '';
+				let takeaways: string[] = [];
+				let symbolOrCategory = '';
 
-			// 3. Format and style Thai content for Facebook using Workers AI
-			console.log(`Formatting and styling Facebook post for Thai: ${subjectInfo}`);
-			const thaiPost = await formatAndStyleFacebookPost(env, {
-				type: post.source_type,
-				symbolOrCategory,
-				summary,
-				takeaways,
-			});
+				if (post.source_type === 'daily_report') {
+					const report = await env.DB.prepare(
+						'SELECT symbol, summary, key_takeaways FROM daily_reports WHERE id = ?'
+					).bind(post.source_id).first() as { symbol: string, summary: string, key_takeaways: string } | null;
 
-			if (!thaiPost) {
-				throw new Error('AI failed to generate Thai translation content');
+					if (!report) {
+						throw new Error(`Daily report ID ${post.source_id} not found`);
+					}
+
+					takeaways = JSON.parse(report.key_takeaways || '[]');
+					summary = report.summary;
+					symbolOrCategory = report.symbol;
+					subjectInfo = `Stock Report: ${report.symbol}`;
+				} else if (post.source_type === 'email_digest') {
+					const digest = await env.DB.prepare(
+						'SELECT category, summary, key_takeaways FROM email_digests WHERE id = ?'
+					).bind(post.source_id).first() as { category: string, summary: string, key_takeaways: string } | null;
+
+					if (!digest) {
+						throw new Error(`Email digest ID ${post.source_id} not found`);
+					}
+
+					takeaways = JSON.parse(digest.key_takeaways || '[]');
+					summary = digest.summary;
+					symbolOrCategory = digest.category;
+					subjectInfo = `Market Digest: ${digest.category}`;
+				} else {
+					throw new Error(`Invalid source_type: ${post.source_type}`);
+				}
+
+				// 3. Format and style Thai content for Facebook using Workers AI
+				console.log(`Formatting and styling Facebook post for Thai: ${subjectInfo}`);
+				const generatedContent = await formatAndStyleFacebookPost(env, {
+					type: post.source_type,
+					symbolOrCategory,
+					summary,
+					takeaways,
+				});
+
+				if (!generatedContent) {
+					throw new Error('AI failed to generate Thai translation content');
+				}
+				thaiPost = generatedContent;
 			}
 
 			// 4. Publish to Facebook Graph API
@@ -156,24 +193,52 @@ export async function processPendingFacebookPosts(env: Env): Promise<number> {
 export async function syncAndProcessFacebookPosts(env: Env): Promise<number> {
 	console.log('Syncing and processing Facebook posts...');
 	
+	// Check pause settings
+	let dailyReportPaused = false;
+	let emailDigestPaused = false;
 	try {
-		// 1. Discover and queue new daily reports from the last 24h
+		// Ensure system_settings table exists
 		await env.DB.prepare(`
-			INSERT OR IGNORE INTO facebook_posts (source_type, source_id, status)
-			SELECT 'daily_report', id, 'pending'
-			FROM daily_reports
-			WHERE created_at > datetime('now', '-1 day')
-			  AND id NOT IN (SELECT source_id FROM facebook_posts WHERE source_type = 'daily_report')
+			CREATE TABLE IF NOT EXISTS system_settings (
+				key TEXT PRIMARY KEY,
+				value TEXT NOT NULL
+			)
 		`).run();
 
+		const dailyRow = await env.DB.prepare("SELECT value FROM system_settings WHERE key = 'pause_daily_report_facebook'").first() as { value: string } | null;
+		const emailRow = await env.DB.prepare("SELECT value FROM system_settings WHERE key = 'pause_email_digest_facebook'").first() as { value: string } | null;
+		dailyReportPaused = dailyRow?.value === '1';
+		emailDigestPaused = emailRow?.value === '1';
+	} catch (e) {
+		console.warn('Failed to fetch Facebook pause settings in syncAndProcessFacebookPosts, defaulting to unpaused:', e);
+	}
+
+	try {
+		// 1. Discover and queue new daily reports from the last 24h
+		if (!dailyReportPaused) {
+			await env.DB.prepare(`
+				INSERT OR IGNORE INTO facebook_posts (source_type, source_id, status)
+				SELECT 'daily_report', id, 'pending'
+				FROM daily_reports
+				WHERE created_at > datetime('now', '-1 day')
+				  AND id NOT IN (SELECT source_id FROM facebook_posts WHERE source_type = 'daily_report')
+			`).run();
+		} else {
+			console.log('Facebook posting for daily reports is paused. Skipping discovery.');
+		}
+
 		// 2. Discover and queue new email digests from the last 24h
-		await env.DB.prepare(`
-			INSERT OR IGNORE INTO facebook_posts (source_type, source_id, status)
-			SELECT 'email_digest', id, 'pending'
-			FROM email_digests
-			WHERE created_at > datetime('now', '-1 day')
-			  AND id NOT IN (SELECT source_id FROM facebook_posts WHERE source_type = 'email_digest')
-		`).run();
+		if (!emailDigestPaused) {
+			await env.DB.prepare(`
+				INSERT OR IGNORE INTO facebook_posts (source_type, source_id, status)
+				SELECT 'email_digest', id, 'pending'
+				FROM email_digests
+				WHERE created_at > datetime('now', '-1 day')
+				  AND id NOT IN (SELECT source_id FROM facebook_posts WHERE source_type = 'email_digest')
+			`).run();
+		} else {
+			console.log('Facebook posting for email digests is paused. Skipping discovery.');
+		}
 
 	} catch (e) {
 		console.error('Failed to sync new daily reports/digests into facebook_posts queue:', e);

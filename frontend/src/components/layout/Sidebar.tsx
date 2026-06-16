@@ -16,7 +16,7 @@ export default function Sidebar({ activeTab, setActiveTab, reportsCount, collaps
     { id: 'dashboard', label: t('sidebar.dashboard'), icon: <LayoutDashboard size={20} /> },
     { id: 'market', label: t('sidebar.market_intelligence'), icon: <BarChart3 size={20} /> },
     { id: 'watchlist', label: t('sidebar.watchlist'), icon: <TrendingUp size={20} /> },
-    { id: 'sources', label: t('sidebar.news_sources'), icon: <Search size={20} /> },
+    { id: 'command-center', label: t('sidebar.command_center'), icon: <Search size={20} /> },
     { id: 'agent', label: t('sidebar.agent_chat'), icon: <Bot size={20} /> },
     { id: 'db-agent', label: t('sidebar.db_agent'), icon: <Database size={20} /> },
     { id: 'about', label: t('sidebar.about_oaktree'), icon: <Info size={20} /> },
