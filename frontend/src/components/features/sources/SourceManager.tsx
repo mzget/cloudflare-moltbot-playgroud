@@ -24,7 +24,8 @@ import {
   TabList,
   Tab,
   TabPanel,
-  Alert
+  Alert,
+  Divider
 } from '@mui/joy';
 import {
   Globe,
@@ -44,6 +45,24 @@ import {
 import { API_BASE_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
 import ManualTrigger from './ManualTrigger';
+
+// Custom Facebook Icon component using standard Lucide SVG path
+const Facebook = (props: any) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width={props.size || 24}
+    height={props.size || 24}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
+  </svg>
+);
 
 export default function SourceManager() {
   const [index, setIndex] = useState(0);
@@ -78,10 +97,67 @@ export default function SourceManager() {
   const [showSubForm, setShowSubForm] = useState(false);
   const [editingSub, setEditingSub] = useState<EmailSubscription | null>(null);
 
+  // Facebook Posting settings
+  const [pauseDailyReportFacebook, setPauseDailyReportFacebook] = useState(false);
+  const [pauseEmailDigestFacebook, setPauseEmailDigestFacebook] = useState(false);
+  const [updatingSettings, setUpdatingSettings] = useState(false);
+
+  const fetchSettings = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/settings`);
+      if (res.ok) {
+        const settings = await res.json();
+        setPauseDailyReportFacebook(settings.pause_daily_report_facebook === '1');
+        setPauseEmailDigestFacebook(settings.pause_email_digest_facebook === '1');
+      }
+    } catch (e) {
+      console.error('Failed to fetch system settings', e);
+    }
+  };
+
+  const handleSettingToggle = async (key: string, currentValue: boolean) => {
+    const newValue = !currentValue;
+    if (key === 'pause_daily_report_facebook') {
+      setPauseDailyReportFacebook(newValue);
+    } else if (key === 'pause_email_digest_facebook') {
+      setPauseEmailDigestFacebook(newValue);
+    }
+
+    try {
+      setUpdatingSettings(true);
+      const res = await fetch(`${API_BASE_URL}/api/settings`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [key]: newValue ? '1' : '0' }),
+      });
+      if (!res.ok) {
+        // Revert on failure
+        if (key === 'pause_daily_report_facebook') {
+          setPauseDailyReportFacebook(currentValue);
+        } else if (key === 'pause_email_digest_facebook') {
+          setPauseEmailDigestFacebook(currentValue);
+        }
+        alert('Failed to update system setting');
+      }
+    } catch (e) {
+      // Revert on failure
+      if (key === 'pause_daily_report_facebook') {
+        setPauseDailyReportFacebook(currentValue);
+      } else if (key === 'pause_email_digest_facebook') {
+        setPauseEmailDigestFacebook(currentValue);
+      }
+      console.error(e);
+      alert('Failed to update system setting');
+    } finally {
+      setUpdatingSettings(false);
+    }
+  };
+
   useEffect(() => {
     fetchSources();
     checkGmailStatus();
     fetchSubscriptions();
+    fetchSettings();
 
     const handleConnected = () => {
       checkGmailStatus();
@@ -203,6 +279,10 @@ export default function SourceManager() {
           <Tab disableIndicator sx={{ px: 3, borderRadius: '8px' }}>
             <Mail size={16} style={{ marginRight: 8 }} />
             Gmail Newsletters
+          </Tab>
+          <Tab disableIndicator sx={{ px: 3, borderRadius: '8px' }}>
+            <Facebook size={16} style={{ marginRight: 8 }} />
+            Facebook Page
           </Tab>
         </TabList>
 
@@ -501,6 +581,82 @@ export default function SourceManager() {
               </Table>
             </Sheet>
           </Stack>
+        </TabPanel>
+
+        <TabPanel value={2} sx={{ p: 0 }}>
+          {/* Tab 3: Facebook Page Settings */}
+          <Sheet
+            variant="outlined"
+            sx={{
+              p: 3,
+              borderRadius: '16px',
+              bgcolor: 'background.surface',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+              mb: 4,
+              maxWidth: '600px'
+            }}
+          >
+            <Stack spacing={3}>
+              <Stack direction="row" spacing={2} alignItems="center">
+                <Box
+                  sx={{
+                    p: 1.5,
+                    borderRadius: '12px',
+                    bgcolor: 'rgba(24, 119, 242, 0.15)',
+                    color: '#1877f2',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  <Facebook size={24} />
+                </Box>
+                <Box>
+                  <Typography level="title-md">Facebook Auto-Posting Controls</Typography>
+                  <Typography level="body-sm" sx={{ opacity: 0.6 }}>
+                    Manage auto-publishing of summaries and digests to the Facebook page.
+                  </Typography>
+                </Box>
+              </Stack>
+
+              <Divider sx={{ opacity: 0.1 }} />
+
+              <Stack spacing={2}>
+                <FormControl orientation="horizontal" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Box>
+                    <FormLabel sx={{ fontWeight: 700 }}>Pause Daily Reports Posting</FormLabel>
+                    <Typography level="body-xs" sx={{ opacity: 0.5 }}>
+                      When enabled, daily stock reports will not be queued or published to Facebook.
+                    </Typography>
+                  </Box>
+                  <Switch
+                    checked={pauseDailyReportFacebook}
+                    onChange={() => handleSettingToggle('pause_daily_report_facebook', pauseDailyReportFacebook)}
+                    disabled={updatingSettings}
+                    color={pauseDailyReportFacebook ? "danger" : "neutral"}
+                  />
+                </FormControl>
+
+                <Divider sx={{ opacity: 0.05 }} />
+
+                <FormControl orientation="horizontal" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Box>
+                    <FormLabel sx={{ fontWeight: 700 }}>Pause Email Digests Posting</FormLabel>
+                    <Typography level="body-xs" sx={{ opacity: 0.5 }}>
+                      When enabled, category email digests will not be queued or published to Facebook.
+                    </Typography>
+                  </Box>
+                  <Switch
+                    checked={pauseEmailDigestFacebook}
+                    onChange={() => handleSettingToggle('pause_email_digest_facebook', pauseEmailDigestFacebook)}
+                    disabled={updatingSettings}
+                    color={pauseEmailDigestFacebook ? "danger" : "neutral"}
+                  />
+                </FormControl>
+              </Stack>
+            </Stack>
+          </Sheet>
         </TabPanel>
       </Tabs>
 

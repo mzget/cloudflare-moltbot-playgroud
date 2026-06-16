@@ -66,7 +66,7 @@ export default function RoutesLayout() {
       const code = searchParams.get('code');
       if (code) {
         // Clear parameters immediately to avoid double execution on reload
-        const newUrl = window.location.pathname + '?tab=sources';
+        const newUrl = window.location.pathname + '?tab=command-center';
         window.history.replaceState({}, document.title, newUrl);
 
         const exchangeOAuth = async () => {
@@ -301,7 +301,7 @@ export default function RoutesLayout() {
           {activeTab === 'watchlist' && <Watchlist />}
           {activeTab === 'agent' && <KnowledgeChat />}
           {activeTab === 'db-agent' && <DatabaseChat />}
-          {activeTab === 'sources' && <SourceManager />}
+          {activeTab === 'command-center' && <SourceManager />}
           {activeTab === 'about' && (
             <Sheet sx={{ ...glassStyle, p: 4 }}>
               <Typography level="h2" sx={{ mb: 2 }}>{t('about.title')}</Typography>

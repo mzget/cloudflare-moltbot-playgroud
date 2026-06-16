@@ -25,10 +25,33 @@ export async function queueFacebookPost(env: Env, sourceType: 'daily_report' | '
 export async function processPendingFacebookPosts(env: Env): Promise<number> {
 	console.log('Processing pending Facebook posts...');
 	
-	// 1. Get all pending posts
-	const { results: pendingPosts } = await env.DB.prepare(
-		"SELECT * FROM facebook_posts WHERE status = 'pending' ORDER BY created_at ASC LIMIT 3"
-	).all() as { results: unknown[] };
+	// Check pause settings
+	let dailyReportPaused = false;
+	let emailDigestPaused = false;
+	try {
+		const dailyRow = await env.DB.prepare("SELECT value FROM system_settings WHERE key = 'pause_daily_report_facebook'").first() as { value: string } | null;
+		const emailRow = await env.DB.prepare("SELECT value FROM system_settings WHERE key = 'pause_email_digest_facebook'").first() as { value: string } | null;
+		dailyReportPaused = dailyRow?.value === '1';
+		emailDigestPaused = emailRow?.value === '1';
+	} catch (e) {
+		console.warn('Failed to fetch Facebook pause settings in processPendingFacebookPosts, defaulting to unpaused:', e);
+	}
+
+	// 1. Get all pending posts, filtering out paused types
+	let query = "SELECT * FROM facebook_posts WHERE status = 'pending'";
+	const conditions: string[] = [];
+	if (dailyReportPaused) {
+		conditions.push("source_type != 'daily_report'");
+	}
+	if (emailDigestPaused) {
+		conditions.push("source_type != 'email_digest'");
+	}
+	if (conditions.length > 0) {
+		query += " AND " + conditions.join(" AND ");
+	}
+	query += " ORDER BY created_at ASC LIMIT 3";
+
+	const { results: pendingPosts } = await env.DB.prepare(query).all() as { results: unknown[] };
 
 	const posts = pendingPosts as FacebookPostRow[];
 	if (posts.length === 0) {
@@ -156,24 +179,52 @@ export async function processPendingFacebookPosts(env: Env): Promise<number> {
 export async function syncAndProcessFacebookPosts(env: Env): Promise<number> {
 	console.log('Syncing and processing Facebook posts...');
 	
+	// Check pause settings
+	let dailyReportPaused = false;
+	let emailDigestPaused = false;
 	try {
-		// 1. Discover and queue new daily reports from the last 24h
+		// Ensure system_settings table exists
 		await env.DB.prepare(`
-			INSERT OR IGNORE INTO facebook_posts (source_type, source_id, status)
-			SELECT 'daily_report', id, 'pending'
-			FROM daily_reports
-			WHERE created_at > datetime('now', '-1 day')
-			  AND id NOT IN (SELECT source_id FROM facebook_posts WHERE source_type = 'daily_report')
+			CREATE TABLE IF NOT EXISTS system_settings (
+				key TEXT PRIMARY KEY,
+				value TEXT NOT NULL
+			)
 		`).run();
 
+		const dailyRow = await env.DB.prepare("SELECT value FROM system_settings WHERE key = 'pause_daily_report_facebook'").first() as { value: string } | null;
+		const emailRow = await env.DB.prepare("SELECT value FROM system_settings WHERE key = 'pause_email_digest_facebook'").first() as { value: string } | null;
+		dailyReportPaused = dailyRow?.value === '1';
+		emailDigestPaused = emailRow?.value === '1';
+	} catch (e) {
+		console.warn('Failed to fetch Facebook pause settings in syncAndProcessFacebookPosts, defaulting to unpaused:', e);
+	}
+
+	try {
+		// 1. Discover and queue new daily reports from the last 24h
+		if (!dailyReportPaused) {
+			await env.DB.prepare(`
+				INSERT OR IGNORE INTO facebook_posts (source_type, source_id, status)
+				SELECT 'daily_report', id, 'pending'
+				FROM daily_reports
+				WHERE created_at > datetime('now', '-1 day')
+				  AND id NOT IN (SELECT source_id FROM facebook_posts WHERE source_type = 'daily_report')
+			`).run();
+		} else {
+			console.log('Facebook posting for daily reports is paused. Skipping discovery.');
+		}
+
 		// 2. Discover and queue new email digests from the last 24h
-		await env.DB.prepare(`
-			INSERT OR IGNORE INTO facebook_posts (source_type, source_id, status)
-			SELECT 'email_digest', id, 'pending'
-			FROM email_digests
-			WHERE created_at > datetime('now', '-1 day')
-			  AND id NOT IN (SELECT source_id FROM facebook_posts WHERE source_type = 'email_digest')
-		`).run();
+		if (!emailDigestPaused) {
+			await env.DB.prepare(`
+				INSERT OR IGNORE INTO facebook_posts (source_type, source_id, status)
+				SELECT 'email_digest', id, 'pending'
+				FROM email_digests
+				WHERE created_at > datetime('now', '-1 day')
+				  AND id NOT IN (SELECT source_id FROM facebook_posts WHERE source_type = 'email_digest')
+			`).run();
+		} else {
+			console.log('Facebook posting for email digests is paused. Skipping discovery.');
+		}
 
 	} catch (e) {
 		console.error('Failed to sync new daily reports/digests into facebook_posts queue:', e);

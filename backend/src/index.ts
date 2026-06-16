@@ -1,4 +1,4 @@
-﻿import puppeteer, { BrowserWorker } from '@cloudflare/puppeteer';
+import puppeteer, { BrowserWorker } from '@cloudflare/puppeteer';
 import { runCrawler } from './crawler';
 import { generateDailySummary } from './summarizer';
 import { sendDailyEmailReport } from './email';
@@ -299,10 +299,65 @@ app.put('/api/sources', async (c) => {
 });
 
 app.delete('/api/sources', async (c) => {
-	const id = c.req.query('id');
-	await c.env.DB.prepare('DELETE FROM news_sources WHERE id = ?').bind(id).run();
-	return c.text('Source removed');
+	try {
+		const id = c.req.query('id');
+		await c.env.DB.prepare('DELETE FROM news_sources WHERE id = ?').bind(id).run();
+		return c.text('Source removed');
+	} catch (e) {
+		return c.text(`Failed to remove source: ${(e as any).message}`, 500);
+	}
 });
+
+// Helper: Ensure system_settings table exists and is seeded with defaults
+async function ensureSystemSettingsTable(db: D1Database) {
+	await db.prepare(`
+		CREATE TABLE IF NOT EXISTS system_settings (
+			key TEXT PRIMARY KEY,
+			value TEXT NOT NULL
+		)
+	`).run();
+	
+	// Seed default values if they do not exist
+	await db.prepare(`
+		INSERT OR IGNORE INTO system_settings (key, value) VALUES 
+		('pause_daily_report_facebook', '0'),
+		('pause_email_digest_facebook', '0')
+	`).run();
+}
+
+// API: System Settings
+app.get('/api/settings', async (c) => {
+	try {
+		await ensureSystemSettingsTable(c.env.DB);
+		const { results } = await c.env.DB.prepare('SELECT * FROM system_settings').all();
+		
+		// Convert results array to key-value record
+		const settings: Record<string, string> = {};
+		for (const row of (results || []) as any[]) {
+			settings[row.key] = row.value;
+		}
+		return c.json(settings);
+	} catch (e) {
+		return c.json({ error: (e as any).message }, 500);
+	}
+});
+
+app.post('/api/settings', async (c) => {
+	try {
+		await ensureSystemSettingsTable(c.env.DB);
+		const body = await c.req.json() as Record<string, string>;
+		
+		for (const [key, value] of Object.entries(body)) {
+			await c.env.DB.prepare('INSERT OR REPLACE INTO system_settings (key, value) VALUES (?, ?)')
+				.bind(key, value)
+				.run();
+		}
+		return c.json({ success: true });
+	} catch (e) {
+		return c.json({ error: (e as any).message }, 500);
+	}
+});
+
 
 // API: Trigger Crawler (Chains to Summarizer)
 app.get('/api/crawl', async (c) => {
