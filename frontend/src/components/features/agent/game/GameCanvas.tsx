@@ -68,7 +68,7 @@ const INITIAL_NPCS: NPC[] = [
     worldX: 12 * TILE_SIZE, worldY: 7 * TILE_SIZE,
     width: TILE_SIZE, height: TILE_SIZE,
     spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/dragonite.gif',
-    responsibility: 'Pulls Watchlist Prices', dialogue: ['Cron: 0 * * * * (Every hour)', 'Job: Pull watchlist prices from Finnhub.', 'Updates price & valuation tables in D1.'],
+    responsibility: 'Pulls Watchlist Prices', dialogue: ['Cron: 0 * * * * (Every hour)', 'Job: Pull quotes for all symbols (up to 30).', 'Fundamental metrics updated daily (max 5/run).', 'Updates price & preserves metrics in D1 when skipped.'],
     isSolid: true, animationType: 'bounce',
     metadata: { type: 'scheduled-job', endpoint: '/api/test-market-stats', triggerLabel: 'Fetch Stats', schedule: 'Hourly' },
   },
