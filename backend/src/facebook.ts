@@ -358,3 +358,59 @@ ${contextContent}
 
 	return finalPost;
 }
+
+export async function styleCustomPost(
+	env: Env,
+	content: string,
+	tone: string,
+	instructions?: string
+): Promise<string> {
+	let toneDescription = '';
+	if (tone === 'howard_marks') {
+		toneDescription = `Write in the philosophical style of Howard Marks' memos: focus on risk awareness, market cycles, second-level thinking, and long-term perspective. Use moderate emojis and professional tone.`;
+	} else if (tone === 'engaging') {
+		toneDescription = `Format the text to be highly engaging and readable for a social media audience on Facebook. Use friendly phrasing, highlight key points with fun/business emojis, add spacing/dividers to make it highly scannable, and include a call to action or engaging question at the end. Focus heavily on emojis and icons to engage with followers.`;
+	} else if (tone === 'analytical') {
+		toneDescription = `Format the text in a professional, structured equity research or business analyst style. Use clear headers, bullet points, and highlight key metrics or figures. Keep the tone objective and informative.`;
+	} else if (tone === 'concise') {
+		toneDescription = `Summarize and format the text into a few short, punchy bulletins or takeaways. Minimize fluff, use clear separators, and keep it extremely fast and easy to read.`;
+	} else {
+		toneDescription = `Format the text to be engaging and readable for a Facebook audience, using appropriate spacing and emojis.`;
+	}
+
+	const systemPrompt = `You are a social media manager and financial copywriter for the Oaktree Agent Facebook Page.
+Your task is to take the user's raw financial/business draft content and rewrite/re-format it into an interesting, engaging, and professional Facebook post.
+
+CRITICAL INSTRUCTIONS:
+1. NO LOSS OF ORIGINAL CONTENT: You MUST preserve all original facts, numbers, percentages, dates, symbols, companies, and key statements. Do NOT omit, summarize out, or lose any factual information from the original draft.
+2. Tone/Style requirement: ${toneDescription}
+3. Emojis and Icons: Focus on using expressive, context-appropriate emojis and icons (e.g. 📊, 📈, 📉, 💡, 🔍, 🚀, 💎, ⚠️, 📅) at the start of headings, points, and next to key numbers to hook the reader and maximize follower engagement.
+4. Spacing: Use double line breaks between paragraphs/bullet points to make the post highly readable on mobile screens.
+5. Language: You MUST output the final post in the same language as the input content (e.g. if the draft is in Thai, the output must be in Thai. If in English, the output must be in English).
+6. Filler text: Output ONLY the final styled post content. Do NOT include any introductory or concluding comments (like "Here is the styled post:").
+${instructions ? `7. Special Instructions: Follow these additional directions strictly: "${instructions}"` : ''}
+`;
+
+	let styledContent = '';
+	try {
+		const response = await env.AI.run('@cf/meta/llama-3.1-8b-instruct-fp8', {
+			messages: [
+				{ role: 'system', content: systemPrompt },
+				{ role: 'user', content: `Please style the following content:\n\n${content}` }
+			],
+			max_tokens: 2048,
+		} as any);
+
+		styledContent = (response as any).choices?.[0]?.message?.content || response.response || '';
+		styledContent = styledContent.trim();
+	} catch (e) {
+		console.error('Workers AI custom post styling failed:', e);
+		throw new Error('AI failed to style custom post content: ' + (e as any).message);
+	}
+
+	if (!styledContent) {
+		throw new Error('AI failed to style custom post content');
+	}
+
+	return styledContent;
+}

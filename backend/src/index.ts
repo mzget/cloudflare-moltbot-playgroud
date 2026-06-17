@@ -8,7 +8,7 @@ import { checkAlertRules } from './alerts';
 import { getAuthUrl, exchangeCodeForTokens } from './gmail';
 import { syncAndIngestEmails, generateEmailDigests } from './emailSummarizer';
 import { checkAuth, fetchGoogleUserProfile, isEmailAuthorized, signJwt, getUserLoginAuthUrl, encryptToken } from './auth';
-import { syncAndProcessFacebookPosts } from './facebook';
+import { syncAndProcessFacebookPosts, styleCustomPost } from './facebook';
 import { recordDailyPortfolioHistory, getPortfolioHistory } from './portfolioHistory';
 import { sortTransactions } from './portfolioUtils';
 import { calculatePerformanceComparison } from './historicalPrices';
@@ -899,6 +899,20 @@ app.post('/api/facebook/posts', async (c) => {
       "INSERT INTO facebook_posts (source_type, source_id, thai_title, thai_content, status) VALUES ('custom', 0, ?, ?, 'draft')"
     ).bind(title || '', content || '').run();
     return c.json({ success: true, message: 'Custom post draft created' });
+  } catch (e) {
+    return c.json({ error: (e as any).message }, 500);
+  }
+});
+
+// API: Style Custom Facebook Post using Workers AI
+app.post('/api/facebook/posts/style', async (c) => {
+  try {
+    const { content, tone, instructions } = await c.req.json() as any;
+    if (!content) {
+      return c.json({ error: 'Content is required' }, 400);
+    }
+    const styledContent = await styleCustomPost(c.env, content, tone || 'engaging', instructions);
+    return c.json({ success: true, styledContent });
   } catch (e) {
     return c.json({ error: (e as any).message }, 500);
   }

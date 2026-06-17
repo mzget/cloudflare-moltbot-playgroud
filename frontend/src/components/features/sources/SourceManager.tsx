@@ -26,7 +26,9 @@ import {
   TabPanel,
   Alert,
   Divider,
-  Grid
+  Grid,
+  Select,
+  Option
 } from '@mui/joy';
 import {
   Globe,
@@ -41,7 +43,8 @@ import {
   RefreshCw,
   Sliders,
   Play,
-  Sparkles
+  Sparkles,
+  RotateCcw
 } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
@@ -186,6 +189,53 @@ export default function SourceManager() {
   });
   const [submittingPost, setSubmittingPost] = useState(false);
 
+  // AI Custom Post Styling States
+  const [stylingTone, setStylingTone] = useState<'howard_marks' | 'engaging' | 'analytical' | 'concise'>('engaging');
+  const [stylingInstructions, setStylingInstructions] = useState('');
+  const [stylingLoading, setStylingLoading] = useState(false);
+  const [originalContent, setOriginalContent] = useState('');
+
+  const handleStyleContent = async () => {
+    if (!editorState.content.trim()) return;
+    try {
+      setStylingLoading(true);
+      const res = await fetch(`${API_BASE_URL}/api/facebook/posts/style`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: editorState.content,
+          tone: stylingTone,
+          instructions: stylingInstructions
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.styledContent) {
+        setOriginalContent(editorState.content);
+        setEditorState(prev => ({
+          ...prev,
+          content: data.styledContent
+        }));
+      } else {
+        alert(`Failed to style content: ${data.error || 'Unknown error'}`);
+      }
+    } catch (e) {
+      console.error('Failed to style custom post content', e);
+      alert('Error styling custom post content');
+    } finally {
+      setStylingLoading(false);
+    }
+  };
+
+  const handleUndoStyling = () => {
+    if (originalContent) {
+      setEditorState(prev => ({
+        ...prev,
+        content: originalContent
+      }));
+      setOriginalContent('');
+    }
+  };
+
   const fetchCustomPosts = async () => {
     try {
       setLoadingPosts(true);
@@ -208,6 +258,9 @@ export default function SourceManager() {
       title: '',
       content: ''
     });
+    setOriginalContent('');
+    setStylingInstructions('');
+    setStylingTone('engaging');
   };
 
   const handleOpenEditPost = (post: any) => {
@@ -217,6 +270,9 @@ export default function SourceManager() {
       title: post.thai_title || '',
       content: post.thai_content || ''
     });
+    setOriginalContent('');
+    setStylingInstructions('');
+    setStylingTone('engaging');
   };
 
   const handleSavePost = async (status: 'draft' | 'pending') => {
@@ -1001,6 +1057,86 @@ export default function SourceManager() {
                     sx={{ borderRadius: '8px' }}
                   />
                 </FormControl>
+
+                {/* AI Styling Assistant Section */}
+                <Sheet
+                  variant="outlined"
+                  sx={{
+                    p: 2,
+                    borderRadius: '12px',
+                    bgcolor: 'rgba(255, 255, 255, 0.02)',
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 1.5
+                  }}
+                >
+                  <Stack direction="row" alignItems="center" spacing={1}>
+                    <Sparkles size={16} style={{ color: '#e91e63' }} />
+                    <Typography level="title-sm" sx={{ fontWeight: 700 }}>
+                      AI Facebook Styling Assistant
+                    </Typography>
+                  </Stack>
+                  <Typography level="body-xs" sx={{ opacity: 0.6 }}>
+                    Convert your raw draft into an engaging, formatted post rich in emojis and structure.
+                  </Typography>
+
+                  <Grid container spacing={1.5} alignItems="flex-end">
+                    <Grid xs={12} sm={4}>
+                      <FormControl size="sm">
+                        <FormLabel>Style Tone</FormLabel>
+                        <Select
+                          value={stylingTone}
+                          onChange={(_, newValue) => setStylingTone(newValue as any)}
+                          sx={{ borderRadius: '8px' }}
+                        >
+                          <Option value="engaging">🔥 Engaging & Buzzing</Option>
+                          <Option value="howard_marks">📝 Howard Marks Style</Option>
+                          <Option value="analytical">📊 Professional Analyst</Option>
+                          <Option value="concise">📰 Concise Bulletins</Option>
+                        </Select>
+                      </FormControl>
+                    </Grid>
+                    <Grid xs={12} sm={8}>
+                      <FormControl size="sm">
+                        <FormLabel>Custom Instructions (Optional)</FormLabel>
+                        <Input
+                          value={stylingInstructions}
+                          onChange={(e) => setStylingInstructions(e.target.value)}
+                          placeholder="e.g. emphasize growth numbers, keep it brief"
+                          sx={{ borderRadius: '8px' }}
+                        />
+                      </FormControl>
+                    </Grid>
+                  </Grid>
+
+                  <Stack direction="row" spacing={1.5} justifyContent="flex-end">
+                    {originalContent && (
+                      <Button
+                        size="sm"
+                        variant="plain"
+                        color="neutral"
+                        startDecorator={<RotateCcw size={16} />}
+                        onClick={handleUndoStyling}
+                        disabled={stylingLoading}
+                      >
+                        Undo Styling
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="solid"
+                      color="primary"
+                      startDecorator={<Sparkles size={16} />}
+                      onClick={handleStyleContent}
+                      loading={stylingLoading}
+                      disabled={!editorState.content.trim()}
+                      sx={{ borderRadius: '8px' }}
+                    >
+                      Style with AI
+                    </Button>
+                  </Stack>
+                </Sheet>
                 
                 <FormControl required>
                   <FormLabel>Post Content (will be published to Facebook)</FormLabel>

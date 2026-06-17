@@ -45,11 +45,10 @@ export default function Sidebar({ activeTab, setActiveTab, reportsCount, collaps
           {menuItems.map((item) => (
             <ListItem key={item.id}>
               <Tooltip 
-                title={item.label} 
+                title={collapsed ? item.label : ""} 
                 placement="right" 
                 variant="solid"
                 arrow
-                disabled={!collapsed}
                 sx={{ 
                   borderRadius: '8px', 
                   fontWeight: 600,
