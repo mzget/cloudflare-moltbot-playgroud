@@ -25,7 +25,8 @@ import {
   Tab,
   TabPanel,
   Alert,
-  Divider
+  Divider,
+  Grid
 } from '@mui/joy';
 import {
   Globe,
@@ -728,8 +729,7 @@ export default function SourceManager() {
                 borderRadius: '16px',
                 bgcolor: 'background.surface',
                 border: '1px solid rgba(255, 255, 255, 0.08)',
-                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
-                maxWidth: '600px'
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)'
               }}
             >
               <Stack spacing={3}>
@@ -757,56 +757,103 @@ export default function SourceManager() {
 
                 <Divider sx={{ opacity: 0.1 }} />
 
-                <Stack spacing={2}>
-                  <FormControl orientation="horizontal" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Box>
-                      <FormLabel sx={{ fontWeight: 700 }}>Pause Daily Reports Posting</FormLabel>
-                      <Typography level="body-xs" sx={{ opacity: 0.5 }}>
-                        When enabled, daily stock reports will not be queued or published to Facebook.
-                      </Typography>
-                    </Box>
-                    <Switch
-                      checked={facebookSettings.pauseDailyReportFacebook}
-                      onChange={() => handleSettingToggle('pause_daily_report_facebook', facebookSettings.pauseDailyReportFacebook)}
-                      disabled={updatingSettings}
-                      color={facebookSettings.pauseDailyReportFacebook ? "danger" : "neutral"}
-                    />
-                  </FormControl>
+                <Grid container spacing={3}>
+                  <Grid xs={12} md={4}>
+                    <Sheet
+                      variant="soft"
+                      sx={{
+                        p: 2.5,
+                        borderRadius: '12px',
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        border: '1px solid rgba(255, 255, 255, 0.04)',
+                        bgcolor: 'rgba(255, 255, 255, 0.02)',
+                        gap: 2
+                      }}
+                    >
+                      <Box>
+                        <FormLabel sx={{ fontWeight: 700, mb: 0.5 }}>Pause Daily Reports Posting</FormLabel>
+                        <Typography level="body-xs" sx={{ opacity: 0.5 }}>
+                          When enabled, daily stock reports will not be queued or published to Facebook.
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 'auto' }}>
+                        <Switch
+                          checked={facebookSettings.pauseDailyReportFacebook}
+                          onChange={() => handleSettingToggle('pause_daily_report_facebook', facebookSettings.pauseDailyReportFacebook)}
+                          disabled={updatingSettings}
+                          color={facebookSettings.pauseDailyReportFacebook ? "danger" : "neutral"}
+                        />
+                      </Box>
+                    </Sheet>
+                  </Grid>
 
-                  <Divider sx={{ opacity: 0.05 }} />
+                  <Grid xs={12} md={4}>
+                    <Sheet
+                      variant="soft"
+                      sx={{
+                        p: 2.5,
+                        borderRadius: '12px',
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        border: '1px solid rgba(255, 255, 255, 0.04)',
+                        bgcolor: 'rgba(255, 255, 255, 0.02)',
+                        gap: 2
+                      }}
+                    >
+                      <Box>
+                        <FormLabel sx={{ fontWeight: 700, mb: 0.5 }}>Pause Email Digests Posting</FormLabel>
+                        <Typography level="body-xs" sx={{ opacity: 0.5 }}>
+                          When enabled, category email digests will not be queued or published to Facebook.
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 'auto' }}>
+                        <Switch
+                          checked={facebookSettings.pauseEmailDigestFacebook}
+                          onChange={() => handleSettingToggle('pause_email_digest_facebook', facebookSettings.pauseEmailDigestFacebook)}
+                          disabled={updatingSettings}
+                          color={facebookSettings.pauseEmailDigestFacebook ? "danger" : "neutral"}
+                        />
+                      </Box>
+                    </Sheet>
+                  </Grid>
 
-                  <FormControl orientation="horizontal" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Box>
-                      <FormLabel sx={{ fontWeight: 700 }}>Pause Email Digests Posting</FormLabel>
-                      <Typography level="body-xs" sx={{ opacity: 0.5 }}>
-                        When enabled, category email digests will not be queued or published to Facebook.
-                      </Typography>
-                    </Box>
-                    <Switch
-                      checked={facebookSettings.pauseEmailDigestFacebook}
-                      onChange={() => handleSettingToggle('pause_email_digest_facebook', facebookSettings.pauseEmailDigestFacebook)}
-                      disabled={updatingSettings}
-                      color={facebookSettings.pauseEmailDigestFacebook ? "danger" : "neutral"}
-                    />
-                  </FormControl>
-
-                  <Divider sx={{ opacity: 0.05 }} />
-
-                  <FormControl orientation="horizontal" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                    <Box>
-                      <FormLabel sx={{ fontWeight: 700 }}>Pause Custom Posts Posting</FormLabel>
-                      <Typography level="body-xs" sx={{ opacity: 0.5 }}>
-                        When enabled, manual custom posts will not be auto-published to Facebook.
-                      </Typography>
-                    </Box>
-                    <Switch
-                      checked={facebookSettings.pauseCustomFacebook}
-                      onChange={() => handleSettingToggle('pause_custom_facebook', facebookSettings.pauseCustomFacebook)}
-                      disabled={updatingSettings}
-                      color={facebookSettings.pauseCustomFacebook ? "danger" : "neutral"}
-                    />
-                  </FormControl>
-                </Stack>
+                  <Grid xs={12} md={4}>
+                    <Sheet
+                      variant="soft"
+                      sx={{
+                        p: 2.5,
+                        borderRadius: '12px',
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        border: '1px solid rgba(255, 255, 255, 0.04)',
+                        bgcolor: 'rgba(255, 255, 255, 0.02)',
+                        gap: 2
+                      }}
+                    >
+                      <Box>
+                        <FormLabel sx={{ fontWeight: 700, mb: 0.5 }}>Pause Custom Posts Posting</FormLabel>
+                        <Typography level="body-xs" sx={{ opacity: 0.5 }}>
+                          When enabled, manual custom posts will not be auto-published to Facebook.
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 'auto' }}>
+                        <Switch
+                          checked={facebookSettings.pauseCustomFacebook}
+                          onChange={() => handleSettingToggle('pause_custom_facebook', facebookSettings.pauseCustomFacebook)}
+                          disabled={updatingSettings}
+                          color={facebookSettings.pauseCustomFacebook ? "danger" : "neutral"}
+                        />
+                      </Box>
+                    </Sheet>
+                  </Grid>
+                </Grid>
               </Stack>
             </Sheet>
 
@@ -932,8 +979,8 @@ export default function SourceManager() {
         <ModalDialog
           sx={{
             ...glassStyle,
-            minWidth: { xs: '90%', md: '850px' },
-            maxWidth: '95vw',
+            width: { xs: '95%', md: '90%' },
+            maxWidth: '1400px',
             p: 3,
             borderRadius: '20px'
           }}

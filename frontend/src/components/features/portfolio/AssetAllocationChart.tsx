@@ -211,8 +211,8 @@ export default function AssetAllocationChart({
         {/* SVG Donut Chart */}
         <Box sx={{ 
           position: 'relative', 
-          width: { xs: 200, sm: 240 }, 
-          height: { xs: 200, sm: 240 }, 
+          width: { xs: 180, sm: 200, lg: 185 }, 
+          height: { xs: 180, sm: 200, lg: 185 }, 
           flexShrink: 0 
         }}>
           <svg
@@ -297,7 +297,7 @@ export default function AssetAllocationChart({
                 fontWeight: 700,
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em',
-                maxWidth: '80%',
+                maxWidth: '85%',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
@@ -310,8 +310,8 @@ export default function AssetAllocationChart({
               sx={{
                 fontWeight: 800,
                 color: activeSlice ? activeSlice.color : 'text.primary',
-                mt: 0.5,
-                fontSize: { xs: '1.25rem', sm: '1.5rem' },
+                mt: 0.3,
+                fontSize: { xs: '1.15rem', sm: '1.35rem' },
               }}
             >
               {activeSlice ? `${activeSlice.percentage.toFixed(1)}%` : '100%'}
@@ -324,13 +324,23 @@ export default function AssetAllocationChart({
           sx={{
             display: 'flex',
             flexDirection: 'column',
-            gap: 1,
-            width: { xs: '100%', lg: '220px' },
-            maxHeight: { xs: 180, lg: 280 },
+            gap: 0.5,
+            flexGrow: 1,
+            minWidth: 0,
+            width: '100%',
+            maxHeight: { xs: 180, lg: 240 },
             overflowY: 'auto',
             justifyContent: 'flex-start',
-            px: { xs: 1, lg: 0 },
+            px: { xs: 1, lg: 0.5 },
             py: 0.5,
+            '&::-webkit-scrollbar': { width: '4px' },
+            '&::-webkit-scrollbar-thumb': { 
+              backgroundColor: 'rgba(255,255,255,0.08)', 
+              borderRadius: '4px' 
+            },
+            '&::-webkit-scrollbar-thumb:hover': {
+              backgroundColor: 'rgba(255,255,255,0.15)'
+            }
           }}
         >
           {slices.map((slice, index) => {
@@ -344,25 +354,23 @@ export default function AssetAllocationChart({
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
-                  px: 1.5,
-                  py: 0.75,
-                  borderRadius: '10px',
+                  px: 1.25,
+                  py: 0.5,
+                  borderRadius: '8px',
                   cursor: 'pointer',
                   bgcolor: isHovered 
                     ? 'rgba(16, 185, 129, 0.08)' 
-                    : 'rgba(255, 255, 255, 0.02)',
-                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                  border: '1px solid',
-                  borderColor: isHovered ? 'rgba(16, 185, 129, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                    : 'transparent',
+                  transition: 'all 0.15s ease-in-out',
                   width: '100%',
                   boxSizing: 'border-box',
                 }}
               >
-                <Stack direction="row" alignItems="center" spacing={1.5} sx={{ minWidth: 0 }}>
+                <Stack direction="row" alignItems="center" spacing={1} sx={{ minWidth: 0, mr: 1, flexGrow: 1 }}>
                   <Box
                     sx={{
-                      width: 8,
-                      height: 8,
+                      width: 7,
+                      height: 7,
                       borderRadius: '50%',
                       bgcolor: slice.color,
                       flexShrink: 0,
@@ -371,7 +379,7 @@ export default function AssetAllocationChart({
                   <Typography
                     level="body-xs"
                     sx={{
-                      fontWeight: 700,
+                      fontWeight: 600,
                       color: isHovered ? 'text.primary' : 'text.secondary',
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
@@ -381,7 +389,7 @@ export default function AssetAllocationChart({
                     {slice.name}
                   </Typography>
                 </Stack>
-                <Typography level="body-xs" sx={{ fontWeight: 800, color: 'text.primary', ml: 1, flexShrink: 0 }}>
+                <Typography level="body-xs" sx={{ fontWeight: 700, color: 'text.primary', flexShrink: 0 }}>
                   {slice.percentage.toFixed(1)}%
                 </Typography>
               </Box>
