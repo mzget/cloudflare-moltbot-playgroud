@@ -129,7 +129,7 @@ export default function RoutesLayout() {
   }, []);
 
   return (
-    <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: '1600px', margin: '0 auto', minHeight: '100vh' }}>
+    <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: { xs: '1600px', xl: '100%' }, margin: '0 auto', minHeight: '100vh' }}>
       <Header 
         onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)} 
         sidebarCollapsed={sidebarCollapsed} 
