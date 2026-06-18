@@ -1215,7 +1215,7 @@ export default function SourceManager() {
                     sx={{
                       flex: 1,
                       overflowY: 'auto',
-                      maxHeight: '220px',
+                      maxHeight: '480px',
                       whiteSpace: 'pre-wrap',
                       fontSize: '14px',
                       lineHeight: '1.5',
