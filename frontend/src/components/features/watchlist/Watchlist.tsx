@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useWatchlist } from './hooks/useWatchlist';
 import { useAlertRules } from './hooks/useAlertRules';
 import { Box, Typography, Sheet, IconButton, Button, Input, Stack, Card, CardContent, Divider, Switch, Grid, CardActions, Avatar, Modal, ModalDialog, DialogTitle, DialogContent, ModalClose, FormControl, FormLabel, Select, Option, FormHelperText, Badge } from '@mui/joy';
-import { Plus, Trash2, Bell } from 'lucide-react';
+import { Plus, Trash2, Bell, Pencil } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
 
 interface WatchlistItem {
@@ -10,6 +10,7 @@ interface WatchlistItem {
   name: string;
   is_active: number;
   in_portfolio: number;
+  type: string;
   active_alerts_count?: number;
 }
 
@@ -20,6 +21,7 @@ export default function Watchlist() {
     watchlist,
     marketStats,
     addWatchlist,
+    updateWatchlistDetails,
     deleteWatchlist,
     toggleActive,
     togglePortfolioStatus,
@@ -36,8 +38,38 @@ export default function Watchlist() {
 
   const [newSecurityForm, setNewSecurityForm] = useState({
     symbol: '',
-    name: ''
+    name: '',
+    type: 'stock'
   });
+
+  // Edit Security Modal State
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    symbol: '',
+    name: '',
+    type: 'stock'
+  });
+
+  const handleOpenEditModal = (item: WatchlistItem) => {
+    setEditForm({
+      symbol: item.symbol,
+      name: item.name || '',
+      type: item.type || 'stock'
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editForm.symbol) return;
+    try {
+      const res = await updateWatchlistDetails(editForm.symbol, editForm.name, editForm.type);
+      if (res.ok) {
+        setIsEditModalOpen(false);
+      }
+    } catch (e) {
+      console.error("Failed to update watchlist item", e);
+    }
+  };
 
   const [sortBy, setSortBy] = useState<string>(() => {
     if (typeof window !== 'undefined') {
@@ -199,9 +231,9 @@ export default function Watchlist() {
   const handleAdd = async () => {
     if (!newSecurityForm.symbol) return;
     try {
-      const res = await addWatchlist(newSecurityForm.symbol, newSecurityForm.name);
+      const res = await addWatchlist(newSecurityForm.symbol, newSecurityForm.name, newSecurityForm.type);
       if (res.ok) {
-        setNewSecurityForm({ symbol: '', name: '' });
+        setNewSecurityForm({ symbol: '', name: '', type: 'stock' });
       }
     } catch (e) {
       console.error("Failed to add to watchlist", e);
@@ -252,6 +284,22 @@ export default function Watchlist() {
               onChange={e => setNewSecurityForm(prev => ({ ...prev, name: e.target.value }))}
               sx={{ flex: 2 }}
             />
+            <Select
+              value={newSecurityForm.type}
+              onChange={(_, val) => setNewSecurityForm(prev => ({ ...prev, type: val || 'stock' }))}
+              sx={{ 
+                minWidth: 120,
+                backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                border: '1px solid rgba(255, 255, 255, 0.1)',
+                '&:hover': {
+                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                  borderColor: 'rgba(255, 255, 255, 0.15)'
+                }
+              }}
+            >
+              <Option value="stock">Stock</Option>
+              <Option value="etf">ETF</Option>
+            </Select>
             <Button 
               variant="solid" 
               color="success" 
@@ -336,11 +384,41 @@ export default function Watchlist() {
                       {item.symbol.substring(0, 2)}
                     </Avatar>
                     <Box>
-                      <Typography level="title-lg" sx={{ fontWeight: '700', letterSpacing: '0.5px', lineHeight: 1.2 }}>{item.symbol}</Typography>
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <Typography level="title-lg" sx={{ fontWeight: '700', letterSpacing: '0.5px', lineHeight: 1.2 }}>{item.symbol}</Typography>
+                        <Box
+                          sx={{
+                            fontSize: '9px',
+                            fontWeight: 'bold',
+                            textTransform: 'uppercase',
+                            px: 1,
+                            py: 0.25,
+                            borderRadius: '4px',
+                            backgroundColor: item.type === 'etf' ? 'rgba(54, 162, 235, 0.15)' : 'rgba(16, 185, 129, 0.1)',
+                            color: item.type === 'etf' ? '#36a2eb' : '#10b981',
+                            border: item.type === 'etf' ? '1px solid rgba(54, 162, 235, 0.3)' : '1px solid rgba(16, 185, 129, 0.2)',
+                            lineHeight: 1.2,
+                          }}
+                        >
+                          {item.type || 'stock'}
+                        </Box>
+                      </Stack>
                       <Typography level="body-sm" sx={{ opacity: 0.7, fontWeight: '500' }}>{item.name}</Typography>
                     </Box>
                   </Stack>
                   <Stack direction="row" spacing={0.5}>
+                    <IconButton 
+                      color="neutral" 
+                      variant="plain" 
+                      onClick={() => handleOpenEditModal(item)}
+                      sx={{ 
+                        opacity: 0.6, 
+                        transition: 'opacity 0.2s', 
+                        '&:hover': { opacity: 1, backgroundColor: 'rgba(255, 255, 255, 0.05)', color: '#10b981' } 
+                      }}
+                    >
+                      <Pencil size={18} />
+                    </IconButton>
                     <Badge
                       badgeContent={item.active_alerts_count}
                       invisible={!item.active_alerts_count}
@@ -549,6 +627,68 @@ export default function Watchlist() {
                 </Stack>
               )}
             </Box>
+          </DialogContent>
+        </ModalDialog>
+      </Modal>
+
+      {/* Edit Symbol Detail Modal */}
+      <Modal open={isEditModalOpen} onClose={() => setIsEditModalOpen(false)}>
+        <ModalDialog
+          sx={{
+            ...glassStyle,
+            minWidth: { xs: '90%', sm: 400 },
+            maxWidth: 450,
+            borderRadius: '20px',
+            border: '1px solid rgba(255, 255, 255, 0.2)',
+            boxShadow: '0 25px 50px rgba(0,0,0,0.3)',
+            p: 3,
+          }}
+        >
+          <ModalClose />
+          <DialogTitle sx={{ fontWeight: 800, fontSize: '1.4rem', letterSpacing: '-0.02em', mb: 1 }}>
+            Edit Security: {editForm.symbol}
+          </DialogTitle>
+          <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+            <FormControl>
+              <FormLabel sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Company Name</FormLabel>
+              <Input
+                placeholder="Company Name"
+                value={editForm.name}
+                onChange={e => setEditForm(prev => ({ ...prev, name: e.target.value }))}
+                size="sm"
+              />
+            </FormControl>
+
+            <FormControl>
+              <FormLabel sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Symbol Type</FormLabel>
+              <Select
+                value={editForm.type}
+                onChange={(_, val) => setEditForm(prev => ({ ...prev, type: val || 'stock' }))}
+                size="sm"
+              >
+                <Option value="stock">Stock</Option>
+                <Option value="etf">ETF</Option>
+              </Select>
+            </FormControl>
+
+            <Stack direction="row" spacing={1.5} justifyContent="flex-end" sx={{ mt: 1 }}>
+              <Button
+                variant="plain"
+                color="neutral"
+                onClick={() => setIsEditModalOpen(false)}
+                size="sm"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="solid"
+                color="success"
+                onClick={handleSaveEdit}
+                size="sm"
+              >
+                Save
+              </Button>
+            </Stack>
           </DialogContent>
         </ModalDialog>
       </Modal>

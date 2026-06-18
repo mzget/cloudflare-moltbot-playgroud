@@ -6,6 +6,7 @@ export interface WatchlistItem {
   name: string;
   is_active: number;
   in_portfolio: number;
+  type: string;
   active_alerts_count?: number;
 }
 
@@ -31,11 +32,23 @@ export function useWatchlist() {
     }
   }, []);
 
-  const addWatchlist = async (symbol: string, name: string) => {
+  const addWatchlist = async (symbol: string, name: string, type: string) => {
     const res = await fetch(`${API_BASE_URL}/api/watchlist`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ symbol: symbol.toUpperCase(), name })
+      body: JSON.stringify({ symbol: symbol.toUpperCase(), name, type })
+    });
+    if (res.ok) {
+      await fetchWatchlist();
+    }
+    return res;
+  };
+
+  const updateWatchlistDetails = async (symbol: string, name: string, type: string) => {
+    const res = await fetch(`${API_BASE_URL}/api/watchlist`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol, name, type })
     });
     if (res.ok) {
       await fetchWatchlist();
@@ -84,6 +97,7 @@ export function useWatchlist() {
     watchlist,
     marketStats,
     addWatchlist,
+    updateWatchlistDetails,
     deleteWatchlist,
     toggleActive,
     togglePortfolioStatus,

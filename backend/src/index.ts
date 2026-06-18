@@ -351,26 +351,36 @@ app.delete('/api/news', async (c) => {
 app.get('/api/watchlist', async (c) => {
   const { results } = await c.env.DB.prepare(`
 		SELECT w.*, 
-		       (CASE WHEN p.symbol IS NOT NULL THEN 1 ELSE 0 END) as in_portfolio,
+		       (CASE WHEN (p.symbol IS NOT NULL OR (h.symbol IS NOT NULL AND h.shares > 0)) THEN 1 ELSE 0 END) as in_portfolio,
 		       (SELECT COUNT(*) FROM alert_rules ar WHERE ar.symbol = w.symbol AND ar.is_active = 1) as active_alerts_count
 		FROM watchlist w
 		LEFT JOIN portfolio_holdings p ON w.symbol = p.symbol
+		LEFT JOIN holdings h ON w.symbol = h.symbol
 	`).all();
   return c.json(results);
 });
 
 app.post('/api/watchlist', async (c) => {
-  const { symbol, name } = await c.req.json() as any;
-  await c.env.DB.prepare('INSERT OR IGNORE INTO watchlist (symbol, name) VALUES (?, ?)')
-    .bind(symbol, name).run();
+  const { symbol, name, type } = await c.req.json() as any;
+  const symbolType = type || 'stock';
+  await c.env.DB.prepare('INSERT OR IGNORE INTO watchlist (symbol, name, type) VALUES (?, ?, ?)')
+    .bind(symbol, name, symbolType).run();
   return c.text('Symbol added');
 });
 
 app.put('/api/watchlist', async (c) => {
-  const { symbol, is_active, in_portfolio } = await c.req.json() as any;
+  const { symbol, is_active, in_portfolio, name, type } = await c.req.json() as any;
   if (is_active !== undefined) {
     await c.env.DB.prepare('UPDATE watchlist SET is_active = ? WHERE symbol = ?')
       .bind(is_active ? 1 : 0, symbol).run();
+  }
+  if (name !== undefined) {
+    await c.env.DB.prepare('UPDATE watchlist SET name = ? WHERE symbol = ?')
+      .bind(name, symbol).run();
+  }
+  if (type !== undefined) {
+    await c.env.DB.prepare('UPDATE watchlist SET type = ? WHERE symbol = ?')
+      .bind(type, symbol).run();
   }
   if (in_portfolio !== undefined) {
     if (in_portfolio) {
