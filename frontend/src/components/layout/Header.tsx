@@ -37,6 +37,8 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
   const [showNotifications, setShowNotifications] = useState(false);
   const bellContainerRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
+  const isFirstFetchRef = useRef(true);
+  const notifiedIdsRef = useRef<Set<number>>(new Set());
 
   const { theme, setTheme, density, setDensity, usdThbRate, setUsdThbRate } = useSettingsStore();
   const [rateInput, setRateInput] = useState(usdThbRate.toString());
@@ -65,7 +67,33 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
     try {
       const res = await fetch(`${API_BASE_URL}/api/notifications`);
       if (res.ok) {
-        const data = await res.json();
+        const data: Notification[] = await res.json();
+        
+        if (isFirstFetchRef.current) {
+          isFirstFetchRef.current = false;
+          data.forEach(n => notifiedIdsRef.current.add(n.id));
+        } else {
+          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+            data.forEach(n => {
+              if (n.is_read === 0 && !notifiedIdsRef.current.has(n.id)) {
+                try {
+                  const notification = new Notification(`Oaktree: ${n.symbol}`, {
+                    body: n.message,
+                    icon: '/favicon.svg',
+                  });
+                  notification.onclick = () => {
+                    window.focus();
+                    setShowNotifications(true);
+                  };
+                } catch (err) {
+                  console.error("Failed to trigger browser notification:", err);
+                }
+                notifiedIdsRef.current.add(n.id);
+              }
+            });
+          }
+        }
+
         setNotifications(data);
       }
     } catch (e) {
@@ -106,6 +134,11 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
   };
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+    }
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);
