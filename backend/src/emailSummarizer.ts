@@ -147,59 +147,56 @@ export async function generateEmailDigests(env: Env, isManual = false): Promise<
     return;
   }
 
-  console.log(`Processing and summarizing ${emails.length} ingested emails for due subscriptions in batches...`);
+  console.log(`Processing and summarizing ${emails.length} ingested emails for due subscriptions (1-by-1)...`);
 
-  const BATCH_SIZE = 2;
-  for (let i = 0; i < emails.length; i += BATCH_SIZE) {
-    const batch = emails.slice(i, i + BATCH_SIZE);
-    console.log(`Processing batch ${Math.floor(i / BATCH_SIZE) + 1} of ${Math.ceil(emails.length / BATCH_SIZE)} (${batch.length} emails)...`);
+  for (const email of emails) {
+    console.log(`Processing email ID: ${email.id} — Subject: ${email.subject}`);
 
     try {
-      // Prepare LLM prompt with batch email contents, truncating body_text to 8000 characters on-the-fly
-      const context = batch.map((e, index) => {
-        const bodyText = e.body_text || '';
-        const truncatedBody = bodyText.length > 8000 ? bodyText.slice(0, 8000) + '... [truncated]' : bodyText;
-        return `--- EMAIL ${index + 1} ---
-ID: ${e.id}
-Sender: ${e.sender}
-Subject: ${e.subject}
-Date: ${new Date(e.received_at).toISOString()}
+      const bodyText = email.body_text || '';
+      const truncatedBody = bodyText.length > 10000 ? bodyText.slice(0, 10000) + '... [truncated]' : bodyText;
+
+      const emailContext = `--- EMAIL ---
+ID: ${email.id}
+Sender: ${email.sender}
+Subject: ${email.subject}
+Date: ${new Date(email.received_at).toISOString()}
 Content: ${truncatedBody}
 ----------------------`;
-      }).join('\n\n');
 
       const prompt = `
-You are the Oaktree Agent, a financial analyst tasked with summarizing email newsletter content for a Thai-speaking investor.
-Analyze the following email newsletter content. Your goal is to:
-1. Extract the main financial, market, or macroeconomic stories/news items discussed in these emails.
-2. Group them into distinct thematic categories (e.g. 'Macroeconomy', 'Technology & AI', 'Corporate Earnings', 'Geopolitics', 'Crypto & Digital Assets'). Keep category names in English.
-3. For each category group, write a clear and comprehensive summary WRITTEN IN THAI that covers all key points. The summary should be thorough enough that a reader fully understands the context and main arguments without referring to the original email (1 to 2 paragraphs, roughly 5 to 8 sentences).
-4. Provide 3 to 5 key takeaways per category WRITTEN IN THAI. Each takeaway should reflect Howard Marks-style thinking: focus on risk awareness, market cycles, and long-term perspective.
-5. Identify which email IDs are associated with each digest category (source_emails).
+You are the Oaktree Agent, a financial analyst summarizing a newsletter email for a Thai-speaking investor.
+Analyze the following single email newsletter. Produce a JSON response with TWO distinct sections:
+
+SECTION 1 — COMPREHENSIVE CONTENT SUMMARY:
+- Identify the thematic category of this email (e.g. 'Macroeconomy', 'Technology & AI', 'Corporate Earnings', 'Geopolitics', 'Crypto & Digital Assets'). Keep category name in English.
+- Write a thorough "summary" IN THAI that covers EVERY major point, story, argument, and data point mentioned in the email. Do not omit anything important. The reader must be able to fully understand what was discussed without reading the original email (2 to 3 paragraphs, 8 to 12 sentences).
+
+SECTION 2 — HOWARD MARKS STYLE COMMENTARY:
+- Provide 4 to 6 "key_takeaways" IN THAI written in Howard Marks' memo style: nuanced, cycle-aware, risk-focused, contrarian when warranted, and long-term in perspective. Each takeaway should offer a genuine investment insight or caution derived from the email content.
 
 RESPONSE INSTRUCTIONS:
-- Return ONLY a JSON object.
+- Return ONLY a JSON object with a single "digests" array containing exactly one object.
 - The "summary" and "key_takeaways" fields MUST be written in Thai language.
-- CRITICAL: Keep your internal reasoning/thinking process very short (under 100 words) so you do not run out of token space.
+- CRITICAL: Keep your internal reasoning/thinking very short (under 50 words) so you do not run out of token space.
 - DO NOT include any markdown code blocks, comments, or introductory text.
 - Ensure the JSON is strictly valid.
-- CRITICAL: Do NOT use double quotes (") inside any JSON string values (like 'summary' or 'key_takeaways'). Instead, use single quotes (') for any internal quotes or speech marks.
-  Example: "summary": "...สรุป...'ตลาดสัมฟัส'..." (valid)
-  Example: "summary": "...สรุป...\"...ตลาดสัมฟัส\"..." (INVALID)
+- CRITICAL: Do NOT use double quotes (") inside any JSON string values. Use single quotes (') for any internal quotes.
 
 JSON Schema:
 {
   "digests": [
     {
-      "category": "Macroeconomy",
-      "summary": "Comprehensive summary in Thai covering all key points...",
+      "category": "Category name in English",
+      "summary": "Comprehensive content summary in Thai covering every key point...",
       "key_takeaways": ["Howard Marks-style insight 1 in Thai", "Howard Marks-style insight 2 in Thai"],
-      "source_emails": ["email_id_1", "email_id_2"]
+      "source_emails": ["${email.id}"]
     }
   ]
 }
-Emails content:
-${context}
+
+Email content:
+${emailContext}
 `;
 
       const response = await env.AI.run('@cf/google/gemma-4-26b-a4b-it', {
@@ -254,26 +251,16 @@ ${context}
         }
 
         const digests = data.digests || [];
-
-        console.log(`AI generated ${digests.length} digest categories for this batch.`);
+        console.log(`AI generated ${digests.length} digest(s) for email ID: ${email.id}`);
 
         for (const digest of digests) {
-          // Map source email IDs back to objects containing subject, sender, received_at from the batch
-          const rawSources = digest.source_emails || [];
-          const mappedSources = rawSources.map((idOrObj: any) => {
-            const emailId = typeof idOrObj === 'object' && idOrObj !== null ? idOrObj.id : idOrObj;
-            const originalEmail = batch.find(e => e.id === emailId);
-            if (originalEmail) {
-              return {
-                id: originalEmail.id,
-                subject: originalEmail.subject,
-                sender: originalEmail.sender,
-                received_at: originalEmail.received_at
-              };
-            }
-            // Fallback in case the model returned an object structure directly or didn't find the email in the batch
-            return typeof idOrObj === 'object' && idOrObj !== null ? idOrObj : { id: idOrObj };
-          });
+          // Source is always the current email being processed
+          const mappedSources = [{
+            id: email.id,
+            subject: email.subject,
+            sender: email.sender,
+            received_at: email.received_at
+          }];
 
           await env.DB.prepare(
             'INSERT INTO email_digests (category, summary, key_takeaways, source_emails) VALUES (?, ?, ?, ?)'
@@ -285,21 +272,19 @@ ${context}
           ).run();
         }
 
-        // Mark only this batch of emails as processed
-        const emailIds = batch.map(e => e.id);
-        const updatePlaceholders = emailIds.map(() => '?').join(',');
+        // Mark this email as processed
         await env.DB.prepare(
-          `UPDATE ingested_emails SET processed = 1 WHERE id IN (${updatePlaceholders})`
-        ).bind(...emailIds).run();
+          'UPDATE ingested_emails SET processed = 1 WHERE id = ?'
+        ).bind(email.id).run();
 
-        console.log(`Successfully completed email summarization for batch email IDs: ${emailIds.join(', ')}`);
+        console.log(`Successfully processed email ID: ${email.id}`);
       } else {
-        console.error('No JSON structure found in AI response for email digests in this batch.');
+        console.error(`No JSON structure found in AI response for email ID: ${email.id}`);
         console.error('Raw responseText:', responseText);
         console.error('Raw response object:', JSON.stringify(response));
       }
-    } catch (batchError) {
-      console.error('Error processing email digest batch:', batchError);
+    } catch (emailError) {
+      console.error(`Error processing email ID: ${email.id}:`, emailError);
     }
   }
 }
