@@ -14,9 +14,10 @@ interface HeaderProps {
   onOpenSidebar?: () => void;
   onToggleSidebar?: () => void;
   sidebarCollapsed?: boolean;
+  sidebarHidden?: boolean;
 }
 
-export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapsed }: HeaderProps) {
+export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapsed, sidebarHidden }: HeaderProps) {
   const { t } = useTranslation();
   const { user, logout } = useContext(AuthContext);
   const { mode, setMode } = useColorScheme();
@@ -297,7 +298,14 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
         )}
         
         <Stack direction="row" spacing={{ xs: 1.5, md: 2.5 }} alignItems="center">
-          <Tooltip title={sidebarCollapsed ? t('header.expand_sidebar') : t('header.collapse_sidebar')} placement="bottom">
+          <Tooltip 
+            title={
+              sidebarHidden 
+                ? t('header.show_sidebar', 'Show Sidebar') 
+                : (sidebarCollapsed ? t('header.expand_sidebar') : t('header.collapse_sidebar'))
+            } 
+            placement="bottom"
+          >
             <IconButton
               variant="plain"
               color="neutral"
@@ -306,7 +314,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
                 display: { xs: 'none', md: 'flex' },
                 borderRadius: '12px',
                 transition: 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                transform: sidebarCollapsed ? 'rotate(180deg)' : 'rotate(0deg)',
+                transform: (sidebarHidden || sidebarCollapsed) ? 'rotate(180deg)' : 'rotate(0deg)',
                 '&:hover': { bgcolor: 'rgba(0,0,0,0.04)' }
               }}
             >

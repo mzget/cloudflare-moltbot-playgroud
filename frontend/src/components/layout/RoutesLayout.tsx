@@ -25,6 +25,7 @@ export default function RoutesLayout() {
   const { tab: activeTab } = useSearch({ from: '/' });
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(true);
+  const [sidebarHidden, setSidebarHidden] = React.useState(false);
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const { user, logout } = React.useContext(AuthContext);
   const theme = useSettingsStore(state => state.theme);
@@ -131,8 +132,15 @@ export default function RoutesLayout() {
   return (
     <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: { xs: '1600px', xl: '100%' }, margin: '0 auto', minHeight: '100vh' }}>
       <Header 
-        onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)} 
+        onToggleSidebar={() => {
+          if (sidebarHidden) {
+            setSidebarHidden(false);
+          } else {
+            setSidebarCollapsed(!sidebarCollapsed);
+          }
+        }} 
         sidebarCollapsed={sidebarCollapsed} 
+        sidebarHidden={sidebarHidden}
         onOpenSidebar={() => setMobileOpen(true)}
       />
 
@@ -235,19 +243,27 @@ export default function RoutesLayout() {
         </Box>
       </Drawer>
 
-      <Box sx={{ display: 'flex', gap: 4 }}>
+      <Box sx={{ 
+        display: 'flex', 
+        gap: sidebarHidden ? 0 : 4,
+        transition: 'gap 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+      }}>
         {/* Sidebar Container */}
         <Box 
           sx={{ 
-            width: sidebarCollapsed ? '80px' : { md: '280px', lg: '320px' },
-            transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+            width: sidebarHidden ? '0px' : (sidebarCollapsed ? '80px' : { md: '280px', lg: '320px' }),
+            transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease, visibility 0.4s ease',
             flexShrink: 0,
+            opacity: sidebarHidden ? 0 : 1,
+            visibility: sidebarHidden ? 'hidden' : 'visible',
             display: { xs: 'none', md: 'block' }
           }}
         >
           <Sheet sx={{ 
             ...glassStyle, 
-            p: 2, 
+            p: sidebarHidden ? 0 : 2, 
+            borderWidth: sidebarHidden ? 0 : '1px',
+            transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
             position: 'sticky', 
             top: 24, 
             height: 'fit-content',
@@ -258,6 +274,7 @@ export default function RoutesLayout() {
               setActiveTab={setActiveTab} 
               reportsCount={reports.length + digests.length} 
               collapsed={sidebarCollapsed}
+              onHide={() => setSidebarHidden(true)}
             />
           </Sheet>
         </Box>
