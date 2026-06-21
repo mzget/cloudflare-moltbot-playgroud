@@ -1,6 +1,6 @@
 import React from 'react';
-import { List, ListItem, ListItemButton, ListItemContent, ListItemDecorator, Typography, Box, Chip, Tooltip } from '@mui/joy';
-import { BarChart3, TrendingUp, Terminal, Info, Bot, LayoutDashboard, Database } from 'lucide-react';
+import { List, ListItem, ListItemButton, ListItemContent, ListItemDecorator, Typography, Box, Chip, Tooltip, Divider } from '@mui/joy';
+import { BarChart3, TrendingUp, Terminal, Info, Bot, LayoutDashboard, Database, ChevronLeft } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 interface SidebarProps {
@@ -8,9 +8,10 @@ interface SidebarProps {
   setActiveTab: (tab: string) => void;
   reportsCount?: number;
   collapsed?: boolean;
+  onHide?: () => void;
 }
 
-export default function Sidebar({ activeTab, setActiveTab, reportsCount, collapsed }: SidebarProps) {
+export default function Sidebar({ activeTab, setActiveTab, reportsCount, collapsed, onHide }: SidebarProps) {
   const { t } = useTranslation();
   const menuItems = [
     { id: 'dashboard', label: t('sidebar.dashboard'), icon: <LayoutDashboard size={20} /> },
@@ -23,7 +24,7 @@ export default function Sidebar({ activeTab, setActiveTab, reportsCount, collaps
   ];
 
   return (
-    <Box>
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', justifyContent: 'space-between' }}>
       <Box sx={{ py: 2 }}>
         <Typography
           level="body-xs"
@@ -101,6 +102,54 @@ export default function Sidebar({ activeTab, setActiveTab, reportsCount, collaps
           ))}
         </List>
       </Box>
+
+      {onHide && (
+        <Box sx={{ mt: 'auto', pt: 1 }}>
+          <Divider sx={{ my: 1, opacity: 0.08 }} />
+          <Tooltip 
+            title={collapsed ? t('sidebar.hide_sidebar', 'Hide Sidebar') : ""} 
+            placement="right" 
+            variant="solid"
+            arrow
+            sx={{ 
+              borderRadius: '8px', 
+              fontWeight: 600,
+              boxShadow: 'md',
+            }}
+          >
+            <ListItemButton
+              onClick={onHide}
+              sx={{
+                justifyContent: collapsed ? 'center' : 'flex-start',
+                px: collapsed ? 1 : 2,
+                py: 1,
+                color: 'text.secondary',
+                borderRadius: '12px',
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  bgcolor: 'background.level1',
+                  color: 'text.primary',
+                }
+              }}
+            >
+              <ListItemDecorator sx={{ 
+                minInlineSize: collapsed ? 0 : '2.5rem',
+              }}>
+                <ChevronLeft size={20} />
+              </ListItemDecorator>
+              <ListItemContent sx={{ 
+                opacity: collapsed ? 0 : 1, 
+                width: collapsed ? 0 : 'auto',
+                transition: 'opacity 0.2s ease' 
+              }}>
+                <Typography level="title-sm" sx={{ whiteSpace: 'nowrap' }}>
+                  {t('sidebar.hide_sidebar', 'Hide Sidebar')}
+                </Typography>
+              </ListItemContent>
+            </ListItemButton>
+          </Tooltip>
+        </Box>
+      )}
     </Box>
   );
 }
