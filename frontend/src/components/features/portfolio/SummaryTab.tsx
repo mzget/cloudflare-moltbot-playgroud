@@ -358,8 +358,8 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
                   <Box component="span" sx={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', bgcolor: 'info.solidBg', mr: 0.75 }} />
                   STOCKS ONLY (USD)
                 </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1.5 }}>
-                  <Typography level="h1" sx={{ fontWeight: 800, fontSize: '2.2rem', letterSpacing: '-0.02em', background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                  <Typography level="h1" sx={{ fontWeight: 800, fontSize: '2.2rem', whiteSpace: 'nowrap', letterSpacing: '-0.02em', background: 'linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
                     {showMoneyValues ? formatCurrency(stocksSummary.total_market_value, false, '$') : '••••••••'}
                   </Typography>
                   <IconButton
@@ -373,27 +373,27 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
                   </IconButton>
                 </Box>
                 <Stack spacing={0.75}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 4 }}>
-                    <Typography level="body-sm" sx={{ opacity: 0.7 }}>Total Cost</Typography>
-                    <Typography level="body-sm" sx={{ fontWeight: 700 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1.5 }}>
+                    <Typography level="body-sm" sx={{ opacity: 0.7, whiteSpace: 'nowrap' }}>Total Cost</Typography>
+                    <Typography level="body-sm" sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
                       {showMoneyValues ? formatCurrency(stocksSummary.total_cost, false, '$') : '••••••••'}
                     </Typography>
                   </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 4 }}>
-                    <Typography level="body-sm" sx={{ opacity: 0.7 }}>Unrealized Gain</Typography>
-                    <Typography level="body-sm" sx={{ fontWeight: 700 }} className={stocksSummary.unrealized_gain_amt >= 0 ? 'yf-positive' : 'yf-negative'}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1.5 }}>
+                    <Typography level="body-sm" sx={{ opacity: 0.7, whiteSpace: 'nowrap' }}>Unrealized Gain</Typography>
+                    <Typography level="body-sm" sx={{ fontWeight: 700, whiteSpace: 'nowrap' }} className={stocksSummary.unrealized_gain_amt >= 0 ? 'yf-positive' : 'yf-negative'}>
                       {showMoneyValues ? formatCurrency(stocksSummary.unrealized_gain_amt, true, '$') : '••••••••'} ({formatPct(stocksSummary.unrealized_gain_pct)})
                     </Typography>
                   </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 4 }}>
-                    <Typography level="body-sm" sx={{ opacity: 0.7 }}>Day Change</Typography>
-                    <Typography level="body-sm" sx={{ fontWeight: 700 }} className={stocksSummary.day_change_amt >= 0 ? 'yf-positive' : 'yf-negative'}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1.5 }}>
+                    <Typography level="body-sm" sx={{ opacity: 0.7, whiteSpace: 'nowrap' }}>Day Change</Typography>
+                    <Typography level="body-sm" sx={{ fontWeight: 700, whiteSpace: 'nowrap' }} className={stocksSummary.day_change_amt >= 0 ? 'yf-positive' : 'yf-negative'}>
                       {showMoneyValues ? formatCurrency(stocksSummary.day_change_amt, true, '$') : '••••••••'} ({formatPct(stocksSummary.day_change_pct)})
                     </Typography>
                   </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 4 }}>
-                    <Typography level="body-sm" sx={{ opacity: 0.7 }}>Realized Gain</Typography>
-                    <Typography level="body-sm" sx={{ fontWeight: 700 }} className={stocksSummary.realized_gain_amt >= 0 ? 'yf-positive' : 'yf-negative'}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1.5 }}>
+                    <Typography level="body-sm" sx={{ opacity: 0.7, whiteSpace: 'nowrap' }}>Realized Gain</Typography>
+                    <Typography level="body-sm" sx={{ fontWeight: 700, whiteSpace: 'nowrap' }} className={stocksSummary.realized_gain_amt >= 0 ? 'yf-positive' : 'yf-negative'}>
                       {showMoneyValues ? formatCurrency(stocksSummary.realized_gain_amt, true, '$') : '••••••••'}
                     </Typography>
                   </Box>
@@ -571,12 +571,23 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
           <Sheet sx={{ ...glassStyle, p: 3, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 3 }}>
               <Box sx={{ width: '100%' }}>
-                <Typography level="body-xs" sx={{ opacity: 0.6, fontWeight: 700, mb: 0.5, display: 'flex', alignItems: 'center' }}>
-                  <Box component="span" sx={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.solidBg', mr: 0.75 }} />
-                  ALL ASSETS (THB)
-                </Typography>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1.5 }}>
-                  <Typography level="h1" sx={{ fontWeight: 800, fontSize: '2.2rem', letterSpacing: '-0.02em', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
+                  <Typography level="body-xs" sx={{ opacity: 0.6, fontWeight: 700, display: 'flex', alignItems: 'center' }}>
+                    <Box component="span" sx={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.solidBg', mr: 0.75 }} />
+                    ALL ASSETS (THB)
+                  </Typography>
+                  <Chip
+                    variant="soft"
+                    color="success"
+                    size="sm"
+                    startDecorator={<TrendingUp size={14} />}
+                    sx={{ borderRadius: '8px', fontWeight: 600 }}
+                  >
+                    Bullish
+                  </Chip>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                  <Typography level="h1" sx={{ fontWeight: 800, fontSize: '2.2rem', letterSpacing: '-0.02em', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', whiteSpace: 'nowrap' }}>
                     {showMoneyValues ? formatCurrency(summary.total_market_value, false, '฿') : '••••••••'}
                   </Typography>
                   <IconButton
@@ -588,32 +599,23 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
                   >
                     {showMoneyValues ? <EyeOff size={16} /> : <Eye size={16} />}
                   </IconButton>
-                  <Chip
-                    variant="soft"
-                    color="success"
-                    size="sm"
-                    startDecorator={<TrendingUp size={14} />}
-                    sx={{ borderRadius: '8px', fontWeight: 600 }}
-                  >
-                    Bullish
-                  </Chip>
                 </Box>
                 <Stack spacing={0.75}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 4 }}>
-                    <Typography level="body-sm" sx={{ opacity: 0.7 }}>Total Cost</Typography>
-                    <Typography level="body-sm" sx={{ fontWeight: 700 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1.5 }}>
+                    <Typography level="body-sm" sx={{ opacity: 0.7, whiteSpace: 'nowrap' }}>Total Cost</Typography>
+                    <Typography level="body-sm" sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
                       {showMoneyValues ? formatCurrency(summary.total_cost, false, '฿') : '••••••••'}
                     </Typography>
                   </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 4 }}>
-                    <Typography level="body-sm" sx={{ opacity: 0.7 }}>Unrealized Gain</Typography>
-                    <Typography level="body-sm" sx={{ fontWeight: 700 }} className={summary.unrealized_gain_amt >= 0 ? 'yf-positive' : 'yf-negative'}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1.5 }}>
+                    <Typography level="body-sm" sx={{ opacity: 0.7, whiteSpace: 'nowrap' }}>Unrealized Gain</Typography>
+                    <Typography level="body-sm" sx={{ fontWeight: 700, whiteSpace: 'nowrap' }} className={summary.unrealized_gain_amt >= 0 ? 'yf-positive' : 'yf-negative'}>
                       {showMoneyValues ? formatCurrency(summary.unrealized_gain_amt, true, '฿') : '••••••••'} ({formatPct(summary.unrealized_gain_pct)})
                     </Typography>
                   </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 4 }}>
-                    <Typography level="body-sm" sx={{ opacity: 0.7 }}>Realized Gain</Typography>
-                    <Typography level="body-sm" sx={{ fontWeight: 700 }} className={summary.realized_gain_amt >= 0 ? 'yf-positive' : 'yf-negative'}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1.5 }}>
+                    <Typography level="body-sm" sx={{ opacity: 0.7, whiteSpace: 'nowrap' }}>Realized Gain</Typography>
+                    <Typography level="body-sm" sx={{ fontWeight: 700, whiteSpace: 'nowrap' }} className={summary.realized_gain_amt >= 0 ? 'yf-positive' : 'yf-negative'}>
                       {showMoneyValues ? formatCurrency(summary.realized_gain_amt, true, '฿') : '••••••••'}
                     </Typography>
                   </Box>
