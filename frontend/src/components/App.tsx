@@ -66,7 +66,8 @@ if (typeof window !== 'undefined') {
 
 // 1. Define the Search Schema (Validation)
 const dashboardSearchSchema = z.object({
-  tab: z.enum(['dashboard', 'market', 'agent', 'db-agent', 'watchlist', 'command-center', 'about']).catch('dashboard'),
+  tab: z.enum(['dashboard', 'market', 'agent', 'db-agent', 'watchlist', 'command-center', 'about', 'analysis']).catch('dashboard'),
+  symbol: z.string().optional(),
 });
 
 // 2. Define the Route Tree

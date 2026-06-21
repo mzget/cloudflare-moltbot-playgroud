@@ -2,7 +2,7 @@ import { McpAgent } from "agents/mcp";
 // @ts-ignore
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { getPortfolio, getPortfolioHistory, getKnowledgeByCategory, searchKnowledge } from "./knowledge";
+import { getPortfolio, getPortfolioHistory, getKnowledgeByCategory, searchKnowledge, getLatestAnalysisReport } from "./knowledge";
 import { createWorkersAI } from "workers-ai-provider";
 import { streamText, tool, convertToModelMessages, UIMessage } from "ai";
 
@@ -58,6 +58,18 @@ export class OaktreeMCP extends McpAgent {
         };
       }
     );
+
+    this.server.tool(
+      "get_analysis_report",
+      "Get the latest value investor deep analysis report for a stock symbol.",
+      { symbol: z.string().describe("The stock symbol to fetch the analysis report for (e.g. AAPL)") },
+      async ({ symbol }: any) => {
+        const data = await getLatestAnalysisReport(this.env as any, symbol);
+        return {
+          content: [{ type: "text", text: JSON.stringify(data, null, 2) }]
+        };
+      }
+    );
   }
 
   // Override fetch to add Bearer token security
@@ -93,12 +105,12 @@ export default {
     if (url.pathname === "/chat" && request.method === "POST") {
       const { messages }: { messages: UIMessage[] } = await request.json() as any;
       const workersai = createWorkersAI({ binding: env.AI });
-      const model = workersai('@cf/meta/llama-3-8b-instruct');
+      const model = workersai('@cf/google/gemma-4-26b-a4b-it');
 
       const result = (streamText as any)({
         model,
         messages: await convertToModelMessages(messages),
-        system: "You are Oaktree AI, an investment portfolio manager. You have tools to read the user's portfolio and knowledge base. Answer briefly and directly using the tools available.",
+        system: "คุณคือ Oaktree AI ผู้ช่วยวิเคราะห์หุ้นและพอร์ตการลงทุนตามแนวคิดของนักลงทุนระดับโลก เช่น Warren Buffett, Charlie Munger, Howard Marks, และคนอื่นๆ จงตอบคำถามในฐานะผู้เชี่ยวชาญ ค้นหาข้อมูลผลวิเคราะห์จากฐานข้อมูล (ด้วยเครื่องมือ getAnalysisReport, getPortfolio, getKnowledge) เพื่อนำมาเป็นความรู้อ้างอิงในการพูดคุยกับผู้ใช้งาน และตอบคำถามเป็นภาษาไทยอย่างสุภาพและลึกซึ้ง",
         tools: {
           getPortfolio: tool({
             description: "Get all portfolio holdings",
@@ -119,6 +131,11 @@ export default {
             description: "Search knowledge base stored in D1",
             parameters: z.object({ query: z.string() }),
             execute: async ({ query }: any) => searchKnowledge(env, query),
+          } as any) as any,
+          getAnalysisReport: tool({
+            description: "Get the latest value investor deep analysis report for a stock symbol",
+            parameters: z.object({ symbol: z.string() }),
+            execute: async ({ symbol }: any) => getLatestAnalysisReport(env, symbol),
           } as any) as any,
           queryNotebookLM: tool({
             description: "Query the user's NotebookLM notebooks for deep research context — use this for earnings calls, 10-K/10-Q filings, company analysis, and detailed investment research that goes beyond the local knowledge base.",
