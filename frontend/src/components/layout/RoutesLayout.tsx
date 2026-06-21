@@ -11,6 +11,7 @@ import Watchlist from '../features/watchlist/Watchlist';
 import YahooPortfolio from '../features/portfolio/YahooPortfolio';
 import KnowledgeChat from '../features/agent/KnowledgeChat';
 import DatabaseChat from '../features/agent/DatabaseChat';
+import AnalysisReport from '../features/agent/AnalysisReport';
 import IntelligenceFeed from '../features/market/IntelligenceFeed';
 import { glassStyle } from '../../styles/glass';
 import { API_BASE_URL } from '../../config';
@@ -22,7 +23,7 @@ import { useSettingsStore } from '../../store/settingsStore';
 
 export default function RoutesLayout() {
   const { t } = useTranslation();
-  const { tab: activeTab } = useSearch({ from: '/' });
+  const { tab: activeTab, symbol } = useSearch({ from: '/' });
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(true);
   const [sidebarHidden, setSidebarHidden] = React.useState(false);
@@ -327,6 +328,8 @@ export default function RoutesLayout() {
 
           {activeTab === 'watchlist' && <Watchlist />}
           {activeTab === 'agent' && <KnowledgeChat />}
+          {activeTab === 'analysis' && symbol && <AnalysisReport symbol={symbol} />}
+          {activeTab === 'analysis' && !symbol && <Box sx={{ py: 4, textAlign: 'center' }}><Typography level="h3">กรุณาระบุสัญลักษณ์หุ้นที่ต้องการวิเคราะห์</Typography></Box>}
           {activeTab === 'db-agent' && <DatabaseChat />}
           {activeTab === 'command-center' && <SourceManager />}
           {activeTab === 'about' && (

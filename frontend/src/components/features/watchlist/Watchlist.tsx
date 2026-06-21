@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useWatchlist } from './hooks/useWatchlist';
 import { useAlertRules } from './hooks/useAlertRules';
 import { Box, Typography, Sheet, IconButton, Button, Input, Stack, Card, CardContent, Divider, Switch, Grid, CardActions, Avatar, Modal, ModalDialog, DialogTitle, DialogContent, ModalClose, FormControl, FormLabel, Select, Option, FormHelperText, Badge } from '@mui/joy';
-import { Plus, Trash2, Bell, Pencil } from 'lucide-react';
+import { Plus, Trash2, Bell, Pencil, Play, FileText } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
 
 interface WatchlistItem {
@@ -17,6 +17,32 @@ interface WatchlistItem {
 import { glassStyle } from '../../../styles/glass';
 
 export default function Watchlist() {
+  const [analyzingSymbol, setAnalyzingSymbol] = useState<string | null>(null);
+
+  const handleRunAnalysis = async (symbol: string) => {
+    setAnalyzingSymbol(symbol);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/analysis/run`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'การวิเคราะห์ขัดข้อง');
+      }
+      // Redirect to the analysis tab
+      window.location.search = `?tab=analysis&symbol=${symbol}`;
+    } catch (e: any) {
+      alert(`การวิเคราะห์ล้มเหลว: ${e.message}`);
+    } finally {
+      setAnalyzingSymbol(null);
+    }
+  };
+
+  const handleViewAnalysis = (symbol: string) => {
+    window.location.search = `?tab=analysis&symbol=${symbol}`;
+  };
   const {
     watchlist,
     marketStats,
@@ -466,6 +492,32 @@ export default function Watchlist() {
                 </Stack>
 
                 <Divider sx={{ my: 1.5, opacity: 0.15 }} />
+
+                <Box sx={{ display: 'flex', gap: 1, mb: 1.5 }}>
+                  <Button
+                    size="sm"
+                    variant="soft"
+                    color="success"
+                    loading={analyzingSymbol === item.symbol}
+                    disabled={analyzingSymbol !== null && analyzingSymbol !== item.symbol}
+                    startDecorator={<Play size={14} />}
+                    onClick={() => handleRunAnalysis(item.symbol)}
+                    sx={{ flex: 1, fontSize: '0.8rem', py: 0.5 }}
+                  >
+                    {analyzingSymbol === item.symbol ? 'วิเคราะห์...' : '🌳 วิเคราะห์เชิงลึก'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outlined"
+                    color="neutral"
+                    disabled={analyzingSymbol !== null}
+                    startDecorator={<FileText size={14} />}
+                    onClick={() => handleViewAnalysis(item.symbol)}
+                    sx={{ fontSize: '0.8rem', py: 0.5 }}
+                  >
+                    ดูผลลัพธ์
+                  </Button>
+                </Box>
 
                 <CardActions sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 0, mt: 1.5 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>

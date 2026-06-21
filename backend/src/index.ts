@@ -12,6 +12,7 @@ import { syncAndProcessFacebookPosts, styleCustomPost } from './facebook';
 import { recordDailyPortfolioHistory, getPortfolioHistory } from './portfolioHistory';
 import { sortTransactions } from './portfolioUtils';
 import { calculatePerformanceComparison } from './historicalPrices';
+import { runFullAnalysis } from './analysisEngine';
 
 
 import { Hono } from 'hono';
@@ -2091,6 +2092,43 @@ app.post('/api/portfolio/brokers/override', async (c) => {
   ).run();
 
   return c.json({ success: true });
+});
+
+// API: Value Investor Deep Analysis
+// POST /api/analysis/run
+app.post('/api/analysis/run', async (c) => {
+  const { symbol } = await c.req.json() as any;
+  if (!symbol) return c.json({ error: 'symbol is required' }, 400);
+  try {
+    const result = await runFullAnalysis(c.env, symbol);
+    return c.json(result);
+  } catch (e) {
+    console.error(`Analysis failed for ${symbol}:`, e);
+    return c.json({ error: (e as any).message }, 500);
+  }
+});
+
+// GET /api/analysis/results
+app.get('/api/analysis/results', async (c) => {
+  const symbol = c.req.query('symbol');
+  if (!symbol) return c.json({ error: 'symbol is required' }, 400);
+  const symbolUpper = symbol.toUpperCase();
+  const result = await c.env.DB.prepare(
+    'SELECT * FROM analysis_results WHERE symbol = ? ORDER BY created_at DESC LIMIT 1'
+  ).bind(symbolUpper).first();
+  if (!result) return c.json({ error: 'Analysis not found' }, 404);
+  return c.json(result);
+});
+
+// GET /api/analysis/history
+app.get('/api/analysis/history', async (c) => {
+  const symbol = c.req.query('symbol');
+  if (!symbol) return c.json({ error: 'symbol is required' }, 400);
+  const symbolUpper = symbol.toUpperCase();
+  const { results } = await c.env.DB.prepare(
+    'SELECT id, symbol, conviction_level, created_at FROM analysis_results WHERE symbol = ? ORDER BY created_at DESC'
+  ).bind(symbolUpper).all();
+  return c.json(results);
 });
 
 // Fallback for non-matching API routes
