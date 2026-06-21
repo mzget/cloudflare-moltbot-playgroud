@@ -55,6 +55,34 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
     return brokers.filter(b => b.broker_name !== 'Cash');
   }, [brokers]);
 
+  const activeStocksCount = React.useMemo(() => {
+    return holdings.filter(h => h.status === 'Open' && (h.shares || 0) > 0).length;
+  }, [holdings]);
+
+  const activeFundsCount = React.useMemo(() => {
+    return funds.filter(fund => {
+      if (fund.broker_name === 'Cash') return false;
+      const totalAlloc = allocations
+        .filter(a => a.fund_id === fund.id)
+        .reduce((sum, a) => sum + (a.amount || 0), 0);
+      return totalAlloc > 0;
+    }).length;
+  }, [funds, allocations]);
+
+  const activeCashCount = React.useMemo(() => {
+    const hasCashAllocation = funds.some(fund => {
+      if (fund.broker_name !== 'Cash') return false;
+      const totalAlloc = allocations
+        .filter(a => a.fund_id === fund.id)
+        .reduce((sum, a) => sum + (a.amount || 0), 0);
+      return totalAlloc > 0;
+    });
+
+    const hasCashBroker = brokers.some(b => b.broker_name === 'Cash' && (b.balance || 0) > 0);
+
+    return (hasCashAllocation || hasCashBroker) ? 1 : 0;
+  }, [funds, allocations, brokers]);
+
   const brokerTotals = React.useMemo(() => {
     if (displayedBrokers.length === 0) return null;
     const cost = displayedBrokers.reduce((sum, b) => sum + (b.cost || 0), 0);
@@ -382,9 +410,14 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
         {/* Pie chart to see percent of all assets */}
         <Grid xs={12} md={4}>
           <Sheet sx={{ ...glassStyle, p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <Typography level="title-md" sx={{ fontWeight: 800, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Landmark size={18} color="#10b981" /> Asset Allocation
-            </Typography>
+            <Box sx={{ mb: 2 }}>
+              <Typography level="title-md" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Landmark size={18} color="#10b981" /> Asset Allocation
+              </Typography>
+              <Typography level="body-xs" sx={{ opacity: 0.6, mt: 0.5, fontWeight: 500 }}>
+                {activeStocksCount} stocks • {activeFundsCount} funds • {activeCashCount} cash
+              </Typography>
+            </Box>
             <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
               <AssetAllocationChart
                 brokers={brokers}
