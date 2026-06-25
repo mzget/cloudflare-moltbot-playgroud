@@ -725,6 +725,15 @@ app.put('/api/notifications', async (c) => {
   return c.text('Notifications updated');
 });
 
+app.delete('/api/notifications', async (c) => {
+  try {
+    await c.env.DB.prepare('DELETE FROM in_app_notifications WHERE is_read = 1').run();
+    return c.text('Read notifications cleared');
+  } catch (e) {
+    return c.json({ error: (e as any).message }, 500);
+  }
+});
+
 // API: Trigger Alert Checks Manually (Test)
 app.get('/api/alerts/check-test', async (c) => {
   try {
@@ -2151,6 +2160,8 @@ export default {
             id: `cron-fb-${Date.now()}`,
             params: {
               syncFacebookPosts: true,
+              fetchMarketStats: true,
+              priceOnly: true,
             }
           });
           console.log("Facebook-only workflow instance triggered successfully.");

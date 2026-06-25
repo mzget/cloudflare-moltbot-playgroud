@@ -134,6 +134,19 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
     }
   };
 
+  const handleClearRead = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/notifications`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        setNotifications(prev => prev.filter(n => n.is_read === 0));
+      }
+    } catch (e) {
+      console.error("Failed to clear read notifications", e);
+    }
+  };
+
   useEffect(() => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
       if (Notification.permission === 'default') {
@@ -449,17 +462,30 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
                 {/* Header */}
                 <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid', borderColor: 'divider' }}>
                   <Typography level="title-md" sx={{ fontWeight: 700 }}>{t('header.notifications')}</Typography>
-                  {unreadCount > 0 && (
-                    <Button 
-                      size="sm" 
-                      variant="plain" 
-                      color="primary" 
-                      onClick={handleMarkAllAsRead}
-                      sx={{ fontSize: '0.75rem', fontWeight: 600, p: 0.5, minHeight: 0 }}
-                    >
-                      {t('header.mark_all_read')}
-                    </Button>
-                  )}
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    {unreadCount > 0 && (
+                      <Button 
+                        size="sm" 
+                        variant="plain" 
+                        color="primary" 
+                        onClick={handleMarkAllAsRead}
+                        sx={{ fontSize: '0.75rem', fontWeight: 600, p: 0.5, minHeight: 0 }}
+                      >
+                        {t('header.mark_all_read')}
+                      </Button>
+                    )}
+                    {notifications.length > unreadCount && (
+                      <Button 
+                        size="sm" 
+                        variant="plain" 
+                        color="neutral" 
+                        onClick={handleClearRead}
+                        sx={{ fontSize: '0.75rem', fontWeight: 600, p: 0.5, minHeight: 0 }}
+                      >
+                        {t('header.clear_read')}
+                      </Button>
+                    )}
+                  </Stack>
                 </Box>
 
                 {/* List */}

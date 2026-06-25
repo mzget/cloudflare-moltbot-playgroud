@@ -24,6 +24,7 @@ export interface OaktreeWorkflowParams {
 	sendDailyEmailReport?: boolean;
 	purgeOldData?: boolean;
 	syncFacebookPosts?: boolean;
+	priceOnly?: boolean;
 }
 
 export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflowParams> {
@@ -32,8 +33,10 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 
 		if (params.fetchMarketStats) {
 			await step.do('fetch-market-stats', async () => {
-				const statsResult = await fetchAndStoreMarketStats(this.env);
-				await recordDailyPortfolioHistory(this.env.DB);
+				const statsResult = await fetchAndStoreMarketStats(this.env, params.priceOnly);
+				if (!params.priceOnly) {
+					await recordDailyPortfolioHistory(this.env.DB);
+				}
 				return statsResult;
 			});
 		}

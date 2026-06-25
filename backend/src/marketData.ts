@@ -1,5 +1,15 @@
 import { Env } from './index';
 
+// Returns true if the US stock market is currently open (Mon-Fri, 9:30-16:00 ET).
+// Uses UTC 13:30-21:00 window to cover both EDT (UTC-4) and EST (UTC-5).
+function isUSMarketOpen(): boolean {
+	const now = new Date();
+	const day = now.getUTCDay(); // 0 = Sun, 6 = Sat
+	if (day === 0 || day === 6) return false;
+	const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+	return utcMinutes >= 13 * 60 + 30 && utcMinutes < 21 * 60;
+}
+
 interface FinnhubResponse {
 	metric?: Record<string, any>;
 	symbol?: string;
@@ -7,11 +17,13 @@ interface FinnhubResponse {
 	series?: Record<string, any>;
 }
 
-export async function fetchAndStoreMarketStats(env: Env): Promise<{ symbol: string, success: boolean, price?: number | null, error?: string }[]> {
+export async function fetchAndStoreMarketStats(env: Env, priceOnly = false): Promise<{ symbol: string, success: boolean, price?: number | null, error?: string }[]> {
 	const apiKey = env.FINNHUB_API_KEY;
 	const runResults: { symbol: string, success: boolean, price?: number | null, error?: string }[] = [];
-	if (!apiKey) {
-		console.warn('FINNHUB_API_KEY is not set. Skipping market stats update.');
+	
+	// Price-only mode: skip entirely when US market is closed
+	if (priceOnly && !isUSMarketOpen()) {
+		console.log('Market is closed. Skipping price-only update.');
 		return runResults;
 	}
 
@@ -113,7 +125,7 @@ export async function fetchAndStoreMarketStats(env: Env): Promise<{ symbol: stri
 		}
 	};
 
-	console.log(`Fetching market stats from Finnhub for ${results.length} symbols...`);
+	console.log(`Fetching market stats from Finnhub for ${results.length} symbols${priceOnly ? " (price-only)" : ""}...`);
 
 	for (const row of results) {
 		const symbol = row.symbol as string;
