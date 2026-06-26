@@ -12,7 +12,7 @@ import { useTranslation } from 'react-i18next';
 import '../i18n';
 import RoutesLayout from './layout/RoutesLayout';
 import LoginScreen from './features/auth/LoginScreen';
-import { API_BASE_URL } from '../config';
+import { API_BASE_URL, MCP_WORKER_URL } from '../config';
 import { AuthContext } from './common/AuthContext';
 import type { User } from './common/AuthContext';
 import { useSettingsStore } from '../store/settingsStore';
@@ -30,8 +30,12 @@ if (typeof window !== 'undefined') {
       url.startsWith('http://127.0.0.1:8787') ||
       url.startsWith('/api/');
 
+    const isMcpWorker = url.startsWith(MCP_WORKER_URL) ||
+      url.startsWith('http://localhost:8789') ||
+      url.startsWith('http://127.0.0.1:8789');
+
     const token = localStorage.getItem('auth_token');
-    if (token && isBackend) {
+    if (token && (isBackend || isMcpWorker)) {
       init = init || {};
       const headers = new Headers(init.headers);
       if (!headers.has('Authorization')) {

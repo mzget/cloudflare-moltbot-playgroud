@@ -1,4 +1,4 @@
-﻿import { McpAgent } from "agents/mcp";
+import { McpAgent } from "agents/mcp";
 // @ts-ignore
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
@@ -213,6 +213,70 @@ export class OaktreeChat extends AIChatAgent<any> {
     });
   }
 }
+// Helper functions for JWT verification inside the worker
+function base64urlDecode(str: string): string {
+  const base64 = str.replace(/-/g, '+').replace(/_/g, '/');
+  const binString = atob(base64);
+  const bytes = Uint8Array.from(binString, (m) => m.codePointAt(0)!);
+  return new TextDecoder().decode(bytes);
+}
+
+async function verifyJwt(token: string, secret: string): Promise<any | null> {
+  const parts = token.split('.');
+  if (parts.length !== 3) return null;
+  
+  const [encodedHeader, encodedPayload, encodedSignature] = parts;
+  const encoder = new TextEncoder();
+  const data = encoder.encode(`${encodedHeader}.${encodedPayload}`);
+  
+  try {
+    const key = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['verify']
+    );
+    
+    const signatureBytes = new Uint8Array(
+      atob(encodedSignature.replace(/-/g, '+').replace(/_/g, '/'))
+        .split('')
+        .map(c => c.charCodeAt(0))
+    );
+    
+    const isValid = await crypto.subtle.verify('HMAC', key, signatureBytes, data);
+    if (!isValid) return null;
+    
+    const payload = JSON.parse(base64urlDecode(encodedPayload));
+    if (payload.exp && Date.now() > payload.exp * 1000) {
+      return null;
+    }
+    return payload;
+  } catch (e) {
+    return null;
+  }
+}
+
+async function authenticateRequest(request: Request, env: any): Promise<{ email: string } | Response> {
+  if (env.IS_LOCAL === 'true') {
+    return { email: 'local@example.com' };
+  }
+
+  const authHeader = request.headers.get("Authorization");
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return new Response("Unauthorized: Missing or invalid token format", { status: 401 });
+  }
+
+  const token = authHeader.substring(7);
+  const jwtSecret = env.JWT_SECRET || 'dev-secret-key-123456';
+  
+  const payload = await verifyJwt(token, jwtSecret);
+  if (!payload || !payload.email) {
+    return new Response("Unauthorized: Invalid or expired token", { status: 401 });
+  }
+
+  return { email: payload.email };
+}
 
 const mcpFetch = OaktreeMCP.serve("/mcp", { binding: "OAKTREE_MCP" }).fetch;
 
@@ -220,21 +284,44 @@ export default {
   async fetch(request: Request, env: any, ctx: ExecutionContext) {
     const url = new URL(request.url);
 
+    // Resolve the allowed origin dynamically
+    const origin = request.headers.get("Origin");
+    const allowedOrigin = (origin === "https://oaktree-agent-frontend.pages.dev" || (origin && origin.startsWith("http://localhost:")))
+      ? origin
+      : "https://oaktree-agent-frontend.pages.dev";
+
     // Handle CORS for all requests
     if (request.method === "OPTIONS") {
       return new Response(null, {
         headers: {
-          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Origin": allowedOrigin,
           "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-          "Access-Control-Allow-Headers": "Content-Type, Authorization",
+          "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Session-ID, x-session-id",
         },
       });
     }
 
     if (url.pathname === "/chat" && request.method === "POST") {
-      const sessionIdHeader = request.headers.get("X-Session-ID") || url.searchParams.get("sessionId") || "default";
+      const auth = await authenticateRequest(request, env);
+      if (auth instanceof Response) {
+        const errorResponse = new Response(auth.body, auth);
+        errorResponse.headers.set("Access-Control-Allow-Origin", allowedOrigin);
+        return errorResponse;
+      }
+
+      const sessionIdHeader = request.headers.get("X-Session-ID") || url.searchParams.get("sessionId") || auth.email;
       const sessionName = sessionIdHeader.replace(/[^a-zA-Z0-9-_]/g, "_").slice(0, 64);
       
+      // Prevent horizontal privilege escalation: users can only fetch their own session (unless local dev)
+      if (env.IS_LOCAL !== 'true' && sessionIdHeader !== auth.email) {
+        return new Response("Forbidden: Session ID mismatch", {
+          status: 403,
+          headers: {
+            "Access-Control-Allow-Origin": allowedOrigin,
+          }
+        });
+      }
+
       const agent = await getAgentByName(env.OAKTREE_CHAT, sessionName);
       
       // Rewrite path to match Durable Object routing convention:
@@ -244,25 +331,39 @@ export default {
       
       const response = await agent.fetch(rewrittenRequest);
       const newResponse = new Response(response.body, response);
-      newResponse.headers.set("Access-Control-Allow-Origin", "*");
+      newResponse.headers.set("Access-Control-Allow-Origin", allowedOrigin);
       return newResponse;
     }
 
     if (url.pathname === "/database-chat/status" && request.method === "GET") {
+      const auth = await authenticateRequest(request, env);
+      if (auth instanceof Response) {
+        const errorResponse = new Response(auth.body, auth);
+        errorResponse.headers.set("Access-Control-Allow-Origin", allowedOrigin);
+        return errorResponse;
+      }
+
       return new Response(JSON.stringify({ enabled: env.ENABLE_DATABASE_AGENT === "true" }), {
         headers: {
           "Content-Type": "application/json",
-          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Origin": allowedOrigin,
         }
       });
     }
 
     if (url.pathname === "/database-chat" && request.method === "POST") {
+      const auth = await authenticateRequest(request, env);
+      if (auth instanceof Response) {
+        const errorResponse = new Response(auth.body, auth);
+        errorResponse.headers.set("Access-Control-Allow-Origin", allowedOrigin);
+        return errorResponse;
+      }
+
       if (env.ENABLE_DATABASE_AGENT !== "true") {
         return new Response("The Database Agent is temporarily disabled.", {
           status: 403,
           headers: {
-            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Origin": allowedOrigin,
           }
         });
       }
@@ -444,14 +545,14 @@ export default {
 
       return result.toUIMessageStreamResponse({
         headers: {
-          "Access-Control-Allow-Origin": "*",
+          "Access-Control-Allow-Origin": allowedOrigin,
         }
       });
     }
 
     const response = await mcpFetch(request, env, ctx);
     const newResponse = new Response(response.body, response);
-    newResponse.headers.set("Access-Control-Allow-Origin", "*");
+    newResponse.headers.set("Access-Control-Allow-Origin", allowedOrigin);
     return newResponse;
   }
 }
