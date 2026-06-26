@@ -1,10 +1,12 @@
-import { McpAgent } from "agents/mcp";
+﻿import { McpAgent } from "agents/mcp";
 // @ts-ignore
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { getPortfolio, getPortfolioHistory, getKnowledgeByCategory, searchKnowledge, getLatestAnalysisReport } from "./knowledge";
 import { createWorkersAI } from "workers-ai-provider";
 import { streamText, tool, convertToModelMessages, UIMessage } from "ai";
+import { AIChatAgent } from "@cloudflare/ai-chat";
+import { getAgentByName } from "agents";
 
 export class OaktreeMCP extends McpAgent {
   server = new McpServer({ name: "oaktree-mcp", version: "1.0.0" });
@@ -85,6 +87,133 @@ export class OaktreeMCP extends McpAgent {
   }
 }
 
+export class OaktreeChat extends AIChatAgent<any> {
+  async onChatMessage(onFinish: any, options?: any) {
+    const workersai = createWorkersAI({ binding: this.env.AI });
+    const model = workersai('@cf/google/gemma-4-26b-a4b-it');
+
+    const systemPrompt = "คุณคือ Oaktree AI ผู้ช่วยวิเคราะห์ข้อมูลการลงทุนแบบเน้นคุณค่า (Value Investing) ตามหลักการลงทุนของ Warren Buffett, Charlie Munger, Howard Marks, และอื่น ๆ กรุณาตอบข้อมูลต่าง ๆ โดยอ้างอิงจากข้อมูลที่มีอยู่ในฐานข้อมูล หรือใช้เครื่องมือเสริมการค้นหาที่มีให้ (เช่น getAnalysisReport, getPortfolio, getKnowledge) ตอบคำถามให้ตรงประเด็นและกระชับที่สุด\n" +
+      "You also have read-only access to the full database via queryDatabase and listTables tools.\n" +
+      "If the fixed tools do not contain the necessary information to answer a question (e.g., about specific broker balances, new tables, or complex queries), use listTables to understand the available tables and columns, then write and run SELECT queries using queryDatabase. Only SELECT queries are permitted.";
+
+    const result = (streamText as any)({
+      model,
+      messages: await convertToModelMessages(this.messages),
+      system: systemPrompt,
+      tools: {
+        getPortfolio: tool({
+          description: "Get all portfolio holdings",
+          parameters: z.object({}),
+          execute: async () => getPortfolio(this.env as any),
+        } as any) as any,
+        getPortfolioHistory: tool({
+          description: "Get portfolio history",
+          parameters: z.object({}),
+          execute: async () => getPortfolioHistory(this.env as any),
+        } as any) as any,
+        getKnowledge: tool({
+          description: "Get investment knowledge by category",
+          parameters: z.object({ category: z.string() }),
+          execute: async ({ category }: any) => getKnowledgeByCategory(this.env as any, category),
+        } as any) as any,
+        searchKnowledge: tool({
+          description: "Search knowledge base stored in D1",
+          parameters: z.object({ query: z.string() }),
+          execute: async ({ query }: any) => searchKnowledge(this.env as any, query),
+        } as any) as any,
+        getAnalysisReport: tool({
+          description: "Get the latest value investor deep analysis report for a stock symbol",
+          parameters: z.object({ symbol: z.string() }),
+          execute: async ({ symbol }: any) => getLatestAnalysisReport(this.env as any, symbol),
+        } as any) as any,
+        queryNotebookLM: tool({
+          description: "Query the user's NotebookLM notebooks for deep research context. Use this for earnings calls, 10-K/10-Q filings, company analysis, and detailed investment research that goes beyond the local knowledge base.",
+          parameters: z.object({
+            question: z.string().describe("The research question to ask NotebookLM"),
+            notebookId: z.string().optional().describe("Optional specific notebook ID to query"),
+          }),
+          execute: async ({ question, notebookId }: any) => {
+            const env = this.env as any;
+            const bridgeUrl = env.NOTEBOOKLM_BRIDGE_URL;
+            if (!bridgeUrl) {
+              return { error: "NotebookLM bridge not configured. NOTEBOOKLM_BRIDGE_URL is not set." };
+            }
+            try {
+              const body: Record<string, string> = { question };
+              if (notebookId) body.notebookId = notebookId;
+
+              const response = await fetch(`${bridgeUrl}/ask`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  ...(env.BRIDGE_SECRET ? { Authorization: `Bearer ${env.BRIDGE_SECRET}` } : {}),
+                },
+                body: JSON.stringify(body),
+                signal: AbortSignal.timeout(30000), // 30s timeout
+              });
+
+              if (!response.ok) {
+                const err = await response.text();
+                return { error: `Bridge error ${response.status}: ${err}` };
+              }
+
+              const data = await response.json() as { answer?: string; error?: string };
+              return data.answer ? { answer: data.answer } : { error: data.error || "No answer returned" };
+            } catch (err: any) {
+              return { error: `Failed to reach NotebookLM bridge: ${err.message}` };
+            }
+          },
+        } as any) as any,
+        queryDatabase: tool({
+          description: "Execute a read-only SQL query against the D1 database. Use this to answer questions about portfolio, holdings, market data, knowledge, news, or any other data. Only SELECT queries are allowed.",
+          parameters: z.object({
+            sql: z.string().describe("A SELECT SQL query to execute"),
+          }),
+          execute: async ({ sql }: any) => {
+            if (!sql.trim().toLowerCase().startsWith("select")) {
+              return { error: "Only SELECT queries are allowed. This tool is read-only." };
+            }
+            try {
+              const { results } = await (this.env as any).DB.prepare(sql).all();
+              return { results: results.slice(0, 50) };
+            } catch (e: any) {
+              return { error: e.message };
+            }
+          },
+        } as any) as any,
+        listTables: tool({
+          description: "List all database tables and their schemas. Use this to understand what data is available before writing SQL queries.",
+          parameters: z.object({}),
+          execute: async () => {
+            try {
+              const { results: tables } = await (this.env as any).DB.prepare(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'"
+              ).all();
+              const schemas: Record<string, any[]> = {};
+              for (const t of tables as any[]) {
+                const { results: cols } = await (this.env as any).DB.prepare(`PRAGMA table_info(${t.name})`).all();
+                schemas[t.name] = cols;
+              }
+              return { tables: schemas };
+            } catch (e: any) {
+              return { error: e.message };
+            }
+          },
+        } as any) as any,
+      },
+      maxSteps: 10,
+      abortSignal: options?.abortSignal,
+      onFinish,
+    } as any);
+
+    return result.toUIMessageStreamResponse({
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+      }
+    });
+  }
+}
+
 const mcpFetch = OaktreeMCP.serve("/mcp", { binding: "OAKTREE_MCP" }).fetch;
 
 export default {
@@ -103,86 +232,20 @@ export default {
     }
 
     if (url.pathname === "/chat" && request.method === "POST") {
-      const { messages }: { messages: UIMessage[] } = await request.json() as any;
-      const workersai = createWorkersAI({ binding: env.AI });
-      const model = workersai('@cf/google/gemma-4-26b-a4b-it');
-
-      const result = (streamText as any)({
-        model,
-        messages: await convertToModelMessages(messages),
-        system: "คุณคือ Oaktree AI ผู้ช่วยวิเคราะห์หุ้นและพอร์ตการลงทุนตามแนวคิดของนักลงทุนระดับโลก เช่น Warren Buffett, Charlie Munger, Howard Marks, และคนอื่นๆ จงตอบคำถามในฐานะผู้เชี่ยวชาญ ค้นหาข้อมูลผลวิเคราะห์จากฐานข้อมูล (ด้วยเครื่องมือ getAnalysisReport, getPortfolio, getKnowledge) เพื่อนำมาเป็นความรู้อ้างอิงในการพูดคุยกับผู้ใช้งาน และตอบคำถามเป็นภาษาไทยอย่างสุภาพและลึกซึ้ง",
-        tools: {
-          getPortfolio: tool({
-            description: "Get all portfolio holdings",
-            parameters: z.object({}),
-            execute: async () => getPortfolio(env),
-          } as any) as any,
-          getPortfolioHistory: tool({
-            description: "Get portfolio history",
-            parameters: z.object({}),
-            execute: async () => getPortfolioHistory(env),
-          } as any) as any,
-          getKnowledge: tool({
-            description: "Get investment knowledge by category",
-            parameters: z.object({ category: z.string() }),
-            execute: async ({ category }: any) => getKnowledgeByCategory(env, category),
-          } as any) as any,
-          searchKnowledge: tool({
-            description: "Search knowledge base stored in D1",
-            parameters: z.object({ query: z.string() }),
-            execute: async ({ query }: any) => searchKnowledge(env, query),
-          } as any) as any,
-          getAnalysisReport: tool({
-            description: "Get the latest value investor deep analysis report for a stock symbol",
-            parameters: z.object({ symbol: z.string() }),
-            execute: async ({ symbol }: any) => getLatestAnalysisReport(env, symbol),
-          } as any) as any,
-          queryNotebookLM: tool({
-            description: "Query the user's NotebookLM notebooks for deep research context — use this for earnings calls, 10-K/10-Q filings, company analysis, and detailed investment research that goes beyond the local knowledge base.",
-            parameters: z.object({
-              question: z.string().describe("The research question to ask NotebookLM"),
-              notebookId: z.string().optional().describe("Optional specific notebook ID to query"),
-            }),
-            execute: async ({ question, notebookId }: any) => {
-              const bridgeUrl = env.NOTEBOOKLM_BRIDGE_URL;
-              if (!bridgeUrl) {
-                return { error: "NotebookLM bridge not configured. NOTEBOOKLM_BRIDGE_URL is not set." };
-              }
-              try {
-                const body: Record<string, string> = { question };
-                if (notebookId) body.notebookId = notebookId;
-
-                const response = await fetch(`${bridgeUrl}/ask`, {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    ...(env.BRIDGE_SECRET ? { Authorization: `Bearer ${env.BRIDGE_SECRET}` } : {}),
-                  },
-                  body: JSON.stringify(body),
-                  signal: AbortSignal.timeout(30000), // 30s timeout
-                });
-
-                if (!response.ok) {
-                  const err = await response.text();
-                  return { error: `Bridge error ${response.status}: ${err}` };
-                }
-
-                const data = await response.json() as { answer?: string; error?: string };
-                return data.answer ? { answer: data.answer } : { error: data.error || "No answer returned" };
-              } catch (err: any) {
-                return { error: `Failed to reach NotebookLM bridge: ${err.message}` };
-              }
-            },
-          } as any) as any,
-        },
-        maxSteps: 5,
-      } as any);
-
-      return result.toUIMessageStreamResponse({
-        headers: {
-          "Access-Control-Allow-Origin": "*",
-        }
-      });
+      const sessionIdHeader = request.headers.get("X-Session-ID") || url.searchParams.get("sessionId") || "default";
+      const sessionName = sessionIdHeader.replace(/[^a-zA-Z0-9-_]/g, "_").slice(0, 64);
+      
+      const agent = await getAgentByName(env.OAKTREE_CHAT, sessionName);
+      
+      // Rewrite path to match Durable Object routing convention:
+      const newUrl = new URL(request.url);
+      newUrl.pathname = `/agents/oaktree-chat/${sessionName}`;
+      const rewrittenRequest = new Request(newUrl.toString(), request);
+      
+      const response = await agent.fetch(rewrittenRequest);
+      const newResponse = new Response(response.body, response);
+      newResponse.headers.set("Access-Control-Allow-Origin", "*");
+      return newResponse;
     }
 
     if (url.pathname === "/database-chat/status" && request.method === "GET") {
@@ -392,3 +455,4 @@ export default {
     return newResponse;
   }
 }
+
