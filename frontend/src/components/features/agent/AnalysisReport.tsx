@@ -3,6 +3,7 @@ import { Box, Button, Typography, Sheet, CircularProgress, Divider, Stack } from
 import { ArrowLeft, RotateCw, CheckCircle, AlertTriangle, Play } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
+import MarkdownRenderer from '../../common/MarkdownRenderer';
 
 interface AnalysisReportProps {
   symbol: string;
@@ -49,7 +50,7 @@ export default function AnalysisReport({ symbol, onBack }: AnalysisReportProps) 
         body: JSON.stringify({ symbol })
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
+        const err = (await res.json().catch(() => ({}))) as any;
         throw new Error(err.error || 'การวิเคราะห์ขัดข้อง');
       }
       const data = await res.json();
@@ -61,144 +62,7 @@ export default function AnalysisReport({ symbol, onBack }: AnalysisReportProps) 
     }
   };
 
-  const renderMarkdown = (md: string) => {
-    const lines = md.split('\n');
-    const elements: React.ReactNode[] = [];
-    let inList = false;
-    let listItems: React.ReactNode[] = [];
-    let inTable = false;
-    let tableRows: string[][] = [];
-    let tableHeaders: string[] = [];
 
-    const flushList = (key: string | number) => {
-      if (listItems.length > 0) {
-        elements.push(
-          <Box component="ul" key={`list-${key}`} sx={{ pl: 3, my: 1.5, color: 'text.secondary' }}>
-            {listItems}
-          </Box>
-        );
-        listItems = [];
-        inList = false;
-      }
-    };
-
-    const flushTable = (key: string | number) => {
-      if (tableRows.length > 0 || tableHeaders.length > 0) {
-        elements.push(
-          <Box key={`table-wrapper-${key}`} sx={{ overflowX: 'auto', my: 2, borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-              {tableHeaders.length > 0 && (
-                <thead>
-                  <tr style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-                    {tableHeaders.map((th, idx) => (
-                      <th key={`th-${idx}`} style={{ padding: '10px 14px', fontSize: '14px', fontWeight: 600 }}>{th}</th>
-                    ))}
-                  </tr>
-                </thead>
-              )}
-              <tbody>
-                {tableRows.map((row, rowIdx) => (
-                  <tr key={`tr-${rowIdx}`} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    {row.map((cell, cellIdx) => (
-                      <td key={`td-${cellIdx}`} style={{ padding: '10px 14px', fontSize: '14px', color: 'rgba(255,255,255,0.8)' }}>{cell}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Box>
-        );
-        tableRows = [];
-        tableHeaders = [];
-        inTable = false;
-      }
-    };
-
-    const parseInline = (text: string) => {
-      const parts = text.split(/\*\*([^\*]+)\*\*/g);
-      return parts.map((part, index) => {
-        if (index % 2 === 1) {
-          return <strong key={index} style={{ color: '#10b981' }}>{part}</strong>;
-        }
-        return part;
-      });
-    };
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-
-      if (line.startsWith('|') && line.includes('---')) {
-        continue;
-      }
-
-      if (line.startsWith('|') && line.endsWith('|')) {
-        flushList(i);
-        const cells = line.split('|').map(c => c.trim()).filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
-        if (!inTable) {
-          inTable = true;
-          tableHeaders = cells;
-        } else {
-          tableRows.push(cells);
-        }
-        continue;
-      } else {
-        flushTable(i);
-      }
-
-      if (line.startsWith('- ') || line.startsWith('* ')) {
-        inList = true;
-        listItems.push(
-          <Box component="li" key={`li-${i}`} sx={{ my: 0.5 }}>
-            {parseInline(line.substring(2))}
-          </Box>
-        );
-        continue;
-      } else {
-        flushList(i);
-      }
-
-      if (line.startsWith('# ')) {
-        elements.push(
-          <Typography level="h2" key={i} sx={{ mt: 3, mb: 1.5, fontWeight: 800, color: 'text.primary', borderBottom: '1px solid', borderColor: 'divider', pb: 1 }}>
-            {parseInline(line.substring(2))}
-          </Typography>
-        );
-      } else if (line.startsWith('## ')) {
-        elements.push(
-          <Typography level="h3" key={i} sx={{ mt: 2.5, mb: 1, fontWeight: 700, color: 'text.primary' }}>
-            {parseInline(line.substring(3))}
-          </Typography>
-        );
-      } else if (line.startsWith('### ')) {
-        elements.push(
-          <Typography level="title-lg" key={i} sx={{ mt: 2, mb: 0.5, fontWeight: 600, color: 'text.primary' }}>
-            {parseInline(line.substring(4))}
-          </Typography>
-        );
-      } else if (line.startsWith('> ')) {
-        elements.push(
-          <Box key={i} sx={{ borderLeft: '4px solid #10b981', pl: 2, my: 2, py: 0.5, bgcolor: 'rgba(16, 185, 129, 0.05)', borderRadius: '0 8px 8px 0' }}>
-            <Typography level="body-md" sx={{ fontStyle: 'italic', color: 'rgba(255,255,255,0.9)' }}>
-              {parseInline(line.substring(2))}
-            </Typography>
-          </Box>
-        );
-      } else if (line === '') {
-        continue;
-      } else {
-        elements.push(
-          <Typography level="body-md" key={i} sx={{ mb: 1.5, lineHeight: 1.7, color: 'rgba(255,255,255,0.8)' }}>
-            {parseInline(line)}
-          </Typography>
-        );
-      }
-    }
-
-    flushList('end');
-    flushTable('end');
-
-    return elements;
-  };
 
   if (loading) {
     return (
@@ -274,7 +138,7 @@ export default function AnalysisReport({ symbol, onBack }: AnalysisReportProps) 
         </Stack>
         <Divider sx={{ mb: 4, opacity: 0.1 }} />
         <Box className="markdown-body">
-          {renderMarkdown(report.summary)}
+          <MarkdownRenderer text={report.summary} />
         </Box>
       </Sheet>
     </Box>

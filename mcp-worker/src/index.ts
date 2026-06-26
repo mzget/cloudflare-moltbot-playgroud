@@ -6,7 +6,7 @@ import { getPortfolio, getPortfolioHistory, getKnowledgeByCategory, searchKnowle
 import { createWorkersAI } from "workers-ai-provider";
 import { streamText, tool, convertToModelMessages, UIMessage } from "ai";
 import { AIChatAgent } from "@cloudflare/ai-chat";
-import { getAgentByName } from "agents";
+import { getAgentByName, routeAgentRequest } from "agents";
 
 export class OaktreeMCP extends McpAgent {
   server = new McpServer({ name: "oaktree-mcp", version: "1.0.0" });
@@ -325,12 +325,20 @@ async function authenticateRequest(request: Request, env: any): Promise<{ email:
     return { email: 'local@example.com' };
   }
 
-  const authHeader = request.headers.get("Authorization");
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+  const url = new URL(request.url);
+  let token = url.searchParams.get("token");
+
+  if (!token) {
+    const authHeader = request.headers.get("Authorization");
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.substring(7);
+    }
+  }
+
+  if (!token) {
     return new Response("Unauthorized: Missing or invalid token format", { status: 401 });
   }
 
-  const token = authHeader.substring(7);
   const jwtSecret = env.JWT_SECRET || 'dev-secret-key-123456';
   
   const payload = await verifyJwt(token, jwtSecret);
@@ -364,7 +372,7 @@ export default {
       });
     }
 
-    if (url.pathname === "/chat" && request.method === "POST") {
+    if (url.pathname.startsWith("/agents/")) {
       const auth = await authenticateRequest(request, env);
       if (auth instanceof Response) {
         const errorResponse = new Response(auth.body, auth);
@@ -372,11 +380,12 @@ export default {
         return errorResponse;
       }
 
-      const sessionIdHeader = request.headers.get("X-Session-ID") || url.searchParams.get("sessionId") || auth.email;
-      const sessionName = sessionIdHeader.replace(/[^a-zA-Z0-9-_]/g, "_").slice(0, 64);
+      const parts = url.pathname.split("/");
+      const sessionName = parts[3];
+      const normalizedEmailSession = auth.email.replace(/[^a-zA-Z0-9-_]/g, "_").slice(0, 64);
       
-      // Prevent horizontal privilege escalation: users can only fetch their own session (unless local dev)
-      if (env.IS_LOCAL !== 'true' && sessionIdHeader !== auth.email) {
+      // Prevent horizontal privilege escalation: users can only connect to their own session (unless local dev)
+      if (env.IS_LOCAL !== 'true' && sessionName !== normalizedEmailSession) {
         return new Response("Forbidden: Session ID mismatch", {
           status: 403,
           headers: {
@@ -385,17 +394,12 @@ export default {
         });
       }
 
-      const agent = await getAgentByName(env.OAKTREE_CHAT, sessionName);
-      
-      // Rewrite path to match Durable Object routing convention:
-      const newUrl = new URL(request.url);
-      newUrl.pathname = `/agents/oaktree-chat/${sessionName}`;
-      const rewrittenRequest = new Request(newUrl.toString(), request);
-      
-      const response = await agent.fetch(rewrittenRequest);
-      const newResponse = new Response(response.body, response);
-      newResponse.headers.set("Access-Control-Allow-Origin", allowedOrigin);
-      return newResponse;
+      const response = await routeAgentRequest(request, env);
+      if (response) {
+        const newResponse = new Response(response.body, response);
+        newResponse.headers.set("Access-Control-Allow-Origin", allowedOrigin);
+        return newResponse;
+      }
     }
 
     if (url.pathname === "/database-chat/status" && request.method === "GET") {
