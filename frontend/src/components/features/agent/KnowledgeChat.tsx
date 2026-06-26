@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+﻿import React, { useState, useContext } from 'react';
+import { AuthContext } from '../../common/AuthContext';
 import { Box, Typography, Input, Button, Card, Stack, Sheet, CircularProgress } from '@mui/joy';
 import { Send, Bot } from 'lucide-react';
 import { useChat } from '@ai-sdk/react';
@@ -8,10 +9,15 @@ import { glassStyle } from '../../../styles/glass';
 
 export default function KnowledgeChat() {
   const [input, setInput] = useState('');
+  const { user } = useContext(AuthContext);
+  const sessionId = user?.email || 'default';
 
   const { messages, sendMessage, status } = useChat({
     transport: new DefaultChatTransport({
       api: `${MCP_WORKER_URL}/chat`,
+      headers: {
+        'X-Session-ID': sessionId,
+      },
     }),
   });
 
@@ -119,3 +125,5 @@ export default function KnowledgeChat() {
     </Card>
   );
 }
+
+
