@@ -1,11 +1,12 @@
 import { fmtNum, fmtPct, fmtShares, gainClass } from '../../../utils/format';
 import * as React from 'react';
-import { Box, Typography, Input, Select, Option, Button } from '@mui/joy';
+import { Box, Typography, Input, Select, Option, Button, Modal, ModalDialog, DialogTitle, DialogContent } from '@mui/joy';
 import { Plus, Trash2, Check, Pencil, X } from 'lucide-react';
 import { useHoldingDetails } from '../portfolio/hooks/useHoldingDetails';
 import type { Lot, Transaction, Dividend } from '../portfolio/hooks/useHoldingDetails';
 import '../../../styles/yahooPortfolio.css';
 import { useSettingsStore } from '../../../store/settingsStore';
+import { glassStyle } from '../../../styles/glass';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -43,7 +44,8 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
     addDiv,
     deleteLot,
     deleteTxn,
-    deleteDiv
+    deleteDiv,
+    deleteSymbolTransactions
   } = useHoldingDetails(symbol, onDataChange);
 
   // Add-form visibility state
@@ -63,6 +65,8 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
   const [newDiv, setNewDiv] = React.useState({
     date: getTodayDate(), amount: '', per_share: '', note: '',
   });
+
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
 
   // Edit-transaction state
   const [editingTxnId, setEditingTxnId] = React.useState<number | null>(null);
@@ -234,6 +238,20 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
       await deleteDiv(id);
     } catch (e) {
       console.error('Failed to delete dividend', e);
+    }
+  };
+
+  const handleDeleteAllTxns = async () => {
+    try {
+      const res = await deleteSymbolTransactions();
+      if (res.ok) {
+        setConfirmOpen(false);
+      } else {
+        alert('Failed to delete all transactions.');
+      }
+    } catch (e) {
+      console.error('Failed to delete all transactions', e);
+      alert('Error deleting transactions. Check console.');
     }
   };
 
@@ -560,15 +578,28 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
         <Box sx={{ marginLeft: 'auto', alignSelf: 'center', mb: 0.5 }}>
           
           {activeTab === 'transactions' && (
-            <Button
-              size="sm"
-              variant="plain"
-              color="primary"
-              startDecorator={<Plus size={14} />}
-              onClick={() => setShowForms(prev => ({ ...prev, txn: !prev.txn }))}
-            >
-              {showForms.txn ? 'Cancel' : 'Add Transaction'}
-            </Button>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                size="sm"
+                variant="plain"
+                color="primary"
+                startDecorator={<Plus size={14} />}
+                onClick={() => setShowForms(prev => ({ ...prev, txn: !prev.txn }))}
+              >
+                {showForms.txn ? 'Cancel' : 'Add Transaction'}
+              </Button>
+              {transactions.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="plain"
+                  color="danger"
+                  startDecorator={<Trash2 size={14} />}
+                  onClick={() => setConfirmOpen(true)}
+                >
+                  Delete All
+                </Button>
+              )}
+            </Box>
           )}
           {activeTab === 'dividends' && (
             <Button
@@ -588,6 +619,29 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
       {activeTab === 'lots' && renderLots()}
       {activeTab === 'transactions' && renderTransactions()}
       {activeTab === 'dividends' && renderDividends()}
+
+      {/* Delete All Transactions Confirm Modal */}
+      <Modal open={confirmOpen} onClose={() => setConfirmOpen(false)}>
+        <ModalDialog sx={{ ...glassStyle, minWidth: { xs: '90%', sm: 400 }, maxWidth: 460, borderRadius: '20px', p: 3 }}>
+          <DialogTitle sx={{ fontWeight: 800, fontSize: '1.25rem', mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Trash2 size={20} color="var(--joy-palette-danger-plainColor)" />
+            Confirm Deletion
+          </DialogTitle>
+          <DialogContent sx={{ mb: 2 }}>
+            <Typography level="body-sm">
+              Are you sure you want to delete all transactions for <strong>{symbol}</strong>? This will also remove the ticker from holdings if there are 0 transactions remaining.
+            </Typography>
+          </DialogContent>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5 }}>
+            <Button variant="outlined" color="neutral" size="sm" onClick={() => setConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="solid" color="danger" size="sm" onClick={handleDeleteAllTxns}>
+              Delete All
+            </Button>
+          </Box>
+        </ModalDialog>
+      </Modal>
     </Box>
   );
 }

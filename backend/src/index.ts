@@ -1076,6 +1076,16 @@ app.get('/api/email-digests', async (c) => {
 
 // Helper: Recalculate holdings aggregate from share_lots
 async function recalcHoldings(db: any, symbol: string) {
+  const txCountResult = await db.prepare(
+    'SELECT COUNT(*) as count FROM transactions WHERE symbol = ?'
+  ).bind(symbol).first();
+  const txCount = (txCountResult as any)?.count || 0;
+
+  if (txCount === 0) {
+    await db.prepare('DELETE FROM holdings WHERE symbol = ?').bind(symbol).run();
+    return;
+  }
+
   const { results } = await db.prepare(
     'SELECT SUM(shares) as total_shares, SUM(total_cost) as total_cost FROM share_lots WHERE symbol = ?'
   ).bind(symbol).all();
@@ -1782,6 +1792,14 @@ app.put('/api/portfolio/transactions/:id', async (c) => {
   // 4. Rebuild share lots and update realized gains FIFO-style
   await rebuildLotsAndRealizedGains(c.env.DB, symbol);
 
+  return c.json({ success: true });
+});
+
+// DELETE /api/portfolio/transactions/symbol/:symbol
+app.delete('/api/portfolio/transactions/symbol/:symbol', async (c) => {
+  const symbol = c.req.param('symbol').toUpperCase();
+  await c.env.DB.prepare('DELETE FROM transactions WHERE symbol = ?').bind(symbol).run();
+  await rebuildLotsAndRealizedGains(c.env.DB, symbol);
   return c.json({ success: true });
 });
 
