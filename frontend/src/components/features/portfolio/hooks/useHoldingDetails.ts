@@ -180,6 +180,17 @@ export function useHoldingDetails(symbol: string, onDataChange?: () => void) {
     return res;
   };
 
+  const deleteSymbolTransactions = async () => {
+    const res = await fetch(`${API_BASE_URL}/api/portfolio/transactions/symbol/${symbol}`, {
+      method: 'DELETE',
+    });
+    if (res.ok) {
+      await fetchTransactions();
+      if (onDataChange) onDataChange();
+    }
+    return res;
+  };
+
   const deleteDiv = async (id: number | undefined) => {
     if (!id) return;
     const res = await fetch(`${API_BASE_URL}/api/portfolio/dividends/${id}`, { method: 'DELETE' });
@@ -202,5 +213,6 @@ export function useHoldingDetails(symbol: string, onDataChange?: () => void) {
     deleteLot,
     deleteTxn,
     deleteDiv,
+    deleteSymbolTransactions,
   };
 }
