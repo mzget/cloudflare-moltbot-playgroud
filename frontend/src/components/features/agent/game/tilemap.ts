@@ -51,8 +51,8 @@ export function generateTileMap(rows: number, cols: number): TileMap {
       if (r === 6 && c >= 4 && c <= 8) isSolid = true;
       
 
-      // Override with Pokémon Center 1F interior collisions
-      // Pokémon Center is placed at X0.5, Y14.5 (columns 1 to 15, rows 15 to 24)
+      // Override with Pokemon Center 1F interior collisions
+      // Pokemon Center is placed at X0.5, Y14.5 (columns 1 to 15, rows 15 to 24)
       if (c >= 1 && c <= 15 && r >= 15 && r <= 24) {
         const relC = Math.floor(c - 0.5);
         const relR = Math.floor(r - 14.5);
@@ -187,7 +187,7 @@ export function drawTileMap(
     }
   }
 
-  // Draw Pokémon Center overlay on top of background image or standard tiles
+  // Draw Pokemon Center overlay on top of background image or standard tiles
   if (pokemonCenterImage) {
     ctx.imageSmoothingEnabled = false;
     const destX = 0.5 * tileSize - cameraX;
