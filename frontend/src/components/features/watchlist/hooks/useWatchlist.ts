@@ -1,5 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
 import { API_BASE_URL } from '../../../../config';
+import { useQuery } from '../../../../utils/useQuery';
+import { useMutation } from '../../../../utils/useMutation';
+import { invalidateQueries } from '../../../../utils/invalidateQueries';
+import { useQueryCache } from '../../../../store/queryCache';
 
 export interface WatchlistItem {
   symbol: string;
@@ -10,98 +14,197 @@ export interface WatchlistItem {
   active_alerts_count?: number;
 }
 
+const WATCHLIST_KEY = 'watchlist';
+const MARKET_STATS_KEY = 'market-stats';
+
+async function fetchWatchlistFn(): Promise<WatchlistItem[]> {
+  const res = await fetch(`${API_BASE_URL}/api/watchlist`);
+  if (!res.ok) throw new Error('Failed to fetch watchlist');
+  return res.json();
+}
+
+async function fetchMarketStatsFn(): Promise<any[]> {
+  const res = await fetch(`${API_BASE_URL}/api/market-intelligence`);
+  if (!res.ok) throw new Error('Failed to fetch market stats');
+  return res.json();
+}
+
 export function useWatchlist() {
-  const [watchlist, setWatchlist] = useState<WatchlistItem[]>([]);
-  const [marketStats, setMarketStats] = useState<any[]>([]);
+  const { data: watchlist = [], refetch: fetchWatchlist } = useQuery<WatchlistItem[]>(
+    WATCHLIST_KEY,
+    fetchWatchlistFn
+  );
 
-  const fetchWatchlist = useCallback(async () => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/watchlist`);
-      if (res.ok) setWatchlist(await res.json());
-    } catch (e) {
-      console.error("Failed to fetch watchlist", e);
+  const { data: marketStats = [], refetch: fetchMarketStats } = useQuery<any[]>(
+    MARKET_STATS_KEY,
+    fetchMarketStatsFn
+  );
+
+  // --- addWatchlist ---
+  const { mutateAsync: addWatchlist } = useMutation(
+    async ({ symbol, name, type }: { symbol: string; name: string; type: string }) => {
+      const res = await fetch(`${API_BASE_URL}/api/watchlist`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol: symbol.toUpperCase(), name, type }),
+      });
+      if (!res.ok) throw res;
+      return res;
+    },
+    {
+      onMutate: ({ symbol, name, type }) => {
+        const { getEntry, setEntry } = useQueryCache.getState();
+        const prev = getEntry<WatchlistItem[]>(WATCHLIST_KEY).data ?? [];
+        setEntry(WATCHLIST_KEY, {
+          data: [...prev, { symbol: symbol.toUpperCase(), name, is_active: 1, in_portfolio: 0, type }] as unknown[],
+        });
+        return prev;
+      },
+      onError: (_err, _vars, snapshot) => {
+        useQueryCache.getState().setEntry(WATCHLIST_KEY, { data: snapshot as unknown[] });
+      },
+      onSuccess: () => invalidateQueries(WATCHLIST_KEY),
     }
-  }, []);
+  );
 
-  const fetchMarketStats = useCallback(async () => {
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/market-intelligence`);
-      if (res.ok) setMarketStats(await res.json());
-    } catch (e) {
-      console.error("Failed to fetch market stats", e);
+  // --- updateWatchlistDetails ---
+  const { mutateAsync: updateWatchlistDetails } = useMutation(
+    async ({ symbol, name, type }: { symbol: string; name: string; type: string }) => {
+      const res = await fetch(`${API_BASE_URL}/api/watchlist`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol, name, type }),
+      });
+      if (!res.ok) throw res;
+      return res;
+    },
+    {
+      onMutate: ({ symbol, name, type }) => {
+        const { getEntry, setEntry } = useQueryCache.getState();
+        const prev = getEntry<WatchlistItem[]>(WATCHLIST_KEY).data ?? [];
+        setEntry(WATCHLIST_KEY, {
+          data: prev.map(item =>
+            item.symbol === symbol ? { ...item, name, type } : item
+          ) as unknown[],
+        });
+        return prev;
+      },
+      onError: (_err, _vars, snapshot) => {
+        useQueryCache.getState().setEntry(WATCHLIST_KEY, { data: snapshot as unknown[] });
+      },
+      onSuccess: () => invalidateQueries(WATCHLIST_KEY),
     }
-  }, []);
+  );
 
-  const addWatchlist = async (symbol: string, name: string, type: string) => {
-    const res = await fetch(`${API_BASE_URL}/api/watchlist`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ symbol: symbol.toUpperCase(), name, type })
-    });
-    if (res.ok) {
-      await fetchWatchlist();
+  // --- deleteWatchlist ---
+  const { mutateAsync: deleteWatchlist } = useMutation(
+    async (symbol: string) => {
+      const res = await fetch(`${API_BASE_URL}/api/watchlist?symbol=${symbol}`, { method: 'DELETE' });
+      if (!res.ok) throw res;
+      return res;
+    },
+    {
+      onMutate: (symbol) => {
+        const { getEntry, setEntry } = useQueryCache.getState();
+        const prev = getEntry<WatchlistItem[]>(WATCHLIST_KEY).data ?? [];
+        setEntry(WATCHLIST_KEY, {
+          data: prev.filter(item => item.symbol !== symbol) as unknown[],
+        });
+        return prev;
+      },
+      onError: (_err, _vars, snapshot) => {
+        useQueryCache.getState().setEntry(WATCHLIST_KEY, { data: snapshot as unknown[] });
+      },
+      onSuccess: () => invalidateQueries(WATCHLIST_KEY),
     }
-    return res;
-  };
+  );
 
-  const updateWatchlistDetails = async (symbol: string, name: string, type: string) => {
-    const res = await fetch(`${API_BASE_URL}/api/watchlist`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ symbol, name, type })
-    });
-    if (res.ok) {
-      await fetchWatchlist();
+  // --- toggleActive ---
+  const { mutateAsync: _toggleActive } = useMutation(
+    async ({ symbol, currentStatus }: { symbol: string; currentStatus: number }) => {
+      const res = await fetch(`${API_BASE_URL}/api/watchlist`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol, is_active: !currentStatus ? 1 : 0 }),
+      });
+      if (!res.ok) throw res;
+      return res;
+    },
+    {
+      onMutate: ({ symbol, currentStatus }) => {
+        const { getEntry, setEntry } = useQueryCache.getState();
+        const prev = getEntry<WatchlistItem[]>(WATCHLIST_KEY).data ?? [];
+        setEntry(WATCHLIST_KEY, {
+          data: prev.map(item =>
+            item.symbol === symbol ? { ...item, is_active: !currentStatus ? 1 : 0 } : item
+          ) as unknown[],
+        });
+        return prev;
+      },
+      onError: (_err, _vars, snapshot) => {
+        useQueryCache.getState().setEntry(WATCHLIST_KEY, { data: snapshot as unknown[] });
+      },
+      onSuccess: () => invalidateQueries(WATCHLIST_KEY),
     }
-    return res;
-  };
+  );
 
-  const deleteWatchlist = async (symbol: string) => {
-    const res = await fetch(`${API_BASE_URL}/api/watchlist?symbol=${symbol}`, { method: 'DELETE' });
-    if (res.ok) {
-      await fetchWatchlist();
+  const toggleActive = useCallback(
+    (symbol: string, currentStatus: number) => _toggleActive({ symbol, currentStatus }),
+    [_toggleActive]
+  );
+
+  // --- togglePortfolioStatus ---
+  const { mutateAsync: _togglePortfolioStatus } = useMutation(
+    async ({ symbol, currentPortfolioStatus }: { symbol: string; currentPortfolioStatus: number }) => {
+      const res = await fetch(`${API_BASE_URL}/api/watchlist`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol, in_portfolio: !currentPortfolioStatus ? 1 : 0 }),
+      });
+      if (!res.ok) throw res;
+      return res;
+    },
+    {
+      onMutate: ({ symbol, currentPortfolioStatus }) => {
+        const { getEntry, setEntry } = useQueryCache.getState();
+        const prev = getEntry<WatchlistItem[]>(WATCHLIST_KEY).data ?? [];
+        setEntry(WATCHLIST_KEY, {
+          data: prev.map(item =>
+            item.symbol === symbol ? { ...item, in_portfolio: !currentPortfolioStatus ? 1 : 0 } : item
+          ) as unknown[],
+        });
+        return prev;
+      },
+      onError: (_err, _vars, snapshot) => {
+        useQueryCache.getState().setEntry(WATCHLIST_KEY, { data: snapshot as unknown[] });
+      },
+      onSuccess: () => invalidateQueries(WATCHLIST_KEY),
     }
-    return res;
-  };
+  );
 
-  const toggleActive = async (symbol: string, currentStatus: number) => {
-    const res = await fetch(`${API_BASE_URL}/api/watchlist`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ symbol, is_active: !currentStatus ? 1 : 0 })
-    });
-    if (res.ok) {
-      await fetchWatchlist();
-    }
-    return res;
-  };
+  const togglePortfolioStatus = useCallback(
+    (symbol: string, currentPortfolioStatus: number) =>
+      _togglePortfolioStatus({ symbol, currentPortfolioStatus }),
+    [_togglePortfolioStatus]
+  );
 
-  const togglePortfolioStatus = async (symbol: string, currentPortfolioStatus: number) => {
-    const res = await fetch(`${API_BASE_URL}/api/watchlist`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ symbol, in_portfolio: !currentPortfolioStatus ? 1 : 0 })
-    });
-    if (res.ok) {
-      await fetchWatchlist();
-    }
-    return res;
-  };
+  const addWatchlistFn = useCallback((symbol: string, name: string, type: string) => {
+    return addWatchlist({ symbol, name, type });
+  }, [addWatchlist]);
 
-  useEffect(() => {
-    fetchWatchlist();
-    fetchMarketStats();
-  }, [fetchWatchlist, fetchMarketStats]);
+  const updateWatchlistDetailsFn = useCallback((symbol: string, name: string, type: string) => {
+    return updateWatchlistDetails({ symbol, name, type });
+  }, [updateWatchlistDetails]);
 
   return {
     watchlist,
     marketStats,
-    addWatchlist,
-    updateWatchlistDetails,
+    addWatchlist: addWatchlistFn,
+    updateWatchlistDetails: updateWatchlistDetailsFn,
     deleteWatchlist,
     toggleActive,
     togglePortfolioStatus,
     fetchWatchlist,
-    fetchMarketStats
+    fetchMarketStats,
   };
 }
