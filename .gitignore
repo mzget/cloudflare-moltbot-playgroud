@@ -46,7 +46,7 @@ coverage/
 *.temp
 .cache/
 
-.agents/skills/
+.agents/skills/**
 .agent/workflows/
 trace-tool/check-color.js
 trace-tool/package-lock.json
