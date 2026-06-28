@@ -13,6 +13,7 @@ import { recordDailyPortfolioHistory, getPortfolioHistory } from './portfolioHis
 import { sortTransactions } from './portfolioUtils';
 import { calculatePerformanceComparison } from './historicalPrices';
 import { runFullAnalysis } from './analysisEngine';
+import okfRoutes from './okfRoutes';
 
 
 import { Hono } from 'hono';
@@ -37,6 +38,10 @@ export interface Env {
   FACEBOOK_PAGE_ACCESS_TOKEN?: string;
   OAKTREE_SYNC_WORKFLOW: Workflow;
   IS_LOCAL?: string;
+  KNOWLEDGE_BUCKET?: R2Bucket;
+  NOTEBOOKLM_BRIDGE_URL?: string;
+  NOTEBOOKLM_DEFAULT_NOTEBOOK_ID?: string;
+  BRIDGE_SECRET?: string;
 }
 
 const app = new Hono<{
@@ -119,6 +124,9 @@ app.use('/api/*', async (c, next) => {
   }
   await next();
 });
+
+// OKF Knowledge Base API
+app.route('/api/knowledge', okfRoutes);
 
 // API: Google OAuth for User Login URL
 app.get('/api/auth/user/login-url', async (c) => {

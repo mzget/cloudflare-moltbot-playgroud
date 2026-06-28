@@ -47,13 +47,15 @@ export default function RoutesLayout() {
 
   const [reports, setReports] = React.useState<any[]>([]);
   const [digests, setDigests] = React.useState<any[]>([]);
+  const [notebookArticles, setNotebookArticles] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
 
   const fetchReports = async () => {
     try {
-      const [reportsRes, digestsRes] = await Promise.all([
+      const [reportsRes, digestsRes, articlesRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/reports`),
-        fetch(`${API_BASE_URL}/api/email-digests`)
+        fetch(`${API_BASE_URL}/api/email-digests`),
+        fetch(`${API_BASE_URL}/api/notebook-articles`)
       ]);
       
       if (reportsRes.ok) {
@@ -64,8 +66,12 @@ export default function RoutesLayout() {
         const digestsData = await digestsRes.json();
         setDigests(digestsData);
       }
+      if (articlesRes.ok) {
+        const articlesData = await articlesRes.json();
+        setNotebookArticles(articlesData);
+      }
     } catch (e) {
-      console.error("Failed to fetch reports or digests", e);
+      console.error("Failed to fetch reports, digests or articles", e);
     } finally {
       setLoading(false);
     }
@@ -287,6 +293,7 @@ export default function RoutesLayout() {
             <IntelligenceFeed 
               reports={reports} 
               digests={digests} 
+              notebookArticles={notebookArticles}
               loading={loading} 
               onDigestRead={async (id) => {
                 // Optimistic UI update

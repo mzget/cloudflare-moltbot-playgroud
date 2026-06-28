@@ -9,6 +9,7 @@ import { checkAlertRules } from './alerts';
 import { syncAndIngestEmails, generateEmailDigests } from './emailSummarizer';
 import { syncAndProcessFacebookPosts } from './facebook';
 import { recordDailyPortfolioHistory } from './portfolioHistory';
+import { syncNotebookArticles } from './notebookSync';
 
 
 export interface OaktreeWorkflowParams {
@@ -24,6 +25,7 @@ export interface OaktreeWorkflowParams {
 	sendDailyEmailReport?: boolean;
 	purgeOldData?: boolean;
 	syncFacebookPosts?: boolean;
+	syncNotebookArticles?: boolean;
 	priceOnly?: boolean;
 }
 
@@ -101,6 +103,12 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 				const r3 = await this.env.DB.prepare("DELETE FROM news WHERE created_at < datetime('now', '-3 days')").run()
 					.catch(e => { console.error("Failed to purge news:", e); throw e; });
 				return { reportsPurged: !!r1, eventsPurged: !!r2, newsPurged: !!r3 };
+			});
+		}
+
+		if (params.syncNotebookArticles) {
+			await step.do('sync-notebook-articles', async () => {
+				return await syncNotebookArticles(this.env);
 			});
 		}
 

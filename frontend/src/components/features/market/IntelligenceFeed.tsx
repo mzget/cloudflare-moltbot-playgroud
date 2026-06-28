@@ -2,30 +2,36 @@ import * as React from 'react';
 import { Box, Typography, Sheet, Stack, Button, ButtonGroup, Badge } from '@mui/joy';
 import DailyReportCard from './DailyReportCard';
 import EmailDigestCard from './EmailDigestCard';
+import NotebookArticleCard from './NotebookArticleCard';
 import { glassStyle } from '../../../styles/glass';
 import MarketEventsTimeline from './MarketEventsTimeline';
 
 export default function IntelligenceFeed({
   reports,
   digests = [],
+  notebookArticles = [],
   loading,
   onDigestRead,
   onReportRead
 }: {
   reports: any[];
   digests?: any[];
+  notebookArticles?: any[];
   loading: boolean;
   onDigestRead?: (id: number) => void;
   onReportRead?: (id: number) => void;
 }) {
-  const [filter, setFilter] = React.useState<'all' | 'reports' | 'digests'>('all');
+  const [filter, setFilter] = React.useState<'all' | 'reports' | 'digests' | 'articles'>('all');
 
   const unreadCount = React.useMemo(() => {
     return digests.filter(d => d.is_readed !== 1).length;
   }, [digests]);
 
   const getReportTime = (item: any) => {
-    if (item.symbol) {
+    if (item.title || item.facebook_status !== undefined) {
+      // Notebook article (created_at is a timestamp in seconds)
+      return item.created_at ? item.created_at * 1000 : 0;
+    } else if (item.symbol) {
       // Symbol report (created_at is a string "YYYY-MM-DD HH:MM:SS" in UTC)
       const utcStr = item.created_at ? item.created_at.replace(' ', 'T') + 'Z' : '';
       return utcStr ? new Date(utcStr).getTime() : 0;
@@ -49,8 +55,9 @@ export default function IntelligenceFeed({
   // Filter items
   const filteredFeed = React.useMemo(() => {
     return combinedFeed.filter(item => {
-      if (filter === 'reports') return !!item.symbol;
+      if (filter === 'reports') return !!item.symbol && !item.title && item.facebook_status === undefined;
       if (filter === 'digests') return !!item.category;
+      if (filter === 'articles') return !!item.title || item.facebook_status !== undefined;
       return true;
     });
   }, [combinedFeed, filter]);
@@ -66,7 +73,7 @@ export default function IntelligenceFeed({
         <Box>
           <Typography level="h2" sx={{ fontWeight: 800, mb: 1 }}>Market Intelligence</Typography>
           <Typography sx={{ color: 'text.secondary' }}>
-            Synthesis of recent market movements, news signals, and email newsletter digests.
+            Synthesis of recent market movements, news signals, and synced NotebookLM articles.
           </Typography>
         </Box>
       </Stack>
@@ -84,7 +91,7 @@ export default function IntelligenceFeed({
         sx={{ mt: 1, gap: { xs: 1, sm: 0 } }}
       >
         <Typography level="h3" sx={{ fontWeight: 800 }}>Howard's Take & Analysis</Typography>
-        
+
         <Box
           sx={{
             width: { xs: '100%', sm: 'auto' },
@@ -185,8 +192,10 @@ export default function IntelligenceFeed({
             {filter === 'reports'
               ? 'No symbol reports generated yet.'
               : filter === 'digests'
-              ? 'No email digests generated yet. Make sure your Gmail is connected.'
-              : 'No intelligence reports or email digests generated yet.'}
+                ? 'No email digests generated yet. Make sure your Gmail is connected.'
+                : filter === 'articles'
+                  ? 'No NotebookLM articles synced yet.'
+                  : 'No intelligence reports, email digests, or articles generated yet.'}
           </Typography>
         </Sheet>
       ) : (
