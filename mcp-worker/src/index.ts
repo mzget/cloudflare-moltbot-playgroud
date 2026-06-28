@@ -88,68 +88,10 @@ export class OaktreeMCP extends McpAgent {
 }
 
 export class OaktreeChat extends AIChatAgent<any> {
-  override async onRequest(request: Request): Promise<Response> {
-    if (request.method === "POST") {
-      try {
-        const { messages } = await request.json() as any;
-
-        // Persist new messages
-        if (messages && Array.isArray(messages)) {
-          const newMessages = messages.filter(
-            (msg: any) => !this.messages.some((m) => m.id === msg.id)
-          );
-          if (newMessages.length > 0) {
-            for (const msg of newMessages) {
-              this.messages.push(msg);
-            }
-            await this.persistMessages(newMessages);
-          }
-        }
-
-        // Trigger chat generation
-        const response = await this.onChatMessage(
-          async (event: any) => {
-            const assistantMsg = event.responseMessages[0];
-            if (assistantMsg) {
-              const uiMsg = {
-                id: assistantMsg.id || crypto.randomUUID(),
-                role: 'assistant',
-                content: typeof assistantMsg.content === 'string' ? assistantMsg.content : '',
-                parts: Array.isArray(assistantMsg.content)
-                  ? assistantMsg.content
-                  : (typeof assistantMsg.content === 'string'
-                      ? [{ type: 'text', text: assistantMsg.content }]
-                      : []),
-                createdAt: new Date()
-              };
-              this.messages.push(uiMsg as any);
-              await this.persistMessages([uiMsg as any]);
-            }
-          },
-          {
-            requestId: crypto.randomUUID(),
-            abortSignal: request.signal,
-          }
-        );
-
-        const allowedOrigin = request.headers.get("Origin") || "*";
-        const headers = new Headers(response.headers);
-        headers.set("Access-Control-Allow-Origin", allowedOrigin);
-        return new Response(response.body, {
-          status: response.status,
-          statusText: response.statusText,
-          headers
-        });
-      } catch (e: any) {
-        return new Response(JSON.stringify({ error: e.message }), {
-          status: 500,
-          headers: { "Content-Type": "application/json" }
-        });
-      }
-    }
-
-    return super.onRequest(request);
-  }
+  // Enable recovery from DO eviction and interrupted tool calls
+  override chatRecovery = true;
+  // Detect hung model/transport streams after 30s of silence
+  override chatStreamStallTimeoutMs = 30_000;
 
   async onChatMessage(onFinish: any, options?: any) {
     const workersai = createWorkersAI({ binding: this.env.AI });
@@ -269,11 +211,7 @@ export class OaktreeChat extends AIChatAgent<any> {
       onFinish,
     } as any);
 
-    return result.toUIMessageStreamResponse({
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-      }
-    });
+    return result.toUIMessageStreamResponse();
   }
 }
 // Helper functions for JWT verification inside the worker

@@ -1,4 +1,8 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useContext } from 'react';
+import { useAgent } from 'agents/react';
+import { useAgentChat } from '@cloudflare/ai-chat/react';
+import { AuthContext } from '../../../common/AuthContext';
+import { MCP_WORKER_URL } from '../../../../config';
 import { Box, Typography, Sheet, Button, Input, CircularProgress, Chip } from '@mui/joy';
 import { GameLoop } from './gameLoop';
 import { Camera } from './camera';
@@ -255,6 +259,26 @@ interface BattleState {
 }
 
 export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authToken }: GameCanvasProps) {
+  // WebSocket connection for OaktreeChat (Knowledge Agent)
+  const { user } = useContext(AuthContext);
+  const sessionId = user?.email || 'default';
+  const host = MCP_WORKER_URL.replace(/^https?:\/\//, '');
+
+  const knowledgeAgent = useAgent({
+    agent: 'OaktreeChat',
+    name: sessionId.replace(/[^a-zA-Z0-9-_]/g, '_').slice(0, 64),
+    host,
+    query: async () => {
+      const token = localStorage.getItem('auth_token') || '';
+      return { token };
+    }
+  });
+
+  const agentChat = useAgentChat({ agent: knowledgeAgent });
+  const agentChatRef = useRef(agentChat);
+  useEffect(() => { agentChatRef.current = agentChat; }, [agentChat]);
+
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const gameLoopRef = useRef<GameLoop | null>(null);
@@ -299,6 +323,33 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
 
   useEffect(() => { modeRef.current = mode; }, [mode]);
   useEffect(() => { sfx.muted = isMuted; }, [isMuted]);
+
+  // Watch for incoming agent messages and display in dialogue
+  useEffect(() => {
+    if (!dialogue || dialogue.npc.metadata?.type !== 'chat-agent') return;
+    const msgs = agentChat.messages;
+    if (msgs.length === 0) return;
+    const last = msgs[msgs.length - 1];
+    if (last.role !== 'assistant') return;
+
+    // Extract text from parts
+    let text = '';
+    for (const part of last.parts) {
+      if (part.type === 'text') text += part.text;
+      else if (part.type === 'tool-invocation') {
+        const inv = (part as any).toolInvocation;
+        if (inv?.state === 'result') {
+          text += `\n[Tool: ${inv.toolName} \u2713]\n`;
+        } else {
+          text += `\n[Calling: ${inv?.toolName}...]\n`;
+        }
+      }
+    }
+    if (text) {
+      const isStreaming = agentChat.status === 'streaming' || agentChat.status === 'submitted';
+      setDialogue(d => d ? { ...d, displayedText: text, isStreaming, showInput: !isStreaming } : null);
+    }
+  }, [agentChat.messages, agentChat.status, dialogue?.npc?.metadata?.type]);
 
   // Resize observer
   useEffect(() => {
@@ -819,32 +870,44 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
   const sendChatMessage = useCallback(async () => {
     if (!dialogue?.inputValue.trim()) return;
     const msg = dialogue.inputValue;
-    const endpoint = dialogue.npc.metadata?.endpoint;
+    const agentType = dialogue.npc.metadata?.type;
     setDialogue(d => d ? { ...d, inputValue: '', isStreaming: true, displayedText: '...' } : null);
     sfx.select();
-    try {
-      const res = await fetch(`${mcpWorkerUrl}/${endpoint}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: [{ role: 'user', parts: [{ type: 'text', text: msg }] }] }),
+
+    if (agentType === 'chat-agent') {
+      // Knowledge Agent — use WebSocket via useAgentChat
+      agentChatRef.current.sendMessage({
+        role: 'user',
+        parts: [{ type: 'text', text: msg }]
       });
-      const reader = res.body?.getReader();
-      const dec = new TextDecoder();
-      let full = '';
-      if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          dec.decode(value, { stream: true }).split('\n').forEach(l => {
-            if (l.startsWith('0:')) { try { full += JSON.parse(l.slice(2)); } catch {} }
-          });
-          setDialogue(d => d ? { ...d, displayedText: full } : null);
+      // Response will arrive via the useEffect watching agentChat.messages
+    } else {
+      // DB Agent — use HTTP POST (stateless endpoint)
+      const endpoint = dialogue.npc.metadata?.endpoint;
+      try {
+        const res = await fetch(`${mcpWorkerUrl}/${endpoint}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ messages: [{ role: 'user', parts: [{ type: 'text', text: msg }] }] }),
+        });
+        const reader = res.body?.getReader();
+        const dec = new TextDecoder();
+        let full = '';
+        if (reader) {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            dec.decode(value, { stream: true }).split('\n').forEach(l => {
+              if (l.startsWith('0:')) { try { full += JSON.parse(l.slice(2)); } catch {} }
+            });
+            setDialogue(d => d ? { ...d, displayedText: full } : null);
+          }
         }
+        setDialogue(d => d ? { ...d, isStreaming: false, displayedText: full, showInput: true } : null);
+      } catch {
+        setDialogue(d => d ? { ...d, isStreaming: false, displayedText: 'Connection error. Try again.', showInput: true } : null);
+        sfx.error();
       }
-      setDialogue(d => d ? { ...d, isStreaming: false, displayedText: full, showInput: true } : null);
-    } catch {
-      setDialogue(d => d ? { ...d, isStreaming: false, displayedText: 'Connection error. Try again.', showInput: true } : null);
-      sfx.error();
     }
   }, [dialogue, mcpWorkerUrl]);
 
