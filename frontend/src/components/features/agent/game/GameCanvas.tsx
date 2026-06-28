@@ -274,7 +274,7 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
     }
   });
 
-  const agentChat = useAgentChat({ agent: knowledgeAgent });
+  const agentChat = useAgentChat({ agent: knowledgeAgent, experimental_throttle: 50 });
   const agentChatRef = useRef(agentChat);
   useEffect(() => { agentChatRef.current = agentChat; }, [agentChat]);
 
