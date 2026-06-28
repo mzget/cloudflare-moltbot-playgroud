@@ -20,11 +20,12 @@ export interface OaktreeWorkflowParams {
 	emailDigestsManual?: boolean;
 	runCrawler?: boolean;
 	generateDailySummaries?: boolean;
+	generateDailySummariesForce?: boolean;
 	fetchMarketEvents?: boolean;
 	sendDailyEmailReport?: boolean;
 	purgeOldData?: boolean;
 	syncFacebookPosts?: boolean;
-	syncNotebookArticles?: boolean;
+	priceOnly?: boolean;
 }
 
 export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflowParams> {
@@ -33,8 +34,10 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 
 		if (params.fetchMarketStats) {
 			await step.do('fetch-market-stats', async () => {
-				const statsResult = await fetchAndStoreMarketStats(this.env);
-				await recordDailyPortfolioHistory(this.env.DB);
+				const statsResult = await fetchAndStoreMarketStats(this.env, params.priceOnly);
+				if (!params.priceOnly) {
+					await recordDailyPortfolioHistory(this.env.DB);
+				}
 				return statsResult;
 			});
 		}
@@ -67,8 +70,9 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 		if (params.generateDailySummaries) {
 			await step.do('generate-daily-summaries', async () => {
 				const { results } = await this.env.DB.prepare('SELECT symbol FROM watchlist WHERE is_active = 1').all();
+				const force = !!params.generateDailySummariesForce;
 				const summaryPromises = results.map(row =>
-					generateDailySummary(this.env, row.symbol as string)
+					generateDailySummary(this.env, row.symbol as string, force)
 						.catch(e => console.error(`Workflow summary failed for ${row.symbol}:`, e))
 				);
 				await Promise.all(summaryPromises);
@@ -84,7 +88,8 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 
 		if (params.sendDailyEmailReport) {
 			await step.do('send-daily-email-report', async () => {
-				return await sendDailyEmailReport(this.env);
+				console.log("sendDailyEmailReport is disabled for this phase.");
+				return { status: "disabled", message: "sendDailyEmailReport is disabled for this phase." };
 			});
 		}
 

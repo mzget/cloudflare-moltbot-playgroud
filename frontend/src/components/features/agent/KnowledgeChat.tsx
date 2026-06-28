@@ -1,18 +1,33 @@
-import React, { useState } from 'react';
+import React, { useState, useContext } from 'react';
+import { AuthContext } from '../../common/AuthContext';
 import { Box, Typography, Input, Button, Card, Stack, Sheet, CircularProgress } from '@mui/joy';
 import { Send, Bot } from 'lucide-react';
-import { useChat } from '@ai-sdk/react';
-import { DefaultChatTransport } from 'ai';
+import { useAgent } from 'agents/react';
+import { useAgentChat } from '@cloudflare/ai-chat/react';
 import { MCP_WORKER_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
+import MarkdownRenderer from '../../common/MarkdownRenderer';
 
 export default function KnowledgeChat() {
   const [input, setInput] = useState('');
+  const { user } = useContext(AuthContext);
+  const sessionId = user?.email || 'default';
 
-  const { messages, sendMessage, status } = useChat({
-    transport: new DefaultChatTransport({
-      api: `${MCP_WORKER_URL}/chat`,
-    }),
+  // Extract host from MCP_WORKER_URL (remove http/https protocol prefix)
+  const host = MCP_WORKER_URL.replace(/^https?:\/\//, '');
+
+  const agent = useAgent({
+    agent: 'OaktreeChat',
+    name: sessionId.replace(/[^a-zA-Z0-9-_]/g, '_').slice(0, 64),
+    host,
+    query: async () => {
+      const token = localStorage.getItem('auth_token') || '';
+      return { token };
+    }
+  });
+
+  const { messages, sendMessage, status } = useAgentChat({
+    agent,
   });
 
   const isLoading = status === 'submitted' || status === 'streaming';
@@ -20,7 +35,10 @@ export default function KnowledgeChat() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
-    sendMessage({ text: input });
+    sendMessage({
+      role: 'user',
+      parts: [{ type: 'text', text: input }]
+    });
     setInput('');
   };
 
@@ -51,6 +69,9 @@ export default function KnowledgeChat() {
               flexDirection: m.role === 'user' ? 'row-reverse' : 'row',
             }}
           >
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mt: 0.5 }}>
+              {m.role !== 'user' && <Bot size={20} style={{ color: 'var(--joy-palette-success-plainColor, #10b981)' }} />}
+            </Box>
             <Sheet
               variant="solid"
               color={m.role === 'user' ? 'primary' : 'neutral'}
@@ -58,12 +79,13 @@ export default function KnowledgeChat() {
                 p: 1.5,
                 borderRadius: 'lg',
                 maxWidth: '80%',
-                whiteSpace: 'pre-wrap',
               }}
             >
-              <Typography textColor={m.role === 'user' ? 'common.white' : 'text.primary'}>
+              <Box sx={{ color: m.role === 'user' ? 'common.white' : 'text.primary' }}>
                 {m.parts.map((part, i) =>
-                  part.type === 'text' ? <span key={i}>{part.text}</span> : null
+                  part.type === 'text' ? (
+                    <MarkdownRenderer key={i} text={part.text} themeColor={m.role === 'user' ? 'primary' : 'neutral'} />
+                  ) : null
                 )}
                 {m.parts.map((part, i) => {
                   const isTool = part.type === 'tool-invocation' || part.type.startsWith('tool-');
@@ -83,7 +105,7 @@ export default function KnowledgeChat() {
                     </Box>
                   );
                 })}
-              </Typography>
+              </Box>
             </Sheet>
           </Box>
         ))}
@@ -119,3 +141,5 @@ export default function KnowledgeChat() {
     </Card>
   );
 }
+
+

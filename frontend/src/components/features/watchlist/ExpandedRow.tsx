@@ -1,11 +1,12 @@
 import { fmtNum, fmtPct, fmtShares, gainClass } from '../../../utils/format';
 import * as React from 'react';
-import { Box, Typography, Input, Select, Option, Button } from '@mui/joy';
-import { Plus, Trash2, Check } from 'lucide-react';
+import { Box, Typography, Input, Select, Option, Button, Modal, ModalDialog, DialogTitle, DialogContent } from '@mui/joy';
+import { Plus, Trash2, Check, Pencil, X } from 'lucide-react';
 import { useHoldingDetails } from '../portfolio/hooks/useHoldingDetails';
 import type { Lot, Transaction, Dividend } from '../portfolio/hooks/useHoldingDetails';
 import '../../../styles/yahooPortfolio.css';
 import { useSettingsStore } from '../../../store/settingsStore';
+import { glassStyle } from '../../../styles/glass';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -39,10 +40,12 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
     loading,
     addLot,
     addTxn,
+    updateTxn,
     addDiv,
     deleteLot,
     deleteTxn,
-    deleteDiv
+    deleteDiv,
+    deleteSymbolTransactions
   } = useHoldingDetails(symbol, onDataChange);
 
   // Add-form visibility state
@@ -61,6 +64,14 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
   });
   const [newDiv, setNewDiv] = React.useState({
     date: getTodayDate(), amount: '', per_share: '', note: '',
+  });
+
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
+
+  // Edit-transaction state
+  const [editingTxnId, setEditingTxnId] = React.useState<number | null>(null);
+  const [editingTxn, setEditingTxn] = React.useState({
+    date: '', type: 'Buy' as 'Buy' | 'Sell', shares: '', cost_per_share: '', commission: '', note: '',
   });
 
   // ── Add handlers ────────────────────────────────────────────────────────────
@@ -119,6 +130,62 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
     }
   };
 
+  const startEditTxn = (txn: Transaction) => {
+    if (txn.id !== undefined) {
+      setEditingTxnId(txn.id);
+      setEditingTxn({
+        date: txn.date,
+        type: txn.type,
+        shares: txn.shares.toString(),
+        cost_per_share: txn.cost_per_share.toString(),
+        commission: (txn.commission || 0).toString(),
+        note: txn.note || '',
+      });
+    }
+  };
+
+  const cancelEditTxn = () => {
+    setEditingTxnId(null);
+    setEditingTxn({
+      date: '', type: 'Buy', shares: '', cost_per_share: '', commission: '', note: '',
+    });
+  };
+
+  const handleUpdateTxn = async () => {
+    if (editingTxnId === null) return;
+    if (!editingTxn.date) {
+      alert('Please select a Date.');
+      return;
+    }
+    if (!editingTxn.shares || parseFloat(editingTxn.shares) <= 0) {
+      alert('Please enter a valid number of Shares.');
+      return;
+    }
+    if (!editingTxn.cost_per_share || parseFloat(editingTxn.cost_per_share) <= 0) {
+      alert('Please enter a valid Cost/Share.');
+      return;
+    }
+    try {
+      const res = await updateTxn(editingTxnId, {
+        date: editingTxn.date,
+        type: editingTxn.type,
+        shares: parseFloat(editingTxn.shares) || 0,
+        cost_per_share: parseFloat(editingTxn.cost_per_share) || 0,
+        commission: parseFloat(editingTxn.commission) || 0,
+        note: editingTxn.note,
+      });
+      if (res.ok) {
+        setEditingTxnId(null);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        alert(`Failed to update transaction: ${errData.error || res.statusText}`);
+      }
+    } catch (e) {
+      console.error('Failed to update transaction', e);
+      alert('Failed to update transaction. Please check console.');
+    }
+  };
+
   const handleAddDiv = async () => {
     if (!newDiv.date) {
       alert('Please select a Date.');
@@ -171,6 +238,20 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
       await deleteDiv(id);
     } catch (e) {
       console.error('Failed to delete dividend', e);
+    }
+  };
+
+  const handleDeleteAllTxns = async () => {
+    try {
+      const res = await deleteSymbolTransactions();
+      if (res.ok) {
+        setConfirmOpen(false);
+      } else {
+        alert('Failed to delete all transactions.');
+      }
+    } catch (e) {
+      console.error('Failed to delete all transactions', e);
+      alert('Error deleting transactions. Check console.');
     }
   };
 
@@ -252,7 +333,7 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
             <th>Realized (%)</th>
             <th>Realized ($)</th>
             <th className="left">Note</th>
-            <th style={{ width: 36 }}>&nbsp;</th>
+            <th style={{ width: 72 }}>&nbsp;</th>
           </tr>
         </thead>
         <tbody>
@@ -299,28 +380,88 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
             </tr>
           )}
 
-          {transactions.map((txn, i) => (
-            <tr key={txn.id ?? i}>
-              <td className="left">{txn.date}</td>
-              <td className="left">{txn.type}</td>
-              <td>{displayShares(txn.shares)}</td>
-              <td>{displayNum(txn.cost_per_share)}</td>
-              <td>{displayNum(txn.commission)}</td>
-              <td>{displayNum(txn.total_cost)}</td>
-              <td className={gainClass(txn.realized_gain_pct)}>{displayPct(txn.realized_gain_pct)}</td>
-              <td className={gainClass(txn.realized_gain_amt)}>{displayNum(txn.realized_gain_amt)}</td>
-              <td className="left">{txn.note || '--'}</td>
-              <td>
-                <button
-                  className="yf-chevron"
-                  onClick={() => handleDeleteTxn(txn.id)}
-                  aria-label="Delete transaction"
-                >
-                  <Trash2 size={12} />
-                </button>
-              </td>
-            </tr>
-          ))}
+          {transactions.map((txn, i) => {
+            const isEditing = txn.id === editingTxnId;
+            if (isEditing) {
+              return (
+                <tr className="yf-add-row" key={txn.id ?? i}>
+                  <td className="left">
+                    <Input size="sm" type="date" value={editingTxn.date}
+                      onChange={(e) => setEditingTxn({ ...editingTxn, date: e.target.value })} />
+                  </td>
+                  <td className="left">
+                    <Select size="sm" value={editingTxn.type}
+                      onChange={(_e, val) => setEditingTxn({ ...editingTxn, type: (val as 'Buy' | 'Sell') || 'Buy' })}>
+                      <Option value="Buy">Buy</Option>
+                      <Option value="Sell">Sell</Option>
+                    </Select>
+                  </td>
+                  <td>
+                    <Input size="sm" type="number" placeholder="0"
+                      value={editingTxn.shares}
+                      onChange={(e) => setEditingTxn({ ...editingTxn, shares: e.target.value })} />
+                  </td>
+                  <td>
+                    <Input size="sm" type="number" placeholder="0.00"
+                      value={editingTxn.cost_per_share}
+                      onChange={(e) => setEditingTxn({ ...editingTxn, cost_per_share: e.target.value })} />
+                  </td>
+                  <td>
+                    <Input size="sm" type="number" placeholder="0.00"
+                      value={editingTxn.commission}
+                      onChange={(e) => setEditingTxn({ ...editingTxn, commission: e.target.value })} />
+                  </td>
+                  <td colSpan={3}>&nbsp;</td>
+                  <td className="left">
+                    <Input size="sm" placeholder="Note"
+                      value={editingTxn.note}
+                      onChange={(e) => setEditingTxn({ ...editingTxn, note: e.target.value })} />
+                  </td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    <Button size="sm" variant="solid" color="success" onClick={handleUpdateTxn}
+                      sx={{ minWidth: 0, px: 1, mr: 0.5 }}>
+                      <Check size={14} />
+                    </Button>
+                    <Button size="sm" variant="outlined" color="neutral" onClick={cancelEditTxn}
+                      sx={{ minWidth: 0, px: 1 }}>
+                      <X size={14} />
+                    </Button>
+                  </td>
+                </tr>
+              );
+            }
+
+            return (
+              <tr key={txn.id ?? i}>
+                <td className="left">{txn.date}</td>
+                <td className="left">{txn.type}</td>
+                <td>{displayShares(txn.shares)}</td>
+                <td>{displayNum(txn.cost_per_share)}</td>
+                <td>{displayNum(txn.commission)}</td>
+                <td>{displayNum(txn.total_cost)}</td>
+                <td className={gainClass(txn.realized_gain_pct)}>{displayPct(txn.realized_gain_pct)}</td>
+                <td className={gainClass(txn.realized_gain_amt)}>{displayNum(txn.realized_gain_amt)}</td>
+                <td className="left">{txn.note || '--'}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  <button
+                    className="yf-chevron"
+                    onClick={() => startEditTxn(txn)}
+                    style={{ marginRight: 4 }}
+                    aria-label="Edit transaction"
+                  >
+                    <Pencil size={12} />
+                  </button>
+                  <button
+                    className="yf-chevron"
+                    onClick={() => handleDeleteTxn(txn.id)}
+                    aria-label="Delete transaction"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
 
           {transactions.length === 0 && !showForms.txn && (
             <tr>
@@ -437,15 +578,28 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
         <Box sx={{ marginLeft: 'auto', alignSelf: 'center', mb: 0.5 }}>
           
           {activeTab === 'transactions' && (
-            <Button
-              size="sm"
-              variant="plain"
-              color="primary"
-              startDecorator={<Plus size={14} />}
-              onClick={() => setShowForms(prev => ({ ...prev, txn: !prev.txn }))}
-            >
-              {showForms.txn ? 'Cancel' : 'Add Transaction'}
-            </Button>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              <Button
+                size="sm"
+                variant="plain"
+                color="primary"
+                startDecorator={<Plus size={14} />}
+                onClick={() => setShowForms(prev => ({ ...prev, txn: !prev.txn }))}
+              >
+                {showForms.txn ? 'Cancel' : 'Add Transaction'}
+              </Button>
+              {transactions.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="plain"
+                  color="danger"
+                  startDecorator={<Trash2 size={14} />}
+                  onClick={() => setConfirmOpen(true)}
+                >
+                  Delete All
+                </Button>
+              )}
+            </Box>
           )}
           {activeTab === 'dividends' && (
             <Button
@@ -465,6 +619,29 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
       {activeTab === 'lots' && renderLots()}
       {activeTab === 'transactions' && renderTransactions()}
       {activeTab === 'dividends' && renderDividends()}
+
+      {/* Delete All Transactions Confirm Modal */}
+      <Modal open={confirmOpen} onClose={() => setConfirmOpen(false)}>
+        <ModalDialog sx={{ ...glassStyle, minWidth: { xs: '90%', sm: 400 }, maxWidth: 460, borderRadius: '20px', p: 3 }}>
+          <DialogTitle sx={{ fontWeight: 800, fontSize: '1.25rem', mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Trash2 size={20} color="var(--joy-palette-danger-plainColor)" />
+            Confirm Deletion
+          </DialogTitle>
+          <DialogContent sx={{ mb: 2 }}>
+            <Typography level="body-sm">
+              Are you sure you want to delete all transactions for <strong>{symbol}</strong>? This will also remove the ticker from holdings if there are 0 transactions remaining.
+            </Typography>
+          </DialogContent>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5 }}>
+            <Button variant="outlined" color="neutral" size="sm" onClick={() => setConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="solid" color="danger" size="sm" onClick={handleDeleteAllTxns}>
+              Delete All
+            </Button>
+          </Box>
+        </ModalDialog>
+      </Modal>
     </Box>
   );
 }

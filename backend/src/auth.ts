@@ -1,5 +1,53 @@
 // backend/src/auth.ts
 
+// AES-GCM encryption helper
+export async function encryptToken(text: string, secret: string): Promise<string> {
+  const enc = new TextEncoder();
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(secret.padEnd(32, "0").slice(0, 32)), // Ensure 256-bit key
+    { name: "AES-GCM" },
+    false,
+    ["encrypt"]
+  );
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encrypted = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    keyMaterial,
+    enc.encode(text)
+  );
+  
+  const buffer = new Uint8Array(encrypted);
+  const combined = new Uint8Array(iv.length + buffer.length);
+  combined.set(iv);
+  combined.set(buffer, iv.length);
+  
+  return btoa(String.fromCharCode(...combined));
+}
+
+// AES-GCM decryption helper
+export async function decryptToken(encryptedBase64: string, secret: string): Promise<string> {
+  const enc = new TextDecoder();
+  const combined = Uint8Array.from(atob(encryptedBase64), c => c.charCodeAt(0));
+  const iv = combined.slice(0, 12);
+  const data = combined.slice(12);
+  
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret.padEnd(32, "0").slice(0, 32)),
+    { name: "AES-GCM" },
+    false,
+    ["decrypt"]
+  );
+  
+  const decrypted = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv },
+    keyMaterial,
+    data
+  );
+  return enc.decode(decrypted);
+}
+
 // Custom Base64Url encoder/decoder for Web Crypto compatibility and UTF-8 safety
 export function base64urlEncode(str: string): string {
   const bytes = new TextEncoder().encode(str);

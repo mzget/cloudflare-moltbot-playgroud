@@ -1,5 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
 import { API_BASE_URL } from '../../../../config';
+import { useQuery } from '../../../../utils/useQuery';
+import { useMutation } from '../../../../utils/useMutation';
+import { invalidateQueries } from '../../../../utils/invalidateQueries';
+import { useQueryCache } from '../../../../store/queryCache';
 
 export interface Lot {
   id?: number;
@@ -39,136 +43,250 @@ export interface Dividend {
 }
 
 export function useHoldingDetails(symbol: string, onDataChange?: () => void) {
-  const [lots, setLots] = useState<Lot[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [dividends, setDividends] = useState<Dividend[]>([]);
-  const [loading, setLoading] = useState(false);
+  const lotsKey = `lots:${symbol}`;
+  const txnKey = `transactions:${symbol}`;
+  const divKey = `dividends:${symbol}`;
 
-  const fetchLots = useCallback(async () => {
-    try {
+  const { data: lots = [], isLoading: lotsLoading } = useQuery<Lot[]>(
+    lotsKey,
+    async () => {
       const res = await fetch(`${API_BASE_URL}/api/portfolio/lots/${symbol}`);
-      if (res.ok) setLots(await res.json());
-    } catch (e) {
-      console.error('Failed to fetch lots', e);
+      if (!res.ok) throw new Error('Failed to fetch lots');
+      return res.json();
     }
-  }, [symbol]);
+  );
 
-  const fetchTransactions = useCallback(async () => {
-    try {
+  const { data: transactions = [], isLoading: txnLoading } = useQuery<Transaction[]>(
+    txnKey,
+    async () => {
       const res = await fetch(`${API_BASE_URL}/api/portfolio/transactions/${symbol}`);
-      if (res.ok) setTransactions(await res.json());
-    } catch (e) {
-      console.error('Failed to fetch transactions', e);
+      if (!res.ok) throw new Error('Failed to fetch transactions');
+      return res.json();
     }
-  }, [symbol]);
+  );
 
-  const fetchDividends = useCallback(async () => {
-    try {
+  const { data: dividends = [], isLoading: divLoading } = useQuery<Dividend[]>(
+    divKey,
+    async () => {
       const res = await fetch(`${API_BASE_URL}/api/portfolio/dividends/${symbol}`);
-      if (res.ok) setDividends(await res.json());
-    } catch (e) {
-      console.error('Failed to fetch dividends', e);
+      if (!res.ok) throw new Error('Failed to fetch dividends');
+      return res.json();
     }
-  }, [symbol]);
+  );
 
-  const fetchAll = useCallback(() => {
-    setLoading(true);
-    Promise.all([fetchLots(), fetchTransactions(), fetchDividends()]).finally(() =>
-      setLoading(false)
-    );
-  }, [fetchLots, fetchTransactions, fetchDividends]);
+  const loading = lotsLoading || txnLoading || divLoading;
 
-  useEffect(() => {
-    fetchAll();
-  }, [fetchAll]);
-
-  const addLot = async (lot: {
-    date: string;
-    shares: number;
-    cost_per_share: number;
-    low_limit: number | null;
-    high_limit: number | null;
-    note: string;
-  }) => {
-    const res = await fetch(`${API_BASE_URL}/api/portfolio/lots`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ symbol, ...lot }),
-    });
-    if (res.ok) {
-      await fetchLots();
-      if (onDataChange) onDataChange();
+  // --- addLot ---
+  const { mutateAsync: addLot } = useMutation(
+    async (lot: { date: string; shares: number; cost_per_share: number; low_limit: number | null; high_limit: number | null; note: string }) => {
+      const res = await fetch(`${API_BASE_URL}/api/portfolio/lots`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol, ...lot }),
+      });
+      if (!res.ok) throw res;
+      return res;
+    },
+    {
+      onMutate: (lot) => {
+        const { getEntry, setEntry } = useQueryCache.getState();
+        const prev = getEntry<Lot[]>(lotsKey).data ?? [];
+        // Optimistically add with placeholder computed fields.
+        setEntry(lotsKey, {
+          data: [...prev, { ...lot, total_cost: lot.shares * lot.cost_per_share, market_value: null, day_gain_pct: null, day_gain_amt: null, tot_gain_pct: null, tot_gain_amt: null }] as unknown[],
+        });
+        return prev;
+      },
+      onError: (_err, _vars, snapshot) => {
+        useQueryCache.getState().setEntry(lotsKey, { data: snapshot as unknown[] });
+      },
+      onSuccess: () => { invalidateQueries(lotsKey); onDataChange?.(); },
     }
-    return res;
-  };
+  );
 
-  const addTxn = async (txn: {
-    date: string;
-    type: 'Buy' | 'Sell';
-    shares: number;
-    cost_per_share: number;
-    commission: number;
-    note: string;
-  }) => {
-    const res = await fetch(`${API_BASE_URL}/api/portfolio/transactions`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ symbol, ...txn }),
-    });
-    if (res.ok) {
-      await fetchTransactions();
-      if (onDataChange) onDataChange();
+  // --- deleteLot ---
+  const { mutateAsync: _deleteLot } = useMutation(
+    async (id: number) => {
+      const res = await fetch(`${API_BASE_URL}/api/portfolio/lots/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw res;
+      return res;
+    },
+    {
+      onMutate: (id) => {
+        const { getEntry, setEntry } = useQueryCache.getState();
+        const prev = getEntry<Lot[]>(lotsKey).data ?? [];
+        setEntry(lotsKey, { data: prev.filter(l => l.id !== id) as unknown[] });
+        return prev;
+      },
+      onError: (_err, _vars, snapshot) => {
+        useQueryCache.getState().setEntry(lotsKey, { data: snapshot as unknown[] });
+      },
+      onSuccess: () => { invalidateQueries(lotsKey); onDataChange?.(); },
     }
-    return res;
-  };
+  );
 
-  const addDiv = async (div: {
-    date: string;
-    amount: number;
-    per_share: number;
-    note: string;
-  }) => {
-    const res = await fetch(`${API_BASE_URL}/api/portfolio/dividends`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ symbol, ...div }),
-    });
-    if (res.ok) {
-      await fetchDividends();
-      if (onDataChange) onDataChange();
-    }
-    return res;
-  };
+  const deleteLot = useCallback(
+    (id: number | undefined) => { if (id != null) _deleteLot(id); },
+    [_deleteLot]
+  );
 
-  const deleteLot = async (id: number | undefined) => {
-    if (!id) return;
-    const res = await fetch(`${API_BASE_URL}/api/portfolio/lots/${id}`, { method: 'DELETE' });
-    if (res.ok) {
-      await fetchLots();
-      if (onDataChange) onDataChange();
+  // --- addTxn ---
+  const { mutateAsync: addTxn } = useMutation(
+    async (txn: { date: string; type: 'Buy' | 'Sell'; shares: number; cost_per_share: number; commission: number; note: string }) => {
+      const res = await fetch(`${API_BASE_URL}/api/portfolio/transactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol, ...txn }),
+      });
+      if (!res.ok) throw res;
+      return res;
+    },
+    {
+      onMutate: (txn) => {
+        const { getEntry, setEntry } = useQueryCache.getState();
+        const prev = getEntry<Transaction[]>(txnKey).data ?? [];
+        setEntry(txnKey, {
+          data: [...prev, { ...txn, total_cost: txn.shares * txn.cost_per_share + txn.commission, realized_gain_pct: null, realized_gain_amt: null }] as unknown[],
+        });
+        return prev;
+      },
+      onError: (_err, _vars, snapshot) => {
+        useQueryCache.getState().setEntry(txnKey, { data: snapshot as unknown[] });
+      },
+      onSuccess: () => { invalidateQueries(txnKey); onDataChange?.(); },
     }
-    return res;
-  };
+  );
 
-  const deleteTxn = async (id: number | undefined) => {
-    if (!id) return;
-    const res = await fetch(`${API_BASE_URL}/api/portfolio/transactions/${id}`, { method: 'DELETE' });
-    if (res.ok) {
-      await fetchTransactions();
-      if (onDataChange) onDataChange();
+  // --- updateTxn ---
+  const { mutateAsync: _updateTxn } = useMutation(
+    async ({ id, txn }: { id: number; txn: { date: string; type: 'Buy' | 'Sell'; shares: number; cost_per_share: number; commission: number; note: string } }) => {
+      const res = await fetch(`${API_BASE_URL}/api/portfolio/transactions/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(txn),
+      });
+      if (!res.ok) throw res;
+      return res;
+    },
+    {
+      onMutate: ({ id, txn }) => {
+        const { getEntry, setEntry } = useQueryCache.getState();
+        const prev = getEntry<Transaction[]>(txnKey).data ?? [];
+        setEntry(txnKey, {
+          data: prev.map(t => t.id === id ? { ...t, ...txn } : t) as unknown[],
+        });
+        return prev;
+      },
+      onError: (_err, _vars, snapshot) => {
+        useQueryCache.getState().setEntry(txnKey, { data: snapshot as unknown[] });
+      },
+      onSuccess: () => { invalidateQueries(txnKey); onDataChange?.(); },
     }
-    return res;
-  };
+  );
 
-  const deleteDiv = async (id: number | undefined) => {
-    if (!id) return;
-    const res = await fetch(`${API_BASE_URL}/api/portfolio/dividends/${id}`, { method: 'DELETE' });
-    if (res.ok) {
-      await fetchDividends();
-      if (onDataChange) onDataChange();
+  const updateTxn = useCallback(
+    (id: number, txn: { date: string; type: 'Buy' | 'Sell'; shares: number; cost_per_share: number; commission: number; note: string }) =>
+      _updateTxn({ id, txn }),
+    [_updateTxn]
+  );
+
+  // --- deleteTxn ---
+  const { mutateAsync: _deleteTxn } = useMutation(
+    async (id: number) => {
+      const res = await fetch(`${API_BASE_URL}/api/portfolio/transactions/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw res;
+      return res;
+    },
+    {
+      onMutate: (id) => {
+        const { getEntry, setEntry } = useQueryCache.getState();
+        const prev = getEntry<Transaction[]>(txnKey).data ?? [];
+        setEntry(txnKey, { data: prev.filter(t => t.id !== id) as unknown[] });
+        return prev;
+      },
+      onError: (_err, _vars, snapshot) => {
+        useQueryCache.getState().setEntry(txnKey, { data: snapshot as unknown[] });
+      },
+      onSuccess: () => { invalidateQueries(txnKey); onDataChange?.(); },
     }
-    return res;
-  };
+  );
+
+  const deleteTxn = useCallback(
+    (id: number | undefined) => { if (id != null) _deleteTxn(id); },
+    [_deleteTxn]
+  );
+
+  // --- deleteSymbolTransactions ---
+  const { mutateAsync: deleteSymbolTransactions } = useMutation(
+    async () => {
+      const res = await fetch(`${API_BASE_URL}/api/portfolio/transactions/symbol/${symbol}`, { method: 'DELETE' });
+      if (!res.ok) throw res;
+      return res;
+    },
+    {
+      onMutate: () => {
+        const { getEntry, setEntry } = useQueryCache.getState();
+        const prev = getEntry<Transaction[]>(txnKey).data ?? [];
+        setEntry(txnKey, { data: [] });
+        return prev;
+      },
+      onError: (_err, _vars, snapshot) => {
+        useQueryCache.getState().setEntry(txnKey, { data: snapshot as unknown[] });
+      },
+      onSuccess: () => { invalidateQueries(txnKey); onDataChange?.(); },
+    }
+  );
+
+  // --- addDiv ---
+  const { mutateAsync: addDiv } = useMutation(
+    async (div: { date: string; amount: number; per_share: number; note: string }) => {
+      const res = await fetch(`${API_BASE_URL}/api/portfolio/dividends`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol, ...div }),
+      });
+      if (!res.ok) throw res;
+      return res;
+    },
+    {
+      onMutate: (div) => {
+        const { getEntry, setEntry } = useQueryCache.getState();
+        const prev = getEntry<Dividend[]>(divKey).data ?? [];
+        setEntry(divKey, { data: [...prev, div] as unknown[] });
+        return prev;
+      },
+      onError: (_err, _vars, snapshot) => {
+        useQueryCache.getState().setEntry(divKey, { data: snapshot as unknown[] });
+      },
+      onSuccess: () => { invalidateQueries(divKey); onDataChange?.(); },
+    }
+  );
+
+  // --- deleteDiv ---
+  const { mutateAsync: _deleteDiv } = useMutation(
+    async (id: number) => {
+      const res = await fetch(`${API_BASE_URL}/api/portfolio/dividends/${id}`, { method: 'DELETE' });
+      if (!res.ok) throw res;
+      return res;
+    },
+    {
+      onMutate: (id) => {
+        const { getEntry, setEntry } = useQueryCache.getState();
+        const prev = getEntry<Dividend[]>(divKey).data ?? [];
+        setEntry(divKey, { data: prev.filter(d => d.id !== id) as unknown[] });
+        return prev;
+      },
+      onError: (_err, _vars, snapshot) => {
+        useQueryCache.getState().setEntry(divKey, { data: snapshot as unknown[] });
+      },
+      onSuccess: () => { invalidateQueries(divKey); onDataChange?.(); },
+    }
+  );
+
+  const deleteDiv = useCallback(
+    (id: number | undefined) => { if (id != null) _deleteDiv(id); },
+    [_deleteDiv]
+  );
 
   return {
     lots,
@@ -177,9 +295,11 @@ export function useHoldingDetails(symbol: string, onDataChange?: () => void) {
     loading,
     addLot,
     addTxn,
+    updateTxn,
     addDiv,
     deleteLot,
     deleteTxn,
     deleteDiv,
+    deleteSymbolTransactions,
   };
 }

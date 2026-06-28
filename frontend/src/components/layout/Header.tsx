@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState, useContext } from 'react';
-import { Box, Typography, Stack, Sheet, IconButton, Tooltip, Button, Dropdown, Menu as JoyMenu, MenuButton, MenuItem, Divider } from '@mui/joy';
+import { Box, Typography, Stack, Sheet, IconButton, Tooltip, Button, Dropdown, Menu as JoyMenu, MenuButton, MenuItem, Divider, Input } from '@mui/joy';
 import { Newspaper, Bell, Settings, User, Menu, Moon, Sun, LogOut, Check } from 'lucide-react';
 import { useColorScheme } from '@mui/joy/styles';
 import { useTranslation } from 'react-i18next';
@@ -14,9 +14,10 @@ interface HeaderProps {
   onOpenSidebar?: () => void;
   onToggleSidebar?: () => void;
   sidebarCollapsed?: boolean;
+  sidebarHidden?: boolean;
 }
 
-export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapsed }: HeaderProps) {
+export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapsed, sidebarHidden }: HeaderProps) {
   const { t } = useTranslation();
   const { user, logout } = useContext(AuthContext);
   const { mode, setMode } = useColorScheme();
@@ -37,18 +38,63 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
   const [showNotifications, setShowNotifications] = useState(false);
   const bellContainerRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
+  const isFirstFetchRef = useRef(true);
+  const notifiedIdsRef = useRef<Set<number>>(new Set());
 
-  const { density, setDensity } = useSettingsStore();
+  const { theme, setTheme, density, setDensity, usdThbRate, setUsdThbRate } = useSettingsStore();
+  const [rateInput, setRateInput] = useState(usdThbRate.toString());
+
+  useEffect(() => {
+    setRateInput(usdThbRate.toString());
+  }, [usdThbRate]);
 
   const handleDensitySelect = (newDensity: DensityMode) => {
     setDensity(newDensity);
+  };
+
+  const handleThemeToggle = () => {
+    setTheme(mode === 'dark' ? 'light' : 'dark');
+  };
+
+  const handleRateUpdate = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const rate = parseFloat(rateInput);
+    if (!isNaN(rate) && rate > 0) {
+      setUsdThbRate(rate);
+    }
   };
 
   const fetchNotifications = async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/notifications`);
       if (res.ok) {
-        const data = await res.json();
+        const data: Notification[] = await res.json();
+        
+        if (isFirstFetchRef.current) {
+          isFirstFetchRef.current = false;
+          data.forEach(n => notifiedIdsRef.current.add(n.id));
+        } else {
+          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+            data.forEach(n => {
+              if (n.is_read === 0 && !notifiedIdsRef.current.has(n.id)) {
+                try {
+                  const notification = new Notification(`Oaktree: ${n.symbol}`, {
+                    body: n.message,
+                    icon: '/favicon.svg',
+                  });
+                  notification.onclick = () => {
+                    window.focus();
+                    setShowNotifications(true);
+                  };
+                } catch (err) {
+                  console.error("Failed to trigger browser notification:", err);
+                }
+                notifiedIdsRef.current.add(n.id);
+              }
+            });
+          }
+        }
+
         setNotifications(data);
       }
     } catch (e) {
@@ -88,7 +134,25 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
     }
   };
 
+  const handleClearRead = async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/notifications`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        setNotifications(prev => prev.filter(n => n.is_read === 0));
+      }
+    } catch (e) {
+      console.error("Failed to clear read notifications", e);
+    }
+  };
+
   useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission === 'default') {
+        Notification.requestPermission();
+      }
+    }
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);
@@ -175,19 +239,51 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
         repeat: -1,
         ease: 'sine.inOut',
       });
-    }, headerRef);
-
-    return () => ctx.revert();
+    });
   }, []);
 
+  // Adaptive polling: pauses when tab is hidden, slows when panel open or all read
+  useEffect(() => {
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    const getInterval = () => {
+      if (showNotifications) return 5 * 60 * 1000; // 5 min � user is viewing panel
+      if (unreadCount === 0) return 2 * 60 * 1000;  // 2 min � nothing unread
+      return 30_000;                                  // 30 s  � has unread items
+    };
+
+    const start = () => {
+      if (intervalId) clearInterval(intervalId);
+      intervalId = setInterval(fetchNotifications, getInterval());
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        if (intervalId) clearInterval(intervalId);
+        intervalId = null;
+      } else {
+        fetchNotifications(); // catch up immediately when tab becomes visible
+        start();
+      }
+    };
+
+    fetchNotifications();
+    start();
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [showNotifications, unreadCount]);
   return (
     <Sheet
       ref={headerRef}
       sx={{
         ...glassStyle,
         mb: 4,
-        px: 4,
-        py: 2.5,
+        px: { xs: 1.5, sm: 3, md: 4 },
+        py: { xs: 1.5, md: 2.5 },
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
@@ -200,7 +296,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
         },
       }}
     >
-      <Stack direction="row" spacing={3} alignItems="center">
+      <Stack direction="row" spacing={{ xs: 1.5, md: 3 }} alignItems="center">
         {onOpenSidebar && (
           <Tooltip title={t('header.menu')} placement="bottom">
             <IconButton
@@ -214,8 +310,15 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
           </Tooltip>
         )}
         
-        <Stack direction="row" spacing={2.5} alignItems="center">
-          <Tooltip title={sidebarCollapsed ? t('header.expand_sidebar') : t('header.collapse_sidebar')} placement="bottom">
+        <Stack direction="row" spacing={{ xs: 1.5, md: 2.5 }} alignItems="center">
+          <Tooltip 
+            title={
+              sidebarHidden 
+                ? t('header.show_sidebar', 'Show Sidebar') 
+                : (sidebarCollapsed ? t('header.expand_sidebar') : t('header.collapse_sidebar'))
+            } 
+            placement="bottom"
+          >
             <IconButton
               variant="plain"
               color="neutral"
@@ -224,7 +327,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
                 display: { xs: 'none', md: 'flex' },
                 borderRadius: '12px',
                 transition: 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-                transform: sidebarCollapsed ? 'rotate(180deg)' : 'rotate(0deg)',
+                transform: (sidebarHidden || sidebarCollapsed) ? 'rotate(180deg)' : 'rotate(0deg)',
                 '&:hover': { bgcolor: 'rgba(0,0,0,0.04)' }
               }}
             >
@@ -236,7 +339,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
             ref={logoRef}
             sx={{ 
               background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', 
-              p: 1.5, 
+              p: { xs: 1, md: 1.5 }, 
               borderRadius: '16px',
               display: 'flex',
               alignItems: 'center',
@@ -251,7 +354,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
             <Typography 
               level="h2" 
               sx={{ 
-                fontSize: '1.5rem',
+                fontSize: { xs: '1.2rem', md: '1.5rem' },
                 fontWeight: 800, 
                 letterSpacing: '-0.03em',
                 color: 'text.primary',
@@ -259,7 +362,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
             >
               {t('app.title')}
             </Typography>
-            <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 0.5 }}>
+            <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: { xs: 0.25, md: 0.5 } }}>
               <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Box 
                   className="status-dot"
@@ -299,8 +402,8 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
         </Stack>
       </Stack>
 
-      <Stack direction="row" spacing={2} alignItems="center">
-        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center' }}>
+      <Stack direction="row" spacing={{ xs: 1, md: 2 }} alignItems="center">
+        <Box sx={{ display: 'flex', gap: { xs: 1, md: 1.5 }, alignItems: 'center' }}>
           {/* Notifications Panel */}
           <Box ref={bellContainerRef} sx={{ position: 'relative' }}>
             <Tooltip title={t('header.notifications')} placement="bottom">
@@ -339,17 +442,19 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
                 ref={notificationsRef}
                 sx={{
                   ...glassStyle,
+                  background: mode === 'dark' ? 'rgba(15, 20, 28, 0.88)' : 'rgba(255, 255, 255, 0.92)',
+                  border: mode === 'dark' ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid rgba(0, 0, 0, 0.08)',
+                  backdropFilter: 'blur(20px) saturate(190%)',
                   position: 'absolute',
                   top: '100%',
                   right: 0,
                   mt: 1.5,
-                  width: 360,
+                  width: { xs: 280, sm: 360 },
                   maxHeight: 480,
                   display: 'flex',
                   flexDirection: 'column',
                   borderRadius: '16px',
-                  boxShadow: '0 20px 40px rgba(0,0,0,0.15)',
-                  border: '1px solid rgba(255, 255, 255, 0.2)',
+                  boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
                   zIndex: 1000,
                   overflow: 'hidden'
                 }}
@@ -357,17 +462,30 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
                 {/* Header */}
                 <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid', borderColor: 'divider' }}>
                   <Typography level="title-md" sx={{ fontWeight: 700 }}>{t('header.notifications')}</Typography>
-                  {unreadCount > 0 && (
-                    <Button 
-                      size="sm" 
-                      variant="plain" 
-                      color="primary" 
-                      onClick={handleMarkAllAsRead}
-                      sx={{ fontSize: '0.75rem', fontWeight: 600, p: 0.5, minHeight: 0 }}
-                    >
-                      {t('header.mark_all_read')}
-                    </Button>
-                  )}
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    {unreadCount > 0 && (
+                      <Button 
+                        size="sm" 
+                        variant="plain" 
+                        color="primary" 
+                        onClick={handleMarkAllAsRead}
+                        sx={{ fontSize: '0.75rem', fontWeight: 600, p: 0.5, minHeight: 0 }}
+                      >
+                        {t('header.mark_all_read')}
+                      </Button>
+                    )}
+                    {notifications.length > unreadCount && (
+                      <Button 
+                        size="sm" 
+                        variant="plain" 
+                        color="neutral" 
+                        onClick={handleClearRead}
+                        sx={{ fontSize: '0.75rem', fontWeight: 600, p: 0.5, minHeight: 0 }}
+                      >
+                        {t('header.clear_read')}
+                      </Button>
+                    )}
+                  </Stack>
                 </Box>
 
                 {/* List */}
@@ -432,7 +550,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
             <IconButton 
               variant="plain" 
               color="neutral"
-              onClick={() => setMode(mode === 'dark' ? 'light' : 'dark')}
+              onClick={handleThemeToggle}
               sx={{ 
                 borderRadius: '12px',
                 '&:hover': { bgcolor: 'rgba(0,0,0,0.04)', transform: 'scale(1.05)' },
@@ -451,7 +569,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
                     variant: 'plain',
                     color: 'neutral',
                     sx: {
-                      display: { xs: 'none', md: 'inline-flex' },
+                      display: 'inline-flex',
                       borderRadius: '12px',
                       '&:hover': { bgcolor: 'rgba(0,0,0,0.04)', transform: 'scale(1.05)' },
                       transition: 'all 0.2s'
@@ -466,9 +584,12 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
               placement="bottom-end"
               sx={{
                 ...glassStyle,
+                background: mode === 'dark' ? 'rgba(15, 20, 28, 0.88)' : 'rgba(255, 255, 255, 0.92)',
+                border: mode === 'dark' ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid rgba(0, 0, 0, 0.08)',
+                backdropFilter: 'blur(20px) saturate(190%)',
                 mt: 1,
                 minWidth: 180,
-                boxShadow: '0 12px 30px rgba(0,0,0,0.15)',
+                boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
                 zIndex: 1200,
                 p: 1.5,
                 borderRadius: '16px',
@@ -478,7 +599,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
                 Table Density
               </Typography>
               <Divider sx={{ my: 1, opacity: 0.15 }} />
-              {(['compact', 'cozy', 'comfort'] as const).map((d) => (
+              {([ 'compact', 'cozy', 'comfort' ] as const).map((d) => (
                 <MenuItem
                   key={d}
                   selected={density === d}
@@ -504,6 +625,33 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
                   {density === d && <Check size={16} />}
                 </MenuItem>
               ))}
+              <Divider sx={{ my: 1.5, opacity: 0.15 }} />
+              <Typography level="body-xs" sx={{ px: 1, py: 0.5, fontWeight: 700, color: 'text.tertiary', textTransform: 'uppercase', letterSpacing: '0.05em', mb: 1 }}>
+                USD/THB Rate
+              </Typography>
+              <Box 
+                onClick={(e) => e.stopPropagation()} 
+                sx={{ px: 1, pb: 0.5, display: 'flex', gap: 1, alignItems: 'center' }}
+              >
+                <Input
+                  size="sm"
+                  type="number"
+                  placeholder="36.5"
+                  value={rateInput}
+                  onChange={e => setRateInput(e.target.value)}
+                  startDecorator={<Typography level="body-xs" sx={{ fontWeight: 700 }}>฿</Typography>}
+                  sx={{ borderRadius: '8px', width: '90px' }}
+                />
+                <Button 
+                  size="sm" 
+                  variant="solid" 
+                  color="primary" 
+                  onClick={handleRateUpdate} 
+                  sx={{ borderRadius: '8px', px: 1.5, fontWeight: 700 }}
+                >
+                  Save
+                </Button>
+              </Box>
             </JoyMenu>
           </Dropdown>
           
@@ -514,7 +662,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
               variant="plain"
               sx={{
                 ...glassStyle,
-                display: 'flex',
+                display: { xs: 'none', md: 'flex' },
                 alignItems: 'center',
                 px: { xs: 1, sm: 2 },
                 py: 0.75,
@@ -570,9 +718,12 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
               placement="bottom-end"
               sx={{
                 ...glassStyle,
+                background: mode === 'dark' ? 'rgba(15, 20, 28, 0.88)' : 'rgba(255, 255, 255, 0.92)',
+                border: mode === 'dark' ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid rgba(0, 0, 0, 0.08)',
+                backdropFilter: 'blur(20px) saturate(190%)',
                 mt: 1,
                 minWidth: 160,
-                boxShadow: '0 12px 30px rgba(0,0,0,0.15)',
+                boxShadow: '0 20px 40px rgba(0, 0, 0, 0.15)',
                 zIndex: 1200,
                 p: 1,
                 borderRadius: '16px',

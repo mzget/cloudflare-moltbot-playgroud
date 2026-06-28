@@ -1,7 +1,12 @@
-name = "oaktree-backend"
+﻿name = "oaktree-backend"
 main = "src/index.ts"
 compatibility_date = "2024-11-18"
 compatibility_flags = [ "nodejs_compat" ]
+
+[observability.logs]
+enabled = true
+invocation_logs = true
+
 
 [browser]
 binding = "BROWSER"
@@ -20,17 +25,10 @@ name = "EMAIL"
 destination_address = "rattajak.n@gmail.com"
 
 [triggers]
-crons = ["0 * * * *"] # Every hour
+crons = ["0 * * * *", "*/30 * * * *"] # Hourly full sync + every 30 min for Facebook
 
 [[workflows]]
 name = "oaktree-sync-workflow"
 binding = "OAKTREE_SYNC_WORKFLOW"
 class_name = "OaktreeSyncWorkflow"
 
-[vars]
-# The URL where your NotebookLM bridge API is running
-NOTEBOOKLM_BRIDGE_URL = "http://localhost:3100"
-# The specific ID of the Notebook in NotebookLM you want to sync
-NOTEBOOKLM_DEFAULT_NOTEBOOK_ID = "sync-articles-notebook"
-# Optional: Secret token if your bridge requires authentication
-BRIDGE_SECRET = ""

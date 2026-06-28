@@ -38,6 +38,11 @@ For all tasks, code changes, and analysis in this repository, you **MUST** load 
    - **Description**: 2D game development principles including sprites, tilemaps, physics, and camera controls.
    - **Key Requirement**: Apply structured game loops, coordinate systems, collision detection, and layout scaling rules for canvas games.
 
+6. **Agents SDK** (Activated when working with agent-chat or stateful agent code):
+   - **File Path**: [SKILL.md](file:///c:/Users/natta/Documents/oaktree-agent/.agents/skills/agents-sdk/SKILL.md)
+   - **Description**: Build AI agents on Cloudflare Workers using the Agents SDK.
+   - **Key Requirement**: Leverage state management, callable RPC methods, and SQLite-backed message persistence patterns from the Agents SDK.
+
 ---
 
 ## Guidelines for execution

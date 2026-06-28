@@ -11,6 +11,7 @@ import {
   Select,
   Option,
   Button,
+  ButtonGroup,
   CircularProgress,
   IconButton,
   Tooltip
@@ -45,6 +46,7 @@ interface MarketEvent {
 export default function MarketEventsTimeline({ inSidebar = false }: { inSidebar?: boolean }) {
   const [selectedSymbol, setSelectedSymbol] = React.useState<string>('ALL');
   const [selectedType, setSelectedType] = React.useState<string>('ALL');
+  const [segment, setSegment] = React.useState<'upcoming' | 'past' | 'all'>('upcoming');
 
   const {
     events,
@@ -54,6 +56,28 @@ export default function MarketEventsTimeline({ inSidebar = false }: { inSidebar?
     refreshing,
     triggerCrawl
   } = useMarketEvents(selectedSymbol, selectedType);
+
+  const todayStr = React.useMemo(() => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }, []);
+
+  const filteredEvents = React.useMemo(() => {
+    let result = [...events];
+    if (segment === 'upcoming') {
+      result = result.filter(e => e.event_date >= todayStr);
+      result.sort((a, b) => a.event_date.localeCompare(b.event_date));
+    } else if (segment === 'past') {
+      result = result.filter(e => e.event_date < todayStr);
+      result.sort((a, b) => b.event_date.localeCompare(a.event_date));
+    } else {
+      result.sort((a, b) => b.event_date.localeCompare(a.event_date));
+    }
+    return result;
+  }, [events, segment, todayStr]);
 
 
 
@@ -90,22 +114,35 @@ export default function MarketEventsTimeline({ inSidebar = false }: { inSidebar?
     if (!evt.metadata) return null;
     try {
       const meta = JSON.parse(evt.metadata);
+
+      const formatDateStr = (dateStr: string) => {
+        if (!dateStr) return '';
+        const dateObj = new Date(dateStr);
+        return isNaN(dateObj.getTime())
+          ? dateStr
+          : dateObj.toLocaleDateString(undefined, {
+              month: 'short',
+              day: 'numeric',
+              year: 'numeric'
+            });
+      };
+
       if (evt.event_type === 'dividend') {
         return (
           <Stack direction="row" spacing={2} sx={{ mt: 1.5, flexWrap: 'wrap', gap: 1 }}>
             {meta.payDate && (
               <Typography level="body-xs" sx={{ bgcolor: 'rgba(46, 204, 113, 0.1)', px: 1, py: 0.5, borderRadius: '4px', color: 'success.dark' }}>
-                Pay Date: <strong>{meta.payDate}</strong>
+                Pay Date: <strong>{formatDateStr(meta.payDate)}</strong>
               </Typography>
             )}
             {meta.recordDate && (
               <Typography level="body-xs" sx={{ bgcolor: 'rgba(0, 0, 0, 0.04)', px: 1, py: 0.5, borderRadius: '4px', color: 'text.secondary' }}>
-                Record Date: <strong>{meta.recordDate}</strong>
+                Record Date: <strong>{formatDateStr(meta.recordDate)}</strong>
               </Typography>
             )}
             {meta.declarationDate && (
               <Typography level="body-xs" sx={{ bgcolor: 'rgba(0, 0, 0, 0.04)', px: 1, py: 0.5, borderRadius: '4px', color: 'text.secondary' }}>
-                Declared: <strong>{meta.declarationDate}</strong>
+                Declared: <strong>{formatDateStr(meta.declarationDate)}</strong>
               </Typography>
             )}
           </Stack>
@@ -193,6 +230,66 @@ export default function MarketEventsTimeline({ inSidebar = false }: { inSidebar?
         </Stack>
       </Stack>
 
+      {/* Time Segment Filter */}
+      <ButtonGroup
+        variant="soft"
+        color="neutral"
+        size="sm"
+        sx={{
+          mb: 2,
+          p: 0.5,
+          borderRadius: '12px',
+          bgcolor: 'background.level1',
+          boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.12)',
+          '--ButtonGroup-radius': '8px',
+          border: '1px solid rgba(255, 255, 255, 0.05)',
+          width: '100%',
+        }}
+      >
+        <Button
+          onClick={() => setSegment('upcoming')}
+          sx={{
+            fontWeight: 600,
+            flex: 1,
+            whiteSpace: 'nowrap',
+            bgcolor: segment === 'upcoming' ? 'background.surface' : 'transparent',
+            color: segment === 'upcoming' ? 'success.plainColor' : 'text.secondary',
+            boxShadow: segment === 'upcoming' ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
+            '&:hover': { bgcolor: segment === 'upcoming' ? 'background.surface' : 'background.level2' }
+          }}
+        >
+          Upcoming
+        </Button>
+        <Button
+          onClick={() => setSegment('past')}
+          sx={{
+            fontWeight: 600,
+            flex: 1,
+            whiteSpace: 'nowrap',
+            bgcolor: segment === 'past' ? 'background.surface' : 'transparent',
+            color: segment === 'past' ? 'primary.plainColor' : 'text.secondary',
+            boxShadow: segment === 'past' ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
+            '&:hover': { bgcolor: segment === 'past' ? 'background.surface' : 'background.level2' }
+          }}
+        >
+          Past
+        </Button>
+        <Button
+          onClick={() => setSegment('all')}
+          sx={{
+            fontWeight: 600,
+            flex: 1,
+            whiteSpace: 'nowrap',
+            bgcolor: segment === 'all' ? 'background.surface' : 'transparent',
+            color: segment === 'all' ? 'neutral.plainColor' : 'text.secondary',
+            boxShadow: segment === 'all' ? '0 2px 8px rgba(0,0,0,0.1)' : 'none',
+            '&:hover': { bgcolor: segment === 'all' ? 'background.surface' : 'background.level2' }
+          }}
+        >
+          All
+        </Button>
+      </ButtonGroup>
+
       {/* Filter Row */}
       <Stack direction={inSidebar ? 'column' : { xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mb: 3 }}>
         <Select
@@ -227,7 +324,7 @@ export default function MarketEventsTimeline({ inSidebar = false }: { inSidebar?
         <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
           <CircularProgress color="success" size="md" />
         </Box>
-      ) : events.length === 0 ? (
+      ) : filteredEvents.length === 0 ? (
         <Typography level="body-md" sx={{ textAlign: 'center', py: 4, color: 'text.secondary' }}>
           No market events found.
         </Typography>
@@ -243,7 +340,7 @@ export default function MarketEventsTimeline({ inSidebar = false }: { inSidebar?
             pointerEvents: fetching ? 'none' : 'auto',
           }}
         >
-          {events.map((evt) => {
+          {filteredEvents.map((evt) => {
             const styles = getEventStyles(evt.event_type);
             const dateObj = new Date(evt.event_date);
             const formattedDate = isNaN(dateObj.getTime())

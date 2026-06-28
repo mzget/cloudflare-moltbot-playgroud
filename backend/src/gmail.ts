@@ -1,5 +1,4 @@
-// backend/src/gmail.ts
-import { D1Database } from '@cloudflare/workers-types';
+import { encryptToken, decryptToken } from './auth';
 
 export function getAuthUrl(clientId: string, redirectUri: string): string {
   const scopes = ['https://www.googleapis.com/auth/gmail.readonly'];
@@ -77,7 +76,8 @@ export async function refreshAccessToken(
 export async function getOrRefreshAccessToken(
   db: D1Database,
   clientId: string,
-  clientSecret: string
+  clientSecret: string,
+  jwtSecret: string
 ): Promise<string | null> {
   const oauthRow = await db.prepare(
     'SELECT access_token, refresh_token, expiry_date FROM gmail_oauth WHERE id = ?'
@@ -87,7 +87,17 @@ export async function getOrRefreshAccessToken(
     return null;
   }
 
-  const { access_token, refresh_token, expiry_date } = oauthRow;
+  let access_token = '';
+  let refresh_token = '';
+  try {
+    access_token = await decryptToken(oauthRow.access_token, jwtSecret);
+    refresh_token = await decryptToken(oauthRow.refresh_token, jwtSecret);
+  } catch (decError) {
+    // If decryption fails, fall back to plain text (in case there's an unencrypted token still in DB)
+    access_token = oauthRow.access_token;
+    refresh_token = oauthRow.refresh_token;
+  }
+  const { expiry_date } = oauthRow;
   const now = Date.now();
 
   // If token is still valid (with a 5-minute buffer)
@@ -103,9 +113,12 @@ export async function getOrRefreshAccessToken(
     // Sometimes Google doesn't return a new refresh token if it's still valid
     const finalRefreshToken = refreshed.refresh_token || refresh_token;
 
+    const encAccessToken = await encryptToken(refreshed.access_token, jwtSecret);
+    const encRefreshToken = await encryptToken(finalRefreshToken, jwtSecret);
+
     await db.prepare(
       'UPDATE gmail_oauth SET access_token = ?, refresh_token = ?, expiry_date = ?, updated_at = (strftime(\'%s\', \'now\')) WHERE id = ?'
-    ).bind(refreshed.access_token, finalRefreshToken, newExpiry, 'default').run();
+    ).bind(encAccessToken, encRefreshToken, newExpiry, 'default').run();
 
     return refreshed.access_token;
   } catch (error) {

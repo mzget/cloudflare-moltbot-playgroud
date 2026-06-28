@@ -54,58 +54,135 @@ export async function fetchAndStoreMarketEvents(env: Env): Promise<void> {
 
 	for (const symbol of symbols) {
 		try {
-			// B. Dividends
-			const divUrl = `https://finnhub.io/api/v1/stock/dividend?symbol=${symbol}&from=${fromDateStrGeneral}&to=${toDateStrGeneral}&token=${apiKey}`;
-			const divRes = await fetch(divUrl);
-			if (divRes.ok) {
-				const divItems = await divRes.json() as any[];
-				for (const item of divItems) {
-					const eventId = `div-${symbol}-${item.date}`;
-					const eventDate = item.date;
-					const title = `Dividend Declared: $${item.amount}`;
-					const description = `Record date: ${item.recordDate || 'N/A'}, Pay date: ${item.payDate || 'N/A'}`;
-					const metadata = JSON.stringify({
-						amount: item.amount,
-						recordDate: item.recordDate,
-						payDate: item.payDate,
-						declarationDate: item.declarationDate
-					});
+			// B. Dividends from Nasdaq (with fallback to Yahoo Finance if Nasdaq fails)
+			let dividendsFetched = false;
+			try {
+				const nasdaqUrl = `https://api.nasdaq.com/api/quote/${encodeURIComponent(symbol)}/dividends?assetclass=stocks`;
+				const nasdaqRes = await fetch(nasdaqUrl, {
+					headers: {
+						'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+						'Accept': 'application/json, text/plain, */*'
+					}
+				});
+				if (nasdaqRes.ok) {
+					const nasdaqData = await nasdaqRes.json() as any;
+					const dividendRows = nasdaqData?.data?.dividends?.rows || [];
+					if (dividendRows.length > 0) {
+						const parseDate = (dStr: string) => {
+							if (!dStr || dStr === 'N/A') return null;
+							const parts = dStr.split('/');
+							if (parts.length === 3) {
+								return `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+							}
+							return null;
+						};
 
-					await env.DB.prepare(`
-						INSERT INTO market_events (id, symbol, event_type, event_date, title, description, url, metadata)
-						VALUES (?, ?, 'dividend', ?, ?, ?, NULL, ?)
-						ON CONFLICT(id) DO UPDATE SET
-							title=excluded.title,
-							description=excluded.description,
-							metadata=excluded.metadata
-					`).bind(eventId, symbol, eventDate, title, description, metadata).run();
+						for (const row of dividendRows) {
+							const eventDate = parseDate(row.exOrEffDate);
+							if (eventDate && eventDate >= fromDateStrGeneral && eventDate <= toDateStrGeneral) {
+								const eventId = `div-${symbol}-${eventDate}`;
+								const cleanAmount = row.amount ? row.amount.replace('$', '') : '';
+								const title = `Dividend Declared: $${cleanAmount}`;
+								
+								const payDate = parseDate(row.paymentDate);
+								const recordDate = parseDate(row.recordDate);
+								const declarationDate = parseDate(row.declarationDate);
+								
+								let description = `Ex-Dividend Date: ${eventDate}`;
+								if (payDate) description += `, Pay Date: ${payDate}`;
+
+								const metadata = JSON.stringify({
+									amount: parseFloat(cleanAmount) || cleanAmount,
+									exDate: eventDate,
+									payDate: payDate,
+									recordDate: recordDate,
+									declarationDate: declarationDate
+								});
+
+								await env.DB.prepare(`
+									INSERT INTO market_events (id, symbol, event_type, event_date, title, description, url, metadata)
+									VALUES (?, ?, 'dividend', ?, ?, ?, NULL, ?)
+									ON CONFLICT(id) DO UPDATE SET
+										title=excluded.title,
+										description=excluded.description,
+										metadata=excluded.metadata
+								`).bind(eventId, symbol, eventDate, title, description, metadata).run();
+							}
+						}
+						dividendsFetched = true;
+					}
 				}
+			} catch (nasdaqError) {
+				console.error(`Error fetching dividends from Nasdaq for ${symbol}:`, nasdaqError);
 			}
 
-			// C. Splits
-			const splitUrl = `https://finnhub.io/api/v1/stock/split?symbol=${symbol}&from=${fromDateStrGeneral}&to=${toDateStrGeneral}&token=${apiKey}`;
-			const splitRes = await fetch(splitUrl);
-			if (splitRes.ok) {
-				const splitItems = await splitRes.json() as any[];
-				for (const item of splitItems) {
-					const eventId = `split-${symbol}-${item.date}`;
-					const eventDate = item.date;
-					const title = `Stock Split: ${item.fromFactor} for ${item.toFactor}`;
-					const description = `Execution date: ${item.date}`;
-					const metadata = JSON.stringify({
-						fromFactor: item.fromFactor,
-						toFactor: item.toFactor
-					});
+			// C. Yahoo Finance: Splits (and Dividends if Nasdaq fallback needed)
+			const yahooUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1d&range=3mo&events=div,split`;
+			try {
+				const yahooRes = await fetch(yahooUrl, {
+					headers: {
+						'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+					}
+				});
+				if (yahooRes.ok) {
+					const data = await yahooRes.json() as any;
+					const events = data?.chart?.result?.[0]?.events;
+					if (events) {
+						// Process dividends ONLY if not fetched from Nasdaq
+						if (events.dividends && !dividendsFetched) {
+							for (const key of Object.keys(events.dividends)) {
+								const item = events.dividends[key];
+								const eventDate = new Date(item.date * 1000).toISOString().split('T')[0];
+								if (eventDate >= fromDateStrGeneral && eventDate <= toDateStrGeneral) {
+									const eventId = `div-${symbol}-${eventDate}`;
+									const title = `Dividend Declared: $${item.amount}`;
+									const description = `Ex-Dividend Date: ${eventDate}`;
+									const metadata = JSON.stringify({
+										amount: item.amount,
+										exDate: eventDate
+									});
 
-					await env.DB.prepare(`
-						INSERT INTO market_events (id, symbol, event_type, event_date, title, description, url, metadata)
-						VALUES (?, ?, 'split', ?, ?, ?, NULL, ?)
-						ON CONFLICT(id) DO UPDATE SET
-							title=excluded.title,
-							description=excluded.description,
-							metadata=excluded.metadata
-					`).bind(eventId, symbol, eventDate, title, description, metadata).run();
+									await env.DB.prepare(`
+										INSERT INTO market_events (id, symbol, event_type, event_date, title, description, url, metadata)
+										VALUES (?, ?, 'dividend', ?, ?, ?, NULL, ?)
+										ON CONFLICT(id) DO UPDATE SET
+											title=excluded.title,
+											description=excluded.description,
+											metadata=excluded.metadata
+									`).bind(eventId, symbol, eventDate, title, description, metadata).run();
+								}
+							}
+						}
+
+						// Process splits
+						if (events.splits) {
+							for (const key of Object.keys(events.splits)) {
+								const item = events.splits[key];
+								const eventDate = new Date(item.date * 1000).toISOString().split('T')[0];
+								if (eventDate >= fromDateStrGeneral && eventDate <= toDateStrGeneral) {
+									const eventId = `split-${symbol}-${eventDate}`;
+									const title = `Stock Split: ${item.numerator} for ${item.denominator}`;
+									const description = `Execution date: ${eventDate}`;
+									const metadata = JSON.stringify({
+										fromFactor: item.numerator,
+										toFactor: item.denominator
+									});
+
+									await env.DB.prepare(`
+										INSERT INTO market_events (id, symbol, event_type, event_date, title, description, url, metadata)
+										VALUES (?, ?, 'split', ?, ?, ?, NULL, ?)
+										ON CONFLICT(id) DO UPDATE SET
+											title=excluded.title,
+											description=excluded.description,
+											metadata=excluded.metadata
+									`).bind(eventId, symbol, eventDate, title, description, metadata).run();
+								}
+							}
+						}
+					}
 				}
+			} catch (yahooError) {
+				console.error(`Error fetching/storing splits (or dividends fallback) from Yahoo for ${symbol}:`, yahooError);
 			}
 
 			// D. Earnings Calendar

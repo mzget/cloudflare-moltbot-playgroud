@@ -2,7 +2,7 @@ import { Env } from './index';
 
 interface FacebookPostRow {
 	id: number;
-	source_type: 'daily_report' | 'email_digest' | 'notebook_article';
+	source_type: 'daily_report' | 'email_digest' | 'custom';
 	source_id: number;
 	thai_title: string | null;
 	thai_content: string | null;
@@ -24,11 +24,40 @@ export async function queueFacebookPost(env: Env, sourceType: 'daily_report' | '
 
 export async function processPendingFacebookPosts(env: Env): Promise<number> {
 	console.log('Processing pending Facebook posts...');
-	
-	// 1. Get all pending posts
-	const { results: pendingPosts } = await env.DB.prepare(
-		"SELECT * FROM facebook_posts WHERE status = 'pending' ORDER BY created_at ASC LIMIT 3"
-	).all() as { results: unknown[] };
+
+	// Check pause settings
+	let dailyReportPaused = false;
+	let emailDigestPaused = false;
+	let customPaused = false;
+	try {
+		const dailyRow = await env.DB.prepare("SELECT value FROM system_settings WHERE key = 'pause_daily_report_facebook'").first() as { value: string } | null;
+		const emailRow = await env.DB.prepare("SELECT value FROM system_settings WHERE key = 'pause_email_digest_facebook'").first() as { value: string } | null;
+		const customRow = await env.DB.prepare("SELECT value FROM system_settings WHERE key = 'pause_custom_facebook'").first() as { value: string } | null;
+		dailyReportPaused = dailyRow?.value === '1';
+		emailDigestPaused = emailRow?.value === '1';
+		customPaused = customRow?.value === '1';
+	} catch (e) {
+		console.warn('Failed to fetch Facebook pause settings in processPendingFacebookPosts, defaulting to unpaused:', e);
+	}
+
+	// 1. Get all pending posts, filtering out paused types
+	let query = "SELECT * FROM facebook_posts WHERE status = 'pending'";
+	const conditions: string[] = [];
+	if (dailyReportPaused) {
+		conditions.push("source_type != 'daily_report'");
+	}
+	if (emailDigestPaused) {
+		conditions.push("source_type != 'email_digest'");
+	}
+	if (customPaused) {
+		conditions.push("source_type != 'custom'");
+	}
+	if (conditions.length > 0) {
+		query += " AND " + conditions.join(" AND ");
+	}
+	query += " ORDER BY created_at ASC LIMIT 3";
+
+	const { results: pendingPosts } = await env.DB.prepare(query).all() as { results: unknown[] };
 
 	const posts = pendingPosts as FacebookPostRow[];
 	if (posts.length === 0) {
@@ -46,56 +75,61 @@ export async function processPendingFacebookPosts(env: Env): Promise<number> {
 		).bind(post.id).run();
 
 		try {
-			// 2. Fetch original Thai content
-			let thaiContent = '';
+			let thaiPost = '';
 			let subjectInfo = '';
 
-			if (post.source_type === 'daily_report') {
-				const report = await env.DB.prepare(
-					'SELECT symbol, summary, key_takeaways FROM daily_reports WHERE id = ?'
-				).bind(post.source_id).first() as { symbol: string, summary: string, key_takeaways: string } | null;
-
-				if (!report) {
-					throw new Error(`Daily report ID ${post.source_id} not found`);
-				}
-
-				const takeaways = JSON.parse(report.key_takeaways || '[]');
-				thaiContent = `Stock Symbol: ${report.symbol}\nDaily Summary: ${report.summary}\nKey Takeaways:\n${takeaways.map((t: string) => `- ${t}`).join('\n')}`;
-				subjectInfo = `Stock Report: ${report.symbol}`;
-			} else if (post.source_type === 'email_digest') {
-				const digest = await env.DB.prepare(
-					'SELECT category, summary, key_takeaways FROM email_digests WHERE id = ?'
-				).bind(post.source_id).first() as { category: string, summary: string, key_takeaways: string } | null;
-
-				if (!digest) {
-					throw new Error(`Email digest ID ${post.source_id} not found`);
-				}
-
-				const takeaways = JSON.parse(digest.key_takeaways || '[]');
-				thaiContent = `Category: ${digest.category}\nDigest Summary: ${digest.summary}\nKey Takeaways:\n${takeaways.map((t: string) => `- ${t}`).join('\n')}`;
-				subjectInfo = `Market Digest: ${digest.category}`;
-			} else if (post.source_type === 'notebook_article') {
-				const article = await env.DB.prepare(
-					'SELECT title, symbol, summary, key_takeaways FROM notebook_articles WHERE id = ?'
-				).bind(post.source_id).first() as { title: string, symbol: string | null, summary: string | null, key_takeaways: string } | null;
-
-				if (!article) {
-					throw new Error(`Notebook article ID ${post.source_id} not found`);
-				}
-
-				const takeaways = JSON.parse(article.key_takeaways || '[]');
-				thaiContent = `Title: ${article.title}\nStock Symbol: ${article.symbol || 'N/A'}\nArticle Summary: ${article.summary || ''}\nKey Takeaways:\n${takeaways.map((t: string) => `- ${t}`).join('\n')}`;
-				subjectInfo = `Notebook Article: ${article.title}`;
+			if (post.source_type === 'custom') {
+				thaiPost = post.thai_content || '';
+				subjectInfo = `Custom Post: ${post.thai_title || 'No Title'}`;
 			} else {
-				throw new Error(`Invalid source_type: ${post.source_type}`);
-			}
+				// 2. Fetch original Thai content
+				let summary = '';
+				let takeaways: string[] = [];
+				let symbolOrCategory = '';
 
-			// 3. Format and style Thai content for Facebook using Workers AI
-			console.log(`Formatting and styling Facebook post for Thai: ${subjectInfo}`);
-			const thaiPost = await formatAndStyleFacebookPost(env, thaiContent, post.source_type);
+				if (post.source_type === 'daily_report') {
+					const report = await env.DB.prepare(
+						'SELECT symbol, summary, key_takeaways FROM daily_reports WHERE id = ?'
+					).bind(post.source_id).first() as { symbol: string, summary: string, key_takeaways: string } | null;
 
-			if (!thaiPost) {
-				throw new Error('AI failed to generate Thai translation content');
+					if (!report) {
+						throw new Error(`Daily report ID ${post.source_id} not found`);
+					}
+
+					takeaways = JSON.parse(report.key_takeaways || '[]');
+					summary = report.summary;
+					symbolOrCategory = report.symbol;
+					subjectInfo = `Stock Report: ${report.symbol}`;
+				} else if (post.source_type === 'email_digest') {
+					const digest = await env.DB.prepare(
+						'SELECT category, summary, key_takeaways FROM email_digests WHERE id = ?'
+					).bind(post.source_id).first() as { category: string, summary: string, key_takeaways: string } | null;
+
+					if (!digest) {
+						throw new Error(`Email digest ID ${post.source_id} not found`);
+					}
+
+					takeaways = JSON.parse(digest.key_takeaways || '[]');
+					summary = digest.summary;
+					symbolOrCategory = digest.category;
+					subjectInfo = `Market Digest: ${digest.category}`;
+				} else {
+					throw new Error(`Invalid source_type: ${post.source_type}`);
+				}
+
+				// 3. Format and style Thai content for Facebook using Workers AI
+				console.log(`Formatting and styling Facebook post for Thai: ${subjectInfo}`);
+				const generatedContent = await formatAndStyleFacebookPost(env, {
+					type: post.source_type,
+					symbolOrCategory,
+					summary,
+					takeaways,
+				});
+
+				if (!generatedContent) {
+					throw new Error('AI failed to generate Thai translation content');
+				}
+				thaiPost = generatedContent;
 			}
 
 			// 4. Publish to Facebook Graph API
@@ -141,7 +175,12 @@ export async function processPendingFacebookPosts(env: Env): Promise<number> {
 			await new Promise(resolve => setTimeout(resolve, 2000));
 
 		} catch (err: any) {
-			console.error(`Error processing Facebook post ID ${post.id}:`, err);
+			const isPurgedError = err.message && err.message.includes('not found') && (err.message.includes('Daily report') || err.message.includes('Email digest'));
+			if (isPurgedError) {
+				console.warn(`Facebook post ID ${post.id} source was purged: ${err.message}`);
+			} else {
+				console.error(`Error processing Facebook post ID ${post.id}:`, err);
+			}
 			await env.DB.prepare(
 				"UPDATE facebook_posts SET status = 'failed', error_message = ?, updated_at = (strftime('%Y-%m-%d %H:%M:%S', 'now')) WHERE id = ?"
 			).bind(err.message || 'Unknown error', post.id).run();
@@ -153,25 +192,53 @@ export async function processPendingFacebookPosts(env: Env): Promise<number> {
 
 export async function syncAndProcessFacebookPosts(env: Env): Promise<number> {
 	console.log('Syncing and processing Facebook posts...');
-	
+
+	// Check pause settings
+	let dailyReportPaused = false;
+	let emailDigestPaused = false;
 	try {
-		// 1. Discover and queue new daily reports from the last 24h
+		// Ensure system_settings table exists
 		await env.DB.prepare(`
-			INSERT OR IGNORE INTO facebook_posts (source_type, source_id, status)
-			SELECT 'daily_report', id, 'pending'
-			FROM daily_reports
-			WHERE created_at > datetime('now', '-1 day')
-			  AND id NOT IN (SELECT source_id FROM facebook_posts WHERE source_type = 'daily_report')
+			CREATE TABLE IF NOT EXISTS system_settings (
+				key TEXT PRIMARY KEY,
+				value TEXT NOT NULL
+			)
 		`).run();
 
+		const dailyRow = await env.DB.prepare("SELECT value FROM system_settings WHERE key = 'pause_daily_report_facebook'").first() as { value: string } | null;
+		const emailRow = await env.DB.prepare("SELECT value FROM system_settings WHERE key = 'pause_email_digest_facebook'").first() as { value: string } | null;
+		dailyReportPaused = dailyRow?.value === '1';
+		emailDigestPaused = emailRow?.value === '1';
+	} catch (e) {
+		console.warn('Failed to fetch Facebook pause settings in syncAndProcessFacebookPosts, defaulting to unpaused:', e);
+	}
+
+	try {
+		// 1. Discover and queue new daily reports from the last 24h
+		if (!dailyReportPaused) {
+			await env.DB.prepare(`
+				INSERT OR IGNORE INTO facebook_posts (source_type, source_id, status)
+				SELECT 'daily_report', id, 'pending'
+				FROM daily_reports
+				WHERE created_at > datetime('now', '-1 day')
+				  AND id NOT IN (SELECT source_id FROM facebook_posts WHERE source_type = 'daily_report')
+			`).run();
+		} else {
+			console.log('Facebook posting for daily reports is paused. Skipping discovery.');
+		}
+
 		// 2. Discover and queue new email digests from the last 24h
-		await env.DB.prepare(`
-			INSERT OR IGNORE INTO facebook_posts (source_type, source_id, status)
-			SELECT 'email_digest', id, 'pending'
-			FROM email_digests
-			WHERE created_at > datetime('now', '-1 day')
-			  AND id NOT IN (SELECT source_id FROM facebook_posts WHERE source_type = 'email_digest')
-		`).run();
+		if (!emailDigestPaused) {
+			await env.DB.prepare(`
+				INSERT OR IGNORE INTO facebook_posts (source_type, source_id, status)
+				SELECT 'email_digest', id, 'pending'
+				FROM email_digests
+				WHERE created_at > datetime('now', '-1 day')
+				  AND id NOT IN (SELECT source_id FROM facebook_posts WHERE source_type = 'email_digest')
+			`).run();
+		} else {
+			console.log('Facebook posting for email digests is paused. Skipping discovery.');
+		}
 
 		// 3. Discover and queue new notebook articles from the last 24h
 		await env.DB.prepare(`
@@ -190,61 +257,169 @@ export async function syncAndProcessFacebookPosts(env: Env): Promise<number> {
 	return await processPendingFacebookPosts(env);
 }
 
-async function formatAndStyleFacebookPost(env: Env, content: string, type: 'daily_report' | 'email_digest' | 'notebook_article'): Promise<string> {
+async function formatAndStyleFacebookPost(
+	env: Env,
+	params: {
+		type: 'daily_report' | 'email_digest';
+		symbolOrCategory: string;
+		summary: string;
+		takeaways: string[];
+	}
+): Promise<string> {
+	const { type, symbolOrCategory, summary, takeaways } = params;
+
+	// Build context for LLM
+	const contextContent = `
+Symbol/Category: ${symbolOrCategory}
+Summary: ${summary}
+Key Takeaways:
+${takeaways.map((t: string) => `- ${t}`).join('\n')}
+`;
+
 	const systemPrompt = `
-You are the Oaktree Agent, a premium financial analyst preparing investment intelligence for a Thai audience on Facebook.
-Your job is to format and rewrite the Thai report content into a premium, engaging Facebook post.
+You are the Oaktree Agent, a premium financial analyst preparing investment intelligence.
+Your task is to write a short 2-3 sentence commentary (an "Oaktree Memo") in Thai based on the provided report details.
 
-CLASSIFICATION RULE:
-- You must dynamically analyze the content and classify it into one of these three categories:
-  1. Stock Report (รายงานหุ้น): If the content is primarily about a specific stock, company financial report, or stock-specific analysis.
-  2. Article (บทความ): If the content is an educational piece, market analysis, general financial/economic article, or macro digest.
-  3. Company Event (ข่าวสาร/กิจกรรมบริษัท): If the content is about a corporate action, earnings call event, shareholder meeting, or company event/announcement.
-- You MUST begin the post with a clear, bracketed header declaring this classification in both Thai and English. For example:
-  - "[รายงานหุ้น / Stock Report]"
-  - "[บทความ / Article]"
-  - "[ข่าวสารและกิจกรรมบริษัท / Corporate News & Event]"
-
-TONE & STYLE RULES:
-- Stick strictly to the raw facts, key takeaways, and data points provided in the source content.
-- Do NOT add any personal opinions, ideas, predictions, interpretations, or subjective commentary. Avoid the style of a market commentary memo or opinion piece.
-- Keep the writing highly professional, clear, objective, and engaging for a social media audience.
-- Use clear spacing, bold headings (without markdown if possible, or use standard emojis for headings), and clean bullet points to organize the information.
-- Use subtle, professional emojis (e.g. 📊, 🔑, 💡, ⚠️, 🔍, 📌) to separate sections and highlight key points.
-- End the post with relevant hashtags (e.g. #OaktreeAgent #สรุปรายงาน #ข้อมูลการลงทุน) and any relevant stock symbol.
-- CRITICAL HASHTAG RULE: Do NOT use or allow any hashtags that refer to investor names (e.g. do NOT use #HowardMarks, #Marks, #Howard, #Buffett, #Munger, etc.).
-- Output ONLY the final Thai Facebook post message content. Do not include any introductory meta text or markdown code block surrounds.
+COMMENTARY STYLE & RULES:
+- Write in the philosophical style of Howard Marks' memos: focus on risk awareness, market cycles, second-level thinking, and long-term perspective.
+- Keep it concise: exactly 2 to 3 sentences in Thai.
+- Wrap the generated commentary in double quotes (e.g. "...").
+- Do NOT add any introductory text, explanation, meta-labels, or other markdown sections. Output ONLY the commentary text itself.
+- Do NOT use or allow any hashtags that refer to investor names (e.g., do NOT use #HowardMarks, #Marks, #Howard, #Buffett, #Munger, etc.).
 `;
 
 	const userPrompt = `
-Format and polish the following Thai content for Facebook:
+Write a Howard Marks-style memo commentary in Thai for:
 ---
-${content}
+${contextContent}
 ---
 `;
 
+	let memoCommentary = '';
 	try {
-		const response = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
+		const response = await env.AI.run('@cf/meta/llama-3.1-8b-instruct-fp8', {
 			messages: [
 				{ role: 'system', content: systemPrompt },
 				{ role: 'user', content: userPrompt }
 			],
-			max_tokens: 4096,
+			max_tokens: 1024,
 		} as any);
 
-		const responseText = (response as any).choices?.[0]?.message?.content || response.response || "";
-		return responseText.trim();
+		memoCommentary = (response as any).choices?.[0]?.message?.content || response.response || "";
+		memoCommentary = memoCommentary.trim();
 	} catch (e) {
 		console.error('Workers AI formatting failed, trying fallback prompt style:', e);
 		// Simple fallback in case system prompt isn't supported by the model structure
-		const response = await env.AI.run('@cf/meta/llama-3.1-8b-instruct', {
+		const response = await env.AI.run('@cf/meta/llama-3.1-8b-instruct-fp8', {
 			messages: [
-				{ role: 'user', content: `${systemPrompt}\n\nContent to format:\n${content}` }
+				{ role: 'user', content: `${systemPrompt}\n\nContent to analyze:\n${contextContent}` }
 			],
-			max_tokens: 4096,
+			max_tokens: 1024,
 		} as any);
-		
-		const responseText = (response as any).choices?.[0]?.message?.content || response.response || "";
-		return responseText.trim();
+
+		memoCommentary = (response as any).choices?.[0]?.message?.content || response.response || "";
+		memoCommentary = memoCommentary.trim();
 	}
+
+	if (!memoCommentary) {
+		throw new Error('AI failed to generate Thai memo commentary');
+	}
+
+	// Make sure the commentary is wrapped in quotes
+	if (!memoCommentary.startsWith('"')) {
+		memoCommentary = `"${memoCommentary}`;
+	}
+	if (!memoCommentary.endsWith('"')) {
+		memoCommentary = `${memoCommentary}"`;
+	}
+
+	// Assemble the final Facebook post programmatically
+	const summaryLabel = type === 'daily_report' ? `สรุปรายวัน: ${symbolOrCategory}` : `สรุปตลาด: ${symbolOrCategory}`;
+	const divider = '━━━━━━━━━━━━━━━━━━━━━━━━━━';
+
+	// Create hashtags
+	const defaultHashtags = ['#OaktreeAgent', '#วิเคราะห์หุ้น', '#การลงทุนระยะยาว'];
+	if (type === 'daily_report') {
+		defaultHashtags.push(`#${symbolOrCategory.toUpperCase()}`);
+	} else {
+		// Clean category name to make a valid hashtag (remove spaces, special characters)
+		const cleanCategory = symbolOrCategory.replace(/[^a-zA-Z0-9\u0e00-\u0e7f]/g, '');
+		if (cleanCategory) {
+			defaultHashtags.push(`#${cleanCategory}`);
+		}
+	}
+	const hashtagsLine = defaultHashtags.join(' ');
+
+	const finalPost = [
+		`🔍 ${summaryLabel}`,
+		summary,
+		'',
+		'💡 ประเด็นสำคัญ (Key Takeaways):',
+		...takeaways.map((t: string) => `• ${t}`),
+		'',
+		divider,
+		'',
+		'📝 Oaktree Memo:',
+		memoCommentary,
+		'',
+		hashtagsLine
+	].join('\n');
+
+	return finalPost;
+}
+
+export async function styleCustomPost(
+	env: Env,
+	content: string,
+	tone: string,
+	instructions?: string
+): Promise<string> {
+	let toneDescription = '';
+	if (tone === 'howard_marks') {
+		toneDescription = `Write in the philosophical style of Howard Marks' memos: focus on risk awareness, market cycles, second-level thinking, and long-term perspective. Use moderate emojis and professional tone.`;
+	} else if (tone === 'engaging') {
+		toneDescription = `Format the text to be highly engaging and readable for a social media audience on Facebook. Use friendly phrasing, highlight key points with fun/business emojis, add spacing/dividers to make it highly scannable, and include a call to action or engaging question at the end. Focus heavily on emojis and icons to engage with followers.`;
+	} else if (tone === 'analytical') {
+		toneDescription = `Format the text in a professional, structured equity research or business analyst style. Use clear headers, bullet points, and highlight key metrics or figures. Keep the tone objective and informative.`;
+	} else if (tone === 'concise') {
+		toneDescription = `Summarize and format the text into a few short, punchy bulletins or takeaways. Minimize fluff, use clear separators, and keep it extremely fast and easy to read.`;
+	} else {
+		toneDescription = `Format the text to be engaging and readable for a Facebook audience, using appropriate spacing and emojis.`;
+	}
+
+	const systemPrompt = `You are a social media manager and financial copywriter for the Oaktree Agent Facebook Page.
+Your task is to take the user's raw financial/business draft content and rewrite/re-format it into an interesting, engaging, and professional Facebook post.
+
+CRITICAL INSTRUCTIONS:
+1. NO LOSS OF ORIGINAL CONTENT: You MUST preserve all original facts, numbers, percentages, dates, symbols, companies, and key statements. Do NOT omit, summarize out, or lose any factual information from the original draft.
+2. Tone/Style requirement: ${toneDescription}
+3. Emojis and Icons: Focus on using expressive, context-appropriate emojis and icons (e.g. 📊, 📈, 📉, 💡, 🔍, 🚀, 💎, ⚠️, 📅) at the start of headings, points, and next to key numbers to hook the reader and maximize follower engagement.
+4. Spacing: Use double line breaks between paragraphs/bullet points to make the post highly readable on mobile screens.
+5. Language: You MUST output the final post in the same language as the input content (e.g. if the draft is in Thai, the output must be in Thai. If in English, the output must be in English).
+6. Filler text: Output ONLY the final styled post content. Do NOT include any introductory or concluding comments (like "Here is the styled post:").
+${instructions ? `7. Special Instructions: Follow these additional directions strictly: "${instructions}"` : ''}
+`;
+
+	let styledContent = '';
+	try {
+		const response = await env.AI.run('@cf/meta/llama-3.1-8b-instruct-fp8', {
+			messages: [
+				{ role: 'system', content: systemPrompt },
+				{ role: 'user', content: `Please style the following content:\n\n${content}` }
+			],
+			max_tokens: 2048,
+		} as any);
+
+		styledContent = (response as any).choices?.[0]?.message?.content || response.response || '';
+		styledContent = styledContent.trim();
+	} catch (e) {
+		console.error('Workers AI custom post styling failed:', e);
+		throw new Error('AI failed to style custom post content: ' + (e as any).message);
+	}
+
+	if (!styledContent) {
+		throw new Error('AI failed to style custom post content');
+	}
+
+	return styledContent;
 }

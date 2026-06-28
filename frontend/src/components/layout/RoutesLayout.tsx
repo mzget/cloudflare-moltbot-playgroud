@@ -3,6 +3,7 @@ import { Box, Grid, Sheet, Typography, Divider, Drawer, Stack, Button } from '@m
 import { useSearch, useNavigate } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import gsap from 'gsap';
+import { useColorScheme } from '@mui/joy/styles';
 import Header from './Header';
 import Sidebar from './Sidebar';
 import SourceManager from '../features/sources/SourceManager';
@@ -10,6 +11,7 @@ import Watchlist from '../features/watchlist/Watchlist';
 import YahooPortfolio from '../features/portfolio/YahooPortfolio';
 import KnowledgeChat from '../features/agent/KnowledgeChat';
 import DatabaseChat from '../features/agent/DatabaseChat';
+import AnalysisReport from '../features/agent/AnalysisReport';
 import IntelligenceFeed from '../features/market/IntelligenceFeed';
 import { glassStyle } from '../../styles/glass';
 import { API_BASE_URL } from '../../config';
@@ -17,14 +19,24 @@ import MarketEventsTimeline from '../features/market/MarketEventsTimeline';
 import OaktreeIcon from '../common/OaktreeIcon';
 import { LogOut, User } from 'lucide-react';
 import { AuthContext } from '../common/AuthContext';
+import { useSettingsStore } from '../../store/settingsStore';
 
 export default function RoutesLayout() {
   const { t } = useTranslation();
-  const { tab: activeTab } = useSearch({ from: '/' });
+  const { tab: activeTab, symbol } = useSearch({ from: '/' });
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(true);
+  const [sidebarHidden, setSidebarHidden] = React.useState(false);
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const { user, logout } = React.useContext(AuthContext);
+  const theme = useSettingsStore(state => state.theme);
+  const { mode, setMode } = useColorScheme();
+
+  React.useEffect(() => {
+    if (theme && theme !== mode) {
+      setMode(theme);
+    }
+  }, [theme, mode, setMode]);
 
   const setActiveTab = (tab: string) => {
     navigate({
@@ -72,7 +84,7 @@ export default function RoutesLayout() {
       const code = searchParams.get('code');
       if (code) {
         // Clear parameters immediately to avoid double execution on reload
-        const newUrl = window.location.pathname + '?tab=sources';
+        const newUrl = window.location.pathname + '?tab=command-center';
         window.history.replaceState({}, document.title, newUrl);
 
         const exchangeOAuth = async () => {
@@ -125,10 +137,17 @@ export default function RoutesLayout() {
   }, []);
 
   return (
-    <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: '1600px', margin: '0 auto', minHeight: '100vh' }}>
+    <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: { xs: '1600px', xl: '100%' }, margin: '0 auto', minHeight: '100vh' }}>
       <Header 
-        onToggleSidebar={() => setSidebarCollapsed(!sidebarCollapsed)} 
+        onToggleSidebar={() => {
+          if (sidebarHidden) {
+            setSidebarHidden(false);
+          } else {
+            setSidebarCollapsed(!sidebarCollapsed);
+          }
+        }} 
         sidebarCollapsed={sidebarCollapsed} 
+        sidebarHidden={sidebarHidden}
         onOpenSidebar={() => setMobileOpen(true)}
       />
 
@@ -231,19 +250,27 @@ export default function RoutesLayout() {
         </Box>
       </Drawer>
 
-      <Box sx={{ display: 'flex', gap: 4 }}>
+      <Box sx={{ 
+        display: 'flex', 
+        gap: sidebarHidden ? 0 : 4,
+        transition: 'gap 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
+      }}>
         {/* Sidebar Container */}
         <Box 
           sx={{ 
-            width: sidebarCollapsed ? '80px' : { md: '280px', lg: '320px' },
-            transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+            width: sidebarHidden ? '0px' : (sidebarCollapsed ? '80px' : { md: '280px', lg: '320px' }),
+            transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease, visibility 0.4s ease',
             flexShrink: 0,
+            opacity: sidebarHidden ? 0 : 1,
+            visibility: sidebarHidden ? 'hidden' : 'visible',
             display: { xs: 'none', md: 'block' }
           }}
         >
           <Sheet sx={{ 
             ...glassStyle, 
-            p: 2, 
+            p: sidebarHidden ? 0 : 2, 
+            borderWidth: sidebarHidden ? 0 : '1px',
+            transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
             position: 'sticky', 
             top: 24, 
             height: 'fit-content',
@@ -254,6 +281,7 @@ export default function RoutesLayout() {
               setActiveTab={setActiveTab} 
               reportsCount={reports.length + digests.length} 
               collapsed={sidebarCollapsed}
+              onHide={() => setSidebarHidden(true)}
             />
           </Sheet>
         </Box>
@@ -285,13 +313,32 @@ export default function RoutesLayout() {
                   await fetchReports();
                 }
               }}
+              onReportRead={async (id) => {
+                // Optimistic UI: mark as read locally
+                setReports(prev => prev.map(r => r.id === id ? { ...r, is_readed: 1 } : r));
+                try {
+                  const res = await fetch(`${API_BASE_URL}/api/reports/mark-read`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id })
+                  });
+                  if (!res.ok) {
+                    throw new Error(await res.text());
+                  }
+                } catch (e) {
+                  console.error("Failed to mark report as read:", e);
+                  await fetchReports();
+                }
+              }}
             />
           )}
 
           {activeTab === 'watchlist' && <Watchlist />}
           {activeTab === 'agent' && <KnowledgeChat />}
+          {activeTab === 'analysis' && symbol && <AnalysisReport symbol={symbol} />}
+          {activeTab === 'analysis' && !symbol && <Box sx={{ py: 4, textAlign: 'center' }}><Typography level="h3">กรุณาระบุสัญลักษณ์หุ้นที่ต้องการวิเคราะห์</Typography></Box>}
           {activeTab === 'db-agent' && <DatabaseChat />}
-          {activeTab === 'sources' && <SourceManager />}
+          {activeTab === 'command-center' && <SourceManager />}
           {activeTab === 'about' && (
             <Sheet sx={{ ...glassStyle, p: 4 }}>
               <Typography level="h2" sx={{ mb: 2 }}>{t('about.title')}</Typography>

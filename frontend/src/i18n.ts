@@ -20,6 +20,7 @@ const resources = {
         intelligence_active: "Intelligence Active",
         notifications: "Notifications",
         mark_all_read: "Mark all as read",
+        clear_read: "Clear read",
         no_notifications: "No notifications yet",
         just_now: "Just now",
         mins_ago: "{{count}}m ago",
@@ -34,6 +35,7 @@ const resources = {
         menu: "Menu",
         expand_sidebar: "Expand Sidebar",
         collapse_sidebar: "Collapse Sidebar",
+        show_sidebar: "Show Sidebar",
       },
       sidebar: {
         command_center: "Command Center",
@@ -45,6 +47,7 @@ const resources = {
         db_agent: "Database Agent",
         about_oaktree: "About Oaktree",
         oaktree_command: "Oaktree Command",
+        hide_sidebar: "Hide Sidebar",
       },
       about: {
         title: "About Oaktree Agent",
@@ -71,6 +74,7 @@ const resources = {
         intelligence_active: "Inteligencia Activa",
         notifications: "Notificaciones",
         mark_all_read: "Marcar todas como leídas",
+        clear_read: "Borrar leídas",
         no_notifications: "No hay notificaciones aún",
         just_now: "Ahora mismo",
         mins_ago: "Hace {{count}}m",
@@ -85,6 +89,7 @@ const resources = {
         menu: "Menú",
         expand_sidebar: "Expandir barra lateral",
         collapse_sidebar: "Contraer barra lateral",
+        show_sidebar: "Mostrar barra lateral",
       },
       sidebar: {
         command_center: "Centro de Comando",
@@ -96,6 +101,7 @@ const resources = {
         db_agent: "Agente de Base de Datos",
         about_oaktree: "Acerca de Oaktree",
         oaktree_command: "Comando Oaktree",
+        hide_sidebar: "Ocultar barra lateral",
       },
       about: {
         title: "Acerca del Agente Oaktree",

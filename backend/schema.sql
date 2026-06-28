@@ -1,6 +1,9 @@
 DROP TABLE IF EXISTS watchlist;
 CREATE TABLE watchlist (
   symbol TEXT PRIMARY KEY,
+  name TEXT,
+  is_active INTEGER DEFAULT 1,
+  type TEXT DEFAULT 'stock',
   created_at INTEGER DEFAULT (strftime('%s', 'now')),
   is_auto_suggested BOOLEAN DEFAULT FALSE
 );

@@ -12,9 +12,10 @@ import { useTranslation } from 'react-i18next';
 import '../i18n';
 import RoutesLayout from './layout/RoutesLayout';
 import LoginScreen from './features/auth/LoginScreen';
-import { API_BASE_URL } from '../config';
+import { API_BASE_URL, MCP_WORKER_URL } from '../config';
 import { AuthContext } from './common/AuthContext';
 import type { User } from './common/AuthContext';
+import { useSettingsStore } from '../store/settingsStore';
 
 // Global Fetch Interceptor to inject JWT token
 if (typeof window !== 'undefined') {
@@ -29,8 +30,12 @@ if (typeof window !== 'undefined') {
       url.startsWith('http://127.0.0.1:8787') ||
       url.startsWith('/api/');
 
+    const isMcpWorker = url.startsWith(MCP_WORKER_URL) ||
+      url.startsWith('http://localhost:8789') ||
+      url.startsWith('http://127.0.0.1:8789');
+
     const token = localStorage.getItem('auth_token');
-    if (token && isBackend) {
+    if (token && (isBackend || isMcpWorker)) {
       init = init || {};
       const headers = new Headers(init.headers);
       if (!headers.has('Authorization')) {
@@ -65,7 +70,8 @@ if (typeof window !== 'undefined') {
 
 // 1. Define the Search Schema (Validation)
 const dashboardSearchSchema = z.object({
-  tab: z.enum(['dashboard', 'market', 'agent', 'db-agent', 'watchlist', 'sources', 'about']).catch('dashboard'),
+  tab: z.enum(['dashboard', 'market', 'agent', 'db-agent', 'watchlist', 'command-center', 'about', 'analysis']).catch('dashboard'),
+  symbol: z.string().optional(),
 });
 
 // 2. Define the Route Tree
@@ -121,6 +127,8 @@ export default function App() {
         picture: ''
       });
       setCheckingAuth(false);
+      // Fetch user preferences
+      useSettingsStore.getState().fetchPreferences().catch(console.error);
       return;
     }
 
@@ -135,6 +143,8 @@ export default function App() {
         if (res.ok) {
           const data = await res.json();
           setUser(data.user);
+          // Fetch user preferences
+          useSettingsStore.getState().fetchPreferences().catch(console.error);
         } else {
           localStorage.removeItem('auth_token');
         }
@@ -171,6 +181,8 @@ export default function App() {
             localStorage.setItem('auth_token', data.token);
             setUser(data.user);
             setAuthError(null);
+            // Fetch user preferences
+            useSettingsStore.getState().fetchPreferences().catch(console.error);
           } else {
             const errText = await res.text();
             setAuthError(errText || 'Failed to authenticate with Google');
