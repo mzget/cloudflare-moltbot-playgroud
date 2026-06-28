@@ -5,62 +5,51 @@ trigger: always_on
 # Oaktree Agent Rules
 
 - **Rule Name**: Oaktree Agent Rules
-- **Description**: Defines guidelines, mandatory skills activation, and stack constraints for the Moltbot workspace.
+- **Description**: Defines guidelines, conditional skills activation, and stack constraints for the Moltbot workspace.
 
-These rules govern the behavior of the Oaktree Agent in this repository. The agent **MUST** read and adhere to these guidelines for every task.
-
-## Mandatory Skills Activation
-
-For all tasks, code changes, and analysis in this repository, you **MUST** load and follow the instructions in the following specific skills at the start of your turn:
-
-1. **Cloudflare Platform Skill**:
-   - **File Path**: [SKILL.md](file:///c:/Users/natta/Documents/oaktree-agent/.agents/skills/cloudflare/SKILL.md)
-   - **Description**: Guidance for building on the Cloudflare platform (Workers, D1, Pages, Durable Objects, Workers AI, Wrangler).
-   - **Key Requirement**: Bias heavily toward retrieval from active documentation (using search tools) over pre-trained knowledge.
-
-2. **Karpathy Guidelines**:
-   - **File Path**: [SKILL.md](file:///c:/Users/natta/Documents/oaktree-agent/.agents/skills/karpathy-guidelines/SKILL.md)
-   - **Description**: Behavioral guidelines to reduce common AI coding mistakes.
-   - **Key Requirement**: Adhere to Simplicity First (minimum code), Surgical Changes (only touch what is necessary), and Goal-Driven Execution.
-
-3. **Antigravity UI & Motion Design Expert**:
-   - **File Path**: [SKILL.md](file:///c:/Users/natta/Documents/oaktree-agent/.agents/skills/@antigravity-design-expert/SKILL.md)
-   - **Description**: Core UI/UX engineering skill for building highly interactive, spatial, weightless, and glassmorphism-based web interfaces.
-   - **Key Requirement**: Apply weightlessness (layered soft drop-shadows), spatial depth, glassmorphism (translucency, background blur), and smooth motion design. Adapt these principles to the project's stack constraints (do not use Tailwind or Next.js).
-
-4. **Hono Web Framework**:
-   - **File Path**: [SKILL.md](file:///c:/Users/natta/Documents/oaktree-agent/.agents/skills/@hono/SKILL.md)
-   - **Description**: Build ultra-fast web APIs and full-stack apps with Hono — runs on Cloudflare Workers, Deno, Bun, Node.js, and any WinterCG-compatible runtime.
-   - **Key Requirement**: Use Hono's routing, middleware, Zod validation middleware (`zValidator`), and RPC client (`hc`) for building clean, type-safe API endpoints on Cloudflare Workers.
-
-5. **2D Games Skill** (Activated when working with canvas/game-related code):
-   - **File Path**: [SKILL.md](file:///c:/Users/natta/Documents/oaktree-agent/.agents/skills/2d-games/SKILL.md)
-   - **Description**: 2D game development principles including sprites, tilemaps, physics, and camera controls.
-   - **Key Requirement**: Apply structured game loops, coordinate systems, collision detection, and layout scaling rules for canvas games.
-
-6. **Agents SDK** (Activated when working with agent-chat or stateful agent code):
-   - **File Path**: [SKILL.md](file:///c:/Users/natta/Documents/oaktree-agent/.agents/skills/agents-sdk/SKILL.md)
-   - **Description**: Build AI agents on Cloudflare Workers using the Agents SDK.
-   - **Key Requirement**: Leverage state management, callable RPC methods, and SQLite-backed message persistence patterns from the Agents SDK.
+These rules govern the behavior of the Oaktree Agent in this repository.
 
 ---
 
-## Guidelines for execution
+## 🛠️ Stack Constraints (Strict Precedence Rule)
 
-### 1. Verification of Skills
-- Read the instructions in all relevant skill files above (including the 2D Games skill if the task involves the canvas game) before proposing any changes or modifications to the code.
-- Align code designs with Cloudflare Wrangler specifications, the simplified architecture guidelines from Andrej Karpathy, the Antigravity design principles, and Hono framework best practices, and 2D canvas game principles when applicable.
-
-### 2. Stack Constraints (Precedence Rule)
 - **Backend**: Cloudflare Worker running in Node.js compatibility mode.
-- **Frontend**: Astro framework UI using React with **MUI Joy UI** and **`sx` props** (no Tailwind).
-- **Conflict Resolution**: The project stack constraints (Astro + React, MUI Joy UI, `sx` prop, and no Tailwind) **MUST** take precedence over the default stack suggested in the Antigravity UI & Motion Design Expert skill.
-- Avoid introducing unnecessary libraries or frameworks.
+- **Frontend**: Astro framework UI using React with **MUI Joy UI** and **`sx` props** (Strictly **NO Tailwind CSS**).
+- **Conflict Resolution**: The project stack constraints (Astro + React, MUI Joy UI, `sx` prop, and no Tailwind) **MUST** take precedence over any default stacks suggested in external skills.
 
-### 3. Component Folder Structure & Best Practices
-- **React Entrypoint**: `src/components/App.tsx` **MUST** remain directly under `src/components/` so it integrates smoothly into Astro pages (e.g., [index.astro](file:///c:/Users/natta/Documents/oaktree-agent/frontend/src/pages/index.astro)).
-- **Subdirectory Classification**:
-  - `src/components/layout/` – Shell components for the dashboard frame (`Header.tsx`, `Sidebar.tsx`, `RoutesLayout.tsx`).
-  - `src/components/common/` – Reusable contexts, helper components, and SVGs (`AuthContext.tsx`, `OaktreeIcon.tsx`, `ThemeToggle.tsx`).
-  - `src/components/features/` – Domain-specific views organized by subfolders (`auth/`, `portfolio/`, `watchlist/`, `market/`, `agent/`, `sources/`).
-- **Relative Path Integrity**: Always use correct relative path imports when traversing module boundaries (e.g., importing type definitions from `../../../types/` or shared components from `../../common/`). Do not write flat component lists directly inside `src/components/`.
+---
+
+## ⚡ Conditional Skills Activation (Load only when relevant)
+
+Do NOT load all skills at the start of every turn. Only call `view_file` to load the instructions of a specific skill when the task matches the following conditions:
+
+1. **Karpathy Guidelines**:
+   - *Condition*: Load when writing, modifying, reviewing, or debugging code.
+   - *Path*: [karpathy-guidelines/SKILL.md](file:///c:/Users/natta/Documents/oaktree-agent/.agents/skills/karpathy-guidelines/SKILL.md)
+2. **Cloudflare Platform & Wrangler**:
+   - *Condition*: Working on Worker backend, `wrangler.jsonc` configuration, or database schemas (D1, KV, R2).
+   - *Path*: [cloudflare/SKILL.md](file:///c:/Users/natta/Documents/oaktree-agent/.agents/skills/cloudflare/SKILL.md)
+3. **Hono Web Framework**:
+   - *Condition*: Creating/modifying API endpoints, backend routing, or RPC-client services.
+   - *Path*: [@hono/SKILL.md](file:///c:/Users/natta/Documents/oaktree-agent/.agents/skills/@hono/SKILL.md)
+4. **Agents SDK**:
+   - *Condition*: Working on stateful agent logic, agent-chat components, or durable workflows.
+   - *Path*: [agents-sdk/SKILL.md](file:///c:/Users/natta/Documents/oaktree-agent/.agents/skills/agents-sdk/SKILL.md)
+5. **2D Games**:
+   - *Condition*: Working with canvas games, sprites, physics, or game loops.
+   - *Path*: [2d-games/SKILL.md](file:///c:/Users/natta/Documents/oaktree-agent/.agents/skills/2d-games/SKILL.md)
+
+---
+
+## 🎨 Antigravity UI Style (Adapted for MUI Joy UI)
+
+Apply these design principles using MUI Joy UI `sx` props (do not load the `@antigravity-design-expert` skill to avoid Tailwind/GSAP stack conflicts):
+- **Glassmorphism**: Use translucent backgrounds (`rgba`), blur effects (`backdropFilter: 'blur(12px)'`), and thin subtle borders.
+- **Weightlessness**: Add soft, layered, and diffused shadows.
+- **Motion**: Ensure all hover/focus/active state changes have smooth transitions (`transition: 'all 0.3s ease-out'`).
+- **React Entrypoint**: `src/components/App.tsx` **MUST** remain directly under `src/components/` to integrate with Astro.
+- **Component Folder Structure**:
+  - `src/components/layout/` – Shell components (`Header.tsx`, `Sidebar.tsx`).
+  - `src/components/common/` – Reusable contexts/helpers (`AuthContext.tsx`, `ThemeToggle.tsx`).
+  - `src/components/features/` – Domain-specific views in subfolders (e.g., `agent/`, `portfolio/`).
+- **Relative Paths**: Always use relative paths (e.g., `../../common/`) rather than flat imports when crossing folder boundaries.

@@ -1081,6 +1081,31 @@ app.get('/api/email-digests', async (c) => {
   }
 });
 
+// API: Get Notebook Articles
+app.get('/api/notebook-articles', async (c) => {
+  try {
+    const { results } = await c.env.DB.prepare(`
+      SELECT 
+        n.id, 
+        n.title, 
+        n.symbol, 
+        n.summary, 
+        n.key_takeaways, 
+        CAST(strftime('%s', n.created_at) as INTEGER) as created_at,
+        f.status as facebook_status,
+        f.facebook_post_id,
+        f.error_message as facebook_error
+      FROM notebook_articles n
+      LEFT JOIN facebook_posts f ON f.source_type = 'notebook_article' AND f.source_id = n.id
+      ORDER BY n.created_at DESC
+      LIMIT 50
+    `).all();
+    return c.json(results || []);
+  } catch (e) {
+    return c.json({ error: (e as any).message }, 500);
+  }
+});
+
 
 // Helper: Recalculate holdings aggregate from share_lots
 async function recalcHoldings(db: any, symbol: string) {
