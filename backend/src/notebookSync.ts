@@ -7,6 +7,44 @@ interface SyncedArticle {
 	key_takeaways: string[];
 }
 
+/** Convert a slug-friendly key from an article title */
+function toSlug(title: string): string {
+	return title
+		.toLowerCase()
+		.replace(/[^a-z0-9\u0E00-\u0E7F]+/g, '_')
+		.replace(/^_|_$/g, '')
+		.slice(0, 80);
+}
+
+/** Serialize a SyncedArticle to an OKF Markdown string */
+function articleToOkf(article: SyncedArticle, timestamp: string): string {
+	const tags = ['notebook-sync', 'stock-analysis'];
+	if (article.symbol) tags.push(article.symbol.toLowerCase());
+
+	const frontmatter = [
+		'---',
+		'type: article',
+		`title: "${article.title.replace(/"/g, "'")}"`,
+		article.symbol ? `symbol: "${article.symbol}"` : null,
+		article.summary ? `description: "${article.summary.replace(/"/g, "'")}"` : null,
+		`tags: [${tags.join(', ')}]`,
+		`timestamp: "${timestamp}"`,
+		'source: notebooklm',
+		'---',
+	].filter(Boolean).join('\n');
+
+	const body = [
+		`# ${article.title}`,
+		'',
+		article.summary ? `## Summary\n\n${article.summary}` : '',
+		article.key_takeaways?.length
+			? `## Key Takeaways\n\n${article.key_takeaways.map((t) => `- ${t}`).join('\n')}`
+			: '',
+	].filter((s) => s !== '').join('\n\n');
+
+	return `${frontmatter}\n\n${body}\n`;
+}
+
 export async function syncNotebookArticles(env: Env): Promise<number> {
 	console.log('Starting sync of NotebookLM articles...');
 	const bridgeUrl = env.NOTEBOOKLM_BRIDGE_URL;
@@ -81,7 +119,7 @@ Format the response strictly as a JSON array of objects, where each object has f
 		}
 
 		// Clean up markdown block if present
-		let cleanText = answer.trim();
+		let cleanText = (answer as string).trim();
 		if (cleanText.includes('```')) {
 			const match = cleanText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
 			if (match) {
@@ -147,6 +185,21 @@ Format the response strictly as a JSON array of objects, where each object has f
 				if (result.meta.changes > 0) {
 					addedCount++;
 					console.log(`New article synced: "${title}" for symbol "${symbol}"`);
+
+					// Write OKF Markdown to R2 so Agent can read it
+					if (env.KNOWLEDGE_BUCKET) {
+						try {
+							const slug = toSlug(article.title);
+							const okfKey = `articles/${slug}.md`;
+							const okfContent = articleToOkf(article, new Date().toISOString().split('T')[0]);
+							await env.KNOWLEDGE_BUCKET.put(okfKey, okfContent, {
+								httpMetadata: { contentType: 'text/markdown' },
+							});
+							console.log(`OKF file written to R2: ${okfKey}`);
+						} catch (r2Err) {
+							console.warn(`Failed to write OKF to R2 for "${title}":`, r2Err);
+						}
+					}
 				}
 			} catch (dbErr) {
 				console.error(`Failed to store article "${title}" in D1:`, dbErr);

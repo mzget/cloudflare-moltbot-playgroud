@@ -25,6 +25,7 @@ export interface OaktreeWorkflowParams {
 	sendDailyEmailReport?: boolean;
 	purgeOldData?: boolean;
 	syncFacebookPosts?: boolean;
+	syncNotebookArticles?: boolean;
 	priceOnly?: boolean;
 }
 

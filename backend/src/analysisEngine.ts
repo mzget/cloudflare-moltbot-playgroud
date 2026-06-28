@@ -1,4 +1,5 @@
 import { Env } from './index';
+import { getFrameworkByCategory } from './okf';
 import { 
   MarketStatsData, 
   formatMetricsForPrompt, 
@@ -197,6 +198,16 @@ export async function getOrUpdateMarketStats(env: Env, symbol: string): Promise<
 }
 
 async function fetchFrameworkContent(env: Env, category: string): Promise<string> {
+  // Primary: Read from Cloudflare R2 OKF bundle
+  if (env.KNOWLEDGE_BUCKET) {
+    try {
+      const doc = await getFrameworkByCategory(env.KNOWLEDGE_BUCKET, category);
+      if (doc?.body) return doc.body;
+    } catch (e) {
+      console.warn(`R2 OKF read failed for "${category}", falling back to D1:`, e);
+    }
+  }
+  // Fallback: D1 knowledge_base table (legacy)
   const row = await env.DB.prepare(
     'SELECT content FROM knowledge_base WHERE category = ?'
   ).bind(category).first<{ content: string }>();

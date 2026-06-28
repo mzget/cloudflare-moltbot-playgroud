@@ -1,4 +1,4 @@
-﻿name = "oaktree-backend"
+name = "oaktree-backend"
 main = "src/index.ts"
 compatibility_date = "2024-11-18"
 compatibility_flags = [ "nodejs_compat" ]
@@ -7,6 +7,10 @@ compatibility_flags = [ "nodejs_compat" ]
 enabled = true
 invocation_logs = true
 
+
+[[r2_buckets]]
+binding = "KNOWLEDGE_BUCKET"
+bucket_name = "oaktree-knowledge"
 
 [browser]
 binding = "BROWSER"
