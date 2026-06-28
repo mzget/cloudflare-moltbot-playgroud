@@ -21,6 +21,11 @@ bindings = [
   { name = "OAKTREE_CHAT", class_name = "OaktreeChat" }
 ]
 
+[observability.logs]
+enabled = true
+invocation_logs = true
+
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["OaktreeMCP"]

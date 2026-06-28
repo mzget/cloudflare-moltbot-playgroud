@@ -43,14 +43,14 @@ export default function IntelligenceFeed({
 
   // Combine and sort: unread first (newest), then read items last
   const combinedFeed = React.useMemo(() => {
-    const items = [...reports, ...digests];
+    const items = [...reports, ...digests, ...notebookArticles];
     return items.sort((a, b) => {
       const aRead = (a.is_readed === 1) ? 1 : 0;
       const bRead = (b.is_readed === 1) ? 1 : 0;
       if (aRead !== bRead) return aRead - bRead; // unread first
       return getReportTime(b) - getReportTime(a); // then newest first
     });
-  }, [reports, digests]);
+  }, [reports, digests, notebookArticles]);
 
   // Filter items
   const filteredFeed = React.useMemo(() => {
@@ -177,6 +177,20 @@ export default function IntelligenceFeed({
                 Email Digests
               </Badge>
             </Button>
+            <Button
+              onClick={() => setFilter('articles')}
+              sx={{
+                fontWeight: 600,
+                flex: { xs: 1, sm: 'initial' },
+                whiteSpace: 'nowrap',
+                bgcolor: filter === 'articles' ? 'background.surface' : 'transparent',
+                color: filter === 'articles' ? 'primary.plainColor' : 'text.secondary',
+                boxShadow: filter === 'articles' ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
+                '&:hover': { bgcolor: filter === 'articles' ? 'background.surface' : 'background.level2' }
+              }}
+            >
+              Notebook Articles
+            </Button>
           </ButtonGroup>
         </Box>
       </Stack>
@@ -201,7 +215,9 @@ export default function IntelligenceFeed({
       ) : (
         <Stack spacing={4}>
           {filteredFeed.map((item) => {
-            if (item.symbol) {
+            if (item.title !== undefined) {
+              return <NotebookArticleCard key={`article-${item.id}`} article={item} />;
+            } else if (item.symbol) {
               return <DailyReportCard key={`report-${item.id}`} report={item} onMarkAsRead={onReportRead} />;
             } else {
               return <EmailDigestCard key={`digest-${item.id}`} digest={item} onMarkAsRead={onDigestRead} />;
