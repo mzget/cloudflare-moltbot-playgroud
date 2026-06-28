@@ -28,6 +28,7 @@ export default function KnowledgeChat() {
 
   const { messages, sendMessage, status } = useAgentChat({
     agent,
+    experimental_throttle: 50,
   });
 
   const isLoading = status === 'submitted' || status === 'streaming';
