@@ -1,21 +1,28 @@
 import * as React from 'react';
-import { Box, Grid, Sheet, Typography, Divider, Drawer, Stack, Button } from '@mui/joy';
+import { Box, Grid, Sheet, Typography, Divider, Drawer, Stack, Button, CircularProgress } from '@mui/joy';
 import { useSearch, useNavigate } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import gsap from 'gsap';
 import { useColorScheme } from '@mui/joy/styles';
 import Header from './Header';
 import Sidebar from './Sidebar';
-import SourceManager from '../features/sources/SourceManager';
-import Watchlist from '../features/watchlist/Watchlist';
-import YahooPortfolio from '../features/portfolio/YahooPortfolio';
-import KnowledgeChat from '../features/agent/KnowledgeChat';
-import DatabaseChat from '../features/agent/DatabaseChat';
-import AnalysisReport from '../features/agent/AnalysisReport';
-import IntelligenceFeed from '../features/market/IntelligenceFeed';
 import { glassStyle } from '../../styles/glass';
 import { API_BASE_URL } from '../../config';
-import MarketEventsTimeline from '../features/market/MarketEventsTimeline';
+
+const SourceManager = React.lazy(() => import('../features/sources/SourceManager'));
+const Watchlist = React.lazy(() => import('../features/watchlist/Watchlist'));
+const YahooPortfolio = React.lazy(() => import('../features/portfolio/YahooPortfolio'));
+const KnowledgeChat = React.lazy(() => import('../features/agent/KnowledgeChat'));
+const DatabaseChat = React.lazy(() => import('../features/agent/DatabaseChat'));
+const AnalysisReport = React.lazy(() => import('../features/agent/AnalysisReport'));
+const IntelligenceFeed = React.lazy(() => import('../features/market/IntelligenceFeed'));
+const MarketEventsTimeline = React.lazy(() => import('../features/market/MarketEventsTimeline'));
+
+const LoadingFallback = (
+  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+    <CircularProgress size="md" variant="soft" />
+  </Box>
+);
 import OaktreeIcon from '../common/OaktreeIcon';
 import { LogOut, User } from 'lucide-react';
 import { AuthContext } from '../common/AuthContext';
@@ -288,7 +295,8 @@ export default function RoutesLayout() {
 
         {/* Main Content Container */}
         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-          {activeTab === 'dashboard' && <YahooPortfolio />}
+          <React.Suspense fallback={LoadingFallback}>
+            {activeTab === 'dashboard' && <YahooPortfolio />}
           {activeTab === 'market' && (
             <IntelligenceFeed 
               reports={reports} 
@@ -351,6 +359,7 @@ export default function RoutesLayout() {
               </Typography>
             </Sheet>
           )}
+          </React.Suspense>
         </Box>
 
         {/* Right Sidebar Container */}
@@ -363,7 +372,9 @@ export default function RoutesLayout() {
             }}
           >
             <Box sx={{ position: 'sticky', top: 24 }}>
-              <MarketEventsTimeline inSidebar />
+              <React.Suspense fallback={LoadingFallback}>
+                <MarketEventsTimeline inSidebar />
+              </React.Suspense>
             </Box>
           </Box>
         )}
