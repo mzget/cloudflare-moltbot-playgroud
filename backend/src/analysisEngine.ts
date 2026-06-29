@@ -3,7 +3,6 @@ import { getFrameworkByCategory } from './okf';
 import { 
   MarketStatsData, 
   formatMetricsForPrompt, 
-  DEFAULT_AI_MODEL,
   getLynchPrompt,
   getHelmerPrompt,
   getBuffettPrompt,
@@ -237,7 +236,7 @@ export async function runFullAnalysis(env: Env, symbol: string): Promise<{
   
   console.log('Starting Step 1 (Peter Lynch) for ' + symbolUpper + '...');
   const lynchPrompt = getLynchPrompt(symbolUpper, metricsStr, lynchFw);
-  const lynchAIResponse = await env.AI.run(DEFAULT_AI_MODEL, {
+  const lynchAIResponse = await env.AI.run(env.default_ai_model, {
     messages: [
       { role: 'system', content: lynchPrompt.system },
       { role: 'user', content: lynchPrompt.prompt }
@@ -250,7 +249,7 @@ export async function runFullAnalysis(env: Env, symbol: string): Promise<{
   
   console.log('Starting Step 2 (7 Powers) for ' + symbolUpper + '...');
   const helmerPrompt = getHelmerPrompt(symbolUpper, metricsStr, helmerFw, JSON.stringify(stepResults.peter_lynch));
-  const helmerAIResponse = await env.AI.run(DEFAULT_AI_MODEL, {
+  const helmerAIResponse = await env.AI.run(env.default_ai_model, {
     messages: [
       { role: 'system', content: helmerPrompt.system },
       { role: 'user', content: helmerPrompt.prompt }
@@ -266,7 +265,7 @@ export async function runFullAnalysis(env: Env, symbol: string): Promise<{
     peter_lynch: stepResults.peter_lynch,
     hamilton_helmer: stepResults.hamilton_helmer
   }));
-  const buffettAIResponse = await env.AI.run(DEFAULT_AI_MODEL, {
+  const buffettAIResponse = await env.AI.run(env.default_ai_model, {
     messages: [
       { role: 'system', content: buffettPrompt.system },
       { role: 'user', content: buffettPrompt.prompt }
@@ -283,7 +282,7 @@ export async function runFullAnalysis(env: Env, symbol: string): Promise<{
     hamilton_helmer: stepResults.hamilton_helmer,
     warren_buffett: stepResults.warren_buffett
   }));
-  const mungerAIResponse = await env.AI.run(DEFAULT_AI_MODEL, {
+  const mungerAIResponse = await env.AI.run(env.default_ai_model, {
     messages: [
       { role: 'system', content: mungerPrompt.system },
       { role: 'user', content: mungerPrompt.prompt }
@@ -301,7 +300,7 @@ export async function runFullAnalysis(env: Env, symbol: string): Promise<{
     warren_buffett: stepResults.warren_buffett,
     charlie_munger: stepResults.charlie_munger
   }));
-  const marksAIResponse = await env.AI.run(DEFAULT_AI_MODEL, {
+  const marksAIResponse = await env.AI.run(env.default_ai_model, {
     messages: [
       { role: 'system', content: marksPrompt.system },
       { role: 'user', content: marksPrompt.prompt }
@@ -320,7 +319,7 @@ export async function runFullAnalysis(env: Env, symbol: string): Promise<{
     charlie_munger: stepResults.charlie_munger,
     howard_marks: stepResults.howard_marks
   }));
-  const greenblattAIResponse = await env.AI.run(DEFAULT_AI_MODEL, {
+  const greenblattAIResponse = await env.AI.run(env.default_ai_model, {
     messages: [
       { role: 'system', content: greenblattPrompt.system },
       { role: 'user', content: greenblattPrompt.prompt }
@@ -333,7 +332,7 @@ export async function runFullAnalysis(env: Env, symbol: string): Promise<{
   
   console.log('Starting Step 7 (Synthesis) for ' + symbolUpper + '...');
   const synthesisPrompt = getSynthesisPrompt(symbolUpper, metricsStr, JSON.stringify(stepResults));
-  const synthesisAIResponse = await env.AI.run(DEFAULT_AI_MODEL, {
+  const synthesisAIResponse = await env.AI.run(env.default_ai_model, {
     messages: [
       { role: 'system', content: synthesisPrompt.system },
       { role: 'user', content: synthesisPrompt.prompt }
@@ -347,7 +346,7 @@ export async function runFullAnalysis(env: Env, symbol: string): Promise<{
   
   console.log('Starting Step 8 (Markdown Compilation) for ' + symbolUpper + '...');
   const reportPrompt = getFinalReportPrompt(symbolUpper, metricsStr, JSON.stringify(synthesis), JSON.stringify(stepResults));
-  const reportAIResponse = await env.AI.run(DEFAULT_AI_MODEL, {
+  const reportAIResponse = await env.AI.run(env.default_ai_model, {
     messages: [
       { role: 'system', content: reportPrompt.system },
       { role: 'user', content: reportPrompt.prompt }

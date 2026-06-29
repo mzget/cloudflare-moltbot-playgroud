@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useContext, useEffect, useRef } from 'react';
 import { AuthContext } from '../../common/AuthContext';
 import {
   Box,
@@ -110,15 +110,37 @@ export default function KnowledgeChat() {
       });
       if (!res.ok) throw new Error(await res.text());
       
-      setSessions(prev => prev.filter(s => s.id !== id));
-      if (activeSessionId === id) {
-        const remaining = sessions.filter(s => s.id !== id);
-        if (remaining.length > 0) {
+      const remaining = sessions.filter(s => s.id !== id);
+      
+      if (remaining.length > 0) {
+        setSessions(remaining);
+        if (activeSessionId === id) {
           setActiveSessionId(remaining[0].id);
-        } else {
+        }
+      } else {
+        // Last session is deleted, create default session first in the same flow
+        // to avoid setting activeSessionId to null and causing a welcome screen flash
+        setIsCreating(true);
+        try {
+          const createRes = await fetch(`${MCP_WORKER_URL}/chat/sessions`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ title: 'General Chat' })
+          });
+          if (!createRes.ok) throw new Error(await createRes.text());
+          const newSession = await createRes.json() as ChatSession;
+          
+          setSessions([newSession]);
+          setActiveSessionId(newSession.id);
+        } catch (createErr) {
+          console.error("Failed to create default session after delete:", createErr);
+          setSessions([]);
           setActiveSessionId(null);
-          // Auto create a new one if list becomes empty
-          await handleCreateSession("General Chat");
+        } finally {
+          setIsCreating(false);
         }
       }
     } catch (e) {
@@ -314,6 +336,7 @@ export default function KnowledgeChat() {
 
 function ChatWindow({ sessionId }: { sessionId: string }) {
   const [input, setInput] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const host = MCP_WORKER_URL.replace(/^https?:\/\//, '');
 
   const agent = useAgent({
@@ -343,74 +366,130 @@ function ChatWindow({ sessionId }: { sessionId: string }) {
     setInput('');
   };
 
+  const lastMessageText = messages[messages.length - 1]?.parts
+    ?.map(p => p.type === 'text' ? p.text : '')
+    ?.join('') || '';
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages.length, lastMessageText, status]);
+
+  const isStateLoading = !agent.state && !connectionError;
+
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <Box sx={{ flex: 1, overflowY: 'auto', p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {messages.length === 0 && (
-          <Sheet variant="soft" color="neutral" sx={{ p: 2, borderRadius: 'md', textAlign: 'center' }}>
-            <Typography>Hello! I am your portfolio agent. Try asking:</Typography>
-            <Typography level="body-sm" sx={{ mt: 1 }}>"What is my current portfolio?"</Typography>
-            <Typography level="body-sm">"What is my history for 2024?"</Typography>
-            <Typography level="body-sm">"Tell me about the Five Forces framework."</Typography>
-          </Sheet>
-        )}
+      <Box sx={{ flex: 1, overflowY: 'auto', p: 2, display: 'flex', flexDirection: 'column', gap: 3 }}>
+        {isStateLoading ? (
+          <Box sx={{ display: 'flex', flex: 1, height: '100%', alignItems: 'center', justifyContent: 'center', minHeight: '200px' }}>
+            <CircularProgress size="md" color="success" />
+          </Box>
+        ) : (
+          <>
+            {messages.length === 0 && (
+              <Sheet variant="soft" color="neutral" sx={{ p: 2, borderRadius: 'md', textAlign: 'center' }}>
+                <Typography>Hello! I am your portfolio agent. Try asking:</Typography>
+                <Typography level="body-sm" sx={{ mt: 1 }}>"What is my current portfolio?"</Typography>
+                <Typography level="body-sm">"What is my history for 2024?"</Typography>
+                <Typography level="body-sm">"Tell me about the Five Forces framework."</Typography>
+              </Sheet>
+            )}
 
-        {messages.map((m) => (
-          <Box
-            key={m.id}
-            sx={{
-              display: 'flex',
-              gap: 1,
-              alignItems: 'flex-start',
-              flexDirection: m.role === 'user' ? 'row-reverse' : 'row',
-            }}
-          >
-            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mt: 0.5 }}>
-              {m.role !== 'user' && <Bot size={20} style={{ color: 'var(--joy-palette-success-plainColor, #10b981)' }} />}
-            </Box>
-            <Sheet
-              variant="solid"
-              color={m.role === 'user' ? 'primary' : 'neutral'}
-              sx={{
-                p: 1.5,
-                borderRadius: 'lg',
-                maxWidth: '80%',
-              }}
-            >
-              <Box sx={{ color: m.role === 'user' ? 'common.white' : 'text.primary' }}>
-                {m.parts.map((part, i) =>
-                  part.type === 'text' ? (
-                    <MarkdownRenderer key={i} text={part.text} themeColor={m.role === 'user' ? 'primary' : 'neutral'} />
-                  ) : null
+            {messages.map((m) => (
+              <Box
+                key={m.id}
+                sx={{
+                  display: 'flex',
+                  gap: 1.5,
+                  alignItems: 'flex-start',
+                  flexDirection: m.role === 'user' ? 'row-reverse' : 'row',
+                }}
+              >
+                {m.role !== 'user' && (
+                  <Box sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: 32,
+                    height: 32,
+                    borderRadius: '50%',
+                    bgcolor: 'rgba(16, 185, 129, 0.15)',
+                    border: '1px solid rgba(16, 185, 129, 0.25)',
+                    flexShrink: 0,
+                    mt: 0.5
+                  }}>
+                    <Bot size={18} style={{ color: 'var(--joy-palette-success-plainColor, #10b981)' }} />
+                  </Box>
                 )}
-                {m.parts.map((part, i) => {
-                  const isTool = part.type === 'tool-invocation' || part.type.startsWith('tool-');
-                  if (!isTool) return null;
-                  const toolInvocation = part.type === 'tool-invocation'
-                    ? (part as any).toolInvocation
-                    : {
-                        toolName: part.type.slice(5),
-                        result: (part as any).output,
-                        state: (part as any).state === 'output-available' ? 'result' : (part as any).state
-                      };
-                  return (
-                    <Box key={i} sx={{ mt: 1, p: 1, bgcolor: 'background.surface', borderRadius: 'sm', opacity: 0.8 }}>
-                      <Typography level="body-xs" color="primary">
-                        Calling: {toolInvocation?.toolName}
-                      </Typography>
-                    </Box>
-                  );
-                })}
+                <Sheet
+                  variant={m.role === 'user' ? 'solid' : 'outlined'}
+                  color={m.role === 'user' ? 'primary' : 'neutral'}
+                  sx={{
+                    px: 2,
+                    py: 1.5,
+                    borderRadius: '16px',
+                    borderBottomRightRadius: m.role === 'user' ? '4px' : '16px',
+                    borderBottomLeftRadius: m.role === 'user' ? '16px' : '4px',
+                    maxWidth: '85%',
+                    bgcolor: m.role === 'user' ? 'primary.solidBg' : 'background.surface',
+                    backdropFilter: m.role === 'user' ? 'none' : 'blur(12px)',
+                    borderColor: m.role === 'user' ? 'transparent' : 'divider',
+                    boxShadow: m.role === 'user' ? 'var(--joy-shadow-md)' : 'var(--joy-shadow-sm)',
+                    transition: 'all 0.3s ease-out',
+                  }}
+                >
+                  <Box sx={{ color: m.role === 'user' ? 'common.white' : 'text.primary' }}>
+                    {m.parts.map((part, i) =>
+                      part.type === 'text' ? (
+                        <MarkdownRenderer key={i} text={part.text} themeColor={m.role === 'user' ? 'primary' : 'neutral'} />
+                      ) : null
+                    )}
+                    {m.parts.map((part, i) => {
+                      const isTool = part.type === 'tool-invocation' || part.type.startsWith('tool-');
+                      if (!isTool) return null;
+                      const toolInvocation = part.type === 'tool-invocation'
+                        ? (part as any).toolInvocation
+                        : {
+                            toolName: part.type.slice(5),
+                            result: (part as any).output,
+                            state: (part as any).state === 'output-available' ? 'result' : (part as any).state
+                          };
+                      return (
+                        <Box key={i} sx={{ mt: 1, p: 1, bgcolor: 'background.surface', borderRadius: 'sm', opacity: 0.8 }}>
+                          <Typography level="body-xs" color="primary">
+                            Calling: {toolInvocation?.toolName}
+                          </Typography>
+                        </Box>
+                      );
+                    })}
+                  </Box>
+                </Sheet>
               </Box>
-            </Sheet>
-          </Box>
-        ))}
+            ))}
 
-        {isLoading && (
-          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-            <CircularProgress size="sm" />
-            <Typography level="body-sm" color="neutral">Thinking...</Typography>
-          </Box>
+            {isLoading && (
+              <InteractiveWaitingState activeTool={activeTool} onStop={stop} />
+            )}
+
+            {connectionError && (
+              <Alert
+                color="danger"
+                variant="soft"
+                startDecorator={<AlertCircle size={20} />}
+                sx={{ borderRadius: 'md', my: 1, alignSelf: 'flex-start', maxWidth: '550px', width: '100%' }}
+              >
+                <Box sx={{ flex: 1 }}>
+                  <Typography level="title-sm" color="danger">
+                    Connection or API Error
+                  </Typography>
+                  <Typography level="body-xs" color="danger" sx={{ opacity: 0.8 }}>
+                    {connectionError?.message || 'The agent encountered an error. Please try again.'}
+                  </Typography>
+                </Box>
+              </Alert>
+            )}
+
+            <div ref={messagesEndRef} />
+          </>
         )}
       </Box>
 
@@ -421,7 +500,7 @@ function ChatWindow({ sessionId }: { sessionId: string }) {
             placeholder="Ask a question..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            disabled={isLoading}
+            disabled={isLoading || isStateLoading}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -429,7 +508,7 @@ function ChatWindow({ sessionId }: { sessionId: string }) {
               }
             }}
           />
-          <Button type="submit" disabled={isLoading || !input.trim()}>
+          <Button type="submit" disabled={isLoading || isStateLoading || !input.trim()}>
             <Send size={18} />
           </Button>
         </Stack>

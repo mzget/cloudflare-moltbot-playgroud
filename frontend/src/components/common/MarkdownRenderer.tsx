@@ -6,7 +6,7 @@ interface MarkdownRendererProps {
   themeColor?: 'primary' | 'neutral';
 }
 
-export const parseInline = (text: string): React.ReactNode[] => {
+export const parseInline = (text: string, themeColor: 'primary' | 'neutral' = 'neutral'): React.ReactNode[] => {
   // Matches:
   // 1. span tag: <span style="...">...</span>
   // 2. bold tag: **...** or __...__
@@ -36,7 +36,7 @@ export const parseInline = (text: string): React.ReactNode[] => {
       
       if (boldInner !== undefined) {
         result.push(
-          <strong key={idx} style={{ fontWeight: 700, color: '#10b981' }}>
+          <strong key={idx} style={{ fontWeight: 700, color: themeColor === 'primary' ? 'inherit' : '#10b981' }}>
             {boldInner}
           </strong>
         );
@@ -54,7 +54,7 @@ export const parseInline = (text: string): React.ReactNode[] => {
         }
         result.push(
           <span key={idx} style={styleObj}>
-            {parseInline(spanInner)}
+            {parseInline(spanInner, themeColor)}
           </span>
         );
       } else if (codeInner !== undefined) {
@@ -105,7 +105,7 @@ export function renderMarkdown(md: string, themeColor: 'primary' | 'neutral' = '
     if (listItems.length > 0) {
       const listTag = isNumberedList ? 'ol' : 'ul';
       elements.push(
-        <Box component={listTag} key={`list-${key}`} sx={{ pl: 3, my: 1.5, color: themeColor === 'primary' ? 'inherit' : 'text.secondary' }}>
+        <Box component={listTag} key={`list-${key}`} sx={{ pl: 3, my: 1.5, color: themeColor === 'primary' ? 'inherit' : 'text.primary' }}>
           {listItems}
         </Box>
       );
@@ -126,7 +126,7 @@ export function renderMarkdown(md: string, themeColor: 'primary' | 'neutral' = '
                     const align = tableAlignments[idx] || 'left';
                     return (
                       <th key={`th-${idx}`} style={{ padding: '10px 14px', fontSize: '14px', fontWeight: 600, textAlign: align, color: themeColor === 'primary' ? '#fff' : 'var(--joy-palette-text-primary)' }}>
-                        {parseInline(th)}
+                        {parseInline(th, themeColor)}
                       </th>
                     );
                   })}
@@ -140,7 +140,7 @@ export function renderMarkdown(md: string, themeColor: 'primary' | 'neutral' = '
                     const align = tableAlignments[cellIdx] || 'left';
                     return (
                       <td key={`td-${cellIdx}`} style={{ padding: '10px 14px', fontSize: '14px', color: themeColor === 'primary' ? 'rgba(255,255,255,0.9)' : 'var(--joy-palette-text-secondary)', textAlign: align }}>
-                        {parseInline(cell)}
+                        {parseInline(cell, themeColor)}
                       </td>
                     );
                   })}
@@ -255,7 +255,7 @@ export function renderMarkdown(md: string, themeColor: 'primary' | 'neutral' = '
       }
       listItems.push(
         <Box component="li" key={`li-${i}`} sx={{ my: 0.5 }}>
-          {parseInline(content)}
+          {parseInline(content, themeColor)}
         </Box>
       );
       continue;
@@ -268,7 +268,7 @@ export function renderMarkdown(md: string, themeColor: 'primary' | 'neutral' = '
       }
       listItems.push(
         <Box component="li" key={`li-${i}`} sx={{ my: 0.5 }}>
-          {parseInline(content)}
+          {parseInline(content, themeColor)}
         </Box>
       );
       continue;
@@ -280,25 +280,25 @@ export function renderMarkdown(md: string, themeColor: 'primary' | 'neutral' = '
     if (line.startsWith('# ')) {
       elements.push(
         <Typography level="h2" key={i} sx={{ mt: 3, mb: 1.5, fontWeight: 800, color: themeColor === 'primary' ? 'inherit' : 'text.primary', borderBottom: '1px solid', borderColor: 'divider', pb: 1 }}>
-          {parseInline(line.substring(2))}
+          {parseInline(line.substring(2), themeColor)}
         </Typography>
       );
     } else if (line.startsWith('## ')) {
       elements.push(
         <Typography level="h3" key={i} sx={{ mt: 2.5, mb: 1, fontWeight: 700, color: themeColor === 'primary' ? 'inherit' : 'text.primary' }}>
-          {parseInline(line.substring(3))}
+          {parseInline(line.substring(3), themeColor)}
         </Typography>
       );
     } else if (line.startsWith('### ')) {
       elements.push(
         <Typography level="title-lg" key={i} sx={{ mt: 2, mb: 0.5, fontWeight: 600, color: themeColor === 'primary' ? 'inherit' : 'text.primary' }}>
-          {parseInline(line.substring(4))}
+          {parseInline(line.substring(4), themeColor)}
         </Typography>
       );
     } else if (line.startsWith('#### ')) {
       elements.push(
         <Typography level="title-md" key={i} sx={{ mt: 1.5, mb: 0.5, fontWeight: 600, color: themeColor === 'primary' ? 'inherit' : 'text.primary' }}>
-          {parseInline(line.substring(5))}
+          {parseInline(line.substring(5), themeColor)}
         </Typography>
       );
     } else if (line.startsWith('> ')) {
@@ -313,7 +313,7 @@ export function renderMarkdown(md: string, themeColor: 'primary' | 'neutral' = '
           borderRadius: '0 8px 8px 0' 
         }}>
           <Typography level="body-md" sx={{ fontStyle: 'italic', color: themeColor === 'primary' ? 'inherit' : 'text.secondary' }}>
-            {parseInline(line.substring(2))}
+            {parseInline(line.substring(2), themeColor)}
           </Typography>
         </Box>
       );
@@ -322,7 +322,7 @@ export function renderMarkdown(md: string, themeColor: 'primary' | 'neutral' = '
     } else {
       elements.push(
         <Typography level="body-md" key={i} sx={{ mb: 1.5, lineHeight: 1.7, color: themeColor === 'primary' ? 'inherit' : 'text.primary' }}>
-          {parseInline(line)}
+          {parseInline(line, themeColor)}
         </Typography>
       );
     }

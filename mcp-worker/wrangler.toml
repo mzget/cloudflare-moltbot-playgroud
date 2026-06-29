@@ -1,4 +1,4 @@
-﻿name = "oaktree-mcp"
+name = "oaktree-mcp"
 main = "src/index.ts"
 compatibility_date = "2024-11-18"
 compatibility_flags = ["nodejs_compat"]
@@ -38,6 +38,13 @@ new_sqlite_classes = ["OaktreeChat"]
 # Override with: npx wrangler secret put NOTEBOOKLM_BRIDGE_URL
 [vars]
 NOTEBOOKLM_BRIDGE_URL = ""  # e.g. "https://xxxx.trycloudflare.com"
-ENABLE_DATABASE_AGENT = "false" # Set to "false" to temporarily disable the Database Agent
+ENABLE_DATABASE_AGENT = "false"
+chat_ai_model = "@cf/google/gemma-4-26b-a4b-it"
+db_ai_model = "@cf/meta/llama-3-8b-instruct"
+
+[dev]
+port = 8788
+
+
 
 

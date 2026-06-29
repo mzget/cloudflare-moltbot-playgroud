@@ -102,7 +102,7 @@ export class OaktreeChat extends AIChatAgent<any> {
 
   async onChatMessage(onFinish: any, options?: any) {
     const workersai = createWorkersAI({ binding: this.env.AI });
-    const model = workersai('@cf/google/gemma-4-26b-a4b-it');
+    const model = workersai(this.env.chat_ai_model);
 
     const systemPrompt = "คุณคือ Oaktree AI ผู้ช่วยวิเคราะห์ข้อมูลการลงทุนแบบเน้นคุณค่า (Value Investing) ตามหลักการลงทุนของ Warren Buffett, Charlie Munger, Howard Marks, และอื่น ๆ กรุณาตอบข้อมูลต่าง ๆ โดยอ้างอิงจากข้อมูลที่มีอยู่ในฐานข้อมูล หรือใช้เครื่องมือเสริมการค้นหาที่มีให้ (เช่น getAnalysisReport, getPortfolio, getKnowledge) ตอบคำถามให้ตรงประเด็นและกระชับที่สุด\n" +
       "You also have read-only access to the full database via queryDatabase and listTables tools.\n" +
@@ -523,7 +523,7 @@ export default {
       }
       const { messages }: { messages: UIMessage[] } = await request.json() as any;
       const workersai = createWorkersAI({ binding: env.AI });
-      const model = workersai('@cf/meta/llama-3-8b-instruct');
+      const model = workersai(env.db_ai_model);
 
       const result = (streamText as any)({
         model,

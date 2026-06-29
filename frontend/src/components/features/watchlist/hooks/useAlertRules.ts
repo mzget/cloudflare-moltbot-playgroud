@@ -47,7 +47,7 @@ export function useAlertRules(onAlertRulesChanged?: () => void) {
         const { getEntry, setEntry } = useQueryCache.getState();
         const prev = getEntry<any[]>(key).data ?? [];
         setEntry(key, {
-          data: [...prev, { symbol, metric, condition_type: condition, target_value: targetValue, is_active: 1 }] as unknown[],
+          data: [...prev, { symbol, metric, condition_type: condition, target_value: targetValue, is_active: 1, last_checked_value: null }] as unknown[],
         });
         return prev;
       },

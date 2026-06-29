@@ -42,6 +42,8 @@ export interface Env {
   NOTEBOOKLM_BRIDGE_URL?: string;
   NOTEBOOKLM_DEFAULT_NOTEBOOK_ID?: string;
   BRIDGE_SECRET?: string;
+  facebook_summarize_model: string;
+  default_ai_model: string;
 }
 
 const app = new Hono<{
@@ -2253,3 +2255,4 @@ export default {
     })());
   },
 };
+

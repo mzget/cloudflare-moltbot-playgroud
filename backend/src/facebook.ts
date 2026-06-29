@@ -297,7 +297,7 @@ ${contextContent}
 
 	let memoCommentary = '';
 	try {
-		const response = await env.AI.run('@cf/meta/llama-3.1-8b-instruct-fp8', {
+		const response = await env.AI.run(env.facebook_summarize_model, {
 			messages: [
 				{ role: 'system', content: systemPrompt },
 				{ role: 'user', content: userPrompt }
@@ -310,7 +310,7 @@ ${contextContent}
 	} catch (e) {
 		console.error('Workers AI formatting failed, trying fallback prompt style:', e);
 		// Simple fallback in case system prompt isn't supported by the model structure
-		const response = await env.AI.run('@cf/meta/llama-3.1-8b-instruct-fp8', {
+		const response = await env.AI.run(env.facebook_summarize_model, {
 			messages: [
 				{ role: 'user', content: `${systemPrompt}\n\nContent to analyze:\n${contextContent}` }
 			],
@@ -402,7 +402,7 @@ ${instructions ? `7. Special Instructions: Follow these additional directions st
 
 	let styledContent = '';
 	try {
-		const response = await env.AI.run('@cf/meta/llama-3.1-8b-instruct-fp8', {
+		const response = await env.AI.run(env.facebook_summarize_model, {
 			messages: [
 				{ role: 'system', content: systemPrompt },
 				{ role: 'user', content: `Please style the following content:\n\n${content}` }
@@ -423,3 +423,4 @@ ${instructions ? `7. Special Instructions: Follow these additional directions st
 
 	return styledContent;
 }
+

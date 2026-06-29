@@ -189,7 +189,10 @@ export default function Watchlist() {
     }
   };
 
-  const formatTargetValue = (val: number, metric: string) => {
+  const formatTargetValue = (val: number | null | undefined, metric: string) => {
+    if (val === null || val === undefined) {
+      return 'N/A';
+    }
     if (metric === 'market_cap') {
       return `$${(val / 1000).toFixed(2)}B`;
     }
@@ -207,26 +210,26 @@ export default function Watchlist() {
 
   const getHelperTextForMetric = (metric: string) => {
     if (!currentSymbolStats) return 'No current data available';
-    let val: number | null = null;
+    let val: number | null | undefined = null;
     if (metric === 'price') {
       val = currentSymbolStats.price;
-      return val !== null ? `Current Price: $${val.toFixed(2)}` : 'Current Price: N/A';
+      return val !== null && val !== undefined ? `Current Price: $${val.toFixed(2)}` : 'Current Price: N/A';
     }
     if (metric === 'market_cap') {
       val = currentSymbolStats.market_cap;
-      return val !== null ? `Current Market Cap: $${(val / 1000).toFixed(2)}B` : 'Current Market Cap: N/A';
+      return val !== null && val !== undefined ? `Current Market Cap: $${(val / 1000).toFixed(2)}B` : 'Current Market Cap: N/A';
     }
     if (metric === 'p_e') {
       val = currentSymbolStats.p_e;
-      return val !== null ? `Current P/E: ${val.toFixed(2)}` : 'Current P/E: N/A';
+      return val !== null && val !== undefined ? `Current P/E: ${val.toFixed(2)}` : 'Current P/E: N/A';
     }
     if (metric === 'ev_ebit') {
       val = currentSymbolStats.ev_ebit;
-      return val !== null ? `Current EV/EBIT: ${val.toFixed(2)}` : 'Current EV/EBIT: N/A';
+      return val !== null && val !== undefined ? `Current EV/EBIT: ${val.toFixed(2)}` : 'Current EV/EBIT: N/A';
     }
     if (metric === 'ev_sales') {
       val = currentSymbolStats.ev_sales;
-      return val !== null ? `Current EV/Sales: ${val.toFixed(2)}` : 'Current EV/Sales: N/A';
+      return val !== null && val !== undefined ? `Current EV/Sales: ${val.toFixed(2)}` : 'Current EV/Sales: N/A';
     }
     return '';
   };
@@ -603,7 +606,7 @@ export default function Watchlist() {
                         <Typography level="body-sm" sx={{ fontWeight: 600 }}>
                           {formatMetricLabel(rule.metric)} {formatConditionLabel(rule.condition_type)} {formatTargetValue(rule.target_value, rule.metric)}
                         </Typography>
-                        {rule.last_checked_value !== null && (
+                        {rule.last_checked_value !== null && rule.last_checked_value !== undefined && (
                           <Typography level="body-xs" sx={{ color: 'text.tertiary', mt: 0.25 }}>
                             Last Checked: {formatTargetValue(rule.last_checked_value, rule.metric)}
                           </Typography>

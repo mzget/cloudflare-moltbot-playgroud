@@ -1,6 +1,5 @@
 import { Env } from './index';
 
-export const DEFAULT_AI_MODEL = '@cf/google/gemma-4-26b-a4b-it';
 
 export interface MarketStatsData {
   symbol: string;

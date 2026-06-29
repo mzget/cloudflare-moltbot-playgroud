@@ -36,3 +36,11 @@ name = "oaktree-sync-workflow"
 binding = "OAKTREE_SYNC_WORKFLOW"
 class_name = "OaktreeSyncWorkflow"
 
+[vars]
+facebook_summarize_model = "@cf/meta/llama-3.2-3b-instruct"
+default_ai_model = "@cf/google/gemma-4-26b-a4b-it"
+
+[dev]
+port = 8787
+
+

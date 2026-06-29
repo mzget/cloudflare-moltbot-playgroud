@@ -1,6 +1,5 @@
 import React, { useRef, useEffect, useState, useCallback, useContext } from 'react';
 import { useAgent } from 'agents/react';
-import { useAgentChat } from '@cloudflare/ai-chat/react';
 import { AuthContext } from '../../../common/AuthContext';
 import { MCP_WORKER_URL } from '../../../../config';
 import { Box, Typography, Sheet, Button, Input, CircularProgress, Chip } from '@mui/joy';
@@ -258,13 +257,25 @@ interface BattleState {
   isExecuting: boolean;
 }
 
+interface Message {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+interface ChatState {
+  messages: Message[];
+  isStreaming: boolean;
+  activeTool?: string;
+}
+
 export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authToken }: GameCanvasProps) {
   // WebSocket connection for OaktreeChat (Knowledge Agent)
   const { user } = useContext(AuthContext);
   const sessionId = user?.email || 'default';
   const host = MCP_WORKER_URL.replace(/^https?:\/\//, '');
 
-  const knowledgeAgent = useAgent({
+  const knowledgeAgent = useAgent<ChatState>({
     agent: 'OaktreeChat',
     name: sessionId.replace(/[^a-zA-Z0-9-_]/g, '_').slice(0, 64),
     host,
@@ -274,9 +285,7 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
     }
   });
 
-  const agentChat = useAgentChat({ agent: knowledgeAgent, experimental_throttle: 50 });
-  const agentChatRef = useRef(agentChat);
-  useEffect(() => { agentChatRef.current = agentChat; }, [agentChat]);
+  // Removed useAgentChat in favor of direct useAgent state sync
 
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -327,29 +336,17 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
   // Watch for incoming agent messages and display in dialogue
   useEffect(() => {
     if (!dialogue || dialogue.npc.metadata?.type !== 'chat-agent') return;
-    const msgs = agentChat.messages;
+    const msgs = knowledgeAgent.state?.messages || [];
     if (msgs.length === 0) return;
     const last = msgs[msgs.length - 1];
     if (last.role !== 'assistant') return;
 
-    // Extract text from parts
-    let text = '';
-    for (const part of last.parts) {
-      if (part.type === 'text') text += part.text;
-      else if (part.type === 'tool-invocation') {
-        const inv = (part as any).toolInvocation;
-        if (inv?.state === 'result') {
-          text += `\n[Tool: ${inv.toolName} \u2713]\n`;
-        } else {
-          text += `\n[Calling: ${inv?.toolName}...]\n`;
-        }
-      }
-    }
+    let text = last.content || '';
     if (text) {
-      const isStreaming = agentChat.status === 'streaming' || agentChat.status === 'submitted';
+      const isStreaming = knowledgeAgent.state?.isStreaming || false;
       setDialogue(d => d ? { ...d, displayedText: text, isStreaming, showInput: !isStreaming } : null);
     }
-  }, [agentChat.messages, agentChat.status, dialogue?.npc?.metadata?.type]);
+  }, [knowledgeAgent.state?.messages, knowledgeAgent.state?.isStreaming, dialogue?.npc?.metadata?.type]);
 
   // Resize observer
   useEffect(() => {
@@ -875,12 +872,9 @@ export default function GameCanvas({ isEnabled, mcpWorkerUrl, apiBaseUrl, authTo
     sfx.select();
 
     if (agentType === 'chat-agent') {
-      // Knowledge Agent — use WebSocket via useAgentChat
-      agentChatRef.current.sendMessage({
-        role: 'user',
-        parts: [{ type: 'text', text: msg }]
-      });
-      // Response will arrive via the useEffect watching agentChat.messages
+      // Knowledge Agent — use WebSocket directly
+      knowledgeAgent.stub.sendMessage(msg);
+      // Response will arrive via the useEffect watching knowledgeAgent.state.messages
     } else {
       // DB Agent — use HTTP POST (stateless endpoint)
       const endpoint = dialogue.npc.metadata?.endpoint;

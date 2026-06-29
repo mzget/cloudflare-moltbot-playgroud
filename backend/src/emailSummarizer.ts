@@ -199,7 +199,7 @@ Email content:
 ${emailContext}
 `;
 
-      const response = await env.AI.run('@cf/google/gemma-4-26b-a4b-it', {
+      const response = await env.AI.run(env.default_ai_model, {
         messages: [
           { role: 'user', content: prompt }
         ],
@@ -288,4 +288,5 @@ ${emailContext}
     }
   }
 }
+
 
