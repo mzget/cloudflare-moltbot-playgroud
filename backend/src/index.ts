@@ -717,14 +717,14 @@ app.delete('/api/alerts', async (c) => {
 });
 
 // API: In-App Notifications
-app.get('/api/notifications', async (c) => {
+app.get('/api/in-app-notifications', async (c) => {
   const { results } = await c.env.DB.prepare(
     'SELECT * FROM in_app_notifications ORDER BY created_at DESC LIMIT 50'
   ).all();
   return c.json(results || []);
 });
 
-app.put('/api/notifications', async (c) => {
+app.put('/api/in-app-notifications', async (c) => {
   const body = await c.req.json().catch(() => ({})) as any;
   const id = body?.id;
   if (id) {
@@ -735,7 +735,7 @@ app.put('/api/notifications', async (c) => {
   return c.text('Notifications updated');
 });
 
-app.delete('/api/notifications', async (c) => {
+app.delete('/api/in-app-notifications', async (c) => {
   try {
     await c.env.DB.prepare('DELETE FROM in_app_notifications WHERE is_read = 1').run();
     return c.text('Read notifications cleared');
