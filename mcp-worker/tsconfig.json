@@ -10,7 +10,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "allowJs": true,
-    "experimentalDecorators": true,
+    "experimentalDecorators": false,
     "outDir": "dist"
   },
   "include": ["src/**/*", "worker-configuration.d.ts"]

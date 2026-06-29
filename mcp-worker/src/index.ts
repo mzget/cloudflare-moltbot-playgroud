@@ -6,7 +6,8 @@ import { getPortfolio, getPortfolioHistory, getKnowledgeByCategory, searchKnowle
 import { createWorkersAI } from "workers-ai-provider";
 import { streamText, tool, convertToModelMessages, UIMessage } from "ai";
 import { AIChatAgent } from "@cloudflare/ai-chat";
-import { getAgentByName, routeAgentRequest } from "agents";
+import { getAgentByName, routeAgentRequest, callable } from "agents";
+
 
 export class OaktreeMCP extends McpAgent {
   server = new McpServer({ name: "oaktree-mcp", version: "1.0.0" });
@@ -92,6 +93,12 @@ export class OaktreeChat extends AIChatAgent<any> {
   override chatRecovery = true;
   // Detect hung model/transport streams after 30s of silence
   override chatStreamStallTimeoutMs = 30_000;
+
+  @callable()
+  async deleteSession() {
+    await this.destroy();
+    return { success: true };
+  }
 
   async onChatMessage(onFinish: any, options?: any) {
     const workersai = createWorkersAI({ binding: this.env.AI });
@@ -323,7 +330,7 @@ export default {
       const normalizedEmailSession = auth.email.replace(/[^a-zA-Z0-9-_]/g, "_").slice(0, 64);
       
       // Prevent horizontal privilege escalation: users can only connect to their own session (unless local dev)
-      if (env.IS_LOCAL !== 'true' && sessionName !== normalizedEmailSession) {
+      if (env.IS_LOCAL !== 'true' && sessionName !== normalizedEmailSession && !sessionName.startsWith(normalizedEmailSession + "--")) {
         return new Response("Forbidden: Session ID mismatch", {
           status: 403,
           headers: {
@@ -339,6 +346,148 @@ export default {
         return newResponse;
       }
     }
+
+    if (url.pathname === "/chat/sessions" && request.method === "GET") {
+      const auth = await authenticateRequest(request, env);
+      if (auth instanceof Response) {
+        const errorResponse = new Response(auth.body, auth);
+        errorResponse.headers.set("Access-Control-Allow-Origin", allowedOrigin);
+        return errorResponse;
+      }
+
+      try {
+        // Ensure table exists
+        await env.DB.prepare(`
+          CREATE TABLE IF NOT EXISTS agent_chat_sessions (
+            id TEXT PRIMARY KEY,
+            user_email TEXT NOT NULL,
+            title TEXT NOT NULL,
+            created_at INTEGER DEFAULT (unixepoch())
+          )
+        `).run();
+        
+        await env.DB.prepare(`
+          CREATE INDEX IF NOT EXISTS idx_agent_chat_sessions_user_email ON agent_chat_sessions(user_email)
+        `).run();
+
+        const { results } = await env.DB.prepare(
+          "SELECT id, title, created_at FROM agent_chat_sessions WHERE user_email = ? ORDER BY created_at DESC"
+        ).bind(auth.email).all();
+
+        return new Response(JSON.stringify({ sessions: results }), {
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": allowedOrigin,
+          }
+        });
+      } catch (e: any) {
+        return new Response(JSON.stringify({ error: e.message }), {
+          status: 500,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": allowedOrigin,
+          }
+        });
+      }
+    }
+
+    if (url.pathname === "/chat/sessions" && request.method === "POST") {
+      const auth = await authenticateRequest(request, env);
+      if (auth instanceof Response) {
+        const errorResponse = new Response(auth.body, auth);
+        errorResponse.headers.set("Access-Control-Allow-Origin", allowedOrigin);
+        return errorResponse;
+      }
+
+      try {
+        const { title } = await request.json() as { title: string };
+        const uuid = crypto.randomUUID();
+        const normalizedEmail = auth.email.replace(/[^a-zA-Z0-9-_]/g, "_").slice(0, 64);
+        const sessionId = `${normalizedEmail}--${uuid}`;
+
+        // Ensure table exists
+        await env.DB.prepare(`
+          CREATE TABLE IF NOT EXISTS agent_chat_sessions (
+            id TEXT PRIMARY KEY,
+            user_email TEXT NOT NULL,
+            title TEXT NOT NULL,
+            created_at INTEGER DEFAULT (unixepoch())
+          )
+        `).run();
+
+        await env.DB.prepare(
+          "INSERT INTO agent_chat_sessions (id, user_email, title) VALUES (?, ?, ?)"
+        ).bind(sessionId, auth.email, title || "New Chat").run();
+
+        return new Response(JSON.stringify({ id: sessionId, title: title || "New Chat" }), {
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": allowedOrigin,
+          }
+        });
+      } catch (e: any) {
+        return new Response(JSON.stringify({ error: e.message }), {
+          status: 500,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": allowedOrigin,
+          }
+        });
+      }
+    }
+
+    if (url.pathname === "/chat/sessions/delete" && request.method === "POST") {
+      const auth = await authenticateRequest(request, env);
+      if (auth instanceof Response) {
+        const errorResponse = new Response(auth.body, auth);
+        errorResponse.headers.set("Access-Control-Allow-Origin", allowedOrigin);
+        return errorResponse;
+      }
+
+      try {
+        const { id } = await request.json() as { id: string };
+        const normalizedEmail = auth.email.replace(/[^a-zA-Z0-9-_]/g, "_").slice(0, 64);
+        
+        // Prevent deletion of other users' sessions
+        if (!id.startsWith(normalizedEmail + "--") && id !== normalizedEmail) {
+          return new Response("Forbidden: Session ID mismatch", {
+            status: 403,
+            headers: {
+              "Access-Control-Allow-Origin": allowedOrigin,
+            }
+          });
+        }
+
+        // 1. Delete from D1 database
+        await env.DB.prepare(
+          "DELETE FROM agent_chat_sessions WHERE id = ? AND user_email = ?"
+        ).bind(id, auth.email).run();
+
+        // 2. Destroy the Durable Object state
+        try {
+          const agentInstance = await getAgentByName(env.OAKTREE_CHAT, id) as any;
+          await agentInstance.deleteSession();
+        } catch (err) {
+          console.error("Failed to destroy Durable Object instance:", err);
+        }
+
+        return new Response(JSON.stringify({ success: true }), {
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": allowedOrigin,
+          }
+        });
+      } catch (e: any) {
+        return new Response(JSON.stringify({ error: e.message }), {
+          status: 500,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": allowedOrigin,
+          }
+        });
+      }
+    }
+
 
     if (url.pathname === "/database-chat/status" && request.method === "GET") {
       const auth = await authenticateRequest(request, env);
