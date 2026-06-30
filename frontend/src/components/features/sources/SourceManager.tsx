@@ -100,6 +100,8 @@ export default function SourceManager() {
   // 'new' represents creating, NewsSource/EmailSubscription represents editing, null represents closed modal
   const [editingSource, setEditingSource] = useState<NewsSource | 'new' | null>(null);
   const [editingSub, setEditingSub] = useState<EmailSubscription | 'new' | null>(null);
+  const [deleteSubId, setDeleteSubId] = useState<number | null>(null);
+  const [deletePostId, setDeletePostId] = useState<number | null>(null);
 
   // Facebook Posting settings
   const [facebookSettings, setFacebookSettings] = useState({
@@ -316,10 +318,14 @@ export default function SourceManager() {
     }
   };
 
-  const handleDeletePost = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this custom post?')) return;
+  const handleDeletePost = (id: number) => {
+    setDeletePostId(id);
+  };
+
+  const handleConfirmDeletePost = async () => {
+    if (deletePostId === null) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/api/facebook/posts/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/api/facebook/posts/${deletePostId}`, {
         method: 'DELETE'
       });
       if (res.ok) {
@@ -329,6 +335,8 @@ export default function SourceManager() {
       }
     } catch (e) {
       console.error('Failed to delete custom post', e);
+    } finally {
+      setDeletePostId(null);
     }
   };
 
@@ -409,12 +417,18 @@ export default function SourceManager() {
     }
   };
 
-  const handleDeleteSub = async (id: number) => {
-    if (!confirm('Delete this email subscription?')) return;
+  const handleDeleteSub = (id: number) => {
+    setDeleteSubId(id);
+  };
+
+  const handleConfirmDeleteSub = async () => {
+    if (deleteSubId === null) return;
     try {
-      await deleteSubscription(id);
+      await deleteSubscription(deleteSubId);
     } catch (e) {
       console.error('Failed to delete subscription', e);
+    } finally {
+      setDeleteSubId(null);
     }
   };
 
@@ -1029,6 +1043,52 @@ export default function SourceManager() {
         subscription={editingSub === 'new' ? null : editingSub}
         onSave={handleSaveSub}
       />
+
+      {/* Delete Email Subscription Confirm Modal */}
+      <Modal open={deleteSubId !== null} onClose={() => setDeleteSubId(null)}>
+        <ModalDialog sx={{ ...glassStyle, minWidth: { xs: '90%', sm: 400 }, maxWidth: 460, borderRadius: '20px', p: 3 }}>
+          <DialogTitle sx={{ fontWeight: 800, fontSize: '1.25rem', mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Trash2 size={20} color="var(--joy-palette-danger-plainColor)" />
+            Confirm Deletion
+          </DialogTitle>
+          <DialogContent sx={{ mb: 2 }}>
+            <Typography level="body-sm">
+              Are you sure you want to delete this email subscription? This action cannot be undone.
+            </Typography>
+          </DialogContent>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5 }}>
+            <Button variant="outlined" color="neutral" size="sm" onClick={() => setDeleteSubId(null)}>
+              Cancel
+            </Button>
+            <Button variant="solid" color="danger" size="sm" onClick={handleConfirmDeleteSub}>
+              Delete
+            </Button>
+          </Box>
+        </ModalDialog>
+      </Modal>
+
+      {/* Delete Custom Post Confirm Modal */}
+      <Modal open={deletePostId !== null} onClose={() => setDeletePostId(null)}>
+        <ModalDialog sx={{ ...glassStyle, minWidth: { xs: '90%', sm: 400 }, maxWidth: 460, borderRadius: '20px', p: 3 }}>
+          <DialogTitle sx={{ fontWeight: 800, fontSize: '1.25rem', mb: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Trash2 size={20} color="var(--joy-palette-danger-plainColor)" />
+            Confirm Deletion
+          </DialogTitle>
+          <DialogContent sx={{ mb: 2 }}>
+            <Typography level="body-sm">
+              Are you sure you want to delete this custom post? This action cannot be undone.
+            </Typography>
+          </DialogContent>
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1.5 }}>
+            <Button variant="outlined" color="neutral" size="sm" onClick={() => setDeletePostId(null)}>
+              Cancel
+            </Button>
+            <Button variant="solid" color="danger" size="sm" onClick={handleConfirmDeletePost}>
+              Delete
+            </Button>
+          </Box>
+        </ModalDialog>
+      </Modal>
 
       {/* Custom Facebook Post Modal */}
       <Modal open={editorState.isOpen} onClose={() => setEditorState(prev => ({ ...prev, isOpen: false }))}>
