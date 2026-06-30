@@ -54,6 +54,10 @@ export function useQuery<T>(
     }
   }, [key]); // Only depends on key; fetcher is via ref.
 
+  // Reactive subscription — subscribe directly to entries[key] (not via getEntry)
+  // to avoid new object references when the key is missing.
+  const entry = useQueryCache(state => state.entries[key] as CacheEntry<T> | undefined);
+
   // Trigger fetch on mount or when key/enabled/staleTime change.
   // Reads cache state IMPERATIVELY (not reactively) to avoid the needsFetch feedback loop.
   useEffect(() => {
@@ -63,11 +67,7 @@ export function useQuery<T>(
     if ((current.status === 'idle' || isStale) && !current.promise) {
       doFetch();
     }
-  }, [key, enabled, staleTime, doFetch]);
-
-  // Reactive subscription — subscribe directly to entries[key] (not via getEntry)
-  // to avoid new object references when the key is missing.
-  const entry = useQueryCache(state => state.entries[key] as CacheEntry<T> | undefined);
+  }, [key, enabled, staleTime, doFetch, entry?.updatedAt, entry?.status]);
 
   return {
     data: entry?.data as T | undefined,

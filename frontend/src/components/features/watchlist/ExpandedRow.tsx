@@ -121,7 +121,7 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
         setNewTxn({ date: getTodayDate(), type: 'Buy', shares: '', cost_per_share: '', commission: '', note: '' });
         setShowForms(prev => ({ ...prev, txn: false }));
       } else {
-        const errData = await res.json().catch(() => ({}));
+        const errData = (await res.json().catch(() => ({}))) as any;
         alert(`Failed to add transaction: ${errData.error || res.statusText}`);
       }
     } catch (e) {
@@ -177,7 +177,7 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
       if (res.ok) {
         setEditingTxnId(null);
       } else {
-        const errData = await res.json().catch(() => ({}));
+        const errData = (await res.json().catch(() => ({}))) as any;
         alert(`Failed to update transaction: ${errData.error || res.statusText}`);
       }
     } catch (e) {
@@ -206,7 +206,7 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
         setNewDiv({ date: getTodayDate(), amount: '', per_share: '', note: '' });
         setShowForms(prev => ({ ...prev, div: false }));
       } else {
-        const errData = await res.json().catch(() => ({}));
+        const errData = (await res.json().catch(() => ({}))) as any;
         alert(`Failed to add dividend: ${errData.error || res.statusText}`);
       }
     } catch (e) {
@@ -319,6 +319,14 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
     </>
   );
 
+  const sortedTransactions = React.useMemo(() => {
+    return [...transactions].sort((a, b) => {
+      const dateCmp = b.date.localeCompare(a.date);
+      if (dateCmp !== 0) return dateCmp;
+      return (b.id || 0) - (a.id || 0);
+    });
+  }, [transactions]);
+
   const renderTransactions = () => (
     <>
       <table className="yf-sub-table">
@@ -380,7 +388,7 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
             </tr>
           )}
 
-          {transactions.map((txn, i) => {
+          {sortedTransactions.map((txn, i) => {
             const isEditing = txn.id === editingTxnId;
             if (isEditing) {
               return (
@@ -463,7 +471,7 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
             );
           })}
 
-          {transactions.length === 0 && !showForms.txn && (
+          {sortedTransactions.length === 0 && !showForms.txn && (
             <tr>
               <td colSpan={10} className="left" style={{ padding: '16px 10px', opacity: 0.5 }}>
                 No transactions recorded.
