@@ -14,13 +14,16 @@ import {
   ListItem,
   ListItemButton,
   ListItemContent,
+  Alert,
 } from '@mui/joy';
-import { Send, Bot, Trash2, Plus, ChevronLeft, MessageSquare } from 'lucide-react';
+import { useColorScheme } from '@mui/joy/styles';
+import { Send, Bot, Trash2, Plus, ChevronLeft, MessageSquare, AlertCircle } from 'lucide-react';
 import { useAgent } from 'agents/react';
 import { useAgentChat } from '@cloudflare/ai-chat/react';
 import { MCP_WORKER_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
 import MarkdownRenderer from '../../common/MarkdownRenderer';
+import InteractiveWaitingState from './InteractiveWaitingState';
 
 interface ChatSession {
   id: string;
@@ -29,6 +32,7 @@ interface ChatSession {
 }
 
 export default function KnowledgeChat() {
+  const { mode } = useColorScheme();
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [isLoadingSessions, setIsLoadingSessions] = useState(true);
@@ -169,8 +173,8 @@ export default function KnowledgeChat() {
           display: { xs: activeSessionId ? 'none' : 'flex', sm: 'flex' },
           flexDirection: 'column',
           borderRight: '1px solid',
-          borderColor: 'rgba(0,0,0,0.08)',
-          bgcolor: 'background.surface',
+          borderColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
+          bgcolor: mode === 'dark' ? 'rgba(10, 10, 10, 0.25)' : 'rgba(245, 245, 245, 0.35)',
           height: '100%',
         }}
       >
@@ -280,7 +284,7 @@ export default function KnowledgeChat() {
           display: { xs: activeSessionId ? 'flex' : 'none', sm: 'flex' },
           flexDirection: 'column',
           height: '100%',
-          bgcolor: 'rgba(255, 255, 255, 0.4)',
+          bgcolor: mode === 'dark' ? 'rgba(15, 15, 15, 0.15)' : 'rgba(255, 255, 255, 0.45)',
           backdropFilter: 'blur(20px)',
         }}
       >
@@ -335,6 +339,7 @@ export default function KnowledgeChat() {
 }
 
 function ChatWindow({ sessionId }: { sessionId: string }) {
+  const { mode } = useColorScheme();
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const host = MCP_WORKER_URL.replace(/^https?:\/\//, '');
@@ -349,12 +354,27 @@ function ChatWindow({ sessionId }: { sessionId: string }) {
     }
   });
 
-  const { messages, sendMessage, status } = useAgentChat({
+  const { messages, sendMessage, status, stop } = useAgentChat({
     agent,
     experimental_throttle: 50,
   });
 
   const isLoading = status === 'submitted' || status === 'streaming';
+
+  const pendingToolCall = messages[messages.length - 1]?.parts?.find(p => {
+    if (p.type === 'tool-invocation') {
+      return (p as any).toolInvocation?.state !== 'result';
+    }
+    if (p.type.startsWith('tool-')) {
+      return (p as any).state !== 'output-available' && (p as any).state !== 'result';
+    }
+    return false;
+  });
+  const activeTool = pendingToolCall
+    ? (pendingToolCall.type === 'tool-invocation'
+        ? (pendingToolCall as any).toolInvocation?.toolName
+        : pendingToolCall.type.slice(5))
+    : undefined;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -374,7 +394,7 @@ function ChatWindow({ sessionId }: { sessionId: string }) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length, lastMessageText, status]);
 
-  const isStateLoading = !agent.state && !connectionError;
+  const isStateLoading = !agent.state && !agent.connectionError;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -386,11 +406,21 @@ function ChatWindow({ sessionId }: { sessionId: string }) {
         ) : (
           <>
             {messages.length === 0 && (
-              <Sheet variant="soft" color="neutral" sx={{ p: 2, borderRadius: 'md', textAlign: 'center' }}>
-                <Typography>Hello! I am your portfolio agent. Try asking:</Typography>
-                <Typography level="body-sm" sx={{ mt: 1 }}>"What is my current portfolio?"</Typography>
-                <Typography level="body-sm">"What is my history for 2024?"</Typography>
-                <Typography level="body-sm">"Tell me about the Five Forces framework."</Typography>
+              <Sheet 
+                variant="outlined" 
+                color="neutral" 
+                sx={{ 
+                  p: 2, 
+                  borderRadius: 'lg', 
+                  textAlign: 'center',
+                  bgcolor: mode === 'dark' ? 'rgba(255, 255, 255, 0.02)' : 'rgba(0, 0, 0, 0.02)',
+                  borderColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
+                }}
+              >
+                <Typography level="title-sm">Hello! I am your portfolio agent. Try asking:</Typography>
+                <Typography level="body-xs" sx={{ mt: 1, opacity: 0.8 }}>"What is my current portfolio?"</Typography>
+                <Typography level="body-xs" sx={{ opacity: 0.8 }}>"What is my history for 2024?"</Typography>
+                <Typography level="body-xs" sx={{ opacity: 0.8 }}>"Tell me about the Five Forces framework."</Typography>
               </Sheet>
             )}
 
@@ -430,9 +460,13 @@ function ChatWindow({ sessionId }: { sessionId: string }) {
                     borderBottomRightRadius: m.role === 'user' ? '4px' : '16px',
                     borderBottomLeftRadius: m.role === 'user' ? '16px' : '4px',
                     maxWidth: '85%',
-                    bgcolor: m.role === 'user' ? 'primary.solidBg' : 'background.surface',
+                    bgcolor: m.role === 'user' 
+                      ? 'primary.solidBg' 
+                      : (mode === 'dark' ? 'rgba(255, 255, 255, 0.04)' : 'background.surface'),
                     backdropFilter: m.role === 'user' ? 'none' : 'blur(12px)',
-                    borderColor: m.role === 'user' ? 'transparent' : 'divider',
+                    borderColor: m.role === 'user' 
+                      ? 'transparent' 
+                      : (mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'divider'),
                     boxShadow: m.role === 'user' ? 'var(--joy-shadow-md)' : 'var(--joy-shadow-sm)',
                     transition: 'all 0.3s ease-out',
                   }}
@@ -454,8 +488,19 @@ function ChatWindow({ sessionId }: { sessionId: string }) {
                             state: (part as any).state === 'output-available' ? 'result' : (part as any).state
                           };
                       return (
-                        <Box key={i} sx={{ mt: 1, p: 1, bgcolor: 'background.surface', borderRadius: 'sm', opacity: 0.8 }}>
-                          <Typography level="body-xs" color="primary">
+                        <Box 
+                          key={i} 
+                          sx={{ 
+                            mt: 1, 
+                            p: 1.5, 
+                            bgcolor: mode === 'dark' ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.03)', 
+                            borderRadius: 'md', 
+                            border: '1px solid',
+                            borderColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
+                            opacity: 0.9 
+                          }}
+                        >
+                          <Typography level="body-xs" color="primary" sx={{ fontWeight: 600 }}>
                             Calling: {toolInvocation?.toolName}
                           </Typography>
                         </Box>
@@ -470,7 +515,7 @@ function ChatWindow({ sessionId }: { sessionId: string }) {
               <InteractiveWaitingState activeTool={activeTool} onStop={stop} />
             )}
 
-            {connectionError && (
+            {agent.connectionError && (
               <Alert
                 color="danger"
                 variant="soft"
@@ -482,7 +527,7 @@ function ChatWindow({ sessionId }: { sessionId: string }) {
                     Connection or API Error
                   </Typography>
                   <Typography level="body-xs" color="danger" sx={{ opacity: 0.8 }}>
-                    {connectionError?.message || 'The agent encountered an error. Please try again.'}
+                    {agent.connectionError?.message || 'The agent encountered an error. Please try again.'}
                   </Typography>
                 </Box>
               </Alert>
@@ -493,7 +538,16 @@ function ChatWindow({ sessionId }: { sessionId: string }) {
         )}
       </Box>
 
-      <Box component="form" onSubmit={handleSubmit} sx={{ p: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+      <Box 
+        component="form" 
+        onSubmit={handleSubmit} 
+        sx={{ 
+          p: 2, 
+          borderTop: '1px solid', 
+          borderColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'divider',
+          bgcolor: mode === 'dark' ? 'rgba(0, 0, 0, 0.1)' : 'transparent',
+        }}
+      >
         <Stack direction="row" spacing={1}>
           <Input
             fullWidth
@@ -507,8 +561,28 @@ function ChatWindow({ sessionId }: { sessionId: string }) {
                 handleSubmit(e as any);
               }
             }}
+            variant="outlined"
+            sx={{
+              bgcolor: mode === 'dark' ? 'rgba(0, 0, 0, 0.25)' : 'rgba(255, 255, 255, 0.65)',
+              borderColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'divider',
+              '&:focus-within': {
+                borderColor: 'primary.outlinedBorder',
+              }
+            }}
           />
-          <Button type="submit" disabled={isLoading || isStateLoading || !input.trim()}>
+          <Button 
+            type="submit" 
+            disabled={isLoading || isStateLoading || !input.trim()}
+            variant="solid"
+            color="success"
+            sx={{
+              transition: 'all 0.2s',
+              '&:hover': {
+                transform: 'translateY(-1px)',
+                boxShadow: 'var(--joy-shadow-md)',
+              }
+            }}
+          >
             <Send size={18} />
           </Button>
         </Stack>

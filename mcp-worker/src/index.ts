@@ -194,19 +194,14 @@ export class OaktreeChat extends AIChatAgent<any> {
           },
         } as any) as any,
         listTables: tool({
-          description: "List all database tables and their schemas. Use this to understand what data is available before writing SQL queries.",
+          description: "List all database tables and their SQL schemas. Use this to understand what data is available before writing SQL queries.",
           parameters: z.object({}),
           execute: async () => {
             try {
-              const { results: tables } = await (this.env as any).DB.prepare(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'"
+              const { results } = await (this.env as any).DB.prepare(
+                "SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'"
               ).all();
-              const schemas: Record<string, any[]> = {};
-              for (const t of tables as any[]) {
-                const { results: cols } = await (this.env as any).DB.prepare(`PRAGMA table_info(${t.name})`).all();
-                schemas[t.name] = cols;
-              }
-              return { tables: schemas };
+              return { tables: results };
             } catch (e: any) {
               return { error: e.message };
             }
