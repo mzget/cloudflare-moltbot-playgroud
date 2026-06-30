@@ -344,14 +344,16 @@ function ChatWindow({ sessionId }: { sessionId: string }) {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const host = MCP_WORKER_URL.replace(/^https?:\/\//, '');
 
+  const queryCallback = React.useCallback(async () => {
+    const token = localStorage.getItem('auth_token') || '';
+    return { token };
+  }, []);
+
   const agent = useAgent({
     agent: 'OaktreeChat',
     name: sessionId.replace(/[^a-zA-Z0-9-_]/g, '_').slice(0, 64),
     host,
-    query: async () => {
-      const token = localStorage.getItem('auth_token') || '';
-      return { token };
-    }
+    query: queryCallback
   });
 
   const { messages, sendMessage, status, stop } = useAgentChat({

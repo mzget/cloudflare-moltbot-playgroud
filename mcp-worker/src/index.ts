@@ -182,13 +182,20 @@ export class OaktreeChat extends AIChatAgent<any> {
             sql: z.string().describe("A SELECT SQL query to execute"),
           }),
           execute: async ({ sql }: any) => {
+            console.log(`[queryDatabase] Tool execution started for query: "${sql}"`);
             if (!sql.trim().toLowerCase().startsWith("select")) {
+              console.log("[queryDatabase] Validation failed: query is not a SELECT statement.");
               return { error: "Only SELECT queries are allowed. This tool is read-only." };
             }
             try {
-              const { results } = await (this.env as any).DB.prepare(sql).all();
+              console.log("[queryDatabase] Attempting D1 database prepare...");
+              const statement = (this.env as any).DB.prepare(sql);
+              console.log("[queryDatabase] D1 database prepared. Executing statement.all()...");
+              const { results } = await statement.all();
+              console.log(`[queryDatabase] D1 statement.all() finished successfully. Returned ${results.length} rows.`);
               return { results: results.slice(0, 50) };
             } catch (e: any) {
+              console.error("[queryDatabase] Error during D1 execution:", e.message);
               return { error: e.message };
             }
           },
