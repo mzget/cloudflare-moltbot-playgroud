@@ -66,7 +66,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
 
   const fetchNotifications = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/in-app-notifications`);
+      const res = await fetch(`${API_BASE_URL}/api/triggered-alerts`);
       if (res.ok) {
         const data: Notification[] = await res.json();
         
@@ -104,7 +104,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
 
   const handleMarkAsRead = async (id: number) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/in-app-notifications`, {
+      const res = await fetch(`${API_BASE_URL}/api/triggered-alerts`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id })
@@ -121,7 +121,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
 
   const handleMarkAllAsRead = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/in-app-notifications`, {
+      const res = await fetch(`${API_BASE_URL}/api/triggered-alerts`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({})
@@ -136,7 +136,7 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
 
   const handleClearRead = async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/in-app-notifications`, {
+      const res = await fetch(`${API_BASE_URL}/api/triggered-alerts`, {
         method: 'DELETE',
       });
       if (res.ok) {
