@@ -179,17 +179,22 @@ export class OaktreeChat extends AIChatAgent<any> {
         queryDatabase: tool({
           description: "Execute a read-only SQL query against the D1 database. Use this to answer questions about portfolio, holdings, market data, knowledge, news, or any other data. Only SELECT queries are allowed.",
           parameters: z.object({
-            sql: z.string().describe("A SELECT SQL query to execute"),
+            sql: z.string().optional().describe("A SELECT SQL query to execute"),
+            query: z.string().optional().describe("A SELECT SQL query to execute (alias for sql)")
           }),
-          execute: async ({ sql }: any) => {
-            console.log(`[queryDatabase] Tool execution started for query: "${sql}"`);
-            if (!sql.trim().toLowerCase().startsWith("select")) {
+          execute: async ({ sql, query }: any) => {
+            const sqlToRun = sql || query;
+            if (!sqlToRun) {
+              return { error: "Missing SQL query parameter (sql or query)" };
+            }
+            console.log(`[queryDatabase] Tool execution started for query: "${sqlToRun}"`);
+            if (!sqlToRun.trim().toLowerCase().startsWith("select")) {
               console.log("[queryDatabase] Validation failed: query is not a SELECT statement.");
               return { error: "Only SELECT queries are allowed. This tool is read-only." };
             }
             try {
               console.log("[queryDatabase] Attempting D1 database prepare...");
-              const statement = (this.env as any).DB.prepare(sql);
+              const statement = (this.env as any).DB.prepare(sqlToRun);
               console.log("[queryDatabase] D1 database prepared. Executing statement.all()...");
               const { results } = await statement.all();
               console.log(`[queryDatabase] D1 statement.all() finished successfully. Returned ${results.length} rows.`);

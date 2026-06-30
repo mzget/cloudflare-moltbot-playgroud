@@ -487,23 +487,43 @@ function ChatWindow({ sessionId }: { sessionId: string }) {
                         : {
                             toolName: part.type.slice(5),
                             result: (part as any).output,
-                            state: (part as any).state === 'output-available' ? 'result' : (part as any).state
+                            state: (part as any).state === 'output-available' ? 'result' : (part as any).state,
+                            error: (part as any).errorText || (part as any).error
                           };
+                      
+                      const state = toolInvocation?.state;
+                      const isError = state === 'output-error' || state === 'error';
+                      const isSuccess = state === 'result' || state === 'success';
+
                       return (
                         <Box 
                           key={i} 
                           sx={{ 
                             mt: 1, 
                             p: 1.5, 
-                            bgcolor: mode === 'dark' ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.03)', 
+                            bgcolor: isError 
+                              ? (mode === 'dark' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.05)')
+                              : (mode === 'dark' ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.03)'), 
                             borderRadius: 'md', 
                             border: '1px solid',
-                            borderColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
+                            borderColor: isError 
+                              ? 'rgba(239, 68, 68, 0.2)' 
+                              : (mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'),
                             opacity: 0.9 
                           }}
                         >
-                          <Typography level="body-xs" color="primary" sx={{ fontWeight: 600 }}>
-                            Calling: {toolInvocation?.toolName}
+                          <Typography 
+                            level="body-xs" 
+                            color={isError ? 'danger' : (isSuccess ? 'neutral' : 'primary')} 
+                            sx={{ fontWeight: 600 }}
+                          >
+                            {isError ? (
+                              `Error: ${toolInvocation?.toolName} (${toolInvocation?.error || 'Failed'})`
+                            ) : isSuccess ? (
+                              `Called: ${toolInvocation?.toolName}`
+                            ) : (
+                              `Calling: ${toolInvocation?.toolName}...`
+                            )}
                           </Typography>
                         </Box>
                       );
