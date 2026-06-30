@@ -394,7 +394,7 @@ function ChatWindow({ sessionId }: { sessionId: string }) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages.length, lastMessageText, status]);
 
-  const isStateLoading = !agent.state && !agent.connectionError;
+  const isStateLoading = !agent.identified && !agent.connectionError;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
