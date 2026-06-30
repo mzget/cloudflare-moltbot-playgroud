@@ -204,24 +204,27 @@ export default function InteractiveWaitingState({ activeTool, onStop }: Interact
     let lastSpawnFrame = 0;
 
     // Ground & Dino dimensions
-    const groundY = canvas.height - 24;
+    const groundY = 136; // 160 (canvas.height) - 24
     const dinoX = 50;
     const dinoSize = 24;
     const gravity = 0.55;
     const jumpForce = -9.2;
 
-    const resizeCanvas = () => {
-      if (canvas && containerRef.current) {
-        canvas.width = containerRef.current.clientWidth;
-        canvas.height = 160;
-        // Adjust Dino ground position on resize
-        if (stateRef.current.gameState === 'idle') {
-          stateRef.current.dinoY = groundY - dinoSize;
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        if (canvas) {
+          canvas.width = entry.contentRect.width;
+          canvas.height = 160;
+          if (stateRef.current.gameState === 'idle') {
+            stateRef.current.dinoY = groundY - dinoSize;
+          }
         }
       }
-    };
-    resizeCanvas();
-    window.addEventListener('resize', resizeCanvas);
+    });
+
+    if (containerRef.current) {
+      resizeObserver.observe(containerRef.current);
+    }
 
     // Background clouds
     const clouds = [
@@ -464,7 +467,7 @@ export default function InteractiveWaitingState({ activeTool, onStop }: Interact
 
     return () => {
       cancelAnimationFrame(animationId);
-      window.removeEventListener('resize', resizeCanvas);
+      resizeObserver.disconnect();
       canvas.removeEventListener('click', handleCanvasClick);
       canvas.removeEventListener('touchstart', handleCanvasTouch);
       window.removeEventListener('keydown', handleKeyDown);

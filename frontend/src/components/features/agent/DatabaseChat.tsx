@@ -40,7 +40,7 @@ export default function DatabaseChat() {
   }
 
   return (
-    <Box sx={{ height: 'calc(100vh - 120px)', display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRadius: 'lg' }}>
+    <Box sx={{ height: { xs: 'calc(100vh - 160px)', md: 'calc(100vh - 192px)' }, display: 'flex', flexDirection: 'column', overflow: 'hidden', borderRadius: 'lg' }}>
       <GameCanvas
         isEnabled={isEnabled}
         mcpWorkerUrl={MCP_WORKER_URL}

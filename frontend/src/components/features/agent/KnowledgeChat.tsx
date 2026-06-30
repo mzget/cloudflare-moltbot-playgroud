@@ -158,7 +158,7 @@ export default function KnowledgeChat() {
     <Card
       sx={{
         ...glassStyle,
-        height: 'calc(100vh - 120px)',
+        height: { xs: 'calc(100vh - 160px)', md: 'calc(100vh - 192px)' },
         display: 'flex',
         flexDirection: 'row',
         p: 0,
@@ -318,7 +318,7 @@ export default function KnowledgeChat() {
             </Box>
 
             {/* Chat Window Component (remounts when activeSessionId changes) */}
-            <Box sx={{ flex: 1, minHeight: 0 }}>
+            <Box sx={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
               <ChatWindow key={activeSessionId} sessionId={activeSessionId} />
             </Box>
           </Box>
@@ -342,6 +342,7 @@ function ChatWindow({ sessionId }: { sessionId: string }) {
   const { mode } = useColorScheme();
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const chatContainerRef = useRef<HTMLDivElement | null>(null);
   const host = MCP_WORKER_URL.replace(/^https?:\/\//, '');
 
   const queryCallback = React.useCallback(async () => {
@@ -393,14 +394,56 @@ function ChatWindow({ sessionId }: { sessionId: string }) {
     ?.join('') || '';
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length, lastMessageText, status]);
+    const container = chatContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
+      if (isNearBottom || isLoading) {
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: 'smooth'
+        });
+      }
+    };
+
+    const resizeObserver = new ResizeObserver(handleScroll);
+    
+    // Observe the container itself and all its current children
+    resizeObserver.observe(container);
+    Array.from(container.children).forEach(child => resizeObserver.observe(child));
+
+    // Observe any new children that might be added
+    const mutationObserver = new MutationObserver((mutations) => {
+      mutations.forEach(mutation => {
+        mutation.addedNodes.forEach(node => {
+          if (node instanceof HTMLElement) {
+            resizeObserver.observe(node);
+          }
+        });
+      });
+      handleScroll();
+    });
+
+    mutationObserver.observe(container, { childList: true });
+
+    // Initial scroll
+    handleScroll();
+
+    return () => {
+      resizeObserver.disconnect();
+      mutationObserver.disconnect();
+    };
+  }, [messages.length, isLoading]);
 
   const isStateLoading = !agent.identified && !agent.connectionError;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <Box sx={{ flex: 1, overflowY: 'auto', p: 2, display: 'flex', flexDirection: 'column', gap: 3 }}>
+      <Box 
+        ref={chatContainerRef}
+        sx={{ flex: 1, overflowY: 'auto', p: 2, display: 'flex', flexDirection: 'column', gap: 3 }}
+      >
         {isStateLoading ? (
           <Box sx={{ display: 'flex', flex: 1, height: '100%', alignItems: 'center', justifyContent: 'center', minHeight: '200px' }}>
             <CircularProgress size="md" color="success" />
@@ -555,6 +598,7 @@ function ChatWindow({ sessionId }: { sessionId: string }) {
               </Alert>
             )}
 
+            <Box sx={{ height: '16px', flexShrink: 0 }} />
             <div ref={messagesEndRef} />
           </>
         )}
