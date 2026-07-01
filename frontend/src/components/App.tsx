@@ -117,10 +117,12 @@ export default function App() {
   }, []);
 
   React.useEffect(() => {
-    const isLocalhost = typeof window !== 'undefined' && 
+    const isLocalhost = typeof window !== 'undefined' &&
       (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 
-    if (isLocalhost) {
+    const shouldMockUser = isLocalhost && import.meta.env.PUBLIC_CONNECT_TO_PROD !== 'true';
+
+    if (shouldMockUser) {
       setUser({
         email: 'local@example.com',
         name: 'Local User',
@@ -266,3 +268,4 @@ export default function App() {
     </ThemeProvider>
   );
 }
+
