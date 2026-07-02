@@ -7,7 +7,7 @@ interface EmailSource {
   id: string;
   subject: string;
   sender: string;
-  received_at?: number;
+  received_at?: number | string;
 }
 
 interface EmailDigest {

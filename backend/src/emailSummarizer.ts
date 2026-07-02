@@ -82,6 +82,7 @@ export async function syncAndIngestEmails(env: Env): Promise<number> {
         const subject = getHeader(headers, 'subject') || 'No Subject';
         const sender = getHeader(headers, 'from') || 'Unknown Sender';
         const receivedAt = parseInt(detail.internalDate) || Date.now();
+        const receivedAtIso = new Date(receivedAt).toISOString();
         const rawBody = parseEmailBody(detail.payload);
         const cleanedBody = cleanEmailBody(rawBody);
 
@@ -93,7 +94,7 @@ export async function syncAndIngestEmails(env: Env): Promise<number> {
           sender,
           subject,
           cleanedBody,
-          receivedAt
+          receivedAtIso
         ).run();
 
         totalNewEmails++;

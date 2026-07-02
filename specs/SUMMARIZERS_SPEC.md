@@ -96,9 +96,9 @@ CREATE TABLE ingested_emails (
   sender TEXT,
   subject TEXT,
   body_text TEXT,
-  received_at INTEGER, -- Timestamp
+  received_at DATETIME, -- Timestamp of receipt
   processed INTEGER DEFAULT 0,
-  created_at INTEGER DEFAULT (strftime('%s', 'now')),
+  created_at DATETIME DEFAULT (CURRENT_TIMESTAMP),
   FOREIGN KEY(subscription_id) REFERENCES email_subscriptions(id) ON DELETE SET NULL
 );
 
