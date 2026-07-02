@@ -321,6 +321,24 @@ export default function RoutesLayout() {
                   await fetchReports();
                 }
               }}
+              onDigestQueueFacebook={async (id) => {
+                // Optimistic UI update
+                setDigests(prev => prev.map(d => d.id === id ? { ...d, facebook_status: 'pending' } : d));
+                try {
+                  const res = await fetch(`${API_BASE_URL}/api/facebook/queue`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ source_type: 'email_digest', source_id: id })
+                  });
+                  if (!res.ok) {
+                    throw new Error(await res.text());
+                  }
+                  await fetchReports();
+                } catch (e) {
+                  console.error("Failed to queue Facebook post:", e);
+                  await fetchReports();
+                }
+              }}
               onReportRead={async (id) => {
                 // Optimistic UI: mark as read locally
                 setReports(prev => prev.map(r => r.id === id ? { ...r, is_readed: 1 } : r));

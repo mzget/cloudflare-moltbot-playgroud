@@ -8,7 +8,7 @@ import { checkAlertRules } from './alerts';
 import { getAuthUrl, exchangeCodeForTokens } from './gmail';
 import { syncAndIngestEmails, generateEmailDigests } from './emailSummarizer';
 import { checkAuth, fetchGoogleUserProfile, isEmailAuthorized, signJwt, getUserLoginAuthUrl, encryptToken } from './auth';
-import { syncAndProcessFacebookPosts, styleCustomPost } from './facebook';
+import { syncAndProcessFacebookPosts, styleCustomPost, queueFacebookPost } from './facebook';
 import { recordDailyPortfolioHistory, getPortfolioHistory } from './portfolioHistory';
 import { sortTransactions } from './portfolioUtils';
 import { calculatePerformanceComparison } from './historicalPrices';
@@ -1071,12 +1071,45 @@ app.post('/api/email-digests/mark-read', async (c) => {
   }
 });
 
+// API: Queue Facebook Post
+app.post('/api/facebook/queue', async (c) => {
+  try {
+    const { source_type, source_id } = await c.req.json() as any;
+    if (!source_type || !source_id) {
+      return c.json({ error: 'source_type and source_id are required' }, 400);
+    }
+    if (source_type !== 'email_digest' && source_type !== 'daily_report') {
+      return c.json({ error: 'Invalid source_type' }, 400);
+    }
+    await queueFacebookPost(c.env, source_type, parseInt(source_id));
+    return c.json({ success: true, message: `${source_type} queued for Facebook posting` });
+  } catch (e) {
+    return c.json({ error: (e as any).message }, 500);
+  }
+});
+
 // API: Get Email Digests
 app.get('/api/email-digests', async (c) => {
   try {
-    const { results } = await c.env.DB.prepare(
-      'SELECT id, category, summary, key_takeaways, source_emails, digest_date, is_readed, CAST(strftime(\'%s\', created_at) as INTEGER) as created_at FROM email_digests WHERE is_readed = 0 ORDER BY created_at DESC LIMIT 50'
-    ).all();
+    const { results } = await c.env.DB.prepare(`
+      SELECT 
+        e.id, 
+        e.category, 
+        e.summary, 
+        e.key_takeaways, 
+        e.source_emails, 
+        e.digest_date, 
+        e.is_readed, 
+        CAST(strftime('%s', e.created_at) as INTEGER) as created_at,
+        f.status as facebook_status,
+        f.facebook_post_id,
+        f.error_message as facebook_error
+      FROM email_digests e
+      LEFT JOIN facebook_posts f ON f.source_type = 'email_digest' AND f.source_id = e.id
+      WHERE e.is_readed = 0 
+      ORDER BY e.created_at DESC 
+      LIMIT 50
+    `).all();
     return c.json(results || []);
   } catch (e) {
     return c.json({ error: (e as any).message }, 500);

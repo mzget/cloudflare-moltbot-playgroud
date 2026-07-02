@@ -1,7 +1,25 @@
 import * as React from 'react';
-import { Box, Typography, Card, CardContent, Chip, Stack, Button } from '@mui/joy';
-import { Mail, Calendar, Sparkles, Check } from 'lucide-react';
+import { Box, Typography, Card, CardContent, Chip, Stack, Button, Tooltip, Link } from '@mui/joy';
+import { Mail, Calendar, Sparkles, Check, ExternalLink, RefreshCw, AlertCircle, Clock } from 'lucide-react';
 import { glassStyle } from '../../../styles/glass';
+
+const Facebook = ({ size = 24, ...props }: React.SVGProps<SVGSVGElement> & { size?: number }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
+  </svg>
+);
+
 
 interface EmailSource {
   id: string;
@@ -19,14 +37,19 @@ interface EmailDigest {
   digest_date: string;
   created_at: number; // timestamp
   is_readed?: number;
+  facebook_status?: 'pending' | 'processing' | 'posted' | 'failed' | null;
+  facebook_post_id?: string | null;
+  facebook_error?: string | null;
 }
 
 export function EmailDigestCard({ 
   digest,
-  onMarkAsRead
+  onMarkAsRead,
+  onQueueFacebook
 }: { 
   digest: EmailDigest;
   onMarkAsRead?: (id: number) => void;
+  onQueueFacebook?: (id: number) => void;
 }) {
   const takeaways = React.useMemo(() => {
     try {
@@ -73,7 +96,7 @@ export function EmailDigestCard({
               Compiled on {new Date(digest.digest_date).toLocaleDateString()}
             </Typography>
           </Box>
-          <Stack direction="row" spacing={1.5} alignItems="center">
+                    <Stack direction="row" spacing={1.5} alignItems="center">
             {onMarkAsRead && (
               <Button
                 variant="outlined"
@@ -102,6 +125,127 @@ export function EmailDigestCard({
               >
                 Mark as Read
               </Button>
+            )}
+            {onQueueFacebook && (
+              (() => {
+                const status = digest.facebook_status;
+                if (!status) {
+                  return (
+                    <Button
+                      variant="outlined"
+                      color="neutral"
+                      size="sm"
+                      startDecorator={<Facebook size={14} />}
+                      onClick={() => onQueueFacebook(digest.id)}
+                      sx={{
+                        borderRadius: '10px',
+                        fontWeight: 600,
+                        fontSize: '0.8rem',
+                        borderColor: 'rgba(24, 119, 242, 0.2)',
+                        bgcolor: 'rgba(24, 119, 242, 0.02)',
+                        color: 'rgba(45, 136, 255, 0.9)',
+                        transition: 'all 0.2s',
+                        '&:hover': {
+                          bgcolor: 'rgba(24, 119, 242, 0.08)',
+                          borderColor: 'rgba(24, 119, 242, 0.4)',
+                          transform: 'translateY(-1px)',
+                          boxShadow: '0 4px 12px rgba(24, 119, 242, 0.15)',
+                        },
+                        '&:active': {
+                          transform: 'translateY(0)',
+                        }
+                      }}
+                    >
+                      Post to FB
+                    </Button>
+                  );
+                }
+
+                switch (status) {
+                  case 'posted':
+                    return (
+                      <Tooltip title="View published post on Facebook" variant="soft">
+                        <Chip
+                          variant="soft"
+                          color="success"
+                          size="sm"
+                          startDecorator={<Facebook size={14} />}
+                          endDecorator={
+                            digest.facebook_post_id ? (
+                              <Link
+                                href={`https://facebook.com/${digest.facebook_post_id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                sx={{ display: 'inline-flex', alignItems: 'center', ml: 0.5 }}
+                              >
+                                <ExternalLink size={12} />
+                              </Link>
+                            ) : undefined
+                          }
+                          sx={{ borderRadius: '10px', fontWeight: 600, fontSize: '0.8rem', height: 32 }}
+                        >
+                          Posted
+                        </Chip>
+                      </Tooltip>
+                    );
+                  case 'processing':
+                    return (
+                      <Chip
+                        variant="soft"
+                        color="warning"
+                        size="sm"
+                        startDecorator={<RefreshCw size={14} className="animate-spin" />}
+                        sx={{ borderRadius: '10px', fontWeight: 600, fontSize: '0.8rem', height: 32 }}
+                      >
+                        Posting...
+                      </Chip>
+                    );
+                  case 'failed':
+                    return (
+                      <Tooltip title={digest.facebook_error || 'Unknown error'} variant="solid" color="danger">
+                        <Button
+                          variant="outlined"
+                          color="danger"
+                          size="sm"
+                          startDecorator={<AlertCircle size={14} />}
+                          onClick={() => onQueueFacebook(digest.id)}
+                          sx={{
+                            borderRadius: '10px',
+                            fontWeight: 600,
+                            fontSize: '0.8rem',
+                            borderColor: 'rgba(211, 47, 47, 0.2)',
+                            bgcolor: 'rgba(211, 47, 47, 0.02)',
+                            transition: 'all 0.2s',
+                            '&:hover': {
+                              bgcolor: 'rgba(211, 47, 47, 0.08)',
+                              borderColor: 'rgba(211, 47, 47, 0.4)',
+                              transform: 'translateY(-1px)',
+                              boxShadow: '0 4px 12px rgba(211, 47, 47, 0.15)',
+                            },
+                            '&:active': {
+                              transform: 'translateY(0)',
+                            }
+                          }}
+                        >
+                          Failed - Retry
+                        </Button>
+                      </Tooltip>
+                    );
+                  case 'pending':
+                  default:
+                    return (
+                      <Chip
+                        variant="soft"
+                        color="primary"
+                        size="sm"
+                        startDecorator={<Clock size={14} />}
+                        sx={{ borderRadius: '10px', fontWeight: 600, fontSize: '0.8rem', height: 32 }}
+                      >
+                        Queued
+                      </Chip>
+                    );
+                }
+              })()
             )}
             <Sparkles size={28} color="var(--joy-palette-primary-plainColor)" style={{ opacity: 0.15 }} />
           </Stack>

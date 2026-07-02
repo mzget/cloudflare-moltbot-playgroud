@@ -12,7 +12,8 @@ export default function IntelligenceFeed({
   notebookArticles = [],
   loading,
   onDigestRead,
-  onReportRead
+  onReportRead,
+  onDigestQueueFacebook
 }: {
   reports: any[];
   digests?: any[];
@@ -20,6 +21,7 @@ export default function IntelligenceFeed({
   loading: boolean;
   onDigestRead?: (id: number) => void;
   onReportRead?: (id: number) => void;
+  onDigestQueueFacebook?: (id: number) => void;
 }) {
   const [filter, setFilter] = React.useState<'all' | 'reports' | 'digests' | 'articles'>('all');
 
@@ -220,7 +222,7 @@ export default function IntelligenceFeed({
             } else if (item.symbol) {
               return <DailyReportCard key={`report-${item.id}`} report={item} onMarkAsRead={onReportRead} />;
             } else {
-              return <EmailDigestCard key={`digest-${item.id}`} digest={item} onMarkAsRead={onDigestRead} />;
+              return <EmailDigestCard key={`digest-${item.id}`} digest={item} onMarkAsRead={onDigestRead} onQueueFacebook={onDigestQueueFacebook} />;
             }
           })}
         </Stack>
