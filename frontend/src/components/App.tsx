@@ -143,7 +143,7 @@ export default function App() {
       try {
         const res = await fetch(`${API_BASE_URL}/api/auth/user/me`);
         if (res.ok) {
-          const data = await res.json();
+          const data = (await res.json()) as any;
           setUser(data.user);
           // Fetch user preferences
           useSettingsStore.getState().fetchPreferences().catch(console.error);
@@ -179,7 +179,7 @@ export default function App() {
           });
 
           if (res.ok) {
-            const data = await res.json();
+            const data = (await res.json()) as any;
             localStorage.setItem('auth_token', data.token);
             setUser(data.user);
             setAuthError(null);
@@ -219,7 +219,7 @@ export default function App() {
       const redirectUri = window.location.origin + '/';
       const res = await fetch(`${API_BASE_URL}/api/auth/user/login-url?redirect_uri=${encodeURIComponent(redirectUri)}`);
       if (res.ok) {
-        const data = await res.json();
+        const data = (await res.json()) as any;
         window.location.href = data.url;
       } else {
         const errText = await res.text();

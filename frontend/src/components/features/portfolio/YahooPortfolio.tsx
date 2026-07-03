@@ -4,7 +4,7 @@ import { Box, Typography, Sheet, Button, Input, Stack, Tabs, TabList, Tab, Divid
 import { API_BASE_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
 import type { Holding } from './HoldingsTable';
-import FundametalDashboard from './FundamentalDashboard';
+import FundamentalDashboard from './FundamentalDashboard';
 import SummaryTab from './SummaryTab';
 import HoldingsTab from './HoldingsTab';
 import '../../../styles/yahooPortfolio.css';
@@ -202,7 +202,7 @@ export default function YahooPortfolio() {
         });
 
         if (res.ok) {
-          const result = await res.json();
+          const result = (await res.json()) as any;
           setImportStatus({
             importing: false,
             error: null,
@@ -302,7 +302,7 @@ export default function YahooPortfolio() {
       {/* Fundamentals Tab */}
       {activeTab === 0 && (
         <Box className="tab-pane-active">
-          <FundametalDashboard />
+          <FundamentalDashboard />
         </Box>
       )}
 

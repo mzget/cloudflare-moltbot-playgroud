@@ -27,7 +27,7 @@ export default function PortfolioChart() {
         setLoading(true);
         const res = await fetch(`${API_BASE_URL}/api/portfolio/performance-comparison?timeframe=${timeframe}`);
         if (res.ok) {
-          const result = await res.json();
+          const result = (await res.json()) as any;
           setData(result);
         }
       } catch (e) {

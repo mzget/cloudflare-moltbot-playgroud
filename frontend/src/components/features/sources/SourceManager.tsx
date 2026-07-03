@@ -115,7 +115,7 @@ export default function SourceManager() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/settings`);
       if (res.ok) {
-        const settings = await res.json();
+        const settings = (await res.json()) as any;
         setFacebookSettings({
           pauseDailyReportFacebook: settings.pause_daily_report_facebook === '1',
           pauseEmailDigestFacebook: settings.pause_email_digest_facebook === '1',
@@ -210,7 +210,7 @@ export default function SourceManager() {
           instructions: stylingInstructions
         }),
       });
-      const data = await res.json();
+      const data = (await res.json()) as any;
       if (data.success && data.styledContent) {
         setOriginalContent(editorState.content);
         setEditorState(prev => ({
@@ -243,7 +243,7 @@ export default function SourceManager() {
       setLoadingPosts(true);
       const res = await fetch(`${API_BASE_URL}/api/facebook/posts`);
       if (res.ok) {
-        const data = await res.json();
+        const data = (await res.json()) as any;
         setCustomPosts(data);
       }
     } catch (e) {
@@ -349,7 +349,7 @@ export default function SourceManager() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content: contentOverride || editorState.content }),
       });
-      const data = await res.json();
+      const data = (await res.json()) as any;
       if (data.success) {
         alert('Successfully posted to Facebook Page!');
         setEditorState(prev => ({ ...prev, isOpen: false }));
@@ -449,7 +449,7 @@ export default function SourceManager() {
       if (res.ok) {
         alert('Email digest generated successfully!');
       } else {
-        const errorData = await res.json().catch(() => ({ error: 'Unknown error' }));
+        const errorData = (await res.json().catch(() => ({ error: 'Unknown error' }))) as any;
         alert(`Failed to generate digest: ${errorData.error}`);
       }
     } catch (e) {

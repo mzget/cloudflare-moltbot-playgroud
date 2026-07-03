@@ -208,7 +208,7 @@ export default function MarketEventsTimeline({ inSidebar = false }: { inSidebar?
     <Card sx={{ ...glassStyle, p: inSidebar ? 2 : 3 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
         <Stack direction="row" spacing={inSidebar ? 1 : 1.5} alignItems="center">
-          <Briefcase size={inSidebar ? 18 : 20} className="text-emerald-500" />
+          <Briefcase size={inSidebar ? 18 : 20} color="#10b981" />
           <Typography level={inSidebar ? "title-md" : "title-lg"} sx={{ fontWeight: 700 }}>
             {inSidebar ? "Market Events" : "Watchlist Market Events"}
           </Typography>

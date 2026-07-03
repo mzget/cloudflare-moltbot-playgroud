@@ -14,7 +14,7 @@ const DEFAULT_VISIBLE: Array<keyof CompanyStats> = ALL_COLUMNS.map(c => c.id);
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function FundametalDashboard() {
+export default function FundamentalDashboard() {
   const [data, setData] = React.useState<CompanyStats[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [visibleColumnIds, setVisibleColumnIds] =
@@ -42,7 +42,7 @@ export default function FundametalDashboard() {
       try {
         const res = await fetch(`${API_BASE_URL}/api/market-intelligence`);
         if (res.ok) {
-          const fetchedData = await res.json();
+          const fetchedData = (await res.json()) as any;
           // Ensure name exists for display and normalize types
           const normalizedData = fetchedData.map((item: any) => ({
             ...item,

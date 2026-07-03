@@ -93,7 +93,7 @@ export const useSettingsStore = create<SettingsState>()(
               headers: getAuthHeaders(),
             });
             if (res.ok) {
-              const data = await res.json();
+              const data = (await res.json()) as any;
               set({
                 theme: data.theme || 'system',
                 density: data.table_density || 'cozy',

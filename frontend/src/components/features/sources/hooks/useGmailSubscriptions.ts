@@ -111,7 +111,7 @@ export function useGmailSubscriptions() {
       `${API_BASE_URL}/api/auth/google/url?redirect_uri=${encodeURIComponent(redirectUri)}`
     );
     if (res.ok) {
-      const data = await res.json();
+      const data = (await res.json()) as any;
       window.location.href = data.url;
     }
   }, []);

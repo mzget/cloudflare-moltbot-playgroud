@@ -24,7 +24,7 @@ export function useMarketEvents(symbol: string, eventType: string) {
     try {
       const res = await fetch(`${API_BASE_URL}/api/watchlist`);
       if (res.ok) {
-        const data = await res.json();
+        const data = (await res.json()) as any;
         const activeSymbols = data
           .filter((item: any) => item.is_active === 1)
           .map((item: any) => item.symbol);

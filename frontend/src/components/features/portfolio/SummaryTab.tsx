@@ -135,14 +135,14 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
         fetch(`${API_BASE_URL}/api/portfolio/brokers?rate=${usdThbRate}`),
       ]);
 
-      if (summaryRes.ok) setSummary(await summaryRes.json());
-      if (historyRes.ok) setYearlyHistory(await historyRes.json());
-      if (taxRes.ok) setTaxSavings(await taxRes.json());
-      if (fundsRes.ok) setFunds(await fundsRes.json());
-      if (catsRes.ok) setCategories(await catsRes.json());
-      if (allocsRes.ok) setAllocations(await allocsRes.json());
+      if (summaryRes.ok) setSummary((await summaryRes.json()) as any);
+      if (historyRes.ok) setYearlyHistory((await historyRes.json()) as any);
+      if (taxRes.ok) setTaxSavings((await taxRes.json()) as any);
+      if (fundsRes.ok) setFunds((await fundsRes.json()) as any);
+      if (catsRes.ok) setCategories((await catsRes.json()) as any);
+      if (allocsRes.ok) setAllocations((await allocsRes.json()) as any);
       if (brokersRes.ok) {
-        const brokerData = await brokersRes.json();
+        const brokerData = (await brokersRes.json()) as any;
         setBrokers(brokerData);
         // Initialize override form
         const formInit: Record<string, { cost: string; balance: string }> = {};

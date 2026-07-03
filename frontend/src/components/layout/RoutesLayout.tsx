@@ -66,15 +66,15 @@ export default function RoutesLayout() {
       ]);
       
       if (reportsRes.ok) {
-        const reportsData = await reportsRes.json();
+        const reportsData = (await reportsRes.json()) as any;
         setReports(reportsData);
       }
       if (digestsRes.ok) {
-        const digestsData = await digestsRes.json();
+        const digestsData = (await digestsRes.json()) as any;
         setDigests(digestsData);
       }
       if (articlesRes.ok) {
-        const articlesData = await articlesRes.json();
+        const articlesData = (await articlesRes.json()) as any;
         setNotebookArticles(articlesData);
       }
     } catch (e) {

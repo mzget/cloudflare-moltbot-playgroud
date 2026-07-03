@@ -43,7 +43,11 @@ export default function HoldingsTab({ holdings, loading, onAddTicker, onDataChan
   const handleExpandRow = useCallback((symbol: string) => {
     setExpandedRows(prev => {
       const next = new Set(prev);
-      next.has(symbol) ? next.delete(symbol) : next.add(symbol);
+      if (next.has(symbol)) {
+        next.delete(symbol);
+      } else {
+        next.add(symbol);
+      }
       return next;
     });
   }, []);
