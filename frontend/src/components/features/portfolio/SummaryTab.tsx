@@ -13,8 +13,11 @@ import { formatCurrency, formatPct } from './YahooPortfolio';
 import type { PortfolioSummary } from './YahooPortfolio';
 import PortfolioChart from './PortfolioChart';
 import AssetAllocationChart from './AssetAllocationChart';
+import FastInlineInput from '../../common/FastInlineInput';
 import { useSettingsStore } from '../../../store/settingsStore';
 import { API_BASE_URL } from '../../../config';
+
+
 
 interface SummaryTabProps {
   summary: PortfolioSummary;
@@ -48,6 +51,8 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
   const [funds, setFunds] = useState<any[]>([]);
   const [categories, setCategories] = useState<any[]>([]);
   const [allocations, setAllocations] = useState<any[]>([]);
+  const [fundsForm, setFundsForm] = useState<Record<number, string>>({});
+  const [categoriesForm, setCategoriesForm] = useState<Record<number, string>>({});
   const [brokers, setBrokers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -229,6 +234,19 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
       });
     });
     setAllocForm(formInit);
+
+    const fundsInit: Record<number, string> = {};
+    funds.forEach(f => {
+      fundsInit[f.id] = f.name;
+    });
+    setFundsForm(fundsInit);
+
+    const catsInit: Record<number, string> = {};
+    categories.forEach(c => {
+      catsInit[c.id] = c.name;
+    });
+    setCategoriesForm(catsInit);
+
     setIsEditingAlloc(true);
   };
 
@@ -248,6 +266,43 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
+
+      // Save fund name edits
+      const fundPromises = Object.entries(fundsForm).map(async ([idStr, newName]) => {
+        const id = Number(idStr);
+        const originalFund = funds.find(f => f.id === id);
+        if (originalFund && originalFund.name !== newName) {
+          await fetch(`${API_BASE_URL}/api/portfolio/funds`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id,
+              name: newName,
+              broker_name: originalFund.broker_name
+            })
+          });
+        }
+      });
+
+      // Save category name edits
+      const catPromises = Object.entries(categoriesForm).map(async ([idStr, newName]) => {
+        const id = Number(idStr);
+        const originalCat = categories.find(c => c.id === id);
+        if (originalCat && originalCat.name !== newName) {
+          await fetch(`${API_BASE_URL}/api/portfolio/categories`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id,
+              name: newName,
+              target_weight: originalCat.target_weight
+            })
+          });
+        }
+      });
+
+      await Promise.all([...fundPromises, ...catPromises]);
+
       if (res.ok) {
         setIsEditingAlloc(false);
         fetchData();
@@ -344,7 +399,39 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
   const currentSsf = currentTaxYearData?.ssf || 0;
   const combinedTaxSavingTotal = currentRmf + currentSsf + (currentTaxYearData?.ltf || 0);
 
-  return (
+    // Memoized charts to avoid re-renders on keystroke in Edit Mode
+
+    const memoizedAssetAllocationChart = React.useMemo(() => (
+
+      <AssetAllocationChart
+
+        brokers={brokers}
+
+        categories={categories}
+
+        allocations={allocations}
+
+        summary={summary}
+
+        rate={usdThbRate}
+
+        holdings={holdings}
+
+      />
+
+    ), [brokers, categories, allocations, summary, usdThbRate, holdings]);
+
+  
+
+    const memoizedPortfolioChart = React.useMemo(() => (
+
+      <PortfolioChart />
+
+    ), []);
+
+  
+
+    return (
     <Box className="tab-pane-active" sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
 
       {/* Top Metrics Cards (THB) */}
@@ -419,14 +506,7 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
               </Typography>
             </Box>
             <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <AssetAllocationChart
-                brokers={brokers}
-                categories={categories}
-                allocations={allocations}
-                summary={summary}
-                rate={usdThbRate}
-                holdings={holdings}
-              />
+              {memoizedAssetAllocationChart}
             </Box>
           </Sheet>
         </Grid>
@@ -438,7 +518,7 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
               <BarChart2 size={18} color="#10b981" /> Daily TWR Performance vs S&P 500 (holdings stock)
             </Typography>
             <Box sx={{ minHeight: 260, height: 'auto', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-              <PortfolioChart />
+              {memoizedPortfolioChart}
             </Box>
           </Sheet>
         </Grid>
@@ -509,13 +589,13 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
                       {/* Cost: edit input when editing, override when set, else calculated */}
                       <td style={{ textAlign: 'right' }}>
                         {isEditingBrokers ? (
-                          <Input
+                          <FastInlineInput
                             size="sm"
                             placeholder="Manual Cost"
                             value={brokerOverrideForm[broker.broker_name]?.cost || ''}
-                            onChange={e => setBrokerOverrideForm(prev => ({
+                            onChange={val => setBrokerOverrideForm(prev => ({
                               ...prev,
-                              [broker.broker_name]: { ...prev[broker.broker_name], cost: e.target.value }
+                              [broker.broker_name]: { ...prev[broker.broker_name], cost: val }
                             }))}
                             slotProps={{ input: { style: { textAlign: 'right' } } }}
                             sx={{ borderRadius: '8px' }}
@@ -525,13 +605,13 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
                       {/* Value: edit input when editing, override when set, else calculated */}
                       <td style={{ textAlign: 'right' }}>
                         {isEditingBrokers ? (
-                          <Input
+                          <FastInlineInput
                             size="sm"
                             placeholder="Manual Value"
                             value={brokerOverrideForm[broker.broker_name]?.balance || ''}
-                            onChange={e => setBrokerOverrideForm(prev => ({
+                            onChange={val => setBrokerOverrideForm(prev => ({
                               ...prev,
-                              [broker.broker_name]: { ...prev[broker.broker_name], balance: e.target.value }
+                              [broker.broker_name]: { ...prev[broker.broker_name], balance: val }
                             }))}
                             slotProps={{ input: { style: { textAlign: 'right' } } }}
                             sx={{ borderRadius: '8px' }}
@@ -680,7 +760,27 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
               <tr>
                 <th style={{ width: 120 }}>Category</th>
                 {funds.map(fund => (
-                  <th key={fund.id} style={{ textAlign: 'right' }}>{fund.name}</th>
+                  <th key={fund.id} style={{ textAlign: 'right' }}>
+                    {isEditingAlloc ? (
+                      <FastInlineInput
+                        size="sm"
+                        value={fundsForm[fund.id] ?? fund.name}
+                        onChange={val => setFundsForm(prev => ({
+                          ...prev,
+                          [fund.id]: val
+                        }))}
+                        slotProps={{ input: { style: { textAlign: 'right' } } }}
+                        sx={{
+                          borderRadius: '8px',
+                          width: '100%',
+                          minWidth: '100px',
+                          display: 'inline-flex',
+                        }}
+                      />
+                    ) : (
+                      fund.name
+                    )}
+                  </th>
                 ))}
                 <th style={{ textAlign: 'right', width: 120 }}>Total</th>
               </tr>
@@ -688,21 +788,39 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
             <tbody>
               {categories.map(cat => (
                 <tr key={cat.id}>
-                  <td style={{ fontWeight: 700 }}>{cat.name}</td>
+                  <td style={{ fontWeight: 700 }}>
+                    {isEditingAlloc ? (
+                      <FastInlineInput
+                        size="sm"
+                        value={categoriesForm[cat.id] ?? cat.name}
+                        onChange={val => setCategoriesForm(prev => ({
+                          ...prev,
+                          [cat.id]: val
+                        }))}
+                        sx={{
+                          borderRadius: '8px',
+                          width: '100%',
+                          minWidth: '80px',
+                        }}
+                      />
+                    ) : (
+                      cat.name
+                    )}
+                  </td>
                   {funds.map(fund => {
                     const alloc = allocations.find(a => a.category_id === cat.id && a.fund_id === fund.id);
                     const amount = alloc ? alloc.amount : 0;
                     return (
                       <td key={fund.id} style={{ textAlign: 'right' }}>
                         {isEditingAlloc ? (
-                          <Input
+                          <FastInlineInput
                             size="sm"
                             type="number"
                             placeholder="0"
                             value={allocForm[`${cat.id}-${fund.id}`] || ''}
-                            onChange={e => setAllocForm(prev => ({
+                            onChange={val => setAllocForm(prev => ({
                               ...prev,
-                              [`${cat.id}-${fund.id}`]: e.target.value
+                              [`${cat.id}-${fund.id}`]: val
                             }))}
                             slotProps={{ input: { style: { textAlign: 'right' } } }}
                             sx={{ borderRadius: '8px', width: '100%', minWidth: '90px' }}
