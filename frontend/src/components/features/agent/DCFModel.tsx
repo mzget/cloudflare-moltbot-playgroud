@@ -1,7 +1,7 @@
 ﻿import * as React from 'react';
 import {
   Box, Sheet, Typography, Stack, Slider, Input, Divider, Table,
-  FormLabel, FormControl, Tooltip
+  FormLabel, FormControl, Tooltip, Button
 } from '@mui/joy';
 import { Calculator, TrendingUp, DollarSign, BarChart3, Info } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
@@ -275,41 +275,131 @@ export default function DCFModel({ symbol }: DCFModelProps) {
   const [sharesOutstanding, setSharesOutstanding] = React.useState(228);
   const [currentPrice, setCurrentPrice] = React.useState<number | null>(null);
   const [loadingDefaults, setLoadingDefaults] = React.useState(false);
+  const [history, setHistory] = React.useState<any[]>([]);
+  const [loadingHistory, setLoadingHistory] = React.useState(false);
+  const [scenarioName, setScenarioName] = React.useState('Base Case');
+  const [isSaving, setIsSaving] = React.useState(false);
 
-  // Fetch defaults from backend
+  const fetchHistory = React.useCallback(async () => {
+    setLoadingHistory(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/analysis/dcf-history?symbol=${symbol}`);
+      if (res.ok) {
+        const data = await res.json() as any[];
+        setHistory(data);
+        return data;
+      }
+    } catch (e) {
+      console.error('Failed to fetch DCF history:', e);
+    } finally {
+      setLoadingHistory(false);
+    }
+    return [];
+  }, [symbol]);
+
+  // Fetch defaults and history from backend
   React.useEffect(() => {
     let cancelled = false;
-    const fetchDefaults = async () => {
+    const initData = async () => {
       setLoadingDefaults(true);
       try {
-        const res = await fetch(`${API_BASE_URL}/api/analysis/dcf-defaults?symbol=${symbol}`);
-        if (!res.ok) return;
-        const d = await res.json() as any;
+        // 1. Fetch history first
+        const histData = await fetchHistory();
         if (cancelled) return;
 
-        if (d.baseRevenue != null) setBaseRev(Math.round(d.baseRevenue * 100) / 100);
-        if (d.revenueGrowth != null) setRevGrowth(Math.round(d.revenueGrowth * 10) / 10);
-        if (d.grossMargin != null) setBaseGm(Math.round(d.grossMargin * 10) / 10);
-        if (d.opexMargin != null) setOpexMargin(Math.round(d.opexMargin * 10) / 10);
-        if (d.fcfMargin != null) {
-          // Estimate FCF conversion from FCF margin and operating margin
-          const opMarg = d.operatingMargin ?? 18;
-          if (opMarg > 0) {
-            const conv = Math.min(100, Math.max(10, (d.fcfMargin / opMarg) * 100));
-            setFcfConversion(Math.round(conv * 10) / 10);
+        if (histData && histData.length > 0) {
+          // Initialize from the latest saved model
+          const latest = histData[0];
+          setBaseRev(latest.base_revenue);
+          setRevGrowth(latest.revenue_growth);
+          setBaseGm(latest.base_gross_margin);
+          setGmImprovement(latest.gross_margin_improvement);
+          setOpexMargin(latest.opex_margin);
+          setTaxRate(latest.tax_rate);
+          setFcfConversion(latest.fcf_conversion);
+          setWacc(latest.wacc);
+          setTerminalGrowth(latest.terminal_growth);
+          setSharesOutstanding(latest.shares_outstanding);
+          setScenarioName(latest.scenario_name);
+
+          // Still fetch defaults just to get the current price of the stock
+          const resDefaults = await fetch(`${API_BASE_URL}/api/analysis/dcf-defaults?symbol=${symbol}`);
+          if (resDefaults.ok) {
+            const d = await resDefaults.json() as any;
+            if (!cancelled && d.price != null) {
+              setCurrentPrice(d.price);
+            }
           }
+        } else {
+          // Fallback: No history, fetch defaults from market data
+          const resDefaults = await fetch(`${API_BASE_URL}/api/analysis/dcf-defaults?symbol=${symbol}`);
+          if (!resDefaults.ok) return;
+          const d = await resDefaults.json() as any;
+          if (cancelled) return;
+
+          if (d.baseRevenue != null) setBaseRev(Math.round(d.baseRevenue * 100) / 100);
+          if (d.revenueGrowth != null) setRevGrowth(Math.round(d.revenueGrowth * 10) / 10);
+          if (d.grossMargin != null) setBaseGm(Math.round(d.grossMargin * 10) / 10);
+          if (d.opexMargin != null) setOpexMargin(Math.round(d.opexMargin * 10) / 10);
+          if (d.fcfMargin != null) {
+            const opMarg = d.operatingMargin ?? 18;
+            if (opMarg > 0) {
+              const conv = Math.min(100, Math.max(10, (d.fcfMargin / opMarg) * 100));
+              setFcfConversion(Math.round(conv * 10) / 10);
+            }
+          }
+          if (d.sharesOutstanding != null) setSharesOutstanding(d.sharesOutstanding);
+          if (d.price != null) setCurrentPrice(d.price);
         }
-        if (d.sharesOutstanding != null) setSharesOutstanding(d.sharesOutstanding);
-        if (d.price != null) setCurrentPrice(d.price);
-      } catch {
-        // Silently fail - user can input manually
+      } catch (e) {
+        console.error('Failed to initialize DCF data:', e);
       } finally {
         if (!cancelled) setLoadingDefaults(false);
       }
     };
-    fetchDefaults();
+
+    initData();
     return () => { cancelled = true; };
-  }, [symbol]);
+  }, [symbol, fetchHistory]);
+
+  const handleSaveScenario = async () => {
+    setIsSaving(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/analysis/dcf-save`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          symbol,
+          scenarioName,
+          baseRevenue: baseRev,
+          revenueGrowth: revGrowth,
+          baseGrossMargin: baseGm,
+          grossMarginImprovement: gmImprovement,
+          opexMargin,
+          taxRate,
+          fcfConversion,
+          wacc,
+          terminalGrowth,
+          sharesOutstanding,
+          impliedSharePrice: result.impliedSharePrice,
+        }),
+      });
+
+      if (res.ok) {
+        await fetchHistory();
+      } else {
+        const err = await res.json() as any;
+        alert(`Failed to save: ${err.error || 'Unknown error'}`);
+      }
+    } catch (e) {
+      console.error('Error saving scenario:', e);
+      alert('Error saving scenario');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   // Calculate DCF
   const result = React.useMemo<DCFResult>(
@@ -441,6 +531,110 @@ export default function DCFModel({ symbol }: DCFModelProps) {
             <Typography level="body-xs" sx={{ opacity: 0.4, mt: 1, fontStyle: 'italic' }}>
               Loading market data defaults...
             </Typography>
+          )}
+
+          <Divider sx={{ my: 3, opacity: 0.1 }} />
+
+          <Typography
+            level="title-sm"
+            sx={{ fontWeight: 700, mb: 1.5, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}
+          >
+            Save Scenario
+          </Typography>
+
+          <Stack spacing={1.5}>
+            <FormControl>
+              <FormLabel sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Scenario Name</FormLabel>
+              <Input
+                size="sm"
+                value={scenarioName}
+                onChange={(e) => setScenarioName(e.target.value)}
+                placeholder="e.g. Pessimistic Case"
+                sx={{ background: 'rgba(255,255,255,0.03)' }}
+              />
+            </FormControl>
+            <Button
+              size="sm"
+              color="primary"
+              variant="solid"
+              onClick={handleSaveScenario}
+              loading={isSaving}
+              sx={{ fontWeight: 700 }}
+            >
+              Save Scenario
+            </Button>
+          </Stack>
+
+          {history.length > 0 && (
+            <>
+              <Divider sx={{ my: 3, opacity: 0.1 }} />
+              <Typography
+                level="title-sm"
+                sx={{ fontWeight: 700, mb: 1.5, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}
+              >
+                Saved Scenarios ({history.length})
+              </Typography>
+              <Stack spacing={1} sx={{ maxHeight: '250px', overflowY: 'auto' }}>
+                {history.map((h) => {
+                  const isActive = 
+                    Math.abs(baseRev - h.base_revenue) < 0.001 &&
+                    Math.abs(revGrowth - h.revenue_growth) < 0.001 &&
+                    Math.abs(baseGm - h.base_gross_margin) < 0.001 &&
+                    Math.abs(gmImprovement - h.gross_margin_improvement) < 0.001 &&
+                    Math.abs(opexMargin - h.opex_margin) < 0.001 &&
+                    Math.abs(taxRate - h.tax_rate) < 0.001 &&
+                    Math.abs(fcfConversion - h.fcf_conversion) < 0.001 &&
+                    Math.abs(wacc - h.wacc) < 0.001 &&
+                    Math.abs(terminalGrowth - h.terminal_growth) < 0.001 &&
+                    Math.abs(sharesOutstanding - h.shares_outstanding) < 0.001;
+
+                  return (
+                    <Sheet
+                      key={h.id}
+                      onClick={() => {
+                        setBaseRev(h.base_revenue);
+                        setRevGrowth(h.revenue_growth);
+                        setBaseGm(h.base_gross_margin);
+                        setGmImprovement(h.gross_margin_improvement);
+                        setOpexMargin(h.opex_margin);
+                        setTaxRate(h.tax_rate);
+                        setFcfConversion(h.fcf_conversion);
+                        setWacc(h.wacc);
+                        setTerminalGrowth(h.terminal_growth);
+                        setSharesOutstanding(h.shares_outstanding);
+                        setScenarioName(h.scenario_name);
+                      }}
+                      sx={{
+                        p: 1.5,
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        background: isActive ? 'rgba(37, 99, 235, 0.12)' : 'rgba(255,255,255,0.02)',
+                        border: isActive ? '1px solid rgba(37, 99, 235, 0.3)' : '1px solid rgba(255,255,255,0.06)',
+                        transition: 'all 0.2s ease-out',
+                        '&:hover': {
+                          background: isActive ? 'rgba(37, 99, 235, 0.18)' : 'rgba(255,255,255,0.05)',
+                          borderColor: isActive ? 'rgba(37, 99, 235, 0.4)' : 'rgba(255,255,255,0.1)',
+                        }
+                      }}
+                    >
+                      <Stack direction="row" justifyContent="space-between" alignItems="center">
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography level="body-xs" sx={{ fontWeight: 700, color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {h.scenario_name}
+                          </Typography>
+                          <Typography level="body-xs" sx={{ opacity: 0.4, fontSize: '0.65rem' }}>
+                            {new Date(h.created_at + 'Z').toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
+                          </Typography>
+                        </Box>
+                        <Typography level="body-xs" sx={{ fontWeight: 800, fontFamily: 'monospace', color: 'success.300', textAlign: 'right' }}>
+                          ${h.implied_share_price.toFixed(2)}
+                        </Typography>
+                      </Stack>
+                    </Sheet>
+                  );
+                })}
+              </Stack>
+            </>
           )}
         </Box>
 

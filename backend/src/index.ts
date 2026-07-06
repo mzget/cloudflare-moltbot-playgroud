@@ -2290,6 +2290,77 @@ app.get('/api/analysis/dcf-defaults', async (c) => {
   });
 });
 
+// GET /api/analysis/dcf-history
+// Returns historical DCF calculations for a given symbol
+app.get('/api/analysis/dcf-history', async (c) => {
+  const symbol = c.req.query('symbol');
+  if (!symbol) return c.json({ error: 'symbol is required' }, 400);
+  const symbolUpper = symbol.toUpperCase();
+
+  try {
+    const { results } = await c.env.DB.prepare(
+      'SELECT * FROM dcf_calculations WHERE symbol = ? ORDER BY created_at DESC'
+    ).bind(symbolUpper).all();
+    return c.json(results);
+  } catch (e) {
+    console.error(`Failed to fetch DCF history for ${symbolUpper}:`, e);
+    return c.json({ error: (e as any).message }, 500);
+  }
+});
+
+// POST /api/analysis/dcf-save
+// Saves a new DCF calculation for a symbol
+app.post('/api/analysis/dcf-save', async (c) => {
+  try {
+    const body = await c.req.json() as any;
+    const {
+      symbol,
+      scenarioName,
+      baseRevenue,
+      revenueGrowth,
+      baseGrossMargin,
+      grossMarginImprovement,
+      opexMargin,
+      taxRate,
+      fcfConversion,
+      wacc,
+      terminalGrowth,
+      sharesOutstanding,
+      impliedSharePrice,
+    } = body;
+
+    if (!symbol) return c.json({ error: 'symbol is required' }, 400);
+    const symbolUpper = symbol.toUpperCase();
+
+    await c.env.DB.prepare(
+      `INSERT INTO dcf_calculations (
+        symbol, scenario_name, base_revenue, revenue_growth, base_gross_margin,
+        gross_margin_improvement, opex_margin, tax_rate, fcf_conversion,
+        wacc, terminal_growth, shares_outstanding, implied_share_price
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).bind(
+      symbolUpper,
+      scenarioName || 'Base Case',
+      baseRevenue,
+      revenueGrowth,
+      baseGrossMargin,
+      grossMarginImprovement,
+      opexMargin,
+      taxRate,
+      fcfConversion,
+      wacc,
+      terminalGrowth,
+      sharesOutstanding,
+      impliedSharePrice
+    ).run();
+
+    return c.json({ success: true });
+  } catch (e) {
+    console.error('Failed to save DCF calculation:', e);
+    return c.json({ error: (e as any).message }, 500);
+  }
+});
+
 // Fallback for non-matching API routes
 app.notFound((c) => {
   return c.text("Oaktree Agent Backend Running");
