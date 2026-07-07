@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSearch, useNavigate } from '@tanstack/react-router';
 import { usePortfolio } from './hooks/usePortfolio';
 import { Box, Typography, Sheet, Button, Input, Stack, Tabs, TabList, Tab, Divider, Modal, ModalDialog, DialogTitle, DialogContent, ModalClose, FormControl, FormLabel } from '@mui/joy';
 import { API_BASE_URL } from '../../../config';
@@ -128,7 +129,28 @@ function parseCSV(text: string): any[] {
 export default function YahooPortfolio() {
   const { holdings, summary, loading, watchlist, fetchAll } = usePortfolio();
 
-  const [activeTab, setActiveTab] = useState<number>(1);
+  const search = useSearch({ strict: false }) as any;
+  const navigate = useNavigate();
+
+  const tabNameToIndex: Record<string, number> = {
+    fundamentals: 0,
+    holdings: 1,
+    summary: 2,
+  };
+  const tabIndexToName = ['fundamentals', 'holdings', 'summary'];
+
+  const activeTab = typeof search?.tab === 'string' && search.tab in tabNameToIndex
+    ? tabNameToIndex[search.tab]
+    : 0; // Default to Fundamentals (0)
+
+  const setActiveTab = (index: number) => {
+    navigate({
+      search: {
+        ...search,
+        tab: tabIndexToName[index],
+      },
+    });
+  };
   const [addModalOpen, setAddModalOpen] = useState(false);
 
   const [form, setForm] = useState({

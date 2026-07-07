@@ -1,6 +1,7 @@
-﻿import * as React from 'react';
+import * as React from 'react';
 import { Box, Button, Typography, Sheet, CircularProgress, Divider, Stack, Tabs, TabList, Tab } from '@mui/joy';
-import { ArrowLeft, RotateCw, CheckCircle, AlertTriangle, Play, FileText, Calculator } from 'lucide-react';
+import { ArrowLeft, RotateCw, CheckCircle, AlertTriangle, Play, FileText, Calculator, BookOpen } from 'lucide-react';
+import StockThesis from './StockThesis';
 import { useNavigate } from '@tanstack/react-router';
 import { API_BASE_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
@@ -20,7 +21,7 @@ export default function AnalysisReport({ symbol, onBack, subTab }: AnalysisRepor
   const [analyzing, setAnalyzing] = React.useState(false);
   const [report, setReport] = React.useState<any>(null);
   const [error, setError] = React.useState<string | null>(null);
-  const activeToolTab = subTab === 'dcf-model' ? 1 : 0;
+  const activeToolTab = subTab === 'dcf-model' ? 1 : subTab === 'stock-thesis' ? 2 : 0;
 
   const fetchReport = async () => {
     setLoading(true);
@@ -161,7 +162,7 @@ export default function AnalysisReport({ symbol, onBack, subTab }: AnalysisRepor
         onChange={(_, val) => {
           navigate({
             to: '/analysis',
-            search: { symbol, tab: val === 1 ? 'dcf-model' : 'report' },
+            search: { symbol, tab: val === 2 ? 'stock-thesis' : val === 1 ? 'dcf-model' : 'report' },
           });
         }}
         sx={{ mb: 3, bgcolor: 'transparent' }}
@@ -202,12 +203,17 @@ export default function AnalysisReport({ symbol, onBack, subTab }: AnalysisRepor
             <Calculator size={15} />
             DCF Model
           </Tab>
+          <Tab disableIndicator>
+            <BookOpen size={15} />
+            Stock Thesis
+          </Tab>
         </TabList>
       </Tabs>
 
       {/* Tab Content */}
       {activeToolTab === 0 && renderReportContent()}
       {activeToolTab === 1 && <DCFModel symbol={symbol} />}
+      {activeToolTab === 2 && <StockThesis symbol={symbol} />}
     </Box>
   );
 }
