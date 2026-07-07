@@ -1,0 +1,34 @@
+---
+export function getStaticPaths() {
+  return [
+    { params: { route: 'dashboard' }, props: { title: 'Dashboard' } },
+    { params: { route: 'market' }, props: { title: 'Market Intelligence' } },
+    { params: { route: 'watchlist' }, props: { title: 'Watchlist' } },
+    { params: { route: 'agent' }, props: { title: 'Agent Chat' } },
+    { params: { route: 'db-agent' }, props: { title: 'Database Chat' } },
+    { params: { route: 'command-center' }, props: { title: 'Command Center' } },
+    { params: { route: 'about' }, props: { title: 'About Oaktree' } },
+    { params: { route: 'analysis' }, props: { title: 'Analysis' } },
+  ];
+}
+
+const { title } = Astro.props;
+import Layout from '../layouts/Layout.astro';
+import Dashboard from '../components/App';
+---
+
+<Layout title={`Oaktree Agent - ${title}`}>
+	<main>
+		<Dashboard client:only="react" />
+	</main>
+</Layout>
+
+<style>
+	main {
+		margin: 0;
+		width: 100%;
+		font-size: 20px;
+		line-height: 1.6;
+		min-height: 100vh;
+	}
+</style>

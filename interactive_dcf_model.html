@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive DCF Model - Value Investing</title>
+    <!-- ใช้ Tailwind CSS เพื่อความสวยงามและ Responsive -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- ใช้ Chart.js สำหรับวาดกราฟ -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f3f4f6; }
+        .slider-container { margin-bottom: 1rem; }
+        .slider-label { display: flex; justify-content: space-between; font-size: 0.875rem; font-weight: 600; color: #374151; margin-bottom: 0.25rem; }
+        input[type=range] { width: 100%; accent-color: #2563eb; }
+        input[type=number] { width: 100px; padding: 0.25rem; border: 1px solid #d1d5db; border-radius: 0.25rem; text-align: right; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+
+    <div class="max-w-7xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
+        <!-- Header -->
+        <div class="bg-blue-900 text-white p-6">
+            <h1 class="text-2xl font-bold">Interactive DCF Model (2026-2030)</h1>
+            <p class="text-sm opacity-80 mt-1">Mental Model เชิงปริมาณ สไตล์ Howard Marks & Charlie Munger</p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-0">
+            <!-- Left Column: Inputs -->
+            <div class="lg:col-span-4 bg-gray-50 p-6 border-r border-gray-200 h-full overflow-y-auto">
+                <h2 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2">สมมติฐานทางธุรกิจ (Inputs)</h2>
+                
+                <div class="slider-container">
+                    <div class="slider-label"><span>รายได้เริ่มต้นปี 2026 (พันล้าน $)</span> <input type="number" id="in-rev" value="3.6" step="0.1"></div>
+                </div>
+                
+                <div class="slider-container">
+                    <div class="slider-label"><span>การเติบโตรายได้ต่อปี (%)</span> <span id="val-growth" class="text-blue-700">18.0%</span></div>
+                    <input type="range" id="in-growth" min="5" max="50" step="0.5" value="18">
+                </div>
+
+                <div class="slider-container">
+                    <div class="slider-label"><span>อัตรากำไรขั้นต้นปี 2026 (%)</span> <span id="val-gm" class="text-blue-700">34.0%</span></div>
+                    <input type="range" id="in-gm" min="15" max="50" step="0.5" value="34">
+                </div>
+
+                <div class="slider-container">
+                    <div class="slider-label"><span>กำไรขั้นต้นเพิ่มขึ้นต่อปี (%)</span> <span id="val-gm-imp" class="text-blue-700">1.5%</span></div>
+                    <input type="range" id="in-gm-imp" min="0" max="5" step="0.1" value="1.5">
+                </div>
+
+                <div class="slider-container">
+                    <div class="slider-label"><span>สัดส่วนค่าใช้จ่าย (OpEx % ต่อรายได้)</span> <span id="val-opex" class="text-blue-700">18.0%</span></div>
+                    <input type="range" id="in-opex" min="10" max="40" step="0.5" value="18">
+                </div>
+
+                <div class="slider-container">
+                    <div class="slider-label"><span>อัตราภาษี (%)</span> <span id="val-tax" class="text-blue-700">15.0%</span></div>
+                    <input type="range" id="in-tax" min="0" max="30" step="1" value="15">
+                </div>
+
+                <div class="slider-container">
+                    <div class="slider-label"><span>การแปลงกำไรเป็นเงินสด (FCF Conversion %)</span> <span id="val-fcf-conv" class="text-blue-700">80.0%</span></div>
+                    <input type="range" id="in-fcf-conv" min="10" max="100" step="1" value="80">
+                </div>
+
+                <div class="slider-container">
+                    <div class="slider-label"><span>อัตราคิดลด (WACC %)</span> <span id="val-wacc" class="text-blue-700">11.0%</span></div>
+                    <input type="range" id="in-wacc" min="6" max="20" step="0.5" value="11">
+                </div>
+
+                <div class="slider-container">
+                    <div class="slider-label"><span>การเติบโตระยะยาว (Terminal Growth %)</span> <span id="val-tg" class="text-blue-700">2.5%</span></div>
+                    <input type="range" id="in-tg" min="0" max="5" step="0.1" value="2.5">
+                </div>
+
+                <div class="slider-container">
+                    <div class="slider-label"><span>จำนวนหุ้นจดทะเบียน (ล้านหุ้น)</span> <input type="number" id="in-shares" value="228"></div>
+                </div>
+            </div>
+
+            <!-- Right Column: Outputs & Charts -->
+            <div class="lg:col-span-8 p-6">
+                <!-- Top Output Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
+                        <p class="text-sm text-blue-600 font-semibold mb-1">มูลค่าพื้นฐานต่อหุ้น (Implied Price)</p>
+                        <p class="text-3xl font-bold text-blue-900" id="out-price">$0.00</p>
+                    </div>
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
+                        <p class="text-sm text-gray-500 font-semibold mb-1">มูลค่ากิจการรวม (Enterprise Value)</p>
+                        <p class="text-2xl font-bold text-gray-800" id="out-ev">$0.00B</p>
+                    </div>
+                    <div class="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
+                        <p class="text-sm text-gray-500 font-semibold mb-1">กระแสเงินสดอิสระปี 2030 (FCF)</p>
+                        <p class="text-2xl font-bold text-gray-800" id="out-fcf30">$0.00B</p>
+                    </div>
+                </div>
+
+                <!-- Chart -->
+                <div class="mb-6 h-64">
+                    <canvas id="dcfChart"></canvas>
+                </div>
+
+                <!-- Table -->
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm text-left text-gray-500">
+                        <thead class="text-xs text-gray-700 uppercase bg-gray-100">
+                            <tr>
+                                <th class="px-4 py-3">ตัวชี้วัด (พันล้าน $)</th>
+                                <th class="px-4 py-3">2026</th>
+                                <th class="px-4 py-3">2027</th>
+                                <th class="px-4 py-3">2028</th>
+                                <th class="px-4 py-3">2029</th>
+                                <th class="px-4 py-3">2030</th>
+                            </tr>
+                        </thead>
+                        <tbody id="table-body">
+                            <!-- Rows will be generated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- แกนหลักของโปรแกรม (สามารถแยกส่วนนี้ไปเป็น Library / Module ได้) -->
+    <script>
+        /**
+         * DCF Calculator Core Module
+         * Encapsulates all the financial logic. 
+         * Usable in any JS environment (Node, React, Vanilla).
+         */
+        class DCFCalculator {
+            constructor(params) {
+                this.params = params;
+            }
+
+            calculate() {
+                const results = [];
+                let currentRev = this.params.baseRev;
+                let pvOfFcfSum = 0;
+
+                for (let i = 0; i < 5; i++) {
+                    const year = 2026 + i;
+                    
+                    // คำนวณรายได้ (ปีแรกใช้ Base เลย ปีถัดไปคูณ Growth)
+                    if (i > 0) {
+                        currentRev = currentRev * (1 + this.params.revGrowth);
+                    }
+                    
+                    // คำนวณอัตรากำไร (เพิ่มขึ้นเรื่อยๆ)
+                    const currentGm = this.params.baseGm + (i * this.params.gmImprovement);
+                    
+                    // คำนวณกำไรจากการดำเนินงาน (EBIT)
+                    const ebit = currentRev * (currentGm - this.params.opexMargin);
+                    
+                    // คำนวณกำไรหลังหักภาษี (NOPAT)
+                    const nopat = ebit * (1 - this.params.taxRate);
+                    
+                    // กระแสเงินสดอิสระ (FCF)
+                    const fcf = nopat * this.params.fcfConversion;
+                    
+                    // มูลค่าปัจจุบันของกระแสเงินสด (PV of FCF)
+                    const discountFactor = Math.pow(1 + this.params.wacc, i + 1);
+                    const pvOfFcf = fcf / discountFactor;
+                    
+                    pvOfFcfSum += pvOfFcf;
+
+                    results.push({
+                        year,
+                        revenue: currentRev,
+                        grossMargin: currentGm,
+                        ebit,
+                        fcf,
+                        pvOfFcf
+                    });
+                }
+
+                // คำนวณ Terminal Value (ใช้วิธี Gordon Growth Model)
+                const lastFcf = results[4].fcf;
+                const terminalValue = (lastFcf * (1 + this.params.terminalGrowth)) / (this.params.wacc - this.params.terminalGrowth);
+                const pvOfTerminalValue = terminalValue / Math.pow(1 + this.params.wacc, 5);
+
+                // คำนวณ Enterprise Value (Billion $)
+                const enterpriseValue = pvOfFcfSum + pvOfTerminalValue;
+
+                // คำนวณราคาหุ้น (EV * 1000 เพื่อแปลง Billion เป็น Million ให้สอดคล้องกับจำนวนหุ้น)
+                const impliedSharePrice = (enterpriseValue * 1000) / this.params.sharesOutstanding;
+
+                return {
+                    yearlyData: results,
+                    enterpriseValue,
+                    impliedSharePrice,
+                    pvOfTerminalValue
+                };
+            }
+        }
+
+        // ==========================================
+        // UI Interaction & Chart Logic
+        // ==========================================
+        let myChart = null;
+
+        function formatCurrency(val) { return "$" + val.toFixed(2); }
+        function formatPercent(val) { return val.toFixed(1) + "%"; }
+
+        function getInputs() {
+            return {
+                baseRev: parseFloat(document.getElementById('in-rev').value) || 0,
+                revGrowth: parseFloat(document.getElementById('in-growth').value) / 100,
+                baseGm: parseFloat(document.getElementById('in-gm').value) / 100,
+                gmImprovement: parseFloat(document.getElementById('in-gm-imp').value) / 100,
+                opexMargin: parseFloat(document.getElementById('in-opex').value) / 100,
+                taxRate: parseFloat(document.getElementById('in-tax').value) / 100,
+                fcfConversion: parseFloat(document.getElementById('in-fcf-conv').value) / 100,
+                wacc: parseFloat(document.getElementById('in-wacc').value) / 100,
+                terminalGrowth: parseFloat(document.getElementById('in-tg').value) / 100,
+                sharesOutstanding: parseFloat(document.getElementById('in-shares').value) || 1
+            };
+        }
+
+        function updateLabels() {
+            document.getElementById('val-growth').innerText = formatPercent(parseFloat(document.getElementById('in-growth').value));
+            document.getElementById('val-gm').innerText = formatPercent(parseFloat(document.getElementById('in-gm').value));
+            document.getElementById('val-gm-imp').innerText = formatPercent(parseFloat(document.getElementById('in-gm-imp').value));
+            document.getElementById('val-opex').innerText = formatPercent(parseFloat(document.getElementById('in-opex').value));
+            document.getElementById('val-tax').innerText = formatPercent(parseFloat(document.getElementById('in-tax').value));
+            document.getElementById('val-fcf-conv').innerText = formatPercent(parseFloat(document.getElementById('in-fcf-conv').value));
+            document.getElementById('val-wacc').innerText = formatPercent(parseFloat(document.getElementById('in-wacc').value));
+            document.getElementById('val-tg').innerText = formatPercent(parseFloat(document.getElementById('in-tg').value));
+        }
+
+        function updateUI() {
+            updateLabels();
+            const params = getInputs();
+            
+            // เรียกใช้ Core Module
+            const calculator = new DCFCalculator(params);
+            const result = calculator.calculate();
+
+            // อัปเดตตัวเลขเด่น
+            document.getElementById('out-price').innerText = formatCurrency(result.impliedSharePrice);
+            document.getElementById('out-ev').innerText = formatCurrency(result.enterpriseValue) + "B";
+            document.getElementById('out-fcf30').innerText = formatCurrency(result.yearlyData[4].fcf) + "B";
+
+            // อัปเดตตาราง
+            const tbody = document.getElementById('table-body');
+            tbody.innerHTML = '';
+            
+            const rows = [
+                { label: 'Revenue', key: 'revenue', isPercent: false },
+                { label: 'Gross Margin %', key: 'grossMargin', isPercent: true },
+                { label: 'EBIT', key: 'ebit', isPercent: false },
+                { label: 'Free Cash Flow', key: 'fcf', isPercent: false }
+            ];
+
+            rows.forEach(r => {
+                let tr = document.createElement('tr');
+                tr.className = "bg-white border-b";
+                let html = `<th scope="row" class="px-4 py-2 font-medium text-gray-900 whitespace-nowrap">${r.label}</th>`;
+                result.yearlyData.forEach(data => {
+                    let val = r.isPercent ? formatPercent(data[r.key] * 100) : formatCurrency(data[r.key]);
+                    html += `<td class="px-4 py-2">${val}</td>`;
+                });
+                tr.innerHTML = html;
+                tbody.appendChild(tr);
+            });
+
+            // อัปเดตกราฟ
+            updateChart(result.yearlyData);
+        }
+
+        function updateChart(yearlyData) {
+            const labels = yearlyData.map(d => d.year);
+            const revenues = yearlyData.map(d => d.revenue.toFixed(2));
+            const fcfs = yearlyData.map(d => d.fcf.toFixed(2));
+
+            if (myChart) {
+                myChart.data.labels = labels;
+                myChart.data.datasets[0].data = revenues;
+                myChart.data.datasets[1].data = fcfs;
+                myChart.update();
+            } else {
+                const ctx = document.getElementById('dcfChart').getContext('2d');
+                myChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Revenue ($B)',
+                                data: revenues,
+                                backgroundColor: 'rgba(59, 130, 246, 0.5)',
+                                borderColor: 'rgb(59, 130, 246)',
+                                borderWidth: 1,
+                                borderRadius: 4
+                            },
+                            {
+                                label: 'Free Cash Flow ($B)',
+                                data: fcfs,
+                                type: 'line',
+                                fill: true,
+                                backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                                borderColor: 'rgb(16, 185, 129)',
+                                tension: 0.3,
+                                borderWidth: 2
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: { tooltip: { enabled: true }, legend: { position: 'bottom' } },
+                        scales: { y: { beginAtZero: true } }
+                    }
+                });
+            }
+        }
+
+        // แนบ Event Listeners ให้กับ Input ทุกตัว
+        document.querySelectorAll('input').forEach(input => {
+            input.addEventListener('input', updateUI);
+        });
+
+        // รันครั้งแรกเมื่อโหลดหน้า
+        window.onload = updateUI;
+
+    </script>
+</body>
+</html>

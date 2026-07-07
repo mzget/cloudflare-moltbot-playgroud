@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { Box, Grid, Sheet, Typography, Divider, Drawer, Stack, Button, CircularProgress } from '@mui/joy';
-import { useSearch, useNavigate } from '@tanstack/react-router';
+import { useSearch, useNavigate, useLocation } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import gsap from 'gsap';
 import { useColorScheme } from '@mui/joy/styles';
@@ -30,7 +30,9 @@ import { useSettingsStore } from '../../store/settingsStore';
 
 export default function RoutesLayout() {
   const { t } = useTranslation();
-  const { tab: activeTab, symbol } = useSearch({ from: '/' });
+  const location = useLocation();
+  const activeTab = location.pathname.substring(1) || 'dashboard';
+  const { symbol, tab: subTab } = useSearch({ strict: false });
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(true);
   const [sidebarHidden, setSidebarHidden] = React.useState(false);
@@ -46,10 +48,16 @@ export default function RoutesLayout() {
   }, [theme, mode, setMode]);
 
   const setActiveTab = (tab: string) => {
-    navigate({
-      to: '/',
-      search: { tab: tab as any },
-    });
+    if (tab === 'analysis') {
+      navigate({
+        to: '/analysis',
+        search: { symbol, tab: 'report' },
+      });
+    } else {
+      navigate({
+        to: `/${tab}`,
+      });
+    }
   };
 
   const [reports, setReports] = React.useState<any[]>([]);
@@ -91,7 +99,7 @@ export default function RoutesLayout() {
       const code = searchParams.get('code');
       if (code) {
         // Clear parameters immediately to avoid double execution on reload
-        const newUrl = window.location.pathname + '?tab=command-center';
+        const newUrl = window.location.origin + '/command-center';
         window.history.replaceState({}, document.title, newUrl);
 
         const exchangeOAuth = async () => {
@@ -361,7 +369,7 @@ export default function RoutesLayout() {
 
           {activeTab === 'watchlist' && <Watchlist />}
           {activeTab === 'agent' && <KnowledgeChat />}
-          {activeTab === 'analysis' && symbol && <AnalysisReport symbol={symbol} />}
+          {activeTab === 'analysis' && symbol && <AnalysisReport symbol={symbol} subTab={subTab} hospitality={undefined} />}
           {activeTab === 'analysis' && !symbol && <Box sx={{ py: 4, textAlign: 'center' }}><Typography level="h3">กรุณาระบุสัญลักษณ์หุ้นที่ต้องการวิเคราะห์</Typography></Box>}
           {activeTab === 'db-agent' && <DatabaseChat />}
           {activeTab === 'command-center' && <SourceManager />}
