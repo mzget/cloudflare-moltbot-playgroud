@@ -12,7 +12,7 @@ import { syncAndProcessFacebookPosts, styleCustomPost, queueFacebookPost } from 
 import { recordDailyPortfolioHistory, getPortfolioHistory } from './portfolioHistory';
 import { sortTransactions } from './portfolioUtils';
 import { calculatePerformanceComparison } from './historicalPrices';
-import { runFullAnalysis } from './analysisEngine';
+import { runFullAnalysis, getOrUpdateMarketStats } from './analysisEngine';
 import okfRoutes from './okfRoutes';
 
 
@@ -2233,9 +2233,19 @@ app.get('/api/analysis/dcf-defaults', async (c) => {
   if (!symbol) return c.json({ error: 'symbol is required' }, 400);
   const symbolUpper = symbol.toUpperCase();
 
-  const stats = await c.env.DB.prepare(
-    'SELECT * FROM market_stats WHERE symbol = ?'
-  ).bind(symbolUpper).first() as any;
+  let stats = null;
+  try {
+    stats = await getOrUpdateMarketStats(c.env, symbolUpper);
+  } catch (e) {
+    stats = null;
+  }
+  if (!stats) {
+    try {
+      stats = await c.env.DB.prepare(
+        'SELECT * FROM market_stats WHERE symbol = ?'
+      ).bind(symbolUpper).first() as any;
+    } catch (dbErr) {}
+  }
 
   if (!stats) {
     return c.json({ error: 'No market stats found for ' + symbolUpper }, 404);

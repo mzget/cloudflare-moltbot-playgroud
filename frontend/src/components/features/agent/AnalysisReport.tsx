@@ -1,6 +1,7 @@
 ﻿import * as React from 'react';
 import { Box, Button, Typography, Sheet, CircularProgress, Divider, Stack, Tabs, TabList, Tab } from '@mui/joy';
 import { ArrowLeft, RotateCw, CheckCircle, AlertTriangle, Play, FileText, Calculator } from 'lucide-react';
+import { useNavigate } from '@tanstack/react-router';
 import { API_BASE_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
 import MarkdownRenderer from '../../common/MarkdownRenderer';
@@ -9,14 +10,17 @@ import DCFModel from './DCFModel';
 interface AnalysisReportProps {
   symbol: string;
   onBack?: () => void;
+  subTab?: string;
+  hospitality?: any; // Keep signature extensible if needed
 }
 
-export default function AnalysisReport({ symbol, onBack }: AnalysisReportProps) {
+export default function AnalysisReport({ symbol, onBack, subTab }: AnalysisReportProps) {
+  const navigate = useNavigate();
   const [loading, setLoading] = React.useState(true);
   const [analyzing, setAnalyzing] = React.useState(false);
   const [report, setReport] = React.useState<any>(null);
   const [error, setError] = React.useState<string | null>(null);
-  const [activeToolTab, setActiveToolTab] = React.useState(0);
+  const activeToolTab = subTab === 'dcf-model' ? 1 : 0;
 
   const fetchReport = async () => {
     setLoading(true);
@@ -57,7 +61,10 @@ export default function AnalysisReport({ symbol, onBack }: AnalysisReportProps) 
       }
       const data = await res.json();
       setReport(data);
-      setActiveToolTab(0); // Switch to report tab after analysis completes
+      navigate({
+        to: '/analysis',
+        search: { symbol, tab: 'report' }
+      }); // Switch to report tab after analysis completes
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -151,7 +158,12 @@ export default function AnalysisReport({ symbol, onBack }: AnalysisReportProps) 
       {/* Tool Tabs */}
       <Tabs
         value={activeToolTab}
-        onChange={(_, val) => setActiveToolTab(val as number)}
+        onChange={(_, val) => {
+          navigate({
+            to: '/analysis',
+            search: { symbol, tab: val === 1 ? 'dcf-model' : 'report' },
+          });
+        }}
         sx={{ mb: 3, bgcolor: 'transparent' }}
       >
         <TabList

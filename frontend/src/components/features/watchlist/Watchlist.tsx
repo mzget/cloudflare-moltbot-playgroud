@@ -4,6 +4,7 @@ import { useAlertRules } from './hooks/useAlertRules';
 import { WatchlistCard } from './WatchlistCard';
 import { Box, Typography, Sheet, IconButton, Button, Input, Stack, Card, CardContent, Divider, Switch, Grid, CardActions, Avatar, Modal, ModalDialog, DialogTitle, DialogContent, ModalClose, FormControl, FormLabel, Select, Option, FormHelperText, Badge } from '@mui/joy';
 import { Plus, Trash2, Bell, Pencil, FileText } from 'lucide-react';
+import { useNavigate } from '@tanstack/react-router';
 import { API_BASE_URL } from '../../../config';
 
 interface WatchlistItem {
@@ -18,8 +19,12 @@ interface WatchlistItem {
 import { glassStyle } from '../../../styles/glass';
 
 export default function Watchlist() {
+  const navigate = useNavigate();
   const handleViewAnalysis = (symbol: string) => {
-    window.location.search = `?tab=analysis&symbol=${symbol}`;
+    navigate({
+      to: '/analysis',
+      search: { symbol, tab: 'report' },
+    });
   };
   const {
     watchlist,

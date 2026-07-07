@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-      # - develop
+      - develop
     paths:
       - 'mcp-worker/**'
       - '.github/workflows/deploy-mcp.yml'
