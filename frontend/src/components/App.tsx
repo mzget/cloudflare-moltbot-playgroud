@@ -69,9 +69,14 @@ if (typeof window !== 'undefined') {
 
 
 // 1. Define the Search Schema (Validation)
-const dashboardSearchSchema = z.object({
-  tab: z.enum(['dashboard', 'market', 'agent', 'db-agent', 'watchlist', 'command-center', 'about', 'analysis']).catch('dashboard'),
+const analysisSearchSchema = z.object({
   symbol: z.string().optional(),
+  tab: z.enum(['report', 'dcf-model']).catch('report'),
+});
+
+const generalSearchSchema = z.object({
+  symbol: z.string().optional(),
+  tab: z.string().optional(),
 });
 
 // 2. Define the Route Tree
@@ -80,11 +85,78 @@ const rootRoute = createRootRoute();
 const indexRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/',
-  validateSearch: dashboardSearchSchema,
+  beforeLoad: ({ navigate }) => {
+    throw navigate({ to: '/dashboard', replace: true });
+  },
+});
+
+const dashboardRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/dashboard',
+  validateSearch: generalSearchSchema,
   component: RoutesLayout,
 });
 
-const routeTree = rootRoute.addChildren([indexRoute]);
+const marketRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/market',
+  validateSearch: generalSearchSchema,
+  component: RoutesLayout,
+});
+
+const watchlistRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/watchlist',
+  validateSearch: generalSearchSchema,
+  component: RoutesLayout,
+});
+
+const agentRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/agent',
+  validateSearch: generalSearchSchema,
+  component: RoutesLayout,
+});
+
+const dbAgentRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/db-agent',
+  validateSearch: generalSearchSchema,
+  component: RoutesLayout,
+});
+
+const commandCenterRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/command-center',
+  validateSearch: generalSearchSchema,
+  component: RoutesLayout,
+});
+
+const aboutRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/about',
+  validateSearch: generalSearchSchema,
+  component: RoutesLayout,
+});
+
+const analysisRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/analysis',
+  validateSearch: analysisSearchSchema,
+  component: RoutesLayout,
+});
+
+const routeTree = rootRoute.addChildren([
+  indexRoute,
+  dashboardRoute,
+  marketRoute,
+  watchlistRoute,
+  agentRoute,
+  dbAgentRoute,
+  commandCenterRoute,
+  aboutRoute,
+  analysisRoute,
+]);
 
 const router = createRouter({
   routeTree,
