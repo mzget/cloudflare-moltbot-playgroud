@@ -57,6 +57,44 @@ const theme = extendTheme({
         spacing: 2,
       },
     },
+    JoyTabList: {
+      styleOverrides: {
+        root: ({ ownerState, theme }) => ({
+          ...(ownerState.variant === 'soft' && {
+            padding: '4px',
+            gap: '8px',
+            borderRadius: '12px',
+            backgroundColor: theme.vars.palette.background.level1,
+            width: 'fit-content',
+          }),
+        }),
+      },
+    },
+    JoyTab: {
+      styleOverrides: {
+        root: ({ ownerState, theme }) => ({
+          fontWeight: 600,
+          borderRadius: '8px',
+          backgroundColor: 'transparent',
+          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+          fontSize: '0.875rem',
+          [theme.breakpoints.down('sm')]: {
+            fontSize: '0.8rem',
+            paddingLeft: '12px',
+            paddingRight: '12px',
+          },
+          '&:hover:not(.Mui-selected)': {
+            color: theme.vars.palette.text.primary,
+            backgroundColor: theme.vars.palette.background.level2,
+          },
+          '&.Mui-selected': {
+            color: theme.vars.palette.primary.plainColor,
+            backgroundColor: theme.vars.palette.background.surface,
+            boxShadow: theme.shadow.sm,
+          },
+        }),
+      },
+    },
   },
 });
 

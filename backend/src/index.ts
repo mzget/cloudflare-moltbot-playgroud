@@ -14,6 +14,7 @@ import { sortTransactions } from './portfolioUtils';
 import { calculatePerformanceComparison } from './historicalPrices';
 import { runFullAnalysis, getOrUpdateMarketStats } from './analysisEngine';
 import okfRoutes from './okfRoutes';
+import { initializeAllTimeRecords } from './athSeeding';
 
 
 import { Hono } from 'hono';
@@ -30,6 +31,7 @@ export interface Env {
     destination_address: string;
   };
   FINNHUB_API_KEY?: string;
+  FMP_API_KEY?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
   JWT_SECRET?: string;
@@ -376,6 +378,16 @@ app.post('/api/watchlist', async (c) => {
   const symbolType = type || 'stock';
   await c.env.DB.prepare('INSERT OR IGNORE INTO watchlist (symbol, name, type) VALUES (?, ?, ?)')
     .bind(symbol, name, symbolType).run();
+
+  // Seed ATH/ATL records for this stock asynchronously
+  const fmpKey = c.env.FMP_API_KEY;
+  if (fmpKey && symbol) {
+    c.executionCtx.waitUntil(
+      initializeAllTimeRecords(c.env.DB, symbol, fmpKey)
+        .catch(err => console.error(`Failed to initialize ATH/ATL for ${symbol}:`, err))
+    );
+  }
+
   return c.text('Symbol added');
 });
 
@@ -741,6 +753,49 @@ app.delete('/api/triggered-alerts', async (c) => {
     return c.text('Read notifications cleared');
   } catch (e) {
     return c.json({ error: (e as any).message }, 500);
+  }
+});
+
+// API: Market Breakouts & Seeding
+app.get('/api/market-breakouts', async (c) => {
+  const dateStr = c.req.query('date') || new Date().toISOString().split('T')[0];
+  try {
+    const { results } = await c.env.DB.prepare(`
+      SELECT * FROM market_breakouts 
+      WHERE scan_date = ?1
+      ORDER BY percent_change DESC
+    `).bind(dateStr).all();
+    return c.json(results || []);
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+app.post('/api/scan-market', async (c) => {
+  const fmpKey = c.env.FMP_API_KEY;
+  if (!fmpKey) {
+    return c.json({ error: 'FMP_API_KEY not configured' }, 400);
+  }
+  const { scanMarketBreakouts } = await import('./marketScanner');
+  try {
+    const results = await scanMarketBreakouts(c.env.DB, fmpKey);
+    return c.json({ success: true, count: results.length, breakouts: results.slice(0, 10) });
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500);
+  }
+});
+
+app.post('/api/seed-ath', async (c) => {
+  const fmpKey = c.env.FMP_API_KEY;
+  if (!fmpKey) {
+    return c.json({ error: 'FMP_API_KEY not configured' }, 400);
+  }
+  const { seedAllActiveWatchlist } = await import('./athSeeding');
+  try {
+    await seedAllActiveWatchlist(c.env.DB, fmpKey);
+    return c.json({ success: true, message: 'Watchlist ATH/ATL seeding triggered successfully' });
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500);
   }
 });
 
@@ -2581,6 +2636,7 @@ export default {
             emailDigestsManual: false,
             runCrawler: isSixHourly,
             generateDailySummaries: isSixHourly,
+            scanMarketBreakouts: true,
             fetchMarketEvents: isSixHourly,
             sendDailyEmailReport: false, // Disabled for this phase
             purgeOldData: isSixHourly,

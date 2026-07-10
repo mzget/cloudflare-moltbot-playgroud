@@ -41,6 +41,10 @@ export const ALL_COLUMNS: ColumnDef[] = [
   { id: 'total_debt', label: 'Total Debt', format: 'currency' },
   { id: 'debt_equity', label: 'Debt/Equity', format: 'ratio2' },
   { id: 'dividend_yield', label: 'Div Yield', format: 'pct2' },
+  { id: 'fifty_two_week_high', label: '52W High', format: 'price' },
+  { id: 'fifty_two_week_low', label: '52W Low', format: 'price' },
+  { id: 'all_time_high', label: 'ATH', format: 'price' },
+  { id: 'all_time_low', label: 'ATL', format: 'price' },
 ];
 
 // ─── Formatters ──────────────────────────────────────────────────────────────

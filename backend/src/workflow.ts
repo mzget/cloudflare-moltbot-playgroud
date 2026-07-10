@@ -27,6 +27,7 @@ export interface OaktreeWorkflowParams {
 	syncFacebookPosts?: boolean;
 	syncNotebookArticles?: boolean;
 	priceOnly?: boolean;
+	scanMarketBreakouts?: boolean;
 }
 
 export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflowParams> {
@@ -109,6 +110,18 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 		if (params.syncNotebookArticles) {
 			await step.do('sync-notebook-articles', async () => {
 				return await syncNotebookArticles(this.env);
+			});
+		}
+
+		if (params.scanMarketBreakouts) {
+			await step.do('scan-market-breakouts', async () => {
+				const fmpKey = this.env.FMP_API_KEY;
+				if (!fmpKey) {
+					console.error("FMP_API_KEY is not configured.");
+					return { error: "FMP_API_KEY is not configured" };
+				}
+				const { scanMarketBreakouts } = await import('./marketScanner');
+				return await scanMarketBreakouts(this.env.DB, fmpKey);
 			});
 		}
 

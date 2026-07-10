@@ -24,4 +24,12 @@ export interface CompanyStats {
   net_debt?: number;           // in USD
   total_debt?: number;         // in USD
   dividend_yield?: number;     // decimal
+  fifty_two_week_high?: number;
+  fifty_two_week_high_date?: string;
+  fifty_two_week_low?: number;
+  fifty_two_week_low_date?: string;
+  all_time_high?: number;
+  all_time_high_date?: string;
+  all_time_low?: number;
+  all_time_low_date?: string;
 }

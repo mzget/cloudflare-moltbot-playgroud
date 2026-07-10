@@ -30,7 +30,11 @@ export async function fetchAndStoreMarketStats(env: Env, priceOnly = false): Pro
 	let results: any[] = [];
 	try {
 		const dbResults = await env.DB.prepare(`
-			SELECT w.symbol, m.updated_at, m.market_cap
+			SELECT w.symbol, m.updated_at, m.market_cap,
+			       m.fifty_two_week_high, m.fifty_two_week_high_date,
+			       m.fifty_two_week_low, m.fifty_two_week_low_date,
+			       m.all_time_high, m.all_time_high_date,
+			       m.all_time_low, m.all_time_low_date
 			FROM watchlist w
 			LEFT JOIN market_stats m ON w.symbol = m.symbol
 			WHERE w.is_active = 1
@@ -138,6 +142,15 @@ export async function fetchAndStoreMarketStats(env: Env, priceOnly = false): Pro
 		let price = null;
 		let previous_close = null, day_high = null, day_low = null, open_price = null;
 		let quoteError = null;
+
+		let fifty_two_week_high = row.fifty_two_week_high ?? null;
+		let fifty_two_week_high_date = row.fifty_two_week_high_date ?? null;
+		let fifty_two_week_low = row.fifty_two_week_low ?? null;
+		let fifty_two_week_low_date = row.fifty_two_week_low_date ?? null;
+		let all_time_high = row.all_time_high ?? null;
+		let all_time_high_date = row.all_time_high_date ?? null;
+		let all_time_low = row.all_time_low ?? null;
+		let all_time_low_date = row.all_time_low_date ?? null;
 
 		const shouldFetchMetrics = metricsSymbolsToUpdate.has(symbol);
 
@@ -260,6 +273,114 @@ export async function fetchAndStoreMarketStats(env: Env, priceOnly = false): Pro
 				} else {
 					capex_to_ocf = typeof m.capexToOperatingCashFlowTTM === 'number' ? m.capexToOperatingCashFlowTTM / 100 : null;
 				}
+
+				fifty_two_week_high = typeof m['52WeekHigh'] === 'number' ? m['52WeekHigh'] : fifty_two_week_high;
+				fifty_two_week_high_date = typeof m['52WeekHighDate'] === 'string' ? m['52WeekHighDate'] : fifty_two_week_high_date;
+				fifty_two_week_low = typeof m['52WeekLow'] === 'number' ? m['52WeekLow'] : fifty_two_week_low;
+				fifty_two_week_low_date = typeof m['52WeekLowDate'] === 'string' ? m['52WeekLowDate'] : fifty_two_week_low_date;
+			}
+
+			// Breakout detection
+			if (price && price > 0) {
+				const todayDate = new Date().toISOString().split('T')[0];
+
+				// 1. All-time High breakout
+				if (all_time_high !== null && price >= all_time_high) {
+					const logged = await env.DB.prepare(`
+						SELECT id FROM record_breaker_events WHERE symbol = ?1 AND event_type = 'ath' AND event_date = ?2
+					`).bind(symbol, todayDate).first();
+
+					if (!logged) {
+						const msg = `${symbol} broke out to a new All-Time High of ${price}!`;
+						await env.DB.batch([
+							env.DB.prepare(`
+								INSERT INTO in_app_notifications (symbol, metric, condition_type, target_value, trigger_value, message, is_read)
+								VALUES (?1, 'ath', 'breakout', ?2, ?3, ?4, 0)
+							`).bind(symbol, all_time_high, price, msg),
+							env.DB.prepare(`
+								INSERT INTO record_breaker_events (symbol, event_type, price, previous_record, event_date, is_notified)
+								VALUES (?1, 'ath', ?2, ?3, ?4, 1)
+							`).bind(symbol, price, all_time_high, todayDate)
+						]);
+					}
+					all_time_high = price;
+					all_time_high_date = todayDate;
+				} else if (all_time_high === null) {
+					all_time_high = price;
+					all_time_high_date = todayDate;
+				}
+
+				// 2. All-time Low breakdown
+				if (all_time_low !== null && price <= all_time_low) {
+					const logged = await env.DB.prepare(`
+						SELECT id FROM record_breaker_events WHERE symbol = ?1 AND event_type = 'atl' AND event_date = ?2
+					`).bind(symbol, todayDate).first();
+
+					if (!logged) {
+						const msg = `${symbol} broke down to a new All-Time Low of ${price}!`;
+						await env.DB.batch([
+							env.DB.prepare(`
+								INSERT INTO in_app_notifications (symbol, metric, condition_type, target_value, trigger_value, message, is_read)
+								VALUES (?1, 'atl', 'breakdown', ?2, ?3, ?4, 0)
+							`).bind(symbol, all_time_low, price, msg),
+							env.DB.prepare(`
+								INSERT INTO record_breaker_events (symbol, event_type, price, previous_record, event_date, is_notified)
+								VALUES (?1, 'atl', ?2, ?3, ?4, 1)
+							`).bind(symbol, price, all_time_low, todayDate)
+						]);
+					}
+					all_time_low = price;
+					all_time_low_date = todayDate;
+				} else if (all_time_low === null) {
+					all_time_low = price;
+					all_time_low_date = todayDate;
+				}
+
+				// 3. 52-week High breakout
+				if (fifty_two_week_high !== null && price >= fifty_two_week_high) {
+					const logged = await env.DB.prepare(`
+						SELECT id FROM record_breaker_events WHERE symbol = ?1 AND event_type = '52w_high' AND event_date = ?2
+					`).bind(symbol, todayDate).first();
+
+					if (!logged) {
+						const msg = `${symbol} broke out to a new 52-week high of ${price}!`;
+						await env.DB.batch([
+							env.DB.prepare(`
+								INSERT INTO in_app_notifications (symbol, metric, condition_type, target_value, trigger_value, message, is_read)
+								VALUES (?1, '52w_high', 'breakout', ?2, ?3, ?4, 0)
+							`).bind(symbol, fifty_two_week_high, price, msg),
+							env.DB.prepare(`
+								INSERT INTO record_breaker_events (symbol, event_type, price, previous_record, event_date, is_notified)
+								VALUES (?1, '52w_high', ?2, ?3, ?4, 1)
+							`).bind(symbol, price, fifty_two_week_high, todayDate)
+						]);
+					}
+					fifty_two_week_high = price;
+					fifty_two_week_high_date = todayDate;
+				}
+
+				// 4. 52-week Low breakdown
+				if (fifty_two_week_low !== null && price <= fifty_two_week_low) {
+					const logged = await env.DB.prepare(`
+						SELECT id FROM record_breaker_events WHERE symbol = ?1 AND event_type = '52w_low' AND event_date = ?2
+					`).bind(symbol, todayDate).first();
+
+					if (!logged) {
+						const msg = `${symbol} broke down to a new 52-week low of ${price}!`;
+						await env.DB.batch([
+							env.DB.prepare(`
+								INSERT INTO in_app_notifications (symbol, metric, condition_type, target_value, trigger_value, message, is_read)
+								VALUES (?1, '52w_low', 'breakdown', ?2, ?3, ?4, 0)
+							`).bind(symbol, fifty_two_week_low, price, msg),
+							env.DB.prepare(`
+								INSERT INTO record_breaker_events (symbol, event_type, price, previous_record, event_date, is_notified)
+								VALUES (?1, '52w_low', ?2, ?3, ?4, 1)
+							`).bind(symbol, price, fifty_two_week_low, todayDate)
+						]);
+					}
+					fifty_two_week_low = price;
+					fifty_two_week_low_date = todayDate;
+				}
 			}
 
 			// Log the data for debugging
@@ -274,8 +395,10 @@ export async function fetchAndStoreMarketStats(env: Env, priceOnly = false): Pro
 					gross_profit_margin, operating_margin, ev_ebit, ev_sales,
 					p_ocf, p_fcf, capex_to_ocf, rd_to_revenue, debt_equity,
 					p_e, fcf_margin, total_cash, net_debt, total_debt, dividend_yield,
-					price, previous_close, day_high, day_low, open_price, updated_at
-				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+					price, previous_close, day_high, day_low, open_price, updated_at,
+					fifty_two_week_high, fifty_two_week_high_date, fifty_two_week_low, fifty_two_week_low_date,
+					all_time_high, all_time_high_date, all_time_low, all_time_low_date
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 				ON CONFLICT(symbol) DO UPDATE SET
 					market_cap=CASE WHEN excluded.updated_at IS NOT NULL THEN excluded.market_cap ELSE market_stats.market_cap END,
 					revenues=CASE WHEN excluded.updated_at IS NOT NULL THEN excluded.revenues ELSE market_stats.revenues END,
@@ -302,13 +425,23 @@ export async function fetchAndStoreMarketStats(env: Env, priceOnly = false): Pro
 					day_high=COALESCE(excluded.day_high, market_stats.day_high),
 					day_low=COALESCE(excluded.day_low, market_stats.day_low),
 					open_price=COALESCE(excluded.open_price, market_stats.open_price),
-					updated_at=COALESCE(excluded.updated_at, market_stats.updated_at)
+					updated_at=COALESCE(excluded.updated_at, market_stats.updated_at),
+					fifty_two_week_high=CASE WHEN excluded.updated_at IS NOT NULL THEN excluded.fifty_two_week_high ELSE market_stats.fifty_two_week_high END,
+					fifty_two_week_high_date=CASE WHEN excluded.updated_at IS NOT NULL THEN excluded.fifty_two_week_high_date ELSE market_stats.fifty_two_week_high_date END,
+					fifty_two_week_low=CASE WHEN excluded.updated_at IS NOT NULL THEN excluded.fifty_two_week_low ELSE market_stats.fifty_two_week_low END,
+					fifty_two_week_low_date=CASE WHEN excluded.updated_at IS NOT NULL THEN excluded.fifty_two_week_low_date ELSE market_stats.fifty_two_week_low_date END,
+					all_time_high=CASE WHEN excluded.updated_at IS NOT NULL THEN excluded.all_time_high ELSE market_stats.all_time_high END,
+					all_time_high_date=CASE WHEN excluded.updated_at IS NOT NULL THEN excluded.all_time_high_date ELSE market_stats.all_time_high_date END,
+					all_time_low=CASE WHEN excluded.updated_at IS NOT NULL THEN excluded.all_time_low ELSE market_stats.all_time_low END,
+					all_time_low_date=CASE WHEN excluded.updated_at IS NOT NULL THEN excluded.all_time_low_date ELSE market_stats.all_time_low_date END
 			`).bind(
 				symbol, market_cap, revenues, revenue_3y_cagr, revenue_1y_growth, revenue_5y_cagr,
 				gross_profit_margin, operating_margin, ev_ebit, ev_sales,
 				p_ocf, p_fcf, capex_to_ocf, rd_to_revenue, debt_equity,
 				p_e, fcf_margin, total_cash, net_debt, total_debt, dividend_yield,
-				price, previous_close, day_high, day_low, open_price, updatedAtVal
+				price, previous_close, day_high, day_low, open_price, updatedAtVal,
+				fifty_two_week_high, fifty_two_week_high_date, fifty_two_week_low, fifty_two_week_low_date,
+				all_time_high, all_time_high_date, all_time_low, all_time_low_date
 			).run();
 
 			runResults.push({ symbol, success: true, price, error: quoteError });
