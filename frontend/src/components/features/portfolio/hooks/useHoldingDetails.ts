@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { API_BASE_URL } from '../../../../config';
 import { useQuery } from '../../../../utils/useQuery';
 import { useMutation } from '../../../../utils/useMutation';
@@ -77,7 +77,7 @@ export function useHoldingDetails(symbol: string, onDataChange?: () => void) {
   const loading = lotsLoading || txnLoading || divLoading;
 
   // --- addLot ---
-  const { mutateAsync: addLot } = useMutation(
+  const { mutateAsync: addLot, isPending: isAddingLot } = useMutation(
     async (lot: { date: string; shares: number; cost_per_share: number; low_limit: number | null; high_limit: number | null; note: string }) => {
       const res = await fetch(`${API_BASE_URL}/api/portfolio/lots`, {
         method: 'POST',
@@ -131,7 +131,7 @@ export function useHoldingDetails(symbol: string, onDataChange?: () => void) {
   );
 
   // --- addTxn ---
-  const { mutateAsync: addTxn } = useMutation(
+  const { mutateAsync: addTxn, isPending: isAddingTxn } = useMutation(
     async (txn: { date: string; type: 'Buy' | 'Sell'; shares: number; cost_per_share: number; commission: number; note: string }) => {
       const res = await fetch(`${API_BASE_URL}/api/portfolio/transactions`, {
         method: 'POST',
@@ -158,7 +158,7 @@ export function useHoldingDetails(symbol: string, onDataChange?: () => void) {
   );
 
   // --- updateTxn ---
-  const { mutateAsync: _updateTxn } = useMutation(
+  const { mutateAsync: _updateTxn, isPending: isUpdatingTxn } = useMutation(
     async ({ id, txn }: { id: number; txn: { date: string; type: 'Buy' | 'Sell'; shares: number; cost_per_share: number; commission: number; note: string } }) => {
       const res = await fetch(`${API_BASE_URL}/api/portfolio/transactions/${id}`, {
         method: 'PUT',
@@ -238,7 +238,7 @@ export function useHoldingDetails(symbol: string, onDataChange?: () => void) {
   );
 
   // --- addDiv ---
-  const { mutateAsync: addDiv } = useMutation(
+  const { mutateAsync: addDiv, isPending: isAddingDiv } = useMutation(
     async (div: { date: string; amount: number; per_share: number; note: string }) => {
       const res = await fetch(`${API_BASE_URL}/api/portfolio/dividends`, {
         method: 'POST',
@@ -288,15 +288,59 @@ export function useHoldingDetails(symbol: string, onDataChange?: () => void) {
     [_deleteDiv]
   );
 
+  // --- updateDiv ---
+  const { mutateAsync: _updateDiv, isPending: isUpdatingDiv } = useMutation(
+    async ({ id, div }: { id: number; div: { date: string; amount: number; per_share: number; note: string } }) => {
+      const res = await fetch(`${API_BASE_URL}/api/portfolio/dividends/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(div),
+      });
+      if (!res.ok) throw res;
+      return res;
+    },
+    {
+      onMutate: ({ id, div }) => {
+        const { getEntry, setEntry } = useQueryCache.getState();
+        const prev = getEntry<Dividend[]>(divKey).data ?? [];
+        setEntry(divKey, {
+          data: prev.map(d => d.id === id ? { ...d, ...div } : d) as unknown[],
+        });
+        return prev;
+      },
+      onError: (_err, _vars, snapshot) => {
+        useQueryCache.getState().setEntry(divKey, { data: snapshot as unknown[] });
+      },
+      onSuccess: () => { invalidateQueries(divKey); onDataChange?.(); },
+    }
+  );
+
+  const updateDiv = useCallback(
+    (id: number, div: { date: string; amount: number; per_share: number; note: string }) =>
+      _updateDiv({ id, div }),
+    [_updateDiv]
+  );
+
+  const saving = useMemo(() => ({
+    lot: isAddingLot,
+    txn: isAddingTxn,
+    div: isAddingDiv,
+    updateTxn: isUpdatingTxn,
+    updateDiv: isUpdatingDiv,
+    any: isAddingLot || isAddingTxn || isUpdatingTxn || isAddingDiv || isUpdatingDiv,
+  }), [isAddingLot, isAddingTxn, isUpdatingTxn, isAddingDiv, isUpdatingDiv]);
+
   return {
     lots,
     transactions,
     dividends,
     loading,
+    saving,
     addLot,
     addTxn,
     updateTxn,
     addDiv,
+    updateDiv,
     deleteLot,
     deleteTxn,
     deleteDiv,
