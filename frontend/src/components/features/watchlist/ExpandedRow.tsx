@@ -38,10 +38,12 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
     transactions,
     dividends,
     loading,
+    saving,
     addLot,
     addTxn,
     updateTxn,
     addDiv,
+    updateDiv,
     deleteLot,
     deleteTxn,
     deleteDiv,
@@ -72,6 +74,12 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
   const [editingTxnId, setEditingTxnId] = React.useState<number | null>(null);
   const [editingTxn, setEditingTxn] = React.useState({
     date: '', type: 'Buy' as 'Buy' | 'Sell', shares: '', cost_per_share: '', commission: '', note: '',
+  });
+
+  // Edit-dividend state
+  const [editingDivId, setEditingDivId] = React.useState<number | null>(null);
+  const [editingDiv, setEditingDiv] = React.useState({
+    date: '', amount: '', per_share: '', note: '',
   });
 
   // ── Add handlers ────────────────────────────────────────────────────────────
@@ -212,6 +220,54 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
     } catch (e) {
       console.error('Failed to add dividend', e);
       alert('Failed to add dividend. Please check console.');
+    }
+  };
+
+  const startEditDiv = (div: Dividend) => {
+    if (div.id !== undefined) {
+      setEditingDivId(div.id);
+      setEditingDiv({
+        date: div.date,
+        amount: div.amount.toString(),
+        per_share: (div.per_share || 0).toString(),
+        note: div.note || '',
+      });
+    }
+  };
+
+  const cancelEditDiv = () => {
+    setEditingDivId(null);
+    setEditingDiv({
+      date: '', amount: '', per_share: '', note: '',
+    });
+  };
+
+  const handleUpdateDiv = async () => {
+    if (editingDivId === null) return;
+    if (!editingDiv.date) {
+      alert('Please select a Date.');
+      return;
+    }
+    if (!editingDiv.amount || parseFloat(editingDiv.amount) <= 0) {
+      alert('Please enter a valid Amount.');
+      return;
+    }
+    try {
+      const res = await updateDiv(editingDivId, {
+        date: editingDiv.date,
+        amount: parseFloat(editingDiv.amount) || 0,
+        per_share: parseFloat(editingDiv.per_share) || 0,
+        note: editingDiv.note,
+      });
+      if (res.ok) {
+        setEditingDivId(null);
+      } else {
+        const errData = (await res.json().catch(() => ({}))) as any;
+        alert(`Failed to update dividend: ${errData.error || res.statusText}`);
+      }
+    } catch (e) {
+      console.error('Failed to update dividend', e);
+      alert('Failed to update dividend. Please check console.');
     }
   };
 
@@ -427,10 +483,13 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
                   </td>
                   <td style={{ whiteSpace: 'nowrap' }}>
                     <Button size="sm" variant="solid" color="success" onClick={handleUpdateTxn}
+                      loading={saving.updateTxn}
+                      disabled={saving.updateTxn}
                       sx={{ minWidth: 0, px: 1, mr: 0.5 }}>
                       <Check size={14} />
                     </Button>
                     <Button size="sm" variant="outlined" color="neutral" onClick={cancelEditTxn}
+                      disabled={saving.updateTxn}
                       sx={{ minWidth: 0, px: 1 }}>
                       <X size={14} />
                     </Button>
@@ -492,27 +551,77 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
             <th>Amount ($)</th>
             <th>Per Share ($)</th>
             <th className="left">Note</th>
-            <th style={{ width: 36 }}>&nbsp;</th>
+            <th style={{ width: 72 }}>&nbsp;</th>
           </tr>
         </thead>
         <tbody>
-          {dividends.map((div, i) => (
-            <tr key={div.id ?? i}>
-              <td className="left">{div.date}</td>
-              <td>{displayNum(div.amount)}</td>
-              <td>{displayNum(div.per_share)}</td>
-              <td className="left">{div.note || '--'}</td>
-              <td>
-                <button
-                  className="yf-chevron"
-                  onClick={() => handleDeleteDiv(div.id)}
-                  aria-label="Delete dividend"
-                >
-                  <Trash2 size={12} />
-                </button>
-              </td>
-            </tr>
-          ))}
+          {dividends.map((div, i) => {
+            const isEditing = div.id === editingDivId;
+            if (isEditing) {
+              return (
+                <tr className="yf-add-row" key={div.id ?? i}>
+                  <td className="left">
+                    <Input size="sm" type="date" value={editingDiv.date}
+                      onChange={(e) => setEditingDiv({ ...editingDiv, date: e.target.value })} />
+                  </td>
+                  <td>
+                    <Input size="sm" type="number" placeholder="0.00"
+                      value={editingDiv.amount}
+                      onChange={(e) => setEditingDiv({ ...editingDiv, amount: e.target.value })} />
+                  </td>
+                  <td>
+                    <Input size="sm" type="number" placeholder="0.00"
+                      value={editingDiv.per_share}
+                      onChange={(e) => setEditingDiv({ ...editingDiv, per_share: e.target.value })} />
+                  </td>
+                  <td className="left">
+                    <Input size="sm" placeholder="Note"
+                      value={editingDiv.note}
+                      onChange={(e) => setEditingDiv({ ...editingDiv, note: e.target.value })} />
+                  </td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    <Button size="sm" variant="solid" color="success" onClick={handleUpdateDiv}
+                      loading={saving.updateDiv}
+                      disabled={saving.updateDiv}
+                      sx={{ minWidth: 0, px: 1, mr: 0.5 }}>
+                      <Check size={14} />
+                    </Button>
+                    <Button size="sm" variant="outlined" color="neutral" onClick={cancelEditDiv}
+                      disabled={saving.updateDiv}
+                      sx={{ minWidth: 0, px: 1 }}>
+                      <X size={14} />
+                    </Button>
+                  </td>
+                </tr>
+              );
+            }
+
+            return (
+              <tr key={div.id ?? i}>
+                <td className="left">{div.date}</td>
+                <td>{displayNum(div.amount)}</td>
+                <td>{displayNum(div.per_share)}</td>
+                <td className="left">{div.note || '--'}</td>
+                <td style={{ whiteSpace: 'nowrap' }}>
+                  <button
+                    className="yf-chevron"
+                    onClick={() => startEditDiv(div)}
+                    style={{ marginRight: 4 }}
+                    aria-label="Edit dividend"
+                  >
+                    <Pencil size={12} />
+                  </button>
+                  <button
+                    className="yf-chevron"
+                    onClick={() => handleDeleteDiv(div.id)}
+                    aria-label="Delete dividend"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
 
           {dividends.length === 0 && !showForms.div && (
             <tr>
@@ -545,6 +654,8 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
               </td>
               <td>
                 <Button size="sm" variant="solid" color="success" onClick={handleAddDiv}
+                  loading={saving.div}
+                  disabled={saving.div}
                   sx={{ minWidth: 0, px: 1 }}>
                   <Check size={14} />
                 </Button>
