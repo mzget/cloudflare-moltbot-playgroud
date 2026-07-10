@@ -1917,6 +1917,25 @@ app.delete('/api/portfolio/dividends/:id', async (c) => {
   return c.json({ success: true });
 });
 
+// PUT /api/portfolio/dividends/:id
+app.put('/api/portfolio/dividends/:id', async (c) => {
+  const id = c.req.param('id');
+  const body = await c.req.json();
+  const { date, amount, per_share, note } = body;
+
+  if (!date || !amount) {
+    return c.json({ error: 'date and amount are required' }, 400);
+  }
+
+  await c.env.DB.prepare(`
+    UPDATE dividends
+    SET date = ?, amount = ?, per_share = ?, note = ?
+    WHERE id = ?
+  `).bind(date, parseFloat(amount) || 0, per_share ? parseFloat(per_share) : null, note || null, id).run();
+
+  return c.json({ success: true });
+});
+
 // GET /api/portfolio/history/yearly
 app.get('/api/portfolio/history/yearly', async (c) => {
   const { results } = await c.env.DB.prepare(
