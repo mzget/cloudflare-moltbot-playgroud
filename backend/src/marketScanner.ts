@@ -1,6 +1,4 @@
-﻿import { fetchExchangeQuotes } from './fmpClient';
-
-export interface BreakoutResult {
+﻿export interface BreakoutResult {
 	symbol: string;
 	name: string;
 	price: number;
@@ -11,55 +9,84 @@ export interface BreakoutResult {
 }
 
 export async function scanMarketBreakouts(db: any, fmpApiKey: string): Promise<BreakoutResult[]> {
-	console.log('[MarketScanner] Starting daily market breakout scan...');
-	const exchanges = ['nasdaq', 'nyse', 'amex'];
+	console.log('[MarketScanner] Starting daily market breakout scan using TradingView bulk API...');
 	const allBreakouts: BreakoutResult[] = [];
 	const todayDate = new Date().toISOString().split('T')[0];
 
-	// 1. Fetch quotes from FMP for NASDAQ, NYSE, AMEX
-	for (const exchange of exchanges) {
-		try {
-			console.log(`[MarketScanner] Fetching quotes for ${exchange}...`);
-			const quotes = await fetchExchangeQuotes(fmpApiKey, exchange);
-			console.log(`[MarketScanner] Received ${quotes.length} quotes for ${exchange}`);
-
-			for (const quote of quotes) {
-				const { symbol, name, price, changesPercentage, yearHigh, yearLow } = quote;
-
-				if (!symbol || !price || price <= 0) continue;
-
-				// Skip symbols that look like options or warrants (typically have '.' or '-' or length > 5)
-				if (symbol.includes('.') || symbol.includes('-') || symbol.length > 5) continue;
-
-				// Check 52-Week High Breakout
-				if (yearHigh && yearHigh > 0 && price >= yearHigh) {
-					allBreakouts.push({
-						symbol: symbol.toUpperCase(),
-						name: name || '',
-						price,
-						percentChange: changesPercentage || 0,
-						yearHigh,
-						yearLow: yearLow || 0,
-						breakoutType: '52w_high'
-					});
+	try {
+		const tvUrl = 'https://scanner.tradingview.com/america/scan';
+		const body = {
+			columns: ['name', 'description', 'close', 'change', 'price_52_week_high', 'price_52_week_low'],
+			filter: [
+				{
+					left: 'type',
+					operation: 'in_range',
+					right: ['stock', 'dr']
 				}
+			],
+			range: [0, 25000]
+		};
 
-				// Check 52-Week Low Breakdown
-				if (yearLow && yearLow > 0 && price <= yearLow) {
-					allBreakouts.push({
-						symbol: symbol.toUpperCase(),
-						name: name || '',
-						price,
-						percentChange: changesPercentage || 0,
-						yearHigh: yearHigh || 0,
-						yearLow,
-						breakoutType: '52w_low'
-					});
-				}
-			}
-		} catch (error) {
-			console.error(`[MarketScanner] Error scanning exchange ${exchange}:`, error);
+		const res = await fetch(tvUrl, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+			},
+			body: JSON.stringify(body)
+		});
+
+		if (!res.ok) {
+			throw new Error(`Failed to fetch TradingView quotes: ${res.statusText}`);
 		}
+
+		const json = (await res.json()) as { data: { s: string; d: any[] }[] };
+		console.log(`[MarketScanner] Received ${json.data.length} quotes from TradingView`);
+
+		for (const item of json.data) {
+			const symbolWithExchange = item.s; // e.g. "NASDAQ:AAPL"
+			const parts = symbolWithExchange.split(':');
+			if (parts.length < 2) continue;
+			const exchange = parts[0];
+			const symbol = parts[1];
+
+			// Filter exchanges
+			if (exchange !== 'NASDAQ' && exchange !== 'NYSE' && exchange !== 'AMEX') continue;
+			// Skip options, warrants, preferreds, etc.
+			if (symbol.includes('.') || symbol.includes('-') || symbol.length > 5) continue;
+
+			const [name, description, price, percentChange, yearHigh, yearLow] = item.d;
+
+			if (!symbol || !price || price <= 0) continue;
+
+			// Check 52-Week High Breakout
+			if (yearHigh && yearHigh > 0 && price >= yearHigh) {
+				allBreakouts.push({
+					symbol: symbol.toUpperCase(),
+					name: description || name || '',
+					price,
+					percentChange: percentChange || 0,
+					yearHigh,
+					yearLow: yearLow || 0,
+					breakoutType: '52w_high'
+				});
+			}
+
+			// Check 52-Week Low Breakdown
+			if (yearLow && yearLow > 0 && price <= yearLow) {
+				allBreakouts.push({
+					symbol: symbol.toUpperCase(),
+					name: description || name || '',
+					price,
+					percentChange: percentChange || 0,
+					yearHigh: yearHigh || 0,
+					yearLow,
+					breakoutType: '52w_low'
+				});
+			}
+		}
+	} catch (error) {
+		console.error('[MarketScanner] Error during TradingView scan:', error);
 	}
 
 	console.log(`[MarketScanner] Scan completed. Found ${allBreakouts.length} total breakouts/breakdowns.`);
