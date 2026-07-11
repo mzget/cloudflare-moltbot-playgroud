@@ -1,41 +1,32 @@
 ﻿import { vi, describe, it, expect } from 'vitest';
 import { scanMarketBreakouts } from './marketScanner';
 
-vi.mock('./fmpClient', () => {
-	return {
-		fetchExchangeQuotes: vi.fn().mockImplementation((apiKey, exchange) => {
-			if (exchange === 'nasdaq') {
-				return Promise.resolve([
+const mockFetch = vi.fn().mockImplementation((url) => {
+	if (url.includes('scanner.tradingview.com')) {
+		return Promise.resolve({
+			ok: true,
+			json: () => Promise.resolve({
+				data: [
 					{
-						symbol: 'AAPL',
-						name: 'Apple Inc.',
-						price: 200,
-						changesPercentage: 1.5,
-						yearHigh: 190,
-						yearLow: 120
+						s: 'NASDAQ:AAPL',
+						d: ['AAPL', 'Apple Inc.', 200, 1.5, 190, 120]
 					},
 					{
-						symbol: 'MSFT',
-						name: 'Microsoft Corp.',
-						price: 100,
-						changesPercentage: -2.0,
-						yearHigh: 400,
-						yearLow: 110
+						s: 'NASDAQ:MSFT',
+						d: ['MSFT', 'Microsoft Corporation', 100, -2.0, 400, 110]
 					},
 					{
-						symbol: 'TSLA',
-						name: 'Tesla Inc.',
-						price: 250,
-						changesPercentage: 0.5,
-						yearHigh: 300,
-						yearLow: 200
+						s: 'NASDAQ:TSLA',
+						d: ['TSLA', 'Tesla Inc.', 250, 0.5, 300, 200]
 					}
-				]);
-			}
-			return Promise.resolve([]);
-		})
-	};
+				]
+			})
+		});
+	}
+	return Promise.reject(new Error('Unknown fetch URL'));
 });
+
+vi.stubGlobal('fetch', mockFetch);
 
 describe('scanMarketBreakouts', () => {
 	it('should correctly identify 52w highs and 52w lows', async () => {
@@ -63,9 +54,11 @@ describe('scanMarketBreakouts', () => {
 
 		expect(aapl).toBeDefined();
 		expect(aapl!.breakoutType).toBe('52w_high');
+		expect(aapl!.name).toBe('Apple Inc.');
 
 		expect(msft).toBeDefined();
 		expect(msft!.breakoutType).toBe('52w_low');
+		expect(msft!.name).toBe('Microsoft Corporation');
 
 		// Verify D1 operations were called
 		expect(mockDb.prepare).toHaveBeenCalledWith(expect.stringContaining('DELETE FROM market_breakouts'));
