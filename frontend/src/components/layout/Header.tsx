@@ -239,7 +239,9 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
         repeat: -1,
         ease: 'sine.inOut',
       });
-    });
+    }, headerRef);
+
+    return () => ctx.revert();
   }, []);
 
   // Adaptive polling: pauses when tab is hidden, slows when panel open or all read

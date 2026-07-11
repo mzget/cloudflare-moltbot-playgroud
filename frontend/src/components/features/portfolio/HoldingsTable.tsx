@@ -5,6 +5,7 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 import { glassStyle } from '../../../styles/glass';
 import '../../../styles/yahooPortfolio.css';
 import { useSettingsStore } from '../../../store/settingsStore';
+import { useNavigate } from '@tanstack/react-router';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -78,6 +79,7 @@ export default function HoldingsTable({
   onSort,
   density,
 }: HoldingsTableProps) {
+  const navigate = useNavigate();
   const showMoneyValues = useSettingsStore(state => state.showMoneyValues);
   const displayNum = (v: number | null, decimals = 2) => showMoneyValues ? fmtNum(v, decimals) : '•••••';
   const displayShares = (v: number | null) => showMoneyValues ? fmtShares(v) : '•••••';
@@ -198,9 +200,14 @@ export default function HoldingsTable({
                   <td className="left" style={{ padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`, fontSize: densityStyles.fontSize }}>
                     <a
                       className="yf-symbol-link"
-                      href={`https://finance.yahoo.com/quote/${h.symbol}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        navigate({
+                          to: '/analysis',
+                          search: { symbol: h.symbol, tab: 'report' },
+                        });
+                      }}
                       style={{ fontSize: densityStyles.fontSize }}
                     >
                       {h.symbol}
