@@ -293,16 +293,28 @@ export function EmailDigestCard({
                   }}
                   title={`From: ${src.sender}`}
                 >
-                  <Typography 
-                    level="body-xs" 
-                    noWrap 
-                    sx={{ 
-                      fontWeight: 600, 
-                      color: 'text.secondary',
-                    }}
-                  >
-                    {src.subject}
-                  </Typography>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+                    <Typography 
+                      level="body-xs" 
+                      noWrap 
+                      sx={{ 
+                        fontWeight: 600, 
+                        color: 'text.secondary',
+                      }}
+                    >
+                      {src.subject}
+                    </Typography>
+                    <Typography
+                      level="body-xs"
+                      noWrap
+                      sx={{
+                        color: 'text.tertiary',
+                        fontSize: '0.65rem',
+                      }}
+                    >
+                      {src.sender}
+                    </Typography>
+                  </Box>
                 </Chip>
               ))}
             </Stack>
