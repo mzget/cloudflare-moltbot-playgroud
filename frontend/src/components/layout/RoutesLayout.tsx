@@ -15,7 +15,7 @@ const YahooPortfolio = React.lazy(() => import('../features/portfolio/YahooPortf
 const KnowledgeChat = React.lazy(() => import('../features/agent/KnowledgeChat'));
 const DatabaseChat = React.lazy(() => import('../features/agent/DatabaseChat'));
 const AnalysisReport = React.lazy(() => import('../features/agent/AnalysisReport'));
-const IntelligenceFeed = React.lazy(() => import('../features/market/IntelligenceFeed'));
+const MarketIntelligence = React.lazy(() => import("../features/market/MarketIntelligence"));
 const MarketEventsTimeline = React.lazy(() => import('../features/market/MarketEventsTimeline'));
 
 const LoadingFallback = (
@@ -27,6 +27,7 @@ import OaktreeIcon from '../common/OaktreeIcon';
 import { LogOut, User } from 'lucide-react';
 import { AuthContext } from '../common/AuthContext';
 import { useSettingsStore } from '../../store/settingsStore';
+import { useIntelligenceStore } from '../../store/intelligenceStore';
 
 export default function RoutesLayout() {
   const { t } = useTranslation();
@@ -60,37 +61,7 @@ export default function RoutesLayout() {
     }
   };
 
-  const [reports, setReports] = React.useState<any[]>([]);
-  const [digests, setDigests] = React.useState<any[]>([]);
-  const [notebookArticles, setNotebookArticles] = React.useState<any[]>([]);
-  const [loading, setLoading] = React.useState(true);
-
-  const fetchReports = async () => {
-    try {
-      const [reportsRes, digestsRes, articlesRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/reports`),
-        fetch(`${API_BASE_URL}/api/email-digests`),
-        fetch(`${API_BASE_URL}/api/notebook-articles`)
-      ]);
-      
-      if (reportsRes.ok) {
-        const reportsData = (await reportsRes.json()) as any;
-        setReports(reportsData);
-      }
-      if (digestsRes.ok) {
-        const digestsData = (await digestsRes.json()) as any;
-        setDigests(digestsData);
-      }
-      if (articlesRes.ok) {
-        const articlesData = (await articlesRes.json()) as any;
-        setNotebookArticles(articlesData);
-      }
-    } catch (e) {
-      console.error("Failed to fetch reports, digests or articles", e);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { reports, digests, fetchReports } = useIntelligenceStore();
 
   React.useEffect(() => {
     // Intercept Google OAuth callback
@@ -305,67 +276,7 @@ export default function RoutesLayout() {
         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
           <React.Suspense fallback={LoadingFallback}>
             {activeTab === 'dashboard' && <YahooPortfolio />}
-          {activeTab === 'market' && (
-            <IntelligenceFeed 
-              reports={reports} 
-              digests={digests} 
-              notebookArticles={notebookArticles}
-              loading={loading} 
-              onDigestRead={async (id) => {
-                // Optimistic UI update
-                setDigests(prev => prev.filter(d => d.id !== id));
-                try {
-                  const res = await fetch(`${API_BASE_URL}/api/email-digests/mark-read`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id })
-                  });
-                  if (!res.ok) {
-                    throw new Error(await res.text());
-                  }
-                  await fetchReports();
-                } catch (e) {
-                  console.error("Failed to mark digest as read:", e);
-                  await fetchReports();
-                }
-              }}
-              onDigestQueueFacebook={async (id) => {
-                // Optimistic UI update
-                setDigests(prev => prev.map(d => d.id === id ? { ...d, facebook_status: 'pending' } : d));
-                try {
-                  const res = await fetch(`${API_BASE_URL}/api/facebook/queue`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ source_type: 'email_digest', source_id: id })
-                  });
-                  if (!res.ok) {
-                    throw new Error(await res.text());
-                  }
-                  await fetchReports();
-                } catch (e) {
-                  console.error("Failed to queue Facebook post:", e);
-                  await fetchReports();
-                }
-              }}
-              onReportRead={async (id) => {
-                // Optimistic UI: mark as read locally
-                setReports(prev => prev.map(r => r.id === id ? { ...r, is_readed: 1 } : r));
-                try {
-                  const res = await fetch(`${API_BASE_URL}/api/reports/mark-read`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id })
-                  });
-                  if (!res.ok) {
-                    throw new Error(await res.text());
-                  }
-                } catch (e) {
-                  console.error("Failed to mark report as read:", e);
-                  await fetchReports();
-                }
-              }}
-            />
-          )}
+          {activeTab === 'market' && <MarketIntelligence />}
 
           {activeTab === 'watchlist' && <Watchlist />}
           {activeTab === 'agent' && <KnowledgeChat />}
