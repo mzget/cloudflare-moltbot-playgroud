@@ -48,9 +48,35 @@ export function EmailDigestCard({
   onQueueFacebook
 }: { 
   digest: EmailDigest;
-  onMarkAsRead?: (id: number) => void;
-  onQueueFacebook?: (id: number) => void;
+  onMarkAsRead?: (id: number) => void | Promise<any>;
+  onQueueFacebook?: (id: number) => void | Promise<any>;
 }) {
+  const [isMarkingRead, setIsMarkingRead] = React.useState(false);
+  const [isPostingFB, setIsPostingFB] = React.useState(false);
+
+  const handleMarkAsRead = async () => {
+    if (!onMarkAsRead) return;
+    setIsMarkingRead(true);
+    try {
+      await onMarkAsRead(digest.id);
+    } catch (e) {
+      console.error("Error marking digest as read:", e);
+    } finally {
+      setIsMarkingRead(false);
+    }
+  };
+
+  const handleQueueFacebook = async () => {
+    if (!onQueueFacebook) return;
+    setIsPostingFB(true);
+    try {
+      await onQueueFacebook(digest.id);
+    } catch (e) {
+      console.error("Error queueing Facebook post:", e);
+    } finally {
+      setIsPostingFB(false);
+    }
+  };
   const takeaways = React.useMemo(() => {
     try {
       return JSON.parse(digest.key_takeaways || '[]');
@@ -103,7 +129,7 @@ export function EmailDigestCard({
                 color="neutral"
                 size="sm"
                 startDecorator={<Check size={14} />}
-                onClick={() => onMarkAsRead(digest.id)}
+                onClick={handleMarkAsRead} loading={isMarkingRead} disabled={isPostingFB}
                 sx={{
                   borderRadius: '10px',
                   fontWeight: 600,
@@ -136,7 +162,7 @@ export function EmailDigestCard({
                       color="neutral"
                       size="sm"
                       startDecorator={<Facebook size={14} />}
-                      onClick={() => onQueueFacebook(digest.id)}
+                      onClick={handleQueueFacebook} loading={isPostingFB} disabled={isMarkingRead}
                       sx={{
                         borderRadius: '10px',
                         fontWeight: 600,
@@ -208,7 +234,7 @@ export function EmailDigestCard({
                           color="danger"
                           size="sm"
                           startDecorator={<AlertCircle size={14} />}
-                          onClick={() => onQueueFacebook(digest.id)}
+                          onClick={handleQueueFacebook} loading={isPostingFB} disabled={isMarkingRead}
                           sx={{
                             borderRadius: '10px',
                             fontWeight: 600,
@@ -293,16 +319,28 @@ export function EmailDigestCard({
                   }}
                   title={`From: ${src.sender}`}
                 >
-                  <Typography 
-                    level="body-xs" 
-                    noWrap 
-                    sx={{ 
-                      fontWeight: 600, 
-                      color: 'text.secondary',
-                    }}
-                  >
-                    {src.subject}
-                  </Typography>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}>
+                    <Typography 
+                      level="body-xs" 
+                      noWrap 
+                      sx={{ 
+                        fontWeight: 600, 
+                        color: 'text.secondary',
+                      }}
+                    >
+                      {src.subject}
+                    </Typography>
+                    <Typography
+                      level="body-xs"
+                      noWrap
+                      sx={{
+                        color: 'text.tertiary',
+                        fontSize: '0.65rem',
+                      }}
+                    >
+                      {src.sender}
+                    </Typography>
+                  </Box>
                 </Chip>
               ))}
             </Stack>
