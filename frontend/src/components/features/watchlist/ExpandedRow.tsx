@@ -437,6 +437,8 @@ export default function ExpandedRow({ symbol, lastPrice, colSpan, onDataChange }
               </td>
               <td>
                 <Button size="sm" variant="solid" color="success" onClick={handleAddTxn}
+                  loading={saving.txn}
+                  disabled={saving.txn}
                   sx={{ minWidth: 0, px: 1 }}>
                   <Check size={14} />
                 </Button>
