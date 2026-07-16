@@ -1,8 +1,7 @@
-﻿import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Box, Typography, Sheet, Table, Button, Input, Grid, Stack, IconButton, CircularProgress, Tooltip, Snackbar, Alert } from '@mui/joy';
-import { Plus, Check, Play, Calendar, ArrowUp, ArrowDown, ArrowUpDown, Search, FileText } from 'lucide-react';
+import { Check, Play, Calendar, ArrowUp, ArrowDown, ArrowUpDown, Search, FileText } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
-import { useWatchlist } from './hooks/useWatchlist';
 import DebouncedInput from '../../common/DebouncedInput';
 import { glassStyle } from '../../../styles/glass';
 import { API_BASE_URL } from '../../../config';
@@ -20,7 +19,6 @@ interface BreakoutItem {
 
 export default function MarketBreakouts() {
 	const navigate = useNavigate();
-	const { watchlist, addWatchlist } = useWatchlist();
 	const [breakouts, setBreakouts] = useState<BreakoutItem[]>([]);
 	const [selectedDate, setSelectedDate] = useState<string>(() => {
 		return new Date().toISOString().split('T')[0];
@@ -42,10 +40,6 @@ export default function MarketBreakouts() {
 		field: 'percent_change',
 		order: 'desc'
 	});
-
-	const watchlistSymbols = useMemo(() => {
-		return new Set(watchlist.map(item => item.symbol.toUpperCase()));
-	}, [watchlist]);
 
 	const fetchBreakouts = async (dateStr: string) => {
 		setLoading(true);
@@ -79,16 +73,6 @@ export default function MarketBreakouts() {
 			console.error('Failed to trigger market scan:', error);
 		} finally {
 			setScanning(false);
-		}
-	};
-
-	const handleAddToWatchlist = async (item: BreakoutItem) => {
-		try {
-			await addWatchlist(item.symbol, item.name || item.symbol, 'stock');
-			setToastMessage(`${item.symbol} added to watchlist successfully!`);
-			setToastOpen(true);
-		} catch (e) {
-			console.error('Failed to add symbol to watchlist:', e);
 		}
 	};
 
@@ -278,7 +262,7 @@ export default function MarketBreakouts() {
 						}
 					}}
 				>
-					Run Market Scan
+					Scan Watchlist
 				</Button>
 			</Sheet>
 
@@ -297,10 +281,10 @@ export default function MarketBreakouts() {
 				>
 					<Stack direction="row" justifyContent="space-between" alignItems="center">
 						<Typography level="title-sm" sx={{ fontWeight: 700 }}>
-							Market Breadth Ratio (52-Week Breakouts)
+							Watchlist Breakout Ratio (52-Week)
 						</Typography>
 						<Typography level="body-xs" sx={{ fontWeight: 700, color: highsPercentage >= 65 ? 'success.solidBg' : highsPercentage <= 35 ? 'danger.solidBg' : 'neutral.solidBg' }}>
-							{highsPercentage >= 65 ? '🔥 Strongly Bullish' : highsPercentage <= 35 ? '❄️ Strongly Bearish' : '⚖️ Balanced Market'} ({highsPercentage.toFixed(1)}% Highs)
+							{highsPercentage >= 65 ? '?? Strongly Bullish' : highsPercentage <= 35 ? '?? Strongly Bearish' : '?? Balanced Market'} ({highsPercentage.toFixed(1)}% Highs)
 						</Typography>
 					</Stack>
 					<Box sx={{ position: 'relative', height: '10px', width: '100%', borderRadius: '5px', overflow: 'hidden', display: 'flex', backgroundColor: 'rgba(255,255,255,0.05)' }}>
@@ -391,19 +375,17 @@ export default function MarketBreakouts() {
 											<th style={{ width: '40%', padding: '8px 12px' }}>Name</th>
 											{renderHeaderSortLabel('Price', 'price', highsSort, handleSortHighs, 'right')}
 											{renderHeaderSortLabel('Change', 'percent_change', highsSort, handleSortHighs, 'right')}
-											<th style={{ textAlign: 'center', width: '60px', padding: '8px 12px' }}>Watch</th>
 										</tr>
 									</thead>
 									<tbody>
 										{highsList.length === 0 ? (
 											<tr>
-												<td colSpan={5} style={{ textAlign: 'center', fontStyle: 'italic', opacity: 0.5 }}>
+												<td colSpan={4} style={{ textAlign: 'center', fontStyle: 'italic', opacity: 0.5 }}>
 													No new 52-week highs scanned.
 												</td>
 											</tr>
 										) : (
 											highsList.map(item => {
-												const isAdded = watchlistSymbols.has(item.symbol);
 												return (
 													<tr key={item.symbol} onClick={() => handleViewAnalysis(item.symbol)}>
 														<td style={{ fontWeight: 700 }}>
@@ -440,24 +422,6 @@ export default function MarketBreakouts() {
 														>
 															{item.percent_change >= 0 ? '+' : ''}
 															{item.percent_change.toFixed(2)}%
-														</td>
-														<td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-															<IconButton
-																size="sm"
-																variant={isAdded ? 'soft' : 'solid'}
-																color={isAdded ? 'neutral' : 'success'}
-																onClick={() => !isAdded && handleAddToWatchlist(item)}
-																disabled={isAdded}
-																sx={{ 
-																	borderRadius: '8px',
-																	transition: 'all 0.2s ease-out',
-																	'&:hover': {
-																		transform: isAdded ? 'none' : 'scale(1.1)'
-																	}
-																}}
-															>
-																{isAdded ? <Check size={16} /> : <Plus size={16} />}
-															</IconButton>
 														</td>
 													</tr>
 												);
@@ -536,19 +500,17 @@ export default function MarketBreakouts() {
 											<th style={{ width: '40%', padding: '8px 12px' }}>Name</th>
 											{renderHeaderSortLabel('Price', 'price', lowsSort, handleSortLows, 'right')}
 											{renderHeaderSortLabel('Change', 'percent_change', lowsSort, handleSortLows, 'right')}
-											<th style={{ textAlign: 'center', width: '60px', padding: '8px 12px' }}>Watch</th>
 										</tr>
 									</thead>
 									<tbody>
 										{lowsList.length === 0 ? (
 											<tr>
-												<td colSpan={5} style={{ textAlign: 'center', fontStyle: 'italic', opacity: 0.5 }}>
+												<td colSpan={4} style={{ textAlign: 'center', fontStyle: 'italic', opacity: 0.5 }}>
 													No new 52-week lows scanned.
 												</td>
 											</tr>
 										) : (
 											lowsList.map(item => {
-												const isAdded = watchlistSymbols.has(item.symbol);
 												return (
 													<tr key={item.symbol} onClick={() => handleViewAnalysis(item.symbol)}>
 														<td style={{ fontWeight: 700 }}>
@@ -585,24 +547,6 @@ export default function MarketBreakouts() {
 														>
 															{item.percent_change >= 0 ? '+' : ''}
 															{item.percent_change.toFixed(2)}%
-														</td>
-														<td style={{ textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-															<IconButton
-																size="sm"
-																variant={isAdded ? 'soft' : 'solid'}
-																color={isAdded ? 'neutral' : 'success'}
-																onClick={() => !isAdded && handleAddToWatchlist(item)}
-																disabled={isAdded}
-																sx={{ 
-																	borderRadius: '8px',
-																	transition: 'all 0.2s ease-out',
-																	'&:hover': {
-																		transform: isAdded ? 'none' : 'scale(1.1)'
-																	}
-																}}
-															>
-																{isAdded ? <Check size={16} /> : <Plus size={16} />}
-															</IconButton>
 														</td>
 													</tr>
 												);

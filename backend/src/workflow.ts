@@ -121,7 +121,7 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 					return { error: "FMP_API_KEY is not configured" };
 				}
 				const { scanMarketBreakouts } = await import('./marketScanner');
-				return await scanMarketBreakouts(this.env.DB, fmpKey);
+				return await scanMarketBreakouts(this.env.DB, fmpKey, 'watchlist');
 			});
 		}
 
