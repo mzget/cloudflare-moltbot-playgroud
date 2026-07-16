@@ -777,8 +777,9 @@ app.post('/api/scan-market', async (c) => {
     return c.json({ error: 'FMP_API_KEY not configured' }, 400);
   }
   const { scanMarketBreakouts } = await import('./marketScanner');
+  const scope = (c.req.query('scope') === 'market' ? 'market' : 'watchlist') as 'watchlist' | 'market';
   try {
-    const results = await scanMarketBreakouts(c.env.DB, fmpKey);
+    const results = await scanMarketBreakouts(c.env.DB, fmpKey, scope);
     return c.json({ success: true, count: results.length, breakouts: results.slice(0, 10) });
   } catch (error: any) {
     return c.json({ success: false, error: error.message }, 500);
