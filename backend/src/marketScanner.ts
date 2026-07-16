@@ -8,24 +8,52 @@
 	breakoutType: '52w_high' | '52w_low';
 }
 
-export async function scanMarketBreakouts(db: any, fmpApiKey: string): Promise<BreakoutResult[]> {
-	console.log('[MarketScanner] Starting daily market breakout scan using TradingView bulk API...');
+export async function scanMarketBreakouts(db: any, fmpApiKey: string, scope: 'watchlist' | 'market' = 'watchlist'): Promise<BreakoutResult[]> {
+	console.log(`[MarketScanner] Starting ${scope} breakout scan using TradingView API...`);
 	const allBreakouts: BreakoutResult[] = [];
 	const todayDate = new Date().toISOString().split('T')[0];
 
+	// For watchlist scope, fetch watchlist symbols first
+	let watchlistSymbols: Set<string> | null = null;
+	if (scope === 'watchlist') {
+		try {
+			const watchlistRes = await db.prepare('SELECT symbol FROM watchlist WHERE is_active = 1').all();
+			const symbols = (watchlistRes.results || []).map((r: any) => r.symbol.toUpperCase());
+			if (symbols.length === 0) {
+				console.log('[MarketScanner] No active watchlist symbols. Skipping scan.');
+				return [];
+			}
+			watchlistSymbols = new Set(symbols);
+			console.log(`[MarketScanner] Scanning ${symbols.length} watchlist symbols: ${symbols.join(', ')}`);
+		} catch (error) {
+			console.error('[MarketScanner] Failed to fetch watchlist:', error);
+			return [];
+		}
+	}
+
 	try {
 		const tvUrl = 'https://scanner.tradingview.com/america/scan';
-		const body = {
+		const body: any = {
 			columns: ['name', 'description', 'close', 'change', 'price_52_week_high', 'price_52_week_low'],
-			filter: [
-				{
-					left: 'type',
-					operation: 'in_range',
-					right: ['stock', 'dr']
-				}
-			],
-			range: [0, 25000]
+			filter: [] as any[],
 		};
+
+		if (scope === 'watchlist') {
+			// Query only watchlist symbols via name filter
+			body.filter.push({
+				left: 'name',
+				operation: 'in_range',
+				right: Array.from(watchlistSymbols!)
+			});
+		} else {
+			// Full market scan
+			body.filter.push({
+				left: 'type',
+				operation: 'in_range',
+				right: ['stock', 'dr']
+			});
+			body.range = [0, 25000];
+		}
 
 		const res = await fetch(tvUrl, {
 			method: 'POST',
@@ -52,8 +80,8 @@ export async function scanMarketBreakouts(db: any, fmpApiKey: string): Promise<B
 
 			// Filter exchanges
 			if (exchange !== 'NASDAQ' && exchange !== 'NYSE' && exchange !== 'AMEX') continue;
-			// Skip options, warrants, preferreds, etc.
-			if (symbol.includes('.') || symbol.includes('-') || symbol.length > 5) continue;
+			// Skip options, warrants, preferreds, etc. (only for market scope)
+			if (scope === 'market' && (symbol.includes('.') || symbol.includes('-') || symbol.length > 5)) continue;
 
 			const [name, description, price, percentChange, yearHigh, yearLow] = item.d;
 
@@ -122,64 +150,78 @@ export async function scanMarketBreakouts(db: any, fmpApiKey: string): Promise<B
 		}
 	}
 
-	// 4. Cross-reference with watchlist
+	// 4. Create notifications for watchlisted breakouts
+	// In watchlist mode: every breakout is a watchlisted stock, create notifications directly
+	// In market mode: cross-reference breakouts against watchlist
 	try {
-		const watchlistRes = await db.prepare(`
-			SELECT symbol FROM watchlist WHERE is_active = 1
-		`).all();
-		const watchlist = new Set((watchlistRes.results || []).map((r: any) => r.symbol.toUpperCase()));
+		const breakoutsToNotify: BreakoutResult[] = [];
 
-		if (watchlist.size > 0) {
-			for (const breakout of allBreakouts) {
-				if (watchlist.has(breakout.symbol)) {
-					// Check if already notified today
-					const alreadyNotified = await db.prepare(`
-						SELECT id FROM record_breaker_events 
-						WHERE symbol = ?1 AND event_type = ?2 AND event_date = ?3
-					`).bind(breakout.symbol, breakout.breakoutType, todayDate).first();
+		if (scope === 'watchlist') {
+			// All breakouts are from watchlist — notify all
+			breakoutsToNotify.push(...allBreakouts);
+		} else {
+			// Market mode: cross-reference with watchlist
+			const watchlistRes = await db.prepare(`
+				SELECT symbol FROM watchlist WHERE is_active = 1
+			`).all();
+			const watchlist = new Set((watchlistRes.results || []).map((r: any) => r.symbol.toUpperCase()));
 
-					if (!alreadyNotified) {
-						console.log(`[MarketScanner] ALERT: Watchlisted stock ${breakout.symbol} triggered ${breakout.breakoutType}`);
-						
-						const isHigh = breakout.breakoutType === '52w_high';
-						const message = isHigh
-							? `${breakout.symbol} broke out to a new 52-week high of $${breakout.price} (${breakout.percentChange >= 0 ? '+' : ''}${breakout.percentChange.toFixed(2)}%)!`
-							: `${breakout.symbol} broke down to a new 52-week low of $${breakout.price} (${breakout.percentChange >= 0 ? '+' : ''}${breakout.percentChange.toFixed(2)}%)!`;
-
-						const previousRecord = isHigh ? breakout.yearHigh : breakout.yearLow;
-
-						// Create transaction/batch for notification and event
-						await db.batch([
-							db.prepare(`
-								INSERT INTO in_app_notifications (
-									symbol, metric, condition_type, target_value, trigger_value, message, is_read, created_at
-								) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, strftime('%s', 'now'))
-							`).bind(
-								breakout.symbol,
-								breakout.breakoutType,
-								isHigh ? 'breakout' : 'breakdown',
-								previousRecord,
-								breakout.price,
-								message
-							),
-							db.prepare(`
-								INSERT INTO record_breaker_events (
-									symbol, event_type, price, previous_record, event_date, is_notified, created_at
-								) VALUES (?1, ?2, ?3, ?4, ?5, 1, strftime('%s', 'now'))
-							`).bind(
-								breakout.symbol,
-								breakout.breakoutType,
-								breakout.price,
-								previousRecord,
-								todayDate
-							)
-						]);
+			if (watchlist.size > 0) {
+				for (const breakout of allBreakouts) {
+					if (watchlist.has(breakout.symbol)) {
+						breakoutsToNotify.push(breakout);
 					}
 				}
 			}
 		}
+
+		for (const breakout of breakoutsToNotify) {
+			// Check if already notified today
+			const alreadyNotified = await db.prepare(`
+				SELECT id FROM record_breaker_events 
+				WHERE symbol = ?1 AND event_type = ?2 AND event_date = ?3
+			`).bind(breakout.symbol, breakout.breakoutType, todayDate).first();
+
+			if (!alreadyNotified) {
+				console.log(`[MarketScanner] ALERT: Watchlisted stock ${breakout.symbol} triggered ${breakout.breakoutType}`);
+				
+				const isHigh = breakout.breakoutType === '52w_high';
+				const message = isHigh
+					? `${breakout.symbol} broke out to a new 52-week high of $${breakout.price} (${breakout.percentChange >= 0 ? '+' : ''}${breakout.percentChange.toFixed(2)}%)!`
+					: `${breakout.symbol} broke down to a new 52-week low of $${breakout.price} (${breakout.percentChange >= 0 ? '+' : ''}${breakout.percentChange.toFixed(2)}%)!`;
+
+				const previousRecord = isHigh ? breakout.yearHigh : breakout.yearLow;
+
+				// Create transaction/batch for notification and event
+				await db.batch([
+					db.prepare(`
+						INSERT INTO in_app_notifications (
+							symbol, metric, condition_type, target_value, trigger_value, message, is_read, created_at
+						) VALUES (?1, ?2, ?3, ?4, ?5, ?6, 0, strftime('%s', 'now'))
+					`).bind(
+						breakout.symbol,
+						breakout.breakoutType,
+						isHigh ? 'breakout' : 'breakdown',
+						previousRecord,
+						breakout.price,
+						message
+					),
+					db.prepare(`
+						INSERT INTO record_breaker_events (
+							symbol, event_type, price, previous_record, event_date, is_notified, created_at
+						) VALUES (?1, ?2, ?3, ?4, ?5, 1, strftime('%s', 'now'))
+					`).bind(
+						breakout.symbol,
+						breakout.breakoutType,
+						breakout.price,
+						previousRecord,
+						todayDate
+					)
+				]);
+			}
+		}
 	} catch (err) {
-		console.error('[MarketScanner] Watchlist cross-reference error:', err);
+		console.error('[MarketScanner] Watchlist notification error:', err);
 	}
 
 	return allBreakouts;
