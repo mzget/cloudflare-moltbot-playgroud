@@ -4,8 +4,10 @@ import {
   Table,
   Typography,
   Box,
+  Link,
 } from '@mui/joy';
 import { ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { useNavigate } from '@tanstack/react-router';
 import type { CompanyStats } from '../../../types/companyStats';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -23,8 +25,8 @@ export const ALL_COLUMNS: ColumnDef[] = [
   { id: 'price', label: 'Price', format: 'price' },
   { id: 'market_cap', label: 'Market Cap', format: 'currency' },
   { id: 'revenues', label: 'Revenues', format: 'currency' },
-  { id: 'revenue_3y_cagr', label: 'Rev 3Y CAGR', format: 'pct' },
   { id: 'revenue_5y_cagr', label: 'Rev 5Y CAGR', format: 'pct' },
+  { id: 'revenue_3y_cagr', label: 'Rev 3Y CAGR', format: 'pct' },
   { id: 'revenue_1y_growth', label: 'Rev 1Y Growth', format: 'pct' },
   { id: 'gross_profit_margin', label: 'Gross Profit', format: 'pct' },
   { id: 'operating_margin', label: 'Op. Margin', format: 'pct' },
@@ -182,21 +184,55 @@ export default function CompanyStatsTable({
   scale,
   density,
 }: CompanyStatsTableProps) {
-  const [sortCol, setSortCol] = React.useState<keyof CompanyStats | null>(null);
-  const [sortDir, setSortDir] = React.useState<SortDir>('none');
+  const navigate = useNavigate();
+
+  const [sortCol, setSortCol] = React.useState<keyof CompanyStats | null>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('fundamental_sort_col');
+      if (saved) {
+        return saved as keyof CompanyStats;
+      }
+    }
+    return null;
+  });
+  const [sortDir, setSortDir] = React.useState<SortDir>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('fundamental_sort_dir');
+      if (saved && ['asc', 'desc', 'none'].includes(saved)) {
+        return saved as SortDir;
+      }
+    }
+    return 'none';
+  });
 
   // Derive visible column definitions (preserve spec order)
   const visibleCols = ALL_COLUMNS.filter(c => visibleColumnIds.includes(c.id));
 
   // Cycle sort: none → asc → desc → none
   const handleSort = (colId: keyof CompanyStats) => {
+    let nextCol: keyof CompanyStats | null = sortCol;
+    let nextDir: SortDir = sortDir;
+
     if (sortCol !== colId) {
-      setSortCol(colId);
-      setSortDir('asc');
+      nextCol = colId;
+      nextDir = 'asc';
     } else {
-      setSortDir(prev =>
-        prev === 'none' ? 'asc' : prev === 'asc' ? 'desc' : 'none'
-      );
+      nextDir = sortDir === 'none' ? 'asc' : sortDir === 'asc' ? 'desc' : 'none';
+      if (nextDir === 'none') {
+        nextCol = null;
+      }
+    }
+
+    setSortCol(nextCol);
+    setSortDir(nextDir);
+
+    if (typeof window !== 'undefined') {
+      if (nextCol) {
+        localStorage.setItem('fundamental_sort_col', nextCol);
+      } else {
+        localStorage.removeItem('fundamental_sort_col');
+      }
+      localStorage.setItem('fundamental_sort_dir', nextDir);
     }
   };
 
@@ -359,16 +395,35 @@ export default function CompanyStatsTable({
                 }}
               >
                 <Box>
-                  <Typography
+                  <Link
+                    component="button"
                     level={densityStyles.tickerTitleSize}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      navigate({
+                        to: '/analysis',
+                        search: { symbol: company.symbol, tab: 'report' },
+                      });
+                    }}
                     sx={{
                       fontWeight: densityStyles.tickerTitleWeight,
                       lineHeight: 1.2,
-                      fontSize: density === 'compact' ? '0.75rem' : undefined
+                      fontSize: density === 'compact' ? '0.75rem' : undefined,
+                      color: 'primary.plainColor',
+                      textDecoration: 'none',
+                      textAlign: 'left',
+                      justifyContent: 'flex-start',
+                      width: 'fit-content',
+                      display: 'block',
+                      '&:hover': {
+                        color: 'primary.hoverColor',
+                        textDecoration: 'underline',
+                      },
+                      transition: 'all 0.15s ease-out',
                     }}
                   >
                     {company.symbol}
-                  </Typography>
+                  </Link>
                   <Typography
                     level="body-xs"
                     sx={{
