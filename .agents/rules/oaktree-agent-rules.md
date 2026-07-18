@@ -53,3 +53,33 @@ Apply these design principles using MUI Joy UI `sx` props (do not load the `@ant
   - `src/components/common/` – Reusable contexts/helpers (`AuthContext.tsx`, `ThemeToggle.tsx`).
   - `src/components/features/` – Domain-specific views in subfolders (e.g., `agent/`, `portfolio/`).
 - **Relative Paths**: Always use relative paths (e.g., `../../common/`) rather than flat imports when crossing folder boundaries.
+
+---
+
+## ⚠️ PowerShell Encoding & File Modification Guidelines
+
+When editing or writing code files containing non-ASCII text (e.g., Thai labels, placeholders, or comments) via PowerShell command runner:
+- Strictly **avoid** using standard `Set-Content` or `Out-File` without explicitly setting encoding, as they default to ANSI/ASCII and will corrupt characters to `?`.
+- Always use `[System.IO.File]::WriteAllText($path, $content, [System.Text.Encoding]::UTF8)` to write files with proper UTF-8 encoding.
+
+---
+
+## ⚡ Database Date/Time Formatting Guidelines
+
+For any newly created tables, standardize datetime fields to use ISO-8601 string format (`DATETIME DEFAULT CURRENT_TIMESTAMP` or `TEXT`) instead of Unix Epoch integers to maintain query consistency across new database architectures.
+---
+
+## 🚫 Ad-Blocker Resilient API Naming Guidelines
+
+When designing and naming backend API paths, avoid naming routes using common ad-blocker keywords such as `notification`, `notifications`, `alert`, `alerts`, `track`, `tracking`, or `analytics` (e.g. `/api/notifications` or `/api/in-app-notifications`). 
+- **Reasoning**: Popular ad-blockers (e.g., uBlock Origin) and privacy filters routinely intercept and block these network requests in production environments (causing errors like `net::ERR_CONNECTION_CLOSED`).
+- **Solution**: Use alternative, less common terms for paths, such as `/api/triggered-alerts` or general transaction/resource names.
+
+---
+
+## ⚡ Cloudflare D1 Database Batching & Query Guidelines
+
+To prevent latency bottlenecks when writing database operations:
+- **No Database Queries in Loops**: Avoid executing inline queries (`await env.DB.prepare(...).first()`, `.run()`, etc.) inside loops.
+- **Pre-fetching SELECT queries**: If you need to check if records exist for multiple items, pre-fetch the list of existing records before entering the loop (e.g., matching on date or IDs) and use an in-memory `Set` or `Map` for checking.
+- **Batching Writes/Updates**: For multiple database inserts/updates, accumulate `D1PreparedStatement` instances in an array (e.g., `batchStatements: any[]`) and execute them in a single batch transaction using `await env.DB.batch(batchStatements)` after the loop completes.

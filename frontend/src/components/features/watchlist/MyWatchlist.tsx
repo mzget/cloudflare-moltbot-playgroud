@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import { useWatchlist } from './hooks/useWatchlist';
 import { useAlertRules } from './hooks/useAlertRules';
 import { WatchlistCard } from './WatchlistCard';
-import { Box, Typography, Sheet, IconButton, Button, Input, Stack, Card, CardContent, Divider, Switch, Grid, CardActions, Avatar, Modal, ModalDialog, DialogTitle, DialogContent, ModalClose, FormControl, FormLabel, Select, Option, FormHelperText, Badge } from '@mui/joy';
-import { Plus, Trash2, Bell, Pencil, FileText } from 'lucide-react';
+import { Box, Typography, Sheet, IconButton, Button, Input, Stack, Card, CardContent, Divider, Switch, Grid, CardActions, Avatar, Modal, ModalDialog, DialogTitle, DialogContent, ModalClose, FormControl, FormLabel, Select, Option, FormHelperText, Badge, Snackbar, Alert } from '@mui/joy';
+import { Plus, Trash2, Bell, Pencil, FileText, AlertTriangle, Check } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
 import { API_BASE_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
@@ -124,6 +124,11 @@ export default function MyWatchlist() {
 
   // Alert Modal State
   const [isAlertsModalOpen, setIsAlertsModalOpen] = useState(false);
+  
+  // Toast state
+  const [toastOpen, setToastOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastColor, setToastColor] = useState<'success' | 'danger'>('success');
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
 
   // Group rule form state
@@ -245,9 +250,29 @@ export default function MyWatchlist() {
       const res = await addWatchlist(newSecurityForm.symbol, newSecurityForm.name, newSecurityForm.type);
       if (res.ok) {
         setNewSecurityForm({ symbol: '', name: '', type: 'stock' });
+        setToastColor('success');
+        setToastMessage('Symbol added successfully!');
+        setToastOpen(true);
       }
-    } catch (e) {
-      console.error("Failed to add to watchlist", e);
+    } catch (err: any) {
+      console.error("Failed to add to watchlist", err);
+      let errMsg = "Failed to add to watchlist";
+      if (err instanceof Response) {
+        try {
+          const data = await err.json() as any;
+          if (data && data.error) errMsg = data.error;
+        } catch {
+          try {
+            const txt = await err.text();
+            if (txt) errMsg = txt;
+          } catch {}
+        }
+      } else if (err && err.message) {
+        errMsg = err.message;
+      }
+      setToastColor('danger');
+      setToastMessage(errMsg);
+      setToastOpen(true);
     }
   };
 
@@ -588,6 +613,33 @@ export default function MyWatchlist() {
           </DialogContent>
         </ModalDialog>
       </Modal>
+
+      {/* Snackbar Toast Alert */}
+      <Snackbar
+        open={toastOpen}
+        autoHideDuration={4000}
+        onClose={() => setToastOpen(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        variant="soft"
+        color={toastColor}
+        sx={{ 
+          borderRadius: '12px', 
+          backgroundColor: 'rgba(20, 20, 20, 0.85)',
+          backdropFilter: 'blur(12px)',
+          border: '1px solid ' + (toastColor === 'success' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'),
+          boxShadow: '0 8px 32px ' + (toastColor === 'success' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)'),
+          p: 0.5
+        }}
+      >
+        <Alert
+          variant="soft"
+          color={toastColor}
+          startDecorator={toastColor === 'success' ? <Check size={18} /> : <AlertTriangle size={18} />}
+          sx={{ width: '100%', bg: 'transparent', p: 1, color: toastColor === 'success' ? '#10b981' : '#ef4444' }}
+        >
+          {toastMessage}
+        </Alert>
+      </Snackbar>
     </>
   );
 }
