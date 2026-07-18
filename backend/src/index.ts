@@ -376,6 +376,20 @@ app.get('/api/watchlist', async (c) => {
 app.post('/api/watchlist', async (c) => {
   const { symbol, name, type } = await c.req.json() as any;
   const symbolType = type || 'stock';
+  const upperSymbol = (symbol || '').toUpperCase();
+
+  // 1. Check if the symbol already exists
+  const existing = await c.env.DB.prepare('SELECT symbol FROM watchlist WHERE UPPER(symbol) = ?')
+    .bind(upperSymbol).first();
+
+  if (!existing) {
+    // 2. Check if total count is >= 100
+    const { count } = await c.env.DB.prepare('SELECT COUNT(*) as count FROM watchlist').first() as { count: number };
+    if (count >= 100) {
+      return c.json({ error: 'Watchlist limit reached. Maximum 100 symbols allowed.' }, 400);
+    }
+  }
+
   await c.env.DB.prepare('INSERT OR IGNORE INTO watchlist (symbol, name, type) VALUES (?, ?, ?)')
     .bind(symbol, name, symbolType).run();
 
@@ -2597,18 +2611,19 @@ export default {
   fetch: app.fetch,
 
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
-    const isFacebookOnlyCron = event.cron === "*/30 * * * *";
+    const now = new Date();
+    const isMinuteZero = now.getUTCMinutes() === 0;
 
-    if (isFacebookOnlyCron) {
-      // Every 30 minutes: only publish pending Facebook posts
-      console.log("Running Facebook-only sync (30-min cron)...");
+    // 1. Price-only & Facebook Sync (Every 30 mins)
+    if (event.cron === "*/30 * * * *") {
+      console.log(`Running 30-min cron (isMinuteZero: ${isMinuteZero})...`);
       ctx.waitUntil((async () => {
         try {
           await env.OAKTREE_SYNC_WORKFLOW.create({
             id: `cron-fb-${Date.now()}`,
             params: {
               syncFacebookPosts: true,
-              fetchMarketStats: true,
+              fetchMarketStats: !isMinuteZero, // Skip price fetch at minute 0 to avoid collision
               priceOnly: true,
             }
           });
@@ -2620,35 +2635,38 @@ export default {
       return;
     }
 
-    // Every hour: full sync (market data, emails, alerts, etc.)
-    console.log("Running full scheduled worker tasks via Workflow...");
-    const hour = new Date().getUTCHours();
-    const isSixHourly = hour % 6 === 0;
+    // 2. Hourly Full Sync Tasks (Every hour)
+    if (event.cron === "0 * * * *") {
+      console.log("Running Hourly Tasks...");
+      const hour = now.getUTCHours();
+      const isSixHourly = hour % 6 === 0;
 
-    ctx.waitUntil((async () => {
-      try {
-        await env.OAKTREE_SYNC_WORKFLOW.create({
-          id: `cron-${Date.now()}`,
-          params: {
-            fetchMarketStats: true,
-            checkAlertRules: true,
-            syncEmails: true,
-            generateEmailDigests: true,
-            emailDigestsManual: false,
-            runCrawler: isSixHourly,
-            generateDailySummaries: isSixHourly,
-            scanMarketBreakouts: true,
-            fetchMarketEvents: isSixHourly,
-            sendDailyEmailReport: false, // Disabled for this phase
-            purgeOldData: isSixHourly,
-            syncFacebookPosts: false, // Facebook handled by 30-min cron
-          }
-        });
-        console.log("Workflow instance triggered successfully.");
-      } catch (e) {
-        console.error("Failed to trigger Workflow instance:", e);
-      }
-    })());
+      ctx.waitUntil((async () => {
+        try {
+          await env.OAKTREE_SYNC_WORKFLOW.create({
+            id: `cron-hourly-${Date.now()}`,
+            params: {
+              fetchMarketStats: true, // Fetch prices (when open) or metrics (when closed)
+              priceOnly: false,       // Allows rolling metrics sync during off-hours
+              checkAlertRules: true,
+              syncEmails: true,
+              generateEmailDigests: true,
+              emailDigestsManual: false,
+              runCrawler: isSixHourly,
+              generateDailySummaries: isSixHourly,
+              scanMarketBreakouts: true,
+              fetchMarketEvents: isSixHourly,
+              sendDailyEmailReport: false,
+              purgeOldData: isSixHourly,
+              syncFacebookPosts: false,
+            }
+          });
+          console.log("Hourly sync workflow instance triggered successfully.");
+        } catch (e) {
+          console.error("Failed to trigger Hourly Sync Workflow instance:", e);
+        }
+      })());
+    }
   },
 };
 

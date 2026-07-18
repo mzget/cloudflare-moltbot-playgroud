@@ -29,7 +29,7 @@ name = "EMAIL"
 destination_address = "rattajak.n@gmail.com"
 
 [triggers]
-crons = ["0 * * * *", "*/30 * * * *"] # Hourly full sync + every 30 min for Facebook
+crons = ["*/30 * * * *", "0 * * * *"]
 
 [[workflows]]
 name = "oaktree-sync-workflow"

@@ -59,6 +59,8 @@ export async function checkAlertRules(env: Env): Promise<{ triggeredCount: numbe
       message: string;
     }[] = [];
 
+    const batchStatements: any[] = [];
+
     // 3. Evaluate each rule
     for (const rule of rules) {
       const stats = statsMap.get(rule.symbol.toUpperCase());
@@ -83,16 +85,13 @@ export async function checkAlertRules(env: Env): Promise<{ triggeredCount: numbe
       const currentState = currentValue >= targetValue ? 'above' : 'below';
       const lastState = rule.last_checked_state;
 
-      // Update state and checked value in DB
-      const updateRuleDb = async (newState: string, val: number) => {
-        await env.DB.prepare(
-          'UPDATE alert_rules SET last_checked_value = ?, last_checked_state = ?, updated_at = (strftime(\'%s\', \'now\')) WHERE id = ?'
-        ).bind(val, newState, rule.id).run();
-      };
-
       if (!lastState) {
         // First check: initialize the state but do not trigger
-        await updateRuleDb(currentState, currentValue);
+        batchStatements.push(
+          env.DB.prepare(
+            'UPDATE alert_rules SET last_checked_value = ?, last_checked_state = ?, updated_at = (strftime(\'%s\', \'now\')) WHERE id = ?'
+          ).bind(currentValue, currentState, rule.id)
+        );
         continue;
       }
 
@@ -117,17 +116,19 @@ export async function checkAlertRules(env: Env): Promise<{ triggeredCount: numbe
         triggeredCount++;
 
         // Save in-app notification
-        await env.DB.prepare(
-          `INSERT INTO in_app_notifications (symbol, metric, condition_type, target_value, trigger_value, message)
-           VALUES (?, ?, ?, ?, ?, ?)`
-        ).bind(
-          rule.symbol.toUpperCase(),
-          rule.metric,
-          rule.condition_type,
-          targetValue,
-          currentValue,
-          triggerMessage
-        ).run();
+        batchStatements.push(
+          env.DB.prepare(
+            `INSERT INTO in_app_notifications (symbol, metric, condition_type, target_value, trigger_value, message)
+             VALUES (?, ?, ?, ?, ?, ?)`
+          ).bind(
+            rule.symbol.toUpperCase(),
+            rule.metric,
+            rule.condition_type,
+            targetValue,
+            currentValue,
+            triggerMessage
+          )
+        );
 
         triggeredAlerts.push({
           symbol: rule.symbol,
@@ -141,13 +142,24 @@ export async function checkAlertRules(env: Env): Promise<{ triggeredCount: numbe
 
       // Update state (either it crossed or changed state back without triggering condition)
       if (lastState !== currentState) {
-        await updateRuleDb(currentState, currentValue);
+        batchStatements.push(
+          env.DB.prepare(
+            'UPDATE alert_rules SET last_checked_value = ?, last_checked_state = ?, updated_at = (strftime(\'%s\', \'now\')) WHERE id = ?'
+          ).bind(currentValue, currentState, rule.id)
+        );
       } else {
         // Just update value to stay current
-        await env.DB.prepare(
-          'UPDATE alert_rules SET last_checked_value = ?, updated_at = (strftime(\'%s\', \'now\')) WHERE id = ?'
-        ).bind(currentValue, rule.id).run();
+        batchStatements.push(
+          env.DB.prepare(
+            'UPDATE alert_rules SET last_checked_value = ?, updated_at = (strftime(\'%s\', \'now\')) WHERE id = ?'
+          ).bind(currentValue, rule.id)
+        );
       }
+    }
+
+    // Execute batch writes if there are any
+    if (batchStatements.length > 0) {
+      await env.DB.batch(batchStatements);
     }
 
     // 4. Send digest email if alerts triggered
