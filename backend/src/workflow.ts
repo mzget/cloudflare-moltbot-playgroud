@@ -27,6 +27,7 @@ export interface OaktreeWorkflowParams {
 	syncFacebookPosts?: boolean;
 	syncNotebookArticles?: boolean;
 	priceOnly?: boolean;
+	metricsOnly?: boolean;
 	scanMarketBreakouts?: boolean;
 }
 
@@ -36,8 +37,11 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 
 		if (params.fetchMarketStats) {
 			await step.do('fetch-market-stats', async () => {
-				const statsResult = await fetchAndStoreMarketStats(this.env, params.priceOnly);
-				if (!params.priceOnly) {
+				const statsResult = await fetchAndStoreMarketStats(this.env, {
+					priceOnly: params.priceOnly,
+					metricsOnly: params.metricsOnly
+				});
+				if (!params.priceOnly && !params.metricsOnly) {
 					await recordDailyPortfolioHistory(this.env.DB);
 				}
 				return statsResult;
