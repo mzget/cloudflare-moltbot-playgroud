@@ -27,6 +27,7 @@ interface IntelligenceStore {
   digests: EmailDigest[];
   notebookArticles: any[];
   loading: boolean;
+  initialized: boolean;
   fetchReports: () => Promise<void>;
   onDigestRead: (id: number) => Promise<void>;
   onDigestQueueFacebook: (id: number) => Promise<void>;
@@ -38,9 +39,12 @@ export const useIntelligenceStore = create<IntelligenceStore>((set, get) => ({
   digests: [],
   notebookArticles: [],
   loading: false,
+  initialized: false,
 
   fetchReports: async () => {
-    set({ loading: true });
+    if (!get().initialized) {
+      set({ loading: true });
+    }
     try {
       const [reportsRes, digestsRes, articlesRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/reports`),
@@ -52,10 +56,10 @@ export const useIntelligenceStore = create<IntelligenceStore>((set, get) => ({
       const digests = digestsRes.ok ? (await digestsRes.json()) as EmailDigest[] : [];
       const notebookArticles = articlesRes.ok ? (await articlesRes.json()) as any[] : [];
 
-      set({ reports, digests, notebookArticles, loading: false });
+      set({ reports, digests, notebookArticles, loading: false, initialized: true });
     } catch (e) {
       console.error("Failed to fetch reports, digests or articles", e);
-      set({ loading: false });
+      set({ loading: false, initialized: true });
     }
   },
 
