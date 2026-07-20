@@ -32,7 +32,7 @@ import { useIntelligenceStore } from '../../store/intelligenceStore';
 export default function RoutesLayout() {
   const { t } = useTranslation();
   const location = useLocation();
-  const activeTab = location.pathname.substring(1) || 'dashboard';
+  const activeTab = location.pathname.replace(/^\/|\/$/g, '') || 'dashboard';
   const { symbol, tab: subTab } = useSearch({ strict: false });
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(true);

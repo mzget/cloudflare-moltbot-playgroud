@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useWatchlist } from './hooks/useWatchlist';
 import { useAlertRules } from './hooks/useAlertRules';
 import { WatchlistCard } from './WatchlistCard';
@@ -52,6 +52,7 @@ export default function MyWatchlist() {
 
   // Edit Security Modal State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [editForm, setEditForm] = useState({
     symbol: '',
     name: '',
@@ -581,12 +582,7 @@ export default function MyWatchlist() {
                 variant="outlined"
                 color="danger"
                 startDecorator={<Trash2 size={16} />}
-                onClick={() => {
-                  if (window.confirm(`Are you sure you want to remove ${editForm.symbol} from your watchlist?`)) {
-                    handleDelete(editForm.symbol);
-                    setIsEditModalOpen(false);
-                  }
-                }}
+                onClick={() => setIsDeleteConfirmOpen(true)}
                 size="sm"
               >
                 Delete
@@ -611,6 +607,57 @@ export default function MyWatchlist() {
               </Stack>
             </Stack>
           </DialogContent>
+        </ModalDialog>
+      </Modal>
+
+      {/* Delete Confirm Dialog */}
+      <Modal open={isDeleteConfirmOpen} onClose={() => setIsDeleteConfirmOpen(false)}>
+        <ModalDialog
+          variant="outlined"
+          role="alertdialog"
+          sx={{
+            ...glassStyle,
+            maxWidth: 400,
+            borderRadius: '16px',
+            border: '1px solid rgba(239, 68, 68, 0.25)',
+          }}
+        >
+          <DialogTitle>
+            <Trash2 size={18} style={{ color: '#ef4444' }} />
+            ลบออกจาก Watchlist
+          </DialogTitle>
+          <DialogContent>
+            <Typography level="body-sm" sx={{ opacity: 0.8 }}>
+              คุณแน่ใจหรือไม่ว่าต้องการลบ{' '}
+              <Typography component="span" fontWeight="bold" sx={{ color: '#ef4444' }}>
+                {editForm.symbol}
+              </Typography>{' '}
+              ออกจาก Watchlist?
+            </Typography>
+          </DialogContent>
+          <Stack direction="row" spacing={1.5} justifyContent="flex-end" sx={{ mt: 1 }}>
+            <Button
+              variant="plain"
+              color="neutral"
+              size="sm"
+              onClick={() => setIsDeleteConfirmOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="solid"
+              color="danger"
+              size="sm"
+              startDecorator={<Trash2 size={14} />}
+              onClick={() => {
+                handleDelete(editForm.symbol);
+                setIsDeleteConfirmOpen(false);
+                setIsEditModalOpen(false);
+              }}
+            >
+              Delete
+            </Button>
+          </Stack>
         </ModalDialog>
       </Modal>
 
