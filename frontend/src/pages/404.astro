@@ -1,0 +1,20 @@
+---
+import Layout from '../layouts/Layout.astro';
+import App from '../components/App';
+---
+
+<Layout title="Oaktree Agent - Page Not Found">
+	<main>
+		<App client:only="react" />
+	</main>
+</Layout>
+
+<style>
+	main {
+		margin: 0;
+		width: 100%;
+		font-size: 20px;
+		line-height: 1.6;
+		min-height: 100vh;
+	}
+</style>

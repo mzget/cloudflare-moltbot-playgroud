@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { useTranslation } from 'react-i18next';
 import '../i18n';
 import RoutesLayout from './layout/RoutesLayout';
+import NotFoundPage from './features/error/NotFoundPage';
 import LoginScreen from './features/auth/LoginScreen';
 import { API_BASE_URL, MCP_WORKER_URL } from '../config';
 import { AuthContext } from './common/AuthContext';
@@ -161,6 +162,8 @@ const routeTree = rootRoute.addChildren([
 const router = createRouter({
   routeTree,
   defaultPreload: 'intent',
+  trailingSlash: 'never',
+  defaultNotFoundComponent: NotFoundPage,
 });
 
 // Register the router instance for type safety
