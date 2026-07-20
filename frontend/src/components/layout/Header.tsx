@@ -214,13 +214,16 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
 
   useEffect(() => {
     const ctx = gsap.context(() => {
-      // Entrance animation
-      gsap.from(headerRef.current, {
-        y: -40,
-        opacity: 0,
-        duration: 1,
-        ease: 'power4.out',
-      });
+      // Entrance animation — use fromTo() so the final state (opacity:1, y:0) is
+      // always explicit. gsap.from() infers the "to" values from current inline
+      // styles, but ctx.revert() during unmount resets those to opacity:0 before
+      // the next render reads them, causing the header to stay invisible on
+      // re-mount (e.g. route navigation).
+      gsap.fromTo(
+        headerRef.current,
+        { y: -40, opacity: 0 },
+        { y: 0, opacity: 1, duration: 1, ease: 'power4.out' },
+      );
 
       // Subtle logo float
       gsap.to(logoRef.current, {

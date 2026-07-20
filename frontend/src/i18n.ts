@@ -53,6 +53,11 @@ const resources = {
         title: "About Oaktree Agent",
         description: "Inspired by the investment philosophy of Howard Marks (Oaktree Capital), this agent goes beyond raw data. It synthesizes news into cohesive narratives, focusing on market cycles, risk assessment, and long-term value.",
         footer: "Powered by Cloudflare Workers, AI (Llama 3), and Browser Rendering.",
+      },
+      not_found: {
+        title: "Page Not Found",
+        description: "The page you're looking for doesn't exist or has been moved. Check the URL and try again.",
+        go_home: "Go to Dashboard",
       }
     }
   },
@@ -107,6 +112,11 @@ const resources = {
         title: "Acerca del Agente Oaktree",
         description: "Inspirado en la filosofía de inversión de Howard Marks (Oaktree Capital), este agente va más allá de los datos brutos. Sintetiza las noticias en narrativas coherivas, centrándose en los ciclos de mercado, la evaluación de riesgos y el valor a largo plazo.",
         footer: "Desarrollado por Cloudflare Workers, AI (Llama 3) y Renderizado de Navegador.",
+      },
+      not_found: {
+        title: "Página No Encontrada",
+        description: "La página que buscas no existe o ha sido movida. Verifica la URL e intenta de nuevo.",
+        go_home: "Ir al Panel",
       }
     }
   }

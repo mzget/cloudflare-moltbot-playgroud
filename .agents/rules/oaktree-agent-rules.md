@@ -83,3 +83,15 @@ To prevent latency bottlenecks when writing database operations:
 - **No Database Queries in Loops**: Avoid executing inline queries (`await env.DB.prepare(...).first()`, `.run()`, etc.) inside loops.
 - **Pre-fetching SELECT queries**: If you need to check if records exist for multiple items, pre-fetch the list of existing records before entering the loop (e.g., matching on date or IDs) and use an in-memory `Set` or `Map` for checking.
 - **Batching Writes/Updates**: For multiple database inserts/updates, accumulate `D1PreparedStatement` instances in an array (e.g., `batchStatements: any[]`) and execute them in a single batch transaction using `await env.DB.batch(batchStatements)` after the loop completes.
+
+---
+
+## 🚫 No Native Browser Dialogs — Use MUI Joy UI Modals
+
+Never use `window.confirm()`, `window.alert()`, `window.prompt()`, or the bare `confirm()` / `alert()` / `prompt()` globals for user-facing interactions in the frontend.
+- **Reasoning**: Native browser dialogs are visually inconsistent with the project's glassmorphism design system and cannot be styled or animated.
+- **Solution**: Always implement confirmation dialogs using MUI Joy UI components:
+  - `<Modal>` + `<ModalDialog role="alertdialog">` for destructive actions (delete, remove).
+  - `<DialogTitle>`, `<DialogContent>`, and `<Stack>` for layout inside the modal.
+  - Use `color="danger"` buttons with a relevant Lucide icon (`<Trash2>`) for destructive confirms.
+  - Control visibility with a dedicated `useState` boolean (e.g., `isDeleteConfirmOpen`).
