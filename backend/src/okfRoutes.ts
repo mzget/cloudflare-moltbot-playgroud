@@ -7,13 +7,14 @@
  */
 
 import { Hono } from 'hono';
+import { cache } from 'hono/cache';
 import { Env } from './index';
 import { listOkfDocuments, getOkfDocument, searchOkfByTags } from './okf';
 
 const okfRoutes = new Hono<{ Bindings: Env }>();
 
 /** List all OKF documents — returns metadata only, no body */
-okfRoutes.get('/', async (c) => {
+okfRoutes.get('/', cache({ cacheName: 'oaktree-knowledge-list', cacheControl: 'max-age=1800' }), async (c) => {
   if (!c.env.KNOWLEDGE_BUCKET) {
     return c.json({ error: 'KNOWLEDGE_BUCKET not configured' }, 503);
   }
@@ -29,7 +30,7 @@ okfRoutes.get('/', async (c) => {
 });
 
 /** Search OKF documents by tags and/or type */
-okfRoutes.get('/search', async (c) => {
+okfRoutes.get('/search', cache({ cacheName: 'oaktree-knowledge-search', cacheControl: 'max-age=1800' }), async (c) => {
   if (!c.env.KNOWLEDGE_BUCKET) {
     return c.json({ error: 'KNOWLEDGE_BUCKET not configured' }, 503);
   }
@@ -54,7 +55,7 @@ okfRoutes.get('/search', async (c) => {
 });
 
 /** Fetch a single OKF document by path key (e.g. frameworks/peter_lynch.md) */
-okfRoutes.get('/:key{.+}', async (c) => {
+okfRoutes.get('/:key{.+}', cache({ cacheName: 'oaktree-knowledge-doc', cacheControl: 'max-age=1800' }), async (c) => {
   if (!c.env.KNOWLEDGE_BUCKET) {
     return c.json({ error: 'KNOWLEDGE_BUCKET not configured' }, 503);
   }
