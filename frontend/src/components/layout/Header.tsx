@@ -153,9 +153,6 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
         Notification.requestPermission();
       }
     }
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
@@ -247,40 +244,51 @@ export default function Header({ onOpenSidebar, onToggleSidebar, sidebarCollapse
     return () => ctx.revert();
   }, []);
 
+  const showNotificationsRef = useRef(showNotifications);
+  const unreadCountRef = useRef(unreadCount);
+
+  useEffect(() => {
+    showNotificationsRef.current = showNotifications;
+    unreadCountRef.current = unreadCount;
+  }, [showNotifications, unreadCount]);
+
   // Adaptive polling: pauses when tab is hidden, slows when panel open or all read
   useEffect(() => {
-    let intervalId: ReturnType<typeof setInterval> | null = null;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let isMounted = true;
 
-    const getInterval = () => {
-      if (showNotifications) return 5 * 60 * 1000; // 5 min � user is viewing panel
-      if (unreadCount === 0) return 2 * 60 * 1000;  // 2 min � nothing unread
-      return 30_000;                                  // 30 s  � has unread items
-    };
+    const scheduleNext = () => {
+      let delay = 30_000; // 30s when has unread items
+      if (showNotificationsRef.current) delay = 5 * 60 * 1000; // 5 min when viewing panel
+      else if (unreadCountRef.current === 0) delay = 2 * 60 * 1000; // 2 min when 0 unread
 
-    const start = () => {
-      if (intervalId) clearInterval(intervalId);
-      intervalId = setInterval(fetchNotifications, getInterval());
+      timeoutId = setTimeout(async () => {
+        if (!document.hidden && isMounted) {
+          await fetchNotifications();
+        }
+        if (isMounted) {
+          scheduleNext();
+        }
+      }, delay);
     };
 
     const handleVisibilityChange = () => {
-      if (document.hidden) {
-        if (intervalId) clearInterval(intervalId);
-        intervalId = null;
-      } else {
+      if (!document.hidden && isMounted) {
         fetchNotifications(); // catch up immediately when tab becomes visible
-        start();
       }
     };
 
     fetchNotifications();
-    start();
+    scheduleNext();
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
-      if (intervalId) clearInterval(intervalId);
+      isMounted = false;
+      if (timeoutId) clearTimeout(timeoutId);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [showNotifications, unreadCount]);
+  }, []);
+
   return (
     <Sheet
       ref={headerRef}

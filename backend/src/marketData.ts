@@ -1,13 +1,29 @@
 import { Env } from './index';
 
-// Returns true if the US stock market is currently open (Mon-Fri, 9:30-16:00 ET).
-// Uses UTC 13:30-21:00 window to cover both EDT (UTC-4) and EST (UTC-5).
-function isUSMarketOpen(): boolean {
-	const now = new Date();
-	const day = now.getUTCDay(); // 0 = Sun, 6 = Sat
+// Returns true if the US stock market is currently open or in post-market close window (Mon-Fri, 9:30-16:30 ET).
+// Uses America/New_York timezone to handle EDT/EST daylight saving transitions automatically.
+export function isUSMarketOpen(targetDate: Date = new Date()): boolean {
+	const formatter = new Intl.DateTimeFormat('en-US', {
+		timeZone: 'America/New_York',
+		hour12: false,
+		weekday: 'short',
+		hour: 'numeric',
+		minute: 'numeric'
+	});
+	const parts = formatter.formatToParts(targetDate);
+	let weekdayStr = '', hour = 0, minute = 0;
+	for (const p of parts) {
+		if (p.type === 'weekday') weekdayStr = p.value;
+		if (p.type === 'hour') hour = parseInt(p.value, 10) % 24;
+		if (p.type === 'minute') minute = parseInt(p.value, 10);
+	}
+	const dayMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+	const day = dayMap[weekdayStr] ?? 0;
 	if (day === 0 || day === 6) return false;
-	const utcMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
-	return utcMinutes >= 13 * 60 + 30 && utcMinutes < 21 * 60;
+
+	const etMinutes = hour * 60 + minute;
+	// 9:30 AM ET (570 mins) to 4:30 PM ET (990 mins - includes 30-min post-market grace period)
+	return etMinutes >= (9 * 60 + 30) && etMinutes <= (16 * 60 + 30);
 }
 
 interface FinnhubResponse {
@@ -137,9 +153,9 @@ export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOpt
 		}
 	};
 
-	// Determine fetch directives based on US market open hours
-	const shouldFetchQuote = marketOpen;
-	const shouldFetchMetrics = !priceOnly && !marketOpen && metricsSymbolsToUpdate.size > 0;
+	// Determine fetch directives based on US market open hours and options
+	const shouldFetchQuote = marketOpen && !metricsOnly;
+	const shouldFetchMetrics = (metricsOnly || (!priceOnly && !marketOpen)) && metricsSymbolsToUpdate.size > 0;
 
 	// Filter active watchlist results based on options
 	const resultsToProcess = shouldFetchQuote
