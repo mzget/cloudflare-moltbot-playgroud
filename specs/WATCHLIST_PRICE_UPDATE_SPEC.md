@@ -8,13 +8,14 @@ To prevent API rate limit collisions and minimize compute/network overhead, the 
 
 1. **Price-Only Mode (Every 30 mins, `*/30 * * * *`)**:
    - Updates real-time quotes (prices) for all active watchlist symbols.
-   - Runs only during US market hours (exits early with 0 API calls when the market is closed).
+   - Runs during US market hours and post-market grace period (9:30 AM – 4:30 PM ET). Exits early with 0 API calls when the market is closed or on weekends.
+   - At 4:30 PM ET (`16:30`), the last price-only run executes to capture final post-close settlement prices.
    - At minute 0, it skips price fetching to avoid duplicating the hourly sync run.
 
 2. **Hourly Tasks & Rolling Metrics Sync (Hourly, `0 * * * *`)**:
-   - **During Market Hours**: Updates prices for active symbols (`priceOnly: true`) and triggers downstream tasks (alert rule checks, news crawler, email digests).
-   - **During Off-Hours**: Skips price fetching entirely (0 quote calls). Instead, it runs the **Rolling Metrics Sync** which fetches fundamental metrics for the **15 oldest/missing symbols** on the watchlist.
-   - *Result*: All 100 symbols have their fundamentals updated daily within the first 7 hours after market close. On weekends, no metrics or price syncs are requested (0 API calls).
+   - **During Market & Grace Hours (9:30 AM – 4:30 PM ET)**: Updates prices for active symbols (`priceOnly: false`) and triggers downstream tasks (alert rule checks, news crawler, email digests).
+   - **During Off-Hours (Starting 5:00 PM ET / 17:00 ET)**: Skips price fetching entirely (0 quote calls). Instead, it runs the **Rolling Metrics Sync** which fetches fundamental metrics for the **15 oldest/missing symbols** on the watchlist.
+   - *Result*: All 100 symbols have their fundamentals updated daily within the first 7 hours after market close (starting at 5:00 PM ET). On weekends, no metrics or price syncs are requested (0 API calls).
 
 ### Watchlist Scale Bounds
 The total size of the watchlist database is capped at a maximum of **100 symbols** (user/system-wide limit) to keep resource usage and execution times bounded.
@@ -27,8 +28,8 @@ To prevent exceeding the Finnhub API limits, five optimization mechanisms are en
 
 ### A. US Market Hours Filter
 Since the workspace monitors US stocks, the price sync check is skipped if the US stock market is closed.
-* **Open Hours**: Monday to Friday, 9:30 AM – 4:00 PM Eastern Time (ET).
-* **Implementation**: The helper function `isUSMarketOpen()` checks the UTC time window (`13:30 - 21:00 UTC` which dynamically covers both standard EST and daylight EDT shifts). If evaluated to false outside these hours or on weekends, price-only runs exit early.
+* **Open & Grace Period Hours**: Monday to Friday, 9:30 AM – 4:30 PM Eastern Time (ET). Includes a 30-minute post-market grace period (until 4:30 PM ET) to ensure official closing prices settle and are fully captured.
+* **Implementation**: The helper function `isUSMarketOpen()` evaluates time using the `America/New_York` timezone via `Intl.DateTimeFormat` to automatically account for Daylight Saving Time (EDT vs EST) transitions. If evaluated to false outside these hours or on weekends, price-only runs exit early.
 
 ### B. Dynamic Fetch Directives
 We split fetching logic inside the sync loop based on market state:

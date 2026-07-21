@@ -1,4 +1,4 @@
-﻿# Technical Specification: In-App Notifications & Alerts System
+# Technical Specification: In-App Notifications & Alerts System
 
 This document outlines the architecture, database tables, API routing, and frontend components of the **In-App Notifications and Custom Alert Rules** system within the Oaktree Agent codebase.
 
@@ -19,7 +19,7 @@ The notification system alerts users to key events:
     *   [marketData.ts](file:///c:/Users/natta/Documents/oaktree-agent/backend/src/marketData.ts) & [marketScanner.ts](file:///c:/Users/natta/Documents/oaktree-agent/backend/src/marketScanner.ts): Detect technical breakouts and insert once-per-day notifications.
     *   [index.ts](file:///c:/Users/natta/Documents/oaktree-agent/backend/src/index.ts): Defines Hono routes to fetch, update, and clear notifications, as well as manage alert rules.
 *   **Frontend Implementation:**
-    *   [Header.tsx](file:///c:/Users/natta/Documents/oaktree-agent/frontend/src/components/layout/Header.tsx): Displays the notification bell, unread badge count, and notifications dropdown panel. Includes adaptive polling and GSAP-powered popover animations.
+    *   [Header.tsx](file:///c:/Users/natta/Documents/oaktree-agent/frontend/src/components/layout/Header.tsx): Displays the notification bell, unread badge count, and notifications dropdown panel. Includes refactored single-loop adaptive polling, browser native desktop notifications (`Notification` API), and GSAP-powered popover animations.
     *   [Watchlist.tsx](file:///c:/Users/natta/Documents/oaktree-agent/frontend/src/components/features/watchlist/Watchlist.tsx): Renders the Alert Manager Modal for creating, toggling, and deleting alert rules for specific symbols.
 
 ---
@@ -93,10 +93,16 @@ To prevent the notifications dialog from rendering underneath sticky components,
 - `position: 'relative'`
 - `zIndex: 1100`
 
-### C. Adaptive Polling Mechanism
-To keep CPU/network resource consumption low, `Header.tsx` employs an adaptive polling interval:
-- **Tab Hidden (`document.hidden`)**: Polling is completely paused.
+### C. Adaptive Single-Loop Polling Mechanism
+To keep CPU/network resource consumption low and avoid duplicate query loops:
+- **Single Polling Loop (`setTimeout`)**: Managed via `useRef` bindings for `showNotifications` and `unreadCount` to prevent effect teardowns on state changes.
+- **Tab Hidden (`document.hidden`)**: Polling pauses completely.
 - **Open Panel**: Polls once every 5 minutes (user is actively inspecting).
 - **All Read (0 unread count)**: Polls once every 2 minutes.
 - **Active Unread**: Polls once every 30 seconds to catch new alerts.
 - **Visibility Transition**: Triggers an immediate catch-up fetch when switching tabs back to active.
+
+### D. Browser Native Push/Desktop Notifications
+- Requests `Notification.requestPermission()` on mount.
+- On each fetch, filters unread items (`is_read === 0`) not previously notified (tracked in `notifiedIdsRef`).
+- Spawns native OS/browser notifications (`new Notification(...)`) with custom symbol titles and alert messages, focusing the window on click.
