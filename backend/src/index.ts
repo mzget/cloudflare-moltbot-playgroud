@@ -19,6 +19,7 @@ import { initializeAllTimeRecords } from './athSeeding';
 
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { cache } from 'hono/cache';
 
 export { OaktreeSyncWorkflow } from './workflow';
 
@@ -344,7 +345,7 @@ app.delete('/api/reports', async (c) => {
 });
 
 // API: Get Latest News / Purge Old News
-app.get('/api/news', async (c) => {
+app.get('/api/news', cache({ cacheName: 'oaktree-news', cacheControl: 'max-age=300' }), async (c) => {
   const { results } = await c.env.DB.prepare(
     "SELECT id, symbol, title, summary, sentiment, url, CAST(strftime('%s', created_at) as INTEGER) as created_at FROM news ORDER BY created_at DESC LIMIT 50"
   ).all();
@@ -594,7 +595,7 @@ app.get('/api/crawl-events', async (c) => {
 });
 
 // API: Get Market Events / Purge Old Market Events
-app.get('/api/market-events', async (c) => {
+app.get('/api/market-events', cache({ cacheName: 'oaktree-market-events', cacheControl: 'max-age=300' }), async (c) => {
   // Ensure table is created
   try {
     await c.env.DB.prepare(`
@@ -674,7 +675,7 @@ app.delete('/api/market-events', async (c) => {
 });
 
 // API: Market Intelligence (Watchlist + Stats)
-app.get('/api/market-intelligence', async (c) => {
+app.get('/api/market-intelligence', cache({ cacheName: 'oaktree-market-intelligence', cacheControl: 'max-age=300' }), async (c) => {
   const { results } = await c.env.DB.prepare(`
 		SELECT 
 			w.symbol, 
@@ -771,7 +772,7 @@ app.delete('/api/triggered-alerts', async (c) => {
 });
 
 // API: Market Breakouts & Seeding
-app.get('/api/market-breakouts', async (c) => {
+app.get('/api/market-breakouts', cache({ cacheName: 'oaktree-market-breakouts', cacheControl: 'max-age=300' }), async (c) => {
   const dateStr = c.req.query('date') || new Date().toISOString().split('T')[0];
   try {
     const { results } = await c.env.DB.prepare(`
@@ -975,7 +976,7 @@ app.post('/api/test-facebook-post', async (c) => {
 });
 
 // API: Get Facebook Custom Posts
-app.get('/api/facebook/posts', async (c) => {
+app.get('/api/facebook/posts', cache({ cacheName: 'oaktree-facebook-posts', cacheControl: 'max-age=600' }), async (c) => {
   try {
     const { results } = await c.env.DB.prepare(`
 			SELECT id, source_type, source_id, thai_title, thai_content, status, facebook_post_id, error_message, 
@@ -1593,7 +1594,7 @@ app.get('/api/portfolio/history', async (c) => {
 });
 
 // GET /api/portfolio/performance-comparison - Compare portfolio performance with S&P 500
-app.get('/api/portfolio/performance-comparison', async (c) => {
+app.get('/api/portfolio/performance-comparison', cache({ cacheName: 'oaktree-performance-comp', cacheControl: 'max-age=900' }), async (c) => {
   try {
     const timeframe = c.req.query('timeframe') || '1y';
     const result = await calculatePerformanceComparison(c.env.DB, timeframe);
