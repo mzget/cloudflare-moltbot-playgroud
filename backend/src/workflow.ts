@@ -31,108 +31,206 @@ export interface OaktreeWorkflowParams {
 	scanMarketBreakouts?: boolean;
 }
 
+// Fail fast: 2 retries with 5s linear backoff instead of the default 5 retries / 10s exponential.
+// This prevents ~40s of wasted wall-time on transient API failures.
+const STEP_CONFIG = {
+	retries: { limit: 2, delay: '5 seconds' as const, backoff: 'linear' as const },
+	timeout: '5 minutes' as const,
+};
+
 export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflowParams> {
 	async run(event: WorkflowEvent<OaktreeWorkflowParams>, step: WorkflowStep) {
 		const params = event.payload;
+		const errors: string[] = [];
 
 		if (params.fetchMarketStats) {
-			await step.do('fetch-market-stats', async () => {
-				const statsResult = await fetchAndStoreMarketStats(this.env, {
-					priceOnly: params.priceOnly,
-					metricsOnly: params.metricsOnly
+			try {
+				await step.do('fetch-market-stats', STEP_CONFIG, async () => {
+					console.log('[Workflow] Starting step: fetch-market-stats');
+					const statsResult = await fetchAndStoreMarketStats(this.env, {
+						priceOnly: params.priceOnly,
+						metricsOnly: params.metricsOnly
+					});
+					if (!params.priceOnly && !params.metricsOnly) {
+						await recordDailyPortfolioHistory(this.env.DB);
+					}
+					return statsResult;
 				});
-				if (!params.priceOnly && !params.metricsOnly) {
-					await recordDailyPortfolioHistory(this.env.DB);
-				}
-				return statsResult;
-			});
+			} catch (e) {
+				const msg = `fetch-market-stats failed: ${(e as Error).message || e}`;
+				console.error(`[Workflow] ${msg}`);
+				errors.push(msg);
+			}
 		}
 
 		if (params.checkAlertRules) {
-			await step.do('check-alert-rules', async () => {
-				return await checkAlertRules(this.env);
-			});
+			try {
+				await step.do('check-alert-rules', STEP_CONFIG, async () => {
+					console.log('[Workflow] Starting step: check-alert-rules');
+					return await checkAlertRules(this.env);
+				});
+			} catch (e) {
+				const msg = `check-alert-rules failed: ${(e as Error).message || e}`;
+				console.error(`[Workflow] ${msg}`);
+				errors.push(msg);
+			}
 		}
 
 		if (params.syncEmails) {
-			await step.do('sync-emails', async () => {
-				return await syncAndIngestEmails(this.env);
-			});
+			try {
+				await step.do('sync-emails', STEP_CONFIG, async () => {
+					console.log('[Workflow] Starting step: sync-emails');
+					return await syncAndIngestEmails(this.env);
+				});
+			} catch (e) {
+				const msg = `sync-emails failed: ${(e as Error).message || e}`;
+				console.error(`[Workflow] ${msg}`);
+				errors.push(msg);
+			}
 		}
 
 		if (params.generateEmailDigests) {
-			await step.do('generate-email-digests', async () => {
-				const isManual = !!params.emailDigestsManual;
-				return await generateEmailDigests(this.env, isManual);
-			});
+			try {
+				await step.do('generate-email-digests', STEP_CONFIG, async () => {
+					console.log('[Workflow] Starting step: generate-email-digests');
+					const isManual = !!params.emailDigestsManual;
+					return await generateEmailDigests(this.env, isManual);
+				});
+			} catch (e) {
+				const msg = `generate-email-digests failed: ${(e as Error).message || e}`;
+				console.error(`[Workflow] ${msg}`);
+				errors.push(msg);
+			}
 		}
 
 		if (params.runCrawler) {
-			await step.do('run-crawler', async () => {
-				return await runCrawler(this.env);
-			});
+			try {
+				await step.do('run-crawler', STEP_CONFIG, async () => {
+					console.log('[Workflow] Starting step: run-crawler');
+					return await runCrawler(this.env);
+				});
+			} catch (e) {
+				const msg = `run-crawler failed: ${(e as Error).message || e}`;
+				console.error(`[Workflow] ${msg}`);
+				errors.push(msg);
+			}
 		}
 
 		if (params.generateDailySummaries) {
-			await step.do('generate-daily-summaries', async () => {
-				const { results } = await this.env.DB.prepare('SELECT symbol FROM watchlist WHERE is_active = 1').all();
-				const force = !!params.generateDailySummariesForce;
-				const summaryPromises = results.map(row =>
-					generateDailySummary(this.env, row.symbol as string, force)
-						.catch(e => console.error(`Workflow summary failed for ${row.symbol}:`, e))
-				);
-				await Promise.all(summaryPromises);
-				return { count: results.length };
-			});
+			try {
+				await step.do('generate-daily-summaries', STEP_CONFIG, async () => {
+					console.log('[Workflow] Starting step: generate-daily-summaries');
+					const { results } = await this.env.DB.prepare('SELECT symbol FROM watchlist WHERE is_active = 1').all();
+					const force = !!params.generateDailySummariesForce;
+					const summaryPromises = results.map(row =>
+						generateDailySummary(this.env, row.symbol as string, force)
+							.catch(e => console.error(`Workflow summary failed for ${row.symbol}:`, e))
+					);
+					await Promise.all(summaryPromises);
+					return { count: results.length };
+				});
+			} catch (e) {
+				const msg = `generate-daily-summaries failed: ${(e as Error).message || e}`;
+				console.error(`[Workflow] ${msg}`);
+				errors.push(msg);
+			}
 		}
 
 		if (params.fetchMarketEvents) {
-			await step.do('fetch-market-events', async () => {
-				return await fetchAndStoreMarketEvents(this.env);
-			});
+			try {
+				await step.do('fetch-market-events', STEP_CONFIG, async () => {
+					console.log('[Workflow] Starting step: fetch-market-events');
+					return await fetchAndStoreMarketEvents(this.env);
+				});
+			} catch (e) {
+				const msg = `fetch-market-events failed: ${(e as Error).message || e}`;
+				console.error(`[Workflow] ${msg}`);
+				errors.push(msg);
+			}
 		}
 
 		if (params.sendDailyEmailReport) {
-			await step.do('send-daily-email-report', async () => {
-				console.log("sendDailyEmailReport is disabled for this phase.");
-				return { status: "disabled", message: "sendDailyEmailReport is disabled for this phase." };
-			});
+			try {
+				await step.do('send-daily-email-report', STEP_CONFIG, async () => {
+					console.log('[Workflow] Starting step: send-daily-email-report');
+					console.log("sendDailyEmailReport is disabled for this phase.");
+					return { status: "disabled", message: "sendDailyEmailReport is disabled for this phase." };
+				});
+			} catch (e) {
+				const msg = `send-daily-email-report failed: ${(e as Error).message || e}`;
+				console.error(`[Workflow] ${msg}`);
+				errors.push(msg);
+			}
 		}
 
 		if (params.purgeOldData) {
-			await step.do('purge-old-data', async () => {
-				const r1 = await this.env.DB.prepare("DELETE FROM daily_reports WHERE created_at < datetime('now', '-3 days')").run()
-					.catch(e => { console.error("Failed to purge daily reports:", e); throw e; });
-				const r2 = await this.env.DB.prepare("DELETE FROM market_events WHERE created_at < strftime('%s', 'now', '-30 days')").run()
-					.catch(e => { console.error("Failed to purge market events:", e); throw e; });
-				const r3 = await this.env.DB.prepare("DELETE FROM news WHERE created_at < datetime('now', '-3 days')").run()
-					.catch(e => { console.error("Failed to purge news:", e); throw e; });
-				return { reportsPurged: !!r1, eventsPurged: !!r2, newsPurged: !!r3 };
-			});
+			try {
+				await step.do('purge-old-data', STEP_CONFIG, async () => {
+					console.log('[Workflow] Starting step: purge-old-data');
+					const r1 = await this.env.DB.prepare("DELETE FROM daily_reports WHERE created_at < datetime('now', '-3 days')").run()
+						.catch(e => { console.error("Failed to purge daily reports:", e); throw e; });
+					const r2 = await this.env.DB.prepare("DELETE FROM market_events WHERE created_at < strftime('%s', 'now', '-30 days')").run()
+						.catch(e => { console.error("Failed to purge market events:", e); throw e; });
+					const r3 = await this.env.DB.prepare("DELETE FROM news WHERE created_at < datetime('now', '-3 days')").run()
+						.catch(e => { console.error("Failed to purge news:", e); throw e; });
+					return { reportsPurged: !!r1, eventsPurged: !!r2, newsPurged: !!r3 };
+				});
+			} catch (e) {
+				const msg = `purge-old-data failed: ${(e as Error).message || e}`;
+				console.error(`[Workflow] ${msg}`);
+				errors.push(msg);
+			}
 		}
 
 		if (params.syncNotebookArticles) {
-			await step.do('sync-notebook-articles', async () => {
-				return await syncNotebookArticles(this.env);
-			});
+			try {
+				await step.do('sync-notebook-articles', STEP_CONFIG, async () => {
+					console.log('[Workflow] Starting step: sync-notebook-articles');
+					return await syncNotebookArticles(this.env);
+				});
+			} catch (e) {
+				const msg = `sync-notebook-articles failed: ${(e as Error).message || e}`;
+				console.error(`[Workflow] ${msg}`);
+				errors.push(msg);
+			}
 		}
 
 		if (params.scanMarketBreakouts) {
-			await step.do('scan-market-breakouts', async () => {
-				const fmpKey = this.env.FMP_API_KEY;
-				if (!fmpKey) {
-					console.error("FMP_API_KEY is not configured.");
-					return { error: "FMP_API_KEY is not configured" };
-				}
-				const { scanMarketBreakouts } = await import('./marketScanner');
-				return await scanMarketBreakouts(this.env.DB, fmpKey, 'watchlist');
-			});
+			try {
+				await step.do('scan-market-breakouts', STEP_CONFIG, async () => {
+					console.log('[Workflow] Starting step: scan-market-breakouts');
+					const fmpKey = this.env.FMP_API_KEY;
+					if (!fmpKey) {
+						console.error("FMP_API_KEY is not configured.");
+						return { error: "FMP_API_KEY is not configured" };
+					}
+					const { scanMarketBreakouts } = await import('./marketScanner');
+					return await scanMarketBreakouts(this.env.DB, fmpKey, 'watchlist');
+				});
+			} catch (e) {
+				const msg = `scan-market-breakouts failed: ${(e as Error).message || e}`;
+				console.error(`[Workflow] ${msg}`);
+				errors.push(msg);
+			}
 		}
 
 		if (params.syncFacebookPosts) {
-			await step.do('sync-facebook-posts', async () => {
-				return await syncAndProcessFacebookPosts(this.env);
-			});
+			try {
+				await step.do('sync-facebook-posts', STEP_CONFIG, async () => {
+					console.log('[Workflow] Starting step: sync-facebook-posts');
+					return await syncAndProcessFacebookPosts(this.env);
+				});
+			} catch (e) {
+				const msg = `sync-facebook-posts failed: ${(e as Error).message || e}`;
+				console.error(`[Workflow] ${msg}`);
+				errors.push(msg);
+			}
+		}
+
+		if (errors.length > 0) {
+			console.error(`[Workflow] Completed with ${errors.length} step failure(s): ${errors.join(' | ')}`);
+		} else {
+			console.log('[Workflow] All steps completed successfully.');
 		}
 	}
 }
