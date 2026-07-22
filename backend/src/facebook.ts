@@ -2,7 +2,7 @@ import { Env } from './index';
 
 interface FacebookPostRow {
 	id: number;
-	source_type: 'daily_report' | 'email_digest' | 'custom';
+	source_type: 'daily_report' | 'email_digest' | 'custom' | 'notebook_article';
 	source_id: number;
 	thai_title: string | null;
 	thai_content: string | null;
@@ -29,13 +29,16 @@ export async function processPendingFacebookPosts(env: Env): Promise<number> {
 	let dailyReportPaused = false;
 	let emailDigestPaused = false;
 	let customPaused = false;
+	let notebookPaused = false;
 	try {
 		const dailyRow = await env.DB.prepare("SELECT value FROM system_settings WHERE key = 'pause_daily_report_facebook'").first() as { value: string } | null;
 		const emailRow = await env.DB.prepare("SELECT value FROM system_settings WHERE key = 'pause_email_digest_facebook'").first() as { value: string } | null;
 		const customRow = await env.DB.prepare("SELECT value FROM system_settings WHERE key = 'pause_custom_facebook'").first() as { value: string } | null;
+		const notebookRow = await env.DB.prepare("SELECT value FROM system_settings WHERE key = 'pause_notebook_facebook'").first() as { value: string } | null;
 		dailyReportPaused = dailyRow?.value === '1';
 		emailDigestPaused = emailRow?.value === '1';
 		customPaused = customRow?.value === '1';
+		notebookPaused = notebookRow?.value === '1';
 	} catch (e) {
 		console.warn('Failed to fetch Facebook pause settings in processPendingFacebookPosts, defaulting to unpaused:', e);
 	}
@@ -51,6 +54,9 @@ export async function processPendingFacebookPosts(env: Env): Promise<number> {
 	}
 	if (customPaused) {
 		conditions.push("source_type != 'custom'");
+	}
+	if (notebookPaused) {
+		conditions.push("source_type != 'notebook_article'");
 	}
 	if (conditions.length > 0) {
 		query += " AND " + conditions.join(" AND ");
@@ -113,6 +119,19 @@ export async function processPendingFacebookPosts(env: Env): Promise<number> {
 					summary = digest.summary;
 					symbolOrCategory = digest.category;
 					subjectInfo = `Market Digest: ${digest.category}`;
+				} else if (post.source_type === 'notebook_article') {
+					const article = await env.DB.prepare(
+						'SELECT title, symbol, summary, key_takeaways FROM notebook_articles WHERE id = ?'
+					).bind(post.source_id).first() as { title: string, symbol: string | null, summary: string, key_takeaways: string } | null;
+
+					if (!article) {
+						throw new Error(`Notebook article ID ${post.source_id} not found`);
+					}
+
+					takeaways = JSON.parse(article.key_takeaways || '[]');
+					summary = article.summary;
+					symbolOrCategory = article.symbol || article.title;
+					subjectInfo = `Notebook: ${article.title}`;
 				} else {
 					throw new Error(`Invalid source_type: ${post.source_type}`);
 				}
@@ -275,7 +294,7 @@ export async function syncAndProcessFacebookPosts(env: Env): Promise<number> {
 async function formatAndStyleFacebookPost(
 	env: Env,
 	params: {
-		type: 'daily_report' | 'email_digest';
+		type: 'daily_report' | 'email_digest' | 'notebook_article';
 		symbolOrCategory: string;
 		summary: string;
 		takeaways: string[];
@@ -349,12 +368,12 @@ ${contextContent}
 	}
 
 	// Assemble the final Facebook post programmatically
-	const summaryLabel = type === 'daily_report' ? `สรุปรายวัน: ${symbolOrCategory}` : `สรุปตลาด: ${symbolOrCategory}`;
+	const summaryLabel = type === 'daily_report' ? `สรุปรายวัน: ${symbolOrCategory}` : type === 'notebook_article' ? `บทความ: ${symbolOrCategory}` : `สรุปตลาด: ${symbolOrCategory}`;
 	const divider = '━━━━━━━━━━━━━━━━━━━━━━━━━━';
 
 	// Create hashtags
 	const defaultHashtags = ['#OaktreeAgent', '#วิเคราะห์หุ้น', '#การลงทุนระยะยาว'];
-	if (type === 'daily_report') {
+	if (type === 'daily_report' || type === 'notebook_article') {
 		defaultHashtags.push(`#${symbolOrCategory.toUpperCase()}`);
 	} else {
 		// Clean category name to make a valid hashtag (remove spaces, special characters)
