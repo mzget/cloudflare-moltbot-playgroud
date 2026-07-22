@@ -58,7 +58,7 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 				});
 			} catch (e) {
 				const msg = `fetch-market-stats failed: ${(e as Error).message || e}`;
-				console.error(`[Workflow] ${msg}`);
+				console.warn(`[Workflow] ${msg}`);
 				errors.push(msg);
 			}
 		}
@@ -72,7 +72,7 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 				});
 			} catch (e) {
 				const msg = `check-alert-rules failed: ${(e as Error).message || e}`;
-				console.error(`[Workflow] ${msg}`);
+				console.warn(`[Workflow] ${msg}`);
 				errors.push(msg);
 			}
 		}
@@ -86,7 +86,7 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 				});
 			} catch (e) {
 				const msg = `sync-emails failed: ${(e as Error).message || e}`;
-				console.error(`[Workflow] ${msg}`);
+				console.warn(`[Workflow] ${msg}`);
 				errors.push(msg);
 			}
 		}
@@ -101,7 +101,7 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 				});
 			} catch (e) {
 				const msg = `generate-email-digests failed: ${(e as Error).message || e}`;
-				console.error(`[Workflow] ${msg}`);
+				console.warn(`[Workflow] ${msg}`);
 				errors.push(msg);
 			}
 		}
@@ -115,7 +115,7 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 				});
 			} catch (e) {
 				const msg = `run-crawler failed: ${(e as Error).message || e}`;
-				console.error(`[Workflow] ${msg}`);
+				console.warn(`[Workflow] ${msg}`);
 				errors.push(msg);
 			}
 		}
@@ -128,14 +128,14 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 					const force = !!params.generateDailySummariesForce;
 					const summaryPromises = (results || []).map(row =>
 						generateDailySummary(this.env, row.symbol as string, force)
-							.catch(e => console.error(`Workflow summary failed for ${row.symbol}:`, e))
+							.catch(e => console.warn(`Workflow summary failed for ${row.symbol}:`, e))
 					);
 					await Promise.all(summaryPromises);
 					return { count: (results || []).length };
 				});
 			} catch (e) {
 				const msg = `generate-daily-summaries failed: ${(e as Error).message || e}`;
-				console.error(`[Workflow] ${msg}`);
+				console.warn(`[Workflow] ${msg}`);
 				errors.push(msg);
 			}
 		}
@@ -149,7 +149,7 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 				});
 			} catch (e) {
 				const msg = `fetch-market-events failed: ${(e as Error).message || e}`;
-				console.error(`[Workflow] ${msg}`);
+				console.warn(`[Workflow] ${msg}`);
 				errors.push(msg);
 			}
 		}
@@ -163,7 +163,7 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 				});
 			} catch (e) {
 				const msg = `send-daily-email-report failed: ${(e as Error).message || e}`;
-				console.error(`[Workflow] ${msg}`);
+				console.warn(`[Workflow] ${msg}`);
 				errors.push(msg);
 			}
 		}
@@ -173,16 +173,16 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 				await step.do('purge-old-data', STEP_CONFIG, async () => {
 					console.log('[Workflow] Starting step: purge-old-data');
 					const r1 = await this.env.DB.prepare("DELETE FROM daily_reports WHERE created_at < datetime('now', '-3 days')").run()
-						.catch(e => { console.error("Failed to purge daily reports:", e); });
+						.catch(e => { console.warn("Failed to purge daily reports:", e); });
 					const r2 = await this.env.DB.prepare("DELETE FROM market_events WHERE created_at < strftime('%s', 'now', '-30 days')").run()
-						.catch(e => { console.error("Failed to purge market events:", e); });
+						.catch(e => { console.warn("Failed to purge market events:", e); });
 					const r3 = await this.env.DB.prepare("DELETE FROM news WHERE created_at < datetime('now', '-3 days')").run()
-						.catch(e => { console.error("Failed to purge news:", e); });
+						.catch(e => { console.warn("Failed to purge news:", e); });
 					return { reportsPurged: !!r1, eventsPurged: !!r2, newsPurged: !!r3 };
 				});
 			} catch (e) {
 				const msg = `purge-old-data failed: ${(e as Error).message || e}`;
-				console.error(`[Workflow] ${msg}`);
+				console.warn(`[Workflow] ${msg}`);
 				errors.push(msg);
 			}
 		}
@@ -196,7 +196,7 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 				});
 			} catch (e) {
 				const msg = `sync-notebook-articles failed: ${(e as Error).message || e}`;
-				console.error(`[Workflow] ${msg}`);
+				console.warn(`[Workflow] ${msg}`);
 				errors.push(msg);
 			}
 		}
@@ -207,7 +207,7 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 					console.log('[Workflow] Starting step: scan-market-breakouts');
 					const fmpKey = this.env.FMP_API_KEY;
 					if (!fmpKey) {
-						console.error("FMP_API_KEY is not configured.");
+						console.warn("FMP_API_KEY is not configured.");
 						return { count: 0, error: "FMP_API_KEY is not configured" };
 					}
 					const { scanMarketBreakouts } = await import('./marketScanner');
@@ -216,7 +216,7 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 				});
 			} catch (e) {
 				const msg = `scan-market-breakouts failed: ${(e as Error).message || e}`;
-				console.error(`[Workflow] ${msg}`);
+				console.warn(`[Workflow] ${msg}`);
 				errors.push(msg);
 			}
 		}
@@ -230,13 +230,13 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 				});
 			} catch (e) {
 				const msg = `sync-facebook-posts failed: ${(e as Error).message || e}`;
-				console.error(`[Workflow] ${msg}`);
+				console.warn(`[Workflow] ${msg}`);
 				errors.push(msg);
 			}
 		}
 
 		if (errors.length > 0) {
-			console.error(`[Workflow] Completed with ${errors.length} step failure(s): ${errors.join(' | ')}`);
+			console.warn(`[Workflow] Completed with ${errors.length} step warning(s): ${errors.join(' | ')}`);
 		} else {
 			console.log('[Workflow] All steps completed successfully.');
 		}

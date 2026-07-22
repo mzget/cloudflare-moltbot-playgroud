@@ -241,16 +241,31 @@ export async function syncAndProcessFacebookPosts(env: Env): Promise<number> {
 		}
 
 		// 3. Discover and queue new notebook articles from the last 24h
-		await env.DB.prepare(`
-			INSERT OR IGNORE INTO facebook_posts (source_type, source_id, status)
-			SELECT 'notebook_article', id, 'pending'
-			FROM notebook_articles
-			WHERE created_at > datetime('now', '-1 day')
-			  AND id NOT IN (SELECT source_id FROM facebook_posts WHERE source_type = 'notebook_article')
-		`).run();
+		try {
+			await env.DB.prepare(`
+				CREATE TABLE IF NOT EXISTS notebook_articles (
+					id INTEGER PRIMARY KEY AUTOINCREMENT,
+					title TEXT NOT NULL,
+					symbol TEXT,
+					summary TEXT,
+					key_takeaways TEXT,
+					synced_at TEXT DEFAULT (datetime('now')),
+					created_at TEXT DEFAULT (datetime('now'))
+				)
+			`).run();
+			await env.DB.prepare(`
+				INSERT OR IGNORE INTO facebook_posts (source_type, source_id, status)
+				SELECT 'notebook_article', id, 'pending'
+				FROM notebook_articles
+				WHERE created_at > datetime('now', '-1 day')
+				  AND id NOT IN (SELECT source_id FROM facebook_posts WHERE source_type = 'notebook_article')
+			`).run();
+		} catch (e) {
+			console.warn('Notebook article Facebook discovery skipped:', e);
+		}
 
 	} catch (e) {
-		console.error('Failed to sync new daily reports/digests/notebook articles into facebook_posts queue:', e);
+		console.warn('Failed to sync new daily reports/digests/notebook articles into facebook_posts queue:', e);
 	}
 
 	// 3. Process the queue
