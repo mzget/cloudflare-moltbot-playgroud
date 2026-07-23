@@ -1,7 +1,8 @@
 import { Env } from './index';
 
 export async function sendDailyEmailReport(env: Env) {
-  console.log("Preparing daily email report...");
+  console.log("Email sending is currently disabled. Skipping daily email report.");
+  return;
 
   // 1. Fetch latest reports (for today)
   const { results } = await env.DB.prepare(
@@ -46,10 +47,11 @@ export async function sendDailyEmailReport(env: Env) {
   // 3. Send Email using Cloudflare Email Binding
   // Note: This requires the [send_email] binding in wrangler.toml and a verified destination.
   try {
+    const recipient = env.ALERT_EMAIL || env.DESTINATION_EMAIL || env.EMAIL?.destination_address || 'rattajak.n@gmail.com';
     const { createMimeMessage } = await import('mimetext');
     const msg = createMimeMessage();
     msg.setSender({ name: 'Oaktree Agent', addr: 'agent@oaktree.internal' });
-    msg.setRecipient(env.EMAIL.destination_address);
+    msg.setRecipient(recipient);
     msg.setSubject(`Daily Market Intelligence - ${new Date().toLocaleDateString()}`);
     msg.addMessage({
       contentType: 'text/html',
