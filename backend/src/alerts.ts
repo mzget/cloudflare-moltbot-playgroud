@@ -201,7 +201,8 @@ async function sendAlertsEmail(
   env: Env, 
   alerts: { symbol: string; message: string }[]
 ) {
-  console.log(`Sending alert notification email for ${alerts.length} trigger(s)...`);
+  console.log(`Alert triggered for ${alerts.length} item(s). Email sending is currently disabled (in-app notification saved).`);
+  return;
 
   let emailHtml = `
     <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; line-height: 1.6; border: 1px solid #e1e8ed; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
@@ -234,10 +235,11 @@ async function sendAlertsEmail(
   `;
 
   try {
+    const recipient = env.ALERT_EMAIL || env.DESTINATION_EMAIL || env.EMAIL?.destination_address || 'rattajak.n@gmail.com';
     const { createMimeMessage } = await import('mimetext');
     const msg = createMimeMessage();
     msg.setSender({ name: 'Oaktree Agent', addr: 'agent@oaktree.internal' });
-    msg.setRecipient(env.EMAIL.destination_address);
+    msg.setRecipient(recipient);
     msg.setSubject(`[Oaktree Alert] Threshold Crossed for ${alerts.map(a => a.symbol).join(', ')}`);
     msg.addMessage({
       contentType: 'text/html',

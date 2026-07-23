@@ -29,8 +29,10 @@ export interface Env {
   BROWSER: BrowserWorker;
   EMAIL: {
     send: (raw: string) => Promise<void>;
-    destination_address: string;
+    destination_address?: string;
   };
+  ALERT_EMAIL?: string;
+  DESTINATION_EMAIL?: string;
   FINNHUB_API_KEY?: string;
   FMP_API_KEY?: string;
   GOOGLE_CLIENT_ID?: string;
