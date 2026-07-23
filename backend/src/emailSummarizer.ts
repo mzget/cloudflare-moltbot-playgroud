@@ -31,80 +31,85 @@ export async function syncAndIngestEmails(env: Env): Promise<number> {
     return 0;
   }
 
-  const jwtSecret = env.JWT_SECRET || 'dev-secret-key-123456';
-  const accessToken = await getOrRefreshAccessToken(env.DB, clientId, clientSecret, jwtSecret);
-  if (!accessToken) {
-    console.warn('Gmail not connected. Please authenticate via OAuth.');
+  try {
+    const jwtSecret = env.JWT_SECRET || 'dev-secret-key-123456';
+    const accessToken = await getOrRefreshAccessToken(env.DB, clientId, clientSecret, jwtSecret);
+    if (!accessToken) {
+      console.warn('Gmail not connected. Please authenticate via OAuth.');
+      return 0;
+    }
+
+    // Fetch active subscriptions
+    const { results: subscriptions } = await env.DB.prepare(
+      'SELECT * FROM email_subscriptions WHERE is_active = 1'
+    ).all() as { results: any[] };
+
+    let totalNewEmails = 0;
+
+    for (const sub of subscriptions) {
+      // Determine the query
+      let query = '';
+      if (sub.raw_query) {
+        query = `${sub.raw_query} is:unread`;
+      } else {
+        const parts = [];
+        if (sub.sender) parts.push(`from:${sub.sender}`);
+        if (sub.subject_filter) parts.push(`subject:(${sub.subject_filter})`);
+        if (sub.label_filter) parts.push(`label:${sub.label_filter}`);
+        if (parts.length > 0) {
+          parts.push('is:unread');
+          query = parts.join(' ');
+        }
+      }
+
+      if (!query) continue;
+
+      console.log(`Polling Gmail for subscription "${sub.name}" with query: "${query}"`);
+      try {
+        const messages = await fetchGmailMessages(accessToken, query);
+        
+        for (const msgSummary of messages) {
+          // Check if already ingested
+          const exists = await env.DB.prepare(
+            'SELECT 1 FROM ingested_emails WHERE id = ?'
+          ).bind(msgSummary.id).first();
+
+          if (exists) continue;
+
+          // Fetch detail
+          console.log(`Ingesting new email message ID: ${msgSummary.id}`);
+          const detail = await fetchGmailMessageDetail(accessToken, msgSummary.id);
+          const headers = detail.payload.headers || [];
+          const subject = getHeader(headers, 'subject') || 'No Subject';
+          const sender = getHeader(headers, 'from') || 'Unknown Sender';
+          const receivedAt = parseInt(detail.internalDate) || Date.now();
+          const receivedAtIso = new Date(receivedAt).toISOString();
+          const rawBody = parseEmailBody(detail.payload);
+          const cleanedBody = cleanEmailBody(rawBody);
+
+          await env.DB.prepare(
+            'INSERT INTO ingested_emails (id, subscription_id, sender, subject, body_text, received_at) VALUES (?, ?, ?, ?, ?, ?)'
+          ).bind(
+            msgSummary.id,
+            sub.id,
+            sender,
+            subject,
+            cleanedBody,
+            receivedAtIso
+          ).run();
+
+          totalNewEmails++;
+        }
+      } catch (e) {
+        console.error(`Failed to ingest emails for subscription ${sub.name}:`, e);
+      }
+    }
+
+    return totalNewEmails;
+  } catch (e) {
+    console.error('syncAndIngestEmails encountered an unexpected error:', e);
     return 0;
   }
-
-  // Fetch active subscriptions
-  const { results: subscriptions } = await env.DB.prepare(
-    'SELECT * FROM email_subscriptions WHERE is_active = 1'
-  ).all() as { results: any[] };
-
-  let totalNewEmails = 0;
-
-  for (const sub of subscriptions) {
-    // Determine the query
-    let query = '';
-    if (sub.raw_query) {
-      query = `${sub.raw_query} is:unread`;
-    } else {
-      const parts = [];
-      if (sub.sender) parts.push(`from:${sub.sender}`);
-      if (sub.subject_filter) parts.push(`subject:(${sub.subject_filter})`);
-      if (sub.label_filter) parts.push(`label:${sub.label_filter}`);
-      if (parts.length > 0) {
-        parts.push('is:unread');
-        query = parts.join(' ');
-      }
-    }
-
-    if (!query) continue;
-
-    console.log(`Polling Gmail for subscription "${sub.name}" with query: "${query}"`);
-    try {
-      const messages = await fetchGmailMessages(accessToken, query);
-      
-      for (const msgSummary of messages) {
-        // Check if already ingested
-        const exists = await env.DB.prepare(
-          'SELECT 1 FROM ingested_emails WHERE id = ?'
-        ).bind(msgSummary.id).first();
-
-        if (exists) continue;
-
-        // Fetch detail
-        console.log(`Ingesting new email message ID: ${msgSummary.id}`);
-        const detail = await fetchGmailMessageDetail(accessToken, msgSummary.id);
-        const headers = detail.payload.headers || [];
-        const subject = getHeader(headers, 'subject') || 'No Subject';
-        const sender = getHeader(headers, 'from') || 'Unknown Sender';
-        const receivedAt = parseInt(detail.internalDate) || Date.now();
-        const receivedAtIso = new Date(receivedAt).toISOString();
-        const rawBody = parseEmailBody(detail.payload);
-        const cleanedBody = cleanEmailBody(rawBody);
-
-        await env.DB.prepare(
-          'INSERT INTO ingested_emails (id, subscription_id, sender, subject, body_text, received_at) VALUES (?, ?, ?, ?, ?, ?)'
-        ).bind(
-          msgSummary.id,
-          sub.id,
-          sender,
-          subject,
-          cleanedBody,
-          receivedAtIso
-        ).run();
-
-        totalNewEmails++;
-      }
-    } catch (e) {
-      console.error(`Failed to ingest emails for subscription ${sub.name}:`, e);
-    }
-  }
-
-  return totalNewEmails;
 }
 
 export async function generateEmailDigests(env: Env, isManual = false): Promise<void> {

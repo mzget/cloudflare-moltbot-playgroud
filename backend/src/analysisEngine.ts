@@ -241,7 +241,7 @@ export async function runFullAnalysis(env: Env, symbol: string): Promise<{
       { role: 'system', content: lynchPrompt.system },
       { role: 'user', content: lynchPrompt.prompt }
     ],
-    max_tokens: 4096,
+    max_tokens: 8192,
     response_format: { type: 'json_object' }
   } as any);
   let lynchText = (lynchAIResponse as any).choices?.[0]?.message?.content || lynchAIResponse.response || '';
@@ -254,7 +254,7 @@ export async function runFullAnalysis(env: Env, symbol: string): Promise<{
       { role: 'system', content: helmerPrompt.system },
       { role: 'user', content: helmerPrompt.prompt }
     ],
-    max_tokens: 4096,
+    max_tokens: 8192,
     response_format: { type: 'json_object' }
   } as any);
   let helmerText = (helmerAIResponse as any).choices?.[0]?.message?.content || helmerAIResponse.response || '';
@@ -270,7 +270,7 @@ export async function runFullAnalysis(env: Env, symbol: string): Promise<{
       { role: 'system', content: buffettPrompt.system },
       { role: 'user', content: buffettPrompt.prompt }
     ],
-    max_tokens: 4096,
+    max_tokens: 8192,
     response_format: { type: 'json_object' }
   } as any);
   let buffettText = (buffettAIResponse as any).choices?.[0]?.message?.content || buffettAIResponse.response || '';
@@ -287,7 +287,7 @@ export async function runFullAnalysis(env: Env, symbol: string): Promise<{
       { role: 'system', content: mungerPrompt.system },
       { role: 'user', content: mungerPrompt.prompt }
     ],
-    max_tokens: 4096,
+    max_tokens: 8192,
     response_format: { type: 'json_object' }
   } as any);
   let mungerText = (mungerAIResponse as any).choices?.[0]?.message?.content || mungerAIResponse.response || '';
@@ -305,7 +305,7 @@ export async function runFullAnalysis(env: Env, symbol: string): Promise<{
       { role: 'system', content: marksPrompt.system },
       { role: 'user', content: marksPrompt.prompt }
     ],
-    max_tokens: 4096,
+    max_tokens: 8192,
     response_format: { type: 'json_object' }
   } as any);
   let marksText = (marksAIResponse as any).choices?.[0]?.message?.content || marksAIResponse.response || '';
@@ -324,7 +324,7 @@ export async function runFullAnalysis(env: Env, symbol: string): Promise<{
       { role: 'system', content: greenblattPrompt.system },
       { role: 'user', content: greenblattPrompt.prompt }
     ],
-    max_tokens: 4096,
+    max_tokens: 8192,
     response_format: { type: 'json_object' }
   } as any);
   let greenblattText = (greenblattAIResponse as any).choices?.[0]?.message?.content || greenblattAIResponse.response || '';
@@ -337,7 +337,7 @@ export async function runFullAnalysis(env: Env, symbol: string): Promise<{
       { role: 'system', content: synthesisPrompt.system },
       { role: 'user', content: synthesisPrompt.prompt }
     ],
-    max_tokens: 4096,
+    max_tokens: 8192,
     response_format: { type: 'json_object' }
   } as any);
   let synthesisText = (synthesisAIResponse as any).choices?.[0]?.message?.content || synthesisAIResponse.response || '';

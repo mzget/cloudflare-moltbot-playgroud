@@ -54,11 +54,11 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 					if (!params.priceOnly && !params.metricsOnly) {
 						await recordDailyPortfolioHistory(this.env.DB);
 					}
-					return statsResult;
+					return statsResult || [];
 				});
 			} catch (e) {
 				const msg = `fetch-market-stats failed: ${(e as Error).message || e}`;
-				console.error(`[Workflow] ${msg}`);
+				console.warn(`[Workflow] ${msg}`);
 				errors.push(msg);
 			}
 		}
@@ -67,11 +67,12 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 			try {
 				await step.do('check-alert-rules', STEP_CONFIG, async () => {
 					console.log('[Workflow] Starting step: check-alert-rules');
-					return await checkAlertRules(this.env);
+					const res = await checkAlertRules(this.env);
+					return { triggeredCount: res.triggeredCount, errors: res.errors || [] };
 				});
 			} catch (e) {
 				const msg = `check-alert-rules failed: ${(e as Error).message || e}`;
-				console.error(`[Workflow] ${msg}`);
+				console.warn(`[Workflow] ${msg}`);
 				errors.push(msg);
 			}
 		}
@@ -80,11 +81,12 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 			try {
 				await step.do('sync-emails', STEP_CONFIG, async () => {
 					console.log('[Workflow] Starting step: sync-emails');
-					return await syncAndIngestEmails(this.env);
+					const count = await syncAndIngestEmails(this.env);
+					return { count: count || 0 };
 				});
 			} catch (e) {
 				const msg = `sync-emails failed: ${(e as Error).message || e}`;
-				console.error(`[Workflow] ${msg}`);
+				console.warn(`[Workflow] ${msg}`);
 				errors.push(msg);
 			}
 		}
@@ -94,11 +96,12 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 				await step.do('generate-email-digests', STEP_CONFIG, async () => {
 					console.log('[Workflow] Starting step: generate-email-digests');
 					const isManual = !!params.emailDigestsManual;
-					return await generateEmailDigests(this.env, isManual);
+					await generateEmailDigests(this.env, isManual);
+					return { status: "completed" };
 				});
 			} catch (e) {
 				const msg = `generate-email-digests failed: ${(e as Error).message || e}`;
-				console.error(`[Workflow] ${msg}`);
+				console.warn(`[Workflow] ${msg}`);
 				errors.push(msg);
 			}
 		}
@@ -107,11 +110,12 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 			try {
 				await step.do('run-crawler', STEP_CONFIG, async () => {
 					console.log('[Workflow] Starting step: run-crawler');
-					return await runCrawler(this.env);
+					await runCrawler(this.env);
+					return { status: "completed" };
 				});
 			} catch (e) {
 				const msg = `run-crawler failed: ${(e as Error).message || e}`;
-				console.error(`[Workflow] ${msg}`);
+				console.warn(`[Workflow] ${msg}`);
 				errors.push(msg);
 			}
 		}
@@ -122,16 +126,16 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 					console.log('[Workflow] Starting step: generate-daily-summaries');
 					const { results } = await this.env.DB.prepare('SELECT symbol FROM watchlist WHERE is_active = 1').all();
 					const force = !!params.generateDailySummariesForce;
-					const summaryPromises = results.map(row =>
+					const summaryPromises = (results || []).map(row =>
 						generateDailySummary(this.env, row.symbol as string, force)
-							.catch(e => console.error(`Workflow summary failed for ${row.symbol}:`, e))
+							.catch(e => console.warn(`Workflow summary failed for ${row.symbol}:`, e))
 					);
 					await Promise.all(summaryPromises);
-					return { count: results.length };
+					return { count: (results || []).length };
 				});
 			} catch (e) {
 				const msg = `generate-daily-summaries failed: ${(e as Error).message || e}`;
-				console.error(`[Workflow] ${msg}`);
+				console.warn(`[Workflow] ${msg}`);
 				errors.push(msg);
 			}
 		}
@@ -140,11 +144,12 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 			try {
 				await step.do('fetch-market-events', STEP_CONFIG, async () => {
 					console.log('[Workflow] Starting step: fetch-market-events');
-					return await fetchAndStoreMarketEvents(this.env);
+					await fetchAndStoreMarketEvents(this.env);
+					return { status: "completed" };
 				});
 			} catch (e) {
 				const msg = `fetch-market-events failed: ${(e as Error).message || e}`;
-				console.error(`[Workflow] ${msg}`);
+				console.warn(`[Workflow] ${msg}`);
 				errors.push(msg);
 			}
 		}
@@ -158,7 +163,7 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 				});
 			} catch (e) {
 				const msg = `send-daily-email-report failed: ${(e as Error).message || e}`;
-				console.error(`[Workflow] ${msg}`);
+				console.warn(`[Workflow] ${msg}`);
 				errors.push(msg);
 			}
 		}
@@ -168,16 +173,16 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 				await step.do('purge-old-data', STEP_CONFIG, async () => {
 					console.log('[Workflow] Starting step: purge-old-data');
 					const r1 = await this.env.DB.prepare("DELETE FROM daily_reports WHERE created_at < datetime('now', '-3 days')").run()
-						.catch(e => { console.error("Failed to purge daily reports:", e); throw e; });
+						.catch(e => { console.warn("Failed to purge daily reports:", e); });
 					const r2 = await this.env.DB.prepare("DELETE FROM market_events WHERE created_at < strftime('%s', 'now', '-30 days')").run()
-						.catch(e => { console.error("Failed to purge market events:", e); throw e; });
+						.catch(e => { console.warn("Failed to purge market events:", e); });
 					const r3 = await this.env.DB.prepare("DELETE FROM news WHERE created_at < datetime('now', '-3 days')").run()
-						.catch(e => { console.error("Failed to purge news:", e); throw e; });
+						.catch(e => { console.warn("Failed to purge news:", e); });
 					return { reportsPurged: !!r1, eventsPurged: !!r2, newsPurged: !!r3 };
 				});
 			} catch (e) {
 				const msg = `purge-old-data failed: ${(e as Error).message || e}`;
-				console.error(`[Workflow] ${msg}`);
+				console.warn(`[Workflow] ${msg}`);
 				errors.push(msg);
 			}
 		}
@@ -186,11 +191,12 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 			try {
 				await step.do('sync-notebook-articles', STEP_CONFIG, async () => {
 					console.log('[Workflow] Starting step: sync-notebook-articles');
-					return await syncNotebookArticles(this.env);
+					const count = await syncNotebookArticles(this.env);
+					return { count: count || 0 };
 				});
 			} catch (e) {
 				const msg = `sync-notebook-articles failed: ${(e as Error).message || e}`;
-				console.error(`[Workflow] ${msg}`);
+				console.warn(`[Workflow] ${msg}`);
 				errors.push(msg);
 			}
 		}
@@ -201,15 +207,16 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 					console.log('[Workflow] Starting step: scan-market-breakouts');
 					const fmpKey = this.env.FMP_API_KEY;
 					if (!fmpKey) {
-						console.error("FMP_API_KEY is not configured.");
-						return { error: "FMP_API_KEY is not configured" };
+						console.warn("FMP_API_KEY is not configured.");
+						return { count: 0, error: "FMP_API_KEY is not configured" };
 					}
 					const { scanMarketBreakouts } = await import('./marketScanner');
-					return await scanMarketBreakouts(this.env.DB, fmpKey, 'watchlist');
+					const breakouts = await scanMarketBreakouts(this.env.DB, fmpKey, 'watchlist');
+					return { count: (breakouts || []).length };
 				});
 			} catch (e) {
 				const msg = `scan-market-breakouts failed: ${(e as Error).message || e}`;
-				console.error(`[Workflow] ${msg}`);
+				console.warn(`[Workflow] ${msg}`);
 				errors.push(msg);
 			}
 		}
@@ -218,17 +225,18 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 			try {
 				await step.do('sync-facebook-posts', STEP_CONFIG, async () => {
 					console.log('[Workflow] Starting step: sync-facebook-posts');
-					return await syncAndProcessFacebookPosts(this.env);
+					const count = await syncAndProcessFacebookPosts(this.env);
+					return { count: count || 0 };
 				});
 			} catch (e) {
 				const msg = `sync-facebook-posts failed: ${(e as Error).message || e}`;
-				console.error(`[Workflow] ${msg}`);
+				console.warn(`[Workflow] ${msg}`);
 				errors.push(msg);
 			}
 		}
 
 		if (errors.length > 0) {
-			console.error(`[Workflow] Completed with ${errors.length} step failure(s): ${errors.join(' | ')}`);
+			console.warn(`[Workflow] Completed with ${errors.length} step warning(s): ${errors.join(' | ')}`);
 		} else {
 			console.log('[Workflow] All steps completed successfully.');
 		}

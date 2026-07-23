@@ -1,5 +1,22 @@
 import { Env } from './index';
 
+async function runAiWithRetry(env: Env, model: string, payload: any, maxRetries = 2): Promise<any> {
+	let lastError: any;
+	for (let attempt = 0; attempt <= maxRetries; attempt++) {
+		try {
+			if (attempt > 0) {
+				const delay = Math.pow(2, attempt - 1) * 1000;
+				await new Promise(resolve => setTimeout(resolve, delay));
+			}
+			return await env.AI.run(model, payload);
+		} catch (err: any) {
+			lastError = err;
+			console.warn(`[Workers AI] Attempt ${attempt + 1} failed for ${model}:`, err?.message || err);
+		}
+	}
+	throw lastError;
+}
+
 export async function generateDailySummary(env: Env, symbol: string, force = false) {
 	// Check if a daily report already exists for this symbol today
 	if (!force) {
@@ -24,7 +41,7 @@ export async function generateDailySummary(env: Env, symbol: string, force = fal
 	}
 
 	const context = news.slice(0, 10).map(n => `- ${n.title}\n  Summary: ${n.summary || 'No summary available.'}`).join('\n\n');
-	
+
 	const prompt = `
 		You are the Oaktree Agent, an expert financial analyst. 
 		Summarize the following news headlines for ${symbol} into a concise, professional report (strictly 2 to 3 sentences) WRITTEN IN THAI.
@@ -52,21 +69,21 @@ export async function generateDailySummary(env: Env, symbol: string, force = fal
 	`;
 
 	try {
-		const response = await env.AI.run(env.default_ai_model, {
+		const response = await runAiWithRetry(env, env.facebook_summarize_model, {
 			messages: [
 				{ role: 'user', content: prompt }
 			],
-			max_tokens: 8192,
+			max_tokens: 2048,
 			response_format: {
 				type: 'json_object'
 			}
 		} as any);
 
 		let responseText = (response as any).choices?.[0]?.message?.content || response.response || "";
-		
+
 		// 2. Extract the JSON object using a more precise regex
 		const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-		
+
 		if (jsonMatch) {
 			try {
 				let data: any;
@@ -105,13 +122,13 @@ export async function generateDailySummary(env: Env, symbol: string, force = fal
 					}
 					data = JSON.parse(cleaned);
 				}
-				
+
 				await env.DB.prepare(
 					'INSERT INTO daily_reports (symbol, summary, sentiment_score, key_takeaways) VALUES (?, ?, ?, ?)'
 				).bind(
-					symbol, 
-					data.summary, 
-					data.sentiment_score || 0, 
+					symbol,
+					data.summary,
+					data.sentiment_score || 0,
 					JSON.stringify(data.key_takeaways || [])
 				).run();
 
