@@ -38,10 +38,10 @@ export interface MarketStatsOptions {
 	metricsOnly?: boolean;
 }
 
-export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOptions = {}): Promise<{ symbol: string, success: boolean, price?: number | null, error?: string }[]> {
+export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOptions = {}): Promise<{ symbol: string, success: boolean, price?: number | null, error?: string | null }[]> {
 	const { priceOnly = false, metricsOnly = false } = options;
 	const apiKey = env.FINNHUB_API_KEY;
-	const runResults: { symbol: string, success: boolean, price?: number | null, error?: string }[] = [];
+	const runResults: { symbol: string, success: boolean, price?: number | null, error?: string | null }[] = [];
 	
 	const marketOpen = isUSMarketOpen();
 
@@ -386,7 +386,7 @@ export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOpt
 
 						if (!logged) {
 							const msg = `${symbol} broke out to a new All-Time High of ${price}!`;
-							await env.DB.batch([
+							batchStatements.push(
 								env.DB.prepare(`
 									INSERT INTO in_app_notifications (symbol, metric, condition_type, target_value, trigger_value, message, is_read)
 									VALUES (?1, 'ath', 'breakout', ?2, ?3, ?4, 0)
@@ -395,7 +395,7 @@ export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOpt
 									INSERT INTO record_breaker_events (symbol, event_type, price, previous_record, event_date, is_notified)
 									VALUES (?1, 'ath', ?2, ?3, ?4, 1)
 								`).bind(symbol, price, all_time_high, todayDate)
-							]);
+							);
 							loggedEvents.add(key);
 						}
 						all_time_high = price;
@@ -412,7 +412,7 @@ export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOpt
 
 						if (!logged) {
 							const msg = `${symbol} broke down to a new All-Time Low of ${price}!`;
-							await env.DB.batch([
+							batchStatements.push(
 								env.DB.prepare(`
 									INSERT INTO in_app_notifications (symbol, metric, condition_type, target_value, trigger_value, message, is_read)
 									VALUES (?1, 'atl', 'breakdown', ?2, ?3, ?4, 0)
@@ -421,7 +421,7 @@ export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOpt
 									INSERT INTO record_breaker_events (symbol, event_type, price, previous_record, event_date, is_notified)
 									VALUES (?1, 'atl', ?2, ?3, ?4, 1)
 								`).bind(symbol, price, all_time_low, todayDate)
-							]);
+							);
 							loggedEvents.add(key);
 						}
 						all_time_low = price;
@@ -438,7 +438,7 @@ export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOpt
 
 						if (!logged) {
 							const msg = `${symbol} broke out to a new 52-week high of ${price}!`;
-							await env.DB.batch([
+							batchStatements.push(
 								env.DB.prepare(`
 									INSERT INTO in_app_notifications (symbol, metric, condition_type, target_value, trigger_value, message, is_read)
 									VALUES (?1, '52w_high', 'breakout', ?2, ?3, ?4, 0)
@@ -447,7 +447,7 @@ export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOpt
 									INSERT INTO record_breaker_events (symbol, event_type, price, previous_record, event_date, is_notified)
 									VALUES (?1, '52w_high', ?2, ?3, ?4, 1)
 								`).bind(symbol, price, fifty_two_week_high, todayDate)
-							]);
+							);
 							loggedEvents.add(key);
 						}
 						fifty_two_week_high = price;
@@ -461,7 +461,7 @@ export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOpt
 
 						if (!logged) {
 							const msg = `${symbol} broke down to a new 52-week low of ${price}!`;
-							await env.DB.batch([
+							batchStatements.push(
 								env.DB.prepare(`
 									INSERT INTO in_app_notifications (symbol, metric, condition_type, target_value, trigger_value, message, is_read)
 									VALUES (?1, '52w_low', 'breakdown', ?2, ?3, ?4, 0)
@@ -470,7 +470,7 @@ export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOpt
 									INSERT INTO record_breaker_events (symbol, event_type, price, previous_record, event_date, is_notified)
 									VALUES (?1, '52w_low', ?2, ?3, ?4, 1)
 								`).bind(symbol, price, fifty_two_week_low, todayDate)
-							]);
+							);
 							loggedEvents.add(key);
 						}
 						fifty_two_week_low = price;
@@ -539,10 +539,10 @@ export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOpt
 				);
 
 				batchStatements.push(stmt);
-				runResults.push({ symbol, success: true, price, error: finalQuoteError || undefined });
+				runResults.push({ symbol, success: true, price: price ?? null, error: finalQuoteError ?? null });
 			} catch (error) {
 				console.error(`Error processing stats for ${symbol}:`, error);
-				runResults.push({ symbol, success: false, error: (error as any).message });
+				runResults.push({ symbol, success: false, price: null, error: (error as any).message || String(error) });
 			}
 		}
 
