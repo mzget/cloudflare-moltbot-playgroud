@@ -95,3 +95,30 @@ Never use `window.confirm()`, `window.alert()`, `window.prompt()`, or the bare `
   - `<DialogTitle>`, `<DialogContent>`, and `<Stack>` for layout inside the modal.
   - Use `color="danger"` buttons with a relevant Lucide icon (`<Trash2>`) for destructive confirms.
   - Control visibility with a dedicated `useState` boolean (e.g., `isDeleteConfirmOpen`).
+
+---
+
+## 🤖 Cloudflare Workers AI Model Specifications
+
+This workspace uses a multi-tier AI model architecture configured in `wrangler.toml` under `[vars]`:
+
+### 1. `default_ai_model` (`@cf/google/gemma-4-26b-a4b-it`)
+- **Category**: Primary Heavy Reasoning & Analysis Model (26B MoE / 4B active).
+- **Target Use Cases**:
+  - Multi-step investment analysis engine (`backend/src/analysisEngine.ts`) executing 6 frameworks (Peter Lynch, Hamilton Helmer 7 Powers, Buffett, Munger, Howard Marks, Joel Greenblatt).
+  - Newsletter digest generation and categorization (`backend/src/emailSummarizer.ts`).
+  - Stock daily news summarization (`backend/src/summarizer.ts`).
+- **Input/Output Constraints**:
+  - Enforce `response_format: { type: 'json_object' }`.
+  - Escaped quotes: Require prompts to instruct the LLM not to use unescaped double quotes inside JSON string values.
+
+### 2. `facebook_summarize_model` (`@cf/meta/llama-3.2-3b-instruct`)
+- **Category**: Fast & Lightweight Social Media Stylist (3B parameters).
+- **Target Use Cases**:
+  - Generating short 2-3 sentence "Oaktree Memo" commentaries for Facebook Page posts (`backend/src/facebook.ts`).
+  - Re-formatting custom user drafts into engaging Facebook posts with emojis, clear spacing, and hashtags (`backend/src/facebook.ts`).
+- **Input/Output Constraints**: Plain text / formatted social media copy (no raw JSON requirement).
+
+### 💡 Developer Rules for AI Models:
+- **No Hardcoded Model Strings**: Always reference models via `env.default_ai_model` or `env.facebook_summarize_model` instead of hardcoding model string literals in TypeScript files.
+- **Model Upgrades**: When changing models in `wrangler.toml`, verify that the model string matches valid Workers AI model identifiers (e.g. `@cf/google/...`, `@cf/meta/...`).

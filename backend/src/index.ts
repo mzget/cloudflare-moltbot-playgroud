@@ -2615,30 +2615,8 @@ export default {
     const now = new Date();
     const isMinuteZero = now.getUTCMinutes() === 0;
 
-    // 1. Price-only & Facebook Sync (Every 30 mins)
-    if (event.cron === "*/30 * * * *") {
-      console.log(`Running 30-min cron (isMinuteZero: ${isMinuteZero})...`);
-      ctx.waitUntil((async () => {
-        try {
-          await env.OAKTREE_SYNC_WORKFLOW.create({
-            id: `cron-fb-${Date.now()}`,
-            params: {
-              syncFacebookPosts: true,
-              fetchMarketStats: !isMinuteZero, // Skip price fetch at minute 0 to avoid collision
-              priceOnly: true,
-            }
-          });
-          console.log("Facebook-only workflow instance triggered successfully.");
-        } catch (e) {
-          console.error("Failed to trigger Facebook-only Workflow instance:", e);
-        }
-      })());
-      return;
-    }
-
-    // 2. Hourly Full Sync Tasks (Every hour)
-    if (event.cron === "0 * * * *") {
-      console.log("Running Hourly Tasks...");
+    if (isMinuteZero) {
+      console.log("Running Hourly Sync Tasks...");
       const hour = now.getUTCHours();
       const isSixHourly = hour % 6 === 0;
 
@@ -2659,12 +2637,29 @@ export default {
               fetchMarketEvents: isSixHourly,
               sendDailyEmailReport: false,
               purgeOldData: isSixHourly,
-              syncFacebookPosts: false,
+              syncFacebookPosts: true,
             }
           });
           console.log("Hourly sync workflow instance triggered successfully.");
         } catch (e) {
           console.error("Failed to trigger Hourly Sync Workflow instance:", e);
+        }
+      })());
+    } else {
+      console.log("Running 30-min price & Facebook sync...");
+      ctx.waitUntil((async () => {
+        try {
+          await env.OAKTREE_SYNC_WORKFLOW.create({
+            id: `cron-fb-${Date.now()}`,
+            params: {
+              syncFacebookPosts: true,
+              fetchMarketStats: true,
+              priceOnly: true,
+            }
+          });
+          console.log("30-min sync workflow instance triggered successfully.");
+        } catch (e) {
+          console.error("Failed to trigger 30-min Workflow instance:", e);
         }
       })());
     }
