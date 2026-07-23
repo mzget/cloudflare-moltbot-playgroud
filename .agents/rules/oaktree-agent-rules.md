@@ -107,14 +107,14 @@ This workspace uses a multi-tier AI model architecture configured in `wrangler.t
 - **Target Use Cases**:
   - Multi-step investment analysis engine (`backend/src/analysisEngine.ts`) executing 6 frameworks (Peter Lynch, Hamilton Helmer 7 Powers, Buffett, Munger, Howard Marks, Joel Greenblatt).
   - Newsletter digest generation and categorization (`backend/src/emailSummarizer.ts`).
-  - Stock daily news summarization (`backend/src/summarizer.ts`).
 - **Input/Output Constraints**:
   - Enforce `response_format: { type: 'json_object' }`.
   - Escaped quotes: Require prompts to instruct the LLM not to use unescaped double quotes inside JSON string values.
 
 ### 2. `facebook_summarize_model` (`@cf/meta/llama-3.2-3b-instruct`)
-- **Category**: Fast & Lightweight Social Media Stylist (3B parameters).
+- **Category**: Fast & Lightweight Social Media Stylist & Daily News Summarizer (3B parameters).
 - **Target Use Cases**:
+  - Stock daily news summarization (`backend/src/summarizer.ts`).
   - Generating short 2-3 sentence "Oaktree Memo" commentaries for Facebook Page posts (`backend/src/facebook.ts`).
   - Re-formatting custom user drafts into engaging Facebook posts with emojis, clear spacing, and hashtags (`backend/src/facebook.ts`).
 - **Input/Output Constraints**: Plain text / formatted social media copy (no raw JSON requirement).
