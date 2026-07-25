@@ -7,6 +7,7 @@ import { useSettingsStore, type DensityMode } from '../../../store/settingsStore
 import { API_BASE_URL } from '../../../config';
 import type { CompanyStats } from '../../../types/companyStats';
 import { glassStyle } from '../../../styles/glass';
+import { useAnalysisCoverage } from '../../../hooks/useAnalysisCoverage';
 
 // ─── Default visible columns (spec: 6 on first load) ─────────────────────────
 
@@ -36,6 +37,9 @@ export default function FundamentalDashboard() {
       return DEFAULT_VISIBLE;
     });
   const density = useSettingsStore((state) => state.density);
+
+  const symbols = React.useMemo(() => data.map(d => d.symbol), [data]);
+  const analysisCoverage = useAnalysisCoverage(symbols);
 
   React.useEffect(() => {
     const fetchData = async () => {
@@ -128,6 +132,7 @@ export default function FundamentalDashboard() {
             visibleColumnIds={visibleColumnIds}
             scale="B"
             density={density}
+            analysisCoverage={analysisCoverage}
           />
         )}
       </Sheet>
