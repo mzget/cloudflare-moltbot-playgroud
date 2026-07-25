@@ -18,25 +18,17 @@ const DEFAULT_VISIBLE: Array<keyof CompanyStats> = ALL_COLUMNS.map(c => c.id);
 export default function FundamentalDashboard() {
   const [data, setData] = React.useState<CompanyStats[]>([]);
   const [loading, setLoading] = React.useState(true);
-  const [visibleColumnIds, setVisibleColumnIds] =
-    React.useState<Array<keyof CompanyStats>>(() => {
-      if (typeof window !== 'undefined') {
-        const saved = localStorage.getItem('visible_columns');
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved) as Array<keyof CompanyStats>;
-            if (!parsed.includes('price')) {
-              return ['price', ...parsed];
-            }
-            return parsed;
-          } catch (e) {
-            console.error("Failed to parse visible_columns", e);
-          }
-        }
-      }
-      return DEFAULT_VISIBLE;
-    });
+
   const density = useSettingsStore((state) => state.density);
+  const storeColumns = useSettingsStore((state) => state.fundamentalVisibleColumns);
+  const setStoreColumns = useSettingsStore((state) => state.setFundamentalVisibleColumns);
+
+  const visibleColumnIds = React.useMemo<Array<keyof CompanyStats>>(() => {
+    if (storeColumns && storeColumns.length > 0) {
+      return storeColumns as Array<keyof CompanyStats>;
+    }
+    return DEFAULT_VISIBLE;
+  }, [storeColumns]);
 
   const symbols = React.useMemo(() => data.map(d => d.symbol), [data]);
   const analysisCoverage = useAnalysisCoverage(symbols);
@@ -64,26 +56,18 @@ export default function FundamentalDashboard() {
     fetchData();
   }, []);
 
-  React.useEffect(() => {
-    localStorage.setItem('visible_columns', JSON.stringify(visibleColumnIds));
-  }, [visibleColumnIds]);
-
-
-
-  // Toggle a column on / off while preserving original column order
+  // Toggle a column on / off while preserving original column order and saving to user preferences
   const handleToggleColumn = (id: keyof CompanyStats) => {
-    setVisibleColumnIds(prev => {
-      if (prev.includes(id)) {
-        // Don't allow hiding all columns
-        if (prev.length === 1) return prev;
-        return prev.filter(c => c !== id);
-      } else {
-        // Re-insert in spec order
-        const allIds = ALL_COLUMNS.map(c => c.id);
-        const next = [...prev, id];
-        return allIds.filter(colId => next.includes(colId));
-      }
-    });
+    let next: Array<keyof CompanyStats>;
+    if (visibleColumnIds.includes(id)) {
+      if (visibleColumnIds.length === 1) return;
+      next = visibleColumnIds.filter(c => c !== id);
+    } else {
+      const allIds = ALL_COLUMNS.map(c => c.id);
+      const combined = [...visibleColumnIds, id];
+      next = allIds.filter(colId => combined.includes(colId));
+    }
+    setStoreColumns(next);
   };
 
   return (
