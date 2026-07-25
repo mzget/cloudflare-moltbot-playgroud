@@ -16,6 +16,8 @@ interface SettingsState {
   setCurrency: (currency: string, sync?: boolean) => void;
   usdThbRate: number;
   setUsdThbRate: (rate: number, sync?: boolean) => void;
+  fundamentalVisibleColumns: string[] | null;
+  setFundamentalVisibleColumns: (columns: string[], sync?: boolean) => void;
   
   fetchPreferences: () => Promise<void>;
   syncPreferences: () => Promise<void>;
@@ -45,6 +47,7 @@ export const useSettingsStore = create<SettingsState>()(
               table_density: get().density,
               currency: get().currency,
               exchange_rate: get().usdThbRate,
+              fundamental_columns: get().fundamentalVisibleColumns,
             }),
           });
         } catch (e) {
@@ -83,6 +86,29 @@ export const useSettingsStore = create<SettingsState>()(
           set({ usdThbRate: rate });
           if (sync) syncWithBackend();
         },
+        fundamentalVisibleColumns: (() => {
+          if (typeof window !== 'undefined') {
+            const saved = localStorage.getItem('visible_columns');
+            if (saved) {
+              try {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                  return parsed;
+                }
+              } catch (e) {
+                console.error("Failed to parse visible_columns", e);
+              }
+            }
+          }
+          return null;
+        })(),
+        setFundamentalVisibleColumns: (columns, sync = true) => {
+          set({ fundamentalVisibleColumns: columns });
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('visible_columns', JSON.stringify(columns));
+          }
+          if (sync) syncWithBackend();
+        },
 
         fetchPreferences: async () => {
           const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
@@ -94,11 +120,28 @@ export const useSettingsStore = create<SettingsState>()(
             });
             if (res.ok) {
               const data = (await res.json()) as any;
+              let parsedColumns: string[] | null = null;
+              if (data.fundamental_columns) {
+                try {
+                  const raw = typeof data.fundamental_columns === 'string'
+                    ? JSON.parse(data.fundamental_columns)
+                    : data.fundamental_columns;
+                  if (Array.isArray(raw) && raw.length > 0) {
+                    parsedColumns = raw;
+                  }
+                } catch (e) {
+                  console.error('Failed to parse fundamental_columns from preferences:', e);
+                }
+              }
+              if (parsedColumns && typeof window !== 'undefined') {
+                localStorage.setItem('visible_columns', JSON.stringify(parsedColumns));
+              }
               set({
                 theme: data.theme || 'system',
                 density: data.table_density || 'cozy',
                 currency: data.currency || 'USD',
                 usdThbRate: data.exchange_rate || 36.5,
+                ...(parsedColumns ? { fundamentalVisibleColumns: parsedColumns } : {}),
               });
             }
           } catch (e) {
