@@ -213,7 +213,7 @@ app.get('/api/user/preferences', async (c) => {
 
   try {
     const row = await c.env.DB.prepare(
-      'SELECT theme, table_density, currency, exchange_rate FROM user_preferences WHERE email = ?'
+      'SELECT theme, table_density, currency, exchange_rate, fundamental_columns FROM user_preferences WHERE email = ?'
     ).bind(user.email).first();
 
     if (row) {
@@ -223,7 +223,8 @@ app.get('/api/user/preferences', async (c) => {
         theme: 'system',
         table_density: 'cozy',
         currency: 'USD',
-        exchange_rate: 1.0
+        exchange_rate: 1.0,
+        fundamental_columns: null
       });
     }
   } catch (e) {
@@ -240,7 +241,7 @@ app.put('/api/user/preferences', async (c) => {
 
   try {
     const body = await c.req.json() as any;
-    const { theme, table_density, currency, exchange_rate } = body;
+    const { theme, table_density, currency, exchange_rate, fundamental_columns } = body;
 
     // Validation
     if (theme && !['light', 'dark', 'system'].includes(theme)) {
@@ -254,29 +255,34 @@ app.put('/api/user/preferences', async (c) => {
     }
 
     const current = await c.env.DB.prepare(
-      'SELECT theme, table_density, currency, exchange_rate FROM user_preferences WHERE email = ?'
+      'SELECT theme, table_density, currency, exchange_rate, fundamental_columns FROM user_preferences WHERE email = ?'
     ).bind(user.email).first() || {
       theme: 'system',
       table_density: 'cozy',
       currency: 'USD',
-      exchange_rate: 1.0
+      exchange_rate: 1.0,
+      fundamental_columns: null
     };
 
     const newTheme = theme !== undefined ? theme : current.theme;
     const newDensity = table_density !== undefined ? table_density : current.table_density;
     const newCurrency = currency !== undefined ? currency : current.currency;
     const newRate = exchange_rate !== undefined ? exchange_rate : current.exchange_rate;
+    const newFundamentalColumns = fundamental_columns !== undefined
+      ? (typeof fundamental_columns === 'string' ? fundamental_columns : JSON.stringify(fundamental_columns))
+      : current.fundamental_columns;
 
     await c.env.DB.prepare(`
-      INSERT INTO user_preferences (email, theme, table_density, currency, exchange_rate, updated_at)
-      VALUES (?, ?, ?, ?, ?, strftime('%s', 'now'))
+      INSERT INTO user_preferences (email, theme, table_density, currency, exchange_rate, fundamental_columns, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, strftime('%s', 'now'))
       ON CONFLICT(email) DO UPDATE SET
         theme = excluded.theme,
         table_density = excluded.table_density,
         currency = excluded.currency,
         exchange_rate = excluded.exchange_rate,
+        fundamental_columns = excluded.fundamental_columns,
         updated_at = excluded.updated_at
-    `).bind(user.email, newTheme, newDensity, newCurrency, newRate).run();
+    `).bind(user.email, newTheme, newDensity, newCurrency, newRate, newFundamentalColumns).run();
 
     return c.json({
       success: true,
@@ -284,7 +290,8 @@ app.put('/api/user/preferences', async (c) => {
         theme: newTheme,
         table_density: newDensity,
         currency: newCurrency,
-        exchange_rate: newRate
+        exchange_rate: newRate,
+        fundamental_columns: newFundamentalColumns
       }
     });
   } catch (e) {
