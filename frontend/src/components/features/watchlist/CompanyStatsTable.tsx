@@ -5,10 +5,13 @@ import {
   Typography,
   Box,
   Link,
+  Stack,
+  Chip,
 } from '@mui/joy';
-import { ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { ArrowUp, ArrowDown, ArrowUpDown, FileBarChart } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
 import type { CompanyStats } from '../../../types/companyStats';
+import type { AnalysisCoverageMap } from '../../../types/analysisCoverage';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -174,6 +177,7 @@ interface CompanyStatsTableProps {
   visibleColumnIds: Array<keyof CompanyStats>;
   scale: ScaleUnit;
   density: 'compact' | 'cozy' | 'comfort';
+  analysisCoverage?: AnalysisCoverageMap;
 }
 
 // ─── Main Component ──────────────────────────────────────────────────────────
@@ -183,6 +187,7 @@ export default function CompanyStatsTable({
   visibleColumnIds,
   scale,
   density,
+  analysisCoverage,
 }: CompanyStatsTableProps) {
   const navigate = useNavigate();
 
@@ -380,62 +385,97 @@ export default function CompanyStatsTable({
           </tr>
         </thead>
         <tbody>
-          {sorted.map((company, idx) => (
-            <tr key={company.symbol}>
-              {/* Sticky company cell */}
-              <td
-                className="sticky-td"
-                style={{
-                  position: 'sticky',
-                  left: 0,
-                  zIndex: 1,
-                  padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`,
-                  borderRight: '1px solid var(--joy-palette-divider)',
-                  minWidth: densityStyles.minWidth,
-                }}
-              >
-                <Box>
-                  <Link
-                    component="button"
-                    level={densityStyles.tickerTitleSize}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      navigate({
-                        to: '/analysis',
-                        search: { symbol: company.symbol, tab: 'report' },
-                      });
-                    }}
-                    sx={{
-                      fontWeight: densityStyles.tickerTitleWeight,
-                      lineHeight: 1.2,
-                      fontSize: density === 'compact' ? '0.75rem' : undefined,
-                      color: 'primary.plainColor',
-                      textDecoration: 'none',
-                      textAlign: 'left',
-                      justifyContent: 'flex-start',
-                      width: 'fit-content',
-                      display: 'block',
-                      '&:hover': {
-                        color: 'primary.hoverColor',
-                        textDecoration: 'underline',
-                      },
-                      transition: 'all 0.15s ease-out',
-                    }}
-                  >
-                    {company.symbol}
-                  </Link>
-                  <Typography
-                    level="body-xs"
-                    sx={{
-                      opacity: 0.5,
-                      mt: densityStyles.rowGap,
-                      fontSize: densityStyles.tickerSubSize
-                    }}
-                  >
-                    {company.name.split(' ').slice(0, 2).join(' ')}
-                  </Typography>
-                </Box>
-              </td>
+          {sorted.map((company, idx) => {
+            const coverage = analysisCoverage?.get(company.symbol);
+
+            return (
+              <tr key={company.symbol}>
+                {/* Sticky company cell */}
+                <td
+                  className="sticky-td"
+                  style={{
+                    position: 'sticky',
+                    left: 0,
+                    zIndex: 1,
+                    padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`,
+                    borderRight: '1px solid var(--joy-palette-divider)',
+                    minWidth: densityStyles.minWidth,
+                  }}
+                >
+                  <Box>
+                    <Stack direction="row" alignItems="center" spacing={0.75}>
+                      <Link
+                        component="button"
+                        level={densityStyles.tickerTitleSize}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          navigate({
+                            to: '/analysis',
+                            search: { symbol: company.symbol, tab: 'report' },
+                          });
+                        }}
+                        sx={{
+                          fontWeight: densityStyles.tickerTitleWeight,
+                          lineHeight: 1.2,
+                          fontSize: density === 'compact' ? '0.75rem' : undefined,
+                          color: 'primary.plainColor',
+                          textDecoration: 'none',
+                          textAlign: 'left',
+                          justifyContent: 'flex-start',
+                          width: 'fit-content',
+                          display: 'block',
+                          '&:hover': {
+                            color: 'primary.hoverColor',
+                            textDecoration: 'underline',
+                          },
+                          transition: 'all 0.15s ease-out',
+                        }}
+                      >
+                        {company.symbol}
+                      </Link>
+
+                      {coverage && coverage.count > 0 && (
+                        <Chip
+                          size="sm"
+                          variant="soft"
+                          color="primary"
+                          startDecorator={<FileBarChart size={12} />}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.preventDefault();
+                            navigate({
+                              to: '/analysis',
+                              search: { symbol: company.symbol, tab: 'report' },
+                            });
+                          }}
+                          sx={{
+                            cursor: 'pointer',
+                            fontSize: '10px',
+                            fontWeight: 600,
+                            px: 0.5,
+                            py: 0,
+                            height: '18px',
+                            minHeight: '18px',
+                            '&:hover': { bgcolor: 'primary.softHoverBg' },
+                          }}
+                        >
+                          {coverage.count}
+                        </Chip>
+                      )}
+                    </Stack>
+
+                    <Typography
+                      level="body-xs"
+                      sx={{
+                        opacity: 0.5,
+                        mt: densityStyles.rowGap,
+                        fontSize: densityStyles.tickerSubSize
+                      }}
+                    >
+                      {company.name.split(' ').slice(0, 2).join(' ')}
+                    </Typography>
+                  </Box>
+                </td>
 
               {visibleCols.map(col => {
                 const rawVal = company[col.id] as number | undefined;
@@ -463,7 +503,8 @@ export default function CompanyStatsTable({
                 );
               })}
             </tr>
-          ))}
+          );
+        })}
         </tbody>
       </Table>
     </Sheet>

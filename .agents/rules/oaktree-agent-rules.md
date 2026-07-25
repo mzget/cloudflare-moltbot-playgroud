@@ -98,6 +98,16 @@ Never use `window.confirm()`, `window.alert()`, `window.prompt()`, or the bare `
 
 ---
 
+## 📊 Mandatory MUI Joy UI Table Standardisation
+
+All data tables across the frontend application **MUST** be implemented using MUI Joy UI components (`<Table>`, `<Sheet>`, `<Typography>`, `<Link>`, `<Chip>`, `<IconButton>`) wrapped in a glassmorphic `<Sheet>`.
+- **No Raw HTML Tables**: Strictly **avoid using bare HTML `<table>`**, `<thead>`, `<tbody>`, `<tr>`, `<th>`, `<td>` elements with custom CSS table classes (e.g. `.yf-table`).
+- **Consistent Layout & Theme Support**:
+  - Always wrap `<Table>` in `<Sheet>` with `borderAxis="xBetween"`, `hoverRow`, `stripe="odd"`, and proper `--TableCell-paddingX` / `--TableCell-paddingY` density configurations.
+  - Sticky headers and fixed columns must use MUI Joy UI theme variables (e.g. `[data-joy-color-scheme="dark"]` / `var(--joy-palette-divider)`) to ensure perfect light/dark theme switching.
+
+---
+
 ## 🤖 Cloudflare Workers AI Model Specifications
 
 This workspace uses a multi-tier AI model architecture configured in `wrangler.toml` under `[vars]`:

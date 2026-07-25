@@ -6,6 +6,7 @@ import HoldingsTable from './HoldingsTable';
 import type { Holding } from './HoldingsTable';
 import { useSettingsStore, type DensityMode } from '../../../store/settingsStore';
 import ExpandedRow from '../watchlist/ExpandedRow';
+import { useAnalysisCoverage } from '../../../hooks/useAnalysisCoverage';
 
 interface HoldingsTabProps {
   holdings: Holding[];
@@ -19,6 +20,9 @@ export default function HoldingsTab({ holdings, loading, onAddTicker, onDataChan
   const [sortBy, setSortBy] = useState<string>('total_cost');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const density = useSettingsStore((state) => state.density);
+
+  const symbols = useMemo(() => holdings.map(h => h.symbol), [holdings]);
+  const analysisCoverage = useAnalysisCoverage(symbols);
 
   const sortedHoldings = useMemo(() => {
     return [...holdings].sort((a, b) => {
@@ -68,7 +72,7 @@ export default function HoldingsTab({ holdings, loading, onAddTicker, onDataChan
         )}
         <Box sx={{ overflowX: 'auto' }}>
           <HoldingsTable holdings={sortedHoldings} onExpandRow={handleExpandRow} expandedRows={expandedRows}
-            sortBy={sortBy} sortDir={sortDir} onSort={handleSort} density={density}
+            sortBy={sortBy} sortDir={sortDir} onSort={handleSort} density={density} analysisCoverage={analysisCoverage}
             expandedContent={(symbol: string, lastPrice: number | null, colSpan: number) => (
               <ExpandedRow symbol={symbol} lastPrice={lastPrice} colSpan={colSpan} onDataChange={onDataChange} />
             )} />

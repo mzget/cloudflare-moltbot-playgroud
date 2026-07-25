@@ -2295,6 +2295,60 @@ app.post('/api/analysis/run', async (c) => {
   }
 });
 
+// GET /api/analysis/coverage
+// Batch endpoint to check if symbols have analysis items (report, dcf, thesis)
+app.get('/api/analysis/coverage', async (c) => {
+  const symbolsParam = c.req.query('symbols');
+  const symbolsList = symbolsParam
+    ? symbolsParam.split(',').map(s => s.trim().toUpperCase()).filter(Boolean)
+    : [];
+
+  let reportSymbols: string[] = [];
+  let dcfSymbols: string[] = [];
+  let thesisSymbols: string[] = [];
+
+  if (symbolsList.length > 0) {
+    const placeholders = symbolsList.map(() => '?').join(',');
+    const [reportsRes, dcfRes, thesesRes] = await Promise.all([
+      c.env.DB.prepare(`SELECT DISTINCT symbol FROM analysis_results WHERE symbol IN (${placeholders})`).bind(...symbolsList).all(),
+      c.env.DB.prepare(`SELECT DISTINCT symbol FROM dcf_calculations WHERE symbol IN (${placeholders})`).bind(...symbolsList).all(),
+      c.env.DB.prepare(`SELECT DISTINCT symbol FROM stock_theses WHERE symbol IN (${placeholders})`).bind(...symbolsList).all(),
+    ]);
+    reportSymbols = (reportsRes.results || []).map((r: any) => r.symbol);
+    dcfSymbols = (dcfRes.results || []).map((r: any) => r.symbol);
+    thesisSymbols = (thesesRes.results || []).map((r: any) => r.symbol);
+  } else {
+    const [reportsRes, dcfRes, thesesRes] = await Promise.all([
+      c.env.DB.prepare('SELECT DISTINCT symbol FROM analysis_results').all(),
+      c.env.DB.prepare('SELECT DISTINCT symbol FROM dcf_calculations').all(),
+      c.env.DB.prepare('SELECT DISTINCT symbol FROM stock_theses').all(),
+    ]);
+    reportSymbols = (reportsRes.results || []).map((r: any) => r.symbol);
+    dcfSymbols = (dcfRes.results || []).map((r: any) => r.symbol);
+    thesisSymbols = (thesesRes.results || []).map((r: any) => r.symbol);
+  }
+
+  const reportSet = new Set(reportSymbols);
+  const dcfSet = new Set(dcfSymbols);
+  const thesisSet = new Set(thesisSymbols);
+
+  const allSymbols = symbolsList.length > 0
+    ? symbolsList
+    : Array.from(new Set([...reportSet, ...dcfSet, ...thesisSet]));
+
+  const coverage: Record<string, { report: boolean; dcf: boolean; thesis: boolean; count: number }> = {};
+
+  for (const sym of allSymbols) {
+    const report = reportSet.has(sym);
+    const dcf = dcfSet.has(sym);
+    const thesis = thesisSet.has(sym);
+    const count = (report ? 1 : 0) + (dcf ? 1 : 0) + (thesis ? 1 : 0);
+    coverage[sym] = { report, dcf, thesis, count };
+  }
+
+  return c.json(coverage);
+});
+
 // GET /api/analysis/results
 app.get('/api/analysis/results', async (c) => {
   const symbol = c.req.query('symbol');
