@@ -1,9 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useWatchlist } from './hooks/useWatchlist';
 import { useAlertRules } from './hooks/useAlertRules';
 import { WatchlistCard } from './WatchlistCard';
+import AddSecurityBox from './AddSecurityBox';
 import { Box, Typography, Sheet, IconButton, Button, Input, Stack, Card, CardContent, Divider, Switch, Grid, CardActions, Avatar, Modal, ModalDialog, DialogTitle, DialogContent, ModalClose, FormControl, FormLabel, Select, Option, FormHelperText, Badge, Snackbar, Alert } from '@mui/joy';
-import { Plus, Trash2, Bell, Pencil, FileText, AlertTriangle, Check } from 'lucide-react';
+import { Trash2, Bell, Pencil, FileText, AlertTriangle, Check } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
 import { API_BASE_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
@@ -19,12 +20,12 @@ interface WatchlistItem {
 
 export default function MyWatchlist() {
   const navigate = useNavigate();
-  const handleViewAnalysis = (symbol: string) => {
+  const handleViewAnalysis = useCallback((symbol: string) => {
     navigate({
       to: '/analysis',
       search: { symbol, tab: 'report' },
     });
-  };
+  }, [navigate]);
   const {
     watchlist,
     marketStats,
@@ -44,11 +45,10 @@ export default function MyWatchlist() {
     deleteRule
   } = useAlertRules(fetchWatchlist);
 
-  const [newSecurityForm, setNewSecurityForm] = useState({
-    symbol: '',
-    name: '',
-    type: 'stock'
-  });
+  // Toast state
+  const [toastOpen, setToastOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastColor, setToastColor] = useState<'success' | 'danger'>('success');
 
   // Edit Security Modal State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -59,16 +59,16 @@ export default function MyWatchlist() {
     type: 'stock'
   });
 
-  const handleOpenEditModal = (item: WatchlistItem) => {
+  const handleOpenEditModal = useCallback((item: WatchlistItem) => {
     setEditForm({
       symbol: item.symbol,
       name: item.name || '',
       type: item.type || 'stock'
     });
     setIsEditModalOpen(true);
-  };
+  }, []);
 
-  const handleSaveEdit = async () => {
+  const handleSaveEdit = useCallback(async () => {
     if (!editForm.symbol) return;
     try {
       const res = await updateWatchlistDetails(editForm.symbol, editForm.name, editForm.type);
@@ -78,7 +78,7 @@ export default function MyWatchlist() {
     } catch (e) {
       console.error("Failed to update watchlist item", e);
     }
-  };
+  }, [editForm, updateWatchlistDetails]);
 
   const [sortBy, setSortBy] = useState<string>(() => {
     if (typeof window !== 'undefined') {
@@ -125,11 +125,6 @@ export default function MyWatchlist() {
 
   // Alert Modal State
   const [isAlertsModalOpen, setIsAlertsModalOpen] = useState(false);
-  
-  // Toast state
-  const [toastOpen, setToastOpen] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
-  const [toastColor, setToastColor] = useState<'success' | 'danger'>('success');
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
 
   // Group rule form state
@@ -139,7 +134,7 @@ export default function MyWatchlist() {
     target: ''
   });
 
-  const handleOpenAlertsModal = (symbol: string) => {
+  const handleOpenAlertsModal = useCallback((symbol: string) => {
     setSelectedSymbol(symbol);
     fetchRulesForSymbol(symbol);
     setRuleForm({
@@ -148,9 +143,9 @@ export default function MyWatchlist() {
       target: ''
     });
     setIsAlertsModalOpen(true);
-  };
+  }, [fetchRulesForSymbol]);
 
-  const handleCreateRule = async () => {
+  const handleCreateRule = useCallback(async () => {
     if (!selectedSymbol || !ruleForm.target || isNaN(Number(ruleForm.target))) return;
     
     let targetVal = Number(ruleForm.target);
@@ -167,9 +162,9 @@ export default function MyWatchlist() {
     } catch (e) {
       console.error("Failed to create alert rule", e);
     }
-  };
+  }, [selectedSymbol, ruleForm, createRule]);
 
-  const handleToggleRule = async (ruleId: number, currentStatus: number) => {
+  const handleToggleRule = useCallback(async (ruleId: number, currentStatus: number) => {
     try {
       if (selectedSymbol) {
         await toggleRule(selectedSymbol, ruleId, currentStatus);
@@ -177,9 +172,9 @@ export default function MyWatchlist() {
     } catch (e) {
       console.error("Failed to toggle alert rule", e);
     }
-  };
+  }, [selectedSymbol, toggleRule]);
 
-  const handleDeleteRule = async (ruleId: number) => {
+  const handleDeleteRule = useCallback(async (ruleId: number) => {
     try {
       if (selectedSymbol) {
         await deleteRule(selectedSymbol, ruleId);
@@ -187,7 +182,7 @@ export default function MyWatchlist() {
     } catch (e) {
       console.error("Failed to delete alert rule", e);
     }
-  };
+  }, [selectedSymbol, deleteRule]);
 
   const formatMetricLabel = (m: string) => {
     switch(m) {
@@ -217,9 +212,12 @@ export default function MyWatchlist() {
     return cond === 'cross_up' ? 'Crosses Up' : 'Crosses Down';
   };
 
-  const currentSymbolStats = marketStats.find(s => s.symbol === selectedSymbol);
+  const currentSymbolStats = useMemo(
+    () => marketStats.find(s => s.symbol === selectedSymbol),
+    [marketStats, selectedSymbol]
+  );
 
-  const getHelperTextForMetric = (metric: string) => {
+  const getHelperTextForMetric = useCallback((metric: string) => {
     if (!currentSymbolStats) return 'No current data available';
     let val: number | null | undefined = null;
     if (metric === 'price') {
@@ -243,109 +241,52 @@ export default function MyWatchlist() {
       return val !== null && val !== undefined ? `Current EV/Sales: ${val.toFixed(2)}` : 'Current EV/Sales: N/A';
     }
     return '';
-  };
+  }, [currentSymbolStats]);
 
-  const handleAdd = async () => {
-    if (!newSecurityForm.symbol) return;
-    try {
-      const res = await addWatchlist(newSecurityForm.symbol, newSecurityForm.name, newSecurityForm.type);
-      if (res.ok) {
-        setNewSecurityForm({ symbol: '', name: '', type: 'stock' });
-        setToastColor('success');
-        setToastMessage('Symbol added successfully!');
-        setToastOpen(true);
-      }
-    } catch (err: any) {
-      console.error("Failed to add to watchlist", err);
-      let errMsg = "Failed to add to watchlist";
-      if (err instanceof Response) {
-        try {
-          const data = await err.json() as any;
-          if (data && data.error) errMsg = data.error;
-        } catch {
-          try {
-            const txt = await err.text();
-            if (txt) errMsg = txt;
-          } catch {}
-        }
-      } else if (err && err.message) {
-        errMsg = err.message;
-      }
-      setToastColor('danger');
-      setToastMessage(errMsg);
-      setToastOpen(true);
-    }
-  };
+  // Stable callbacks for AddSecurityBox
+  const handleAddSuccess = useCallback(() => {
+    setToastColor('success');
+    setToastMessage('Symbol added successfully!');
+    setToastOpen(true);
+  }, []);
 
-  const handleDelete = async (symbol: string) => {
+  const handleAddError = useCallback((errMsg: string) => {
+    setToastColor('danger');
+    setToastMessage(errMsg);
+    setToastOpen(true);
+  }, []);
+
+  const handleDelete = useCallback(async (symbol: string) => {
     try {
       await deleteWatchlist(symbol);
     } catch (e) {
       console.error("Failed to delete from watchlist", e);
     }
-  };
+  }, [deleteWatchlist]);
 
-  const handleToggleActive = async (symbol: string, currentStatus: number) => {
+  const handleToggleActive = useCallback(async (symbol: string, currentStatus: number) => {
     try {
       await toggleActive(symbol, currentStatus);
     } catch (e) {
       console.error("Failed to toggle watchlist status", e);
     }
-  };
+  }, [toggleActive]);
 
-  const handleTogglePortfolio = async (symbol: string, currentPortfolioStatus: number) => {
+  const handleTogglePortfolio = useCallback(async (symbol: string, currentPortfolioStatus: number) => {
     try {
       await togglePortfolioStatus(symbol, currentPortfolioStatus);
     } catch (e) {
       console.error("Failed to toggle portfolio status", e);
     }
-  };
+  }, [togglePortfolioStatus]);
 
   return (
     <>
-      <Sheet sx={{ ...glassStyle, p: 2, mb: 4 }}>
-        <Stack spacing={2}>
-          <Typography level="title-sm" sx={{ opacity: 0.6 }}>Add New Security</Typography>
-          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <Input 
-              placeholder="Symbol (e.g. AAPL)" 
-              value={newSecurityForm.symbol} 
-              onChange={e => setNewSecurityForm(prev => ({ ...prev, symbol: e.target.value }))}
-              sx={{ flex: 1 }}
-            />
-            <Input 
-              placeholder="Company Name" 
-              value={newSecurityForm.name} 
-              onChange={e => setNewSecurityForm(prev => ({ ...prev, name: e.target.value }))}
-              sx={{ flex: 2 }}
-            />
-            <Select
-              value={newSecurityForm.type}
-              onChange={(_, val) => setNewSecurityForm(prev => ({ ...prev, type: val || 'stock' }))}
-              sx={{ 
-                minWidth: 120,
-                backgroundColor: 'rgba(255, 255, 255, 0.05)',
-                border: '1px solid rgba(255, 255, 255, 0.1)',
-                '&:hover': {
-                  backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                  borderColor: 'rgba(255, 255, 255, 0.15)'
-                }
-              }}
-            >
-              <Option value="stock">Stock</Option>
-              <Option value="etf">ETF</Option>
-            </Select>
-            <Button 
-              variant="solid" 
-              color="success" 
-              onClick={handleAdd}
-              startDecorator={<Plus size={18} />}
-            >
-              Add
-            </Button>
-          </Stack>
-        </Stack>
-      </Sheet>
+      <AddSecurityBox
+        onAdd={addWatchlist}
+        onSuccess={handleAddSuccess}
+        onError={handleAddError}
+      />
 
       <Stack 
         direction={{ xs: 'column', sm: 'row' }} 
