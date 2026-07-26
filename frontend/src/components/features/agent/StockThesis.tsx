@@ -1,7 +1,8 @@
 import * as React from 'react';
 import {
   Box, Sheet, Typography, Stack, Divider, Input, Textarea, Button,
-  Select, Option, Grid, IconButton, Alert, CircularProgress, Badge
+  Select, Option, Grid, IconButton, Alert, CircularProgress, Badge,
+  Modal, ModalDialog, DialogTitle, DialogContent, DialogActions
 } from '@mui/joy';
 import {
   BookOpen, Plus, Trash2, Save, Calendar, Check,
@@ -46,6 +47,7 @@ export default function StockThesis({ symbol }: StockThesisProps) {
   const [saving, setSaving] = React.useState(false);
   const [addingJournal, setAddingJournal] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = React.useState(false);
 
   // Form states for edits
   const [title, setTitle] = React.useState('');
@@ -185,8 +187,6 @@ export default function StockThesis({ symbol }: StockThesisProps) {
 
   const handleDeleteThesis = async () => {
     if (!selectedThesis) return;
-    if (!window.confirm('Are you sure you want to delete this thesis?')) return;
-    
     setSaving(true);
     setError(null);
     try {
@@ -194,6 +194,7 @@ export default function StockThesis({ symbol }: StockThesisProps) {
         method: 'DELETE'
       });
       if (!res.ok) throw new Error('Failed to delete thesis');
+      setDeleteConfirmOpen(false);
       await fetchTheses();
     } catch (e: any) {
       setError(e.message);
@@ -352,23 +353,37 @@ export default function StockThesis({ symbol }: StockThesisProps) {
             {/* THESIS HEADER & CONTROLS */}
             <Sheet sx={{ ...glassStyle, p: 3 }}>
               {error && <Alert color="danger" sx={{ mb: 2 }}>{error}</Alert>}
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} justifyContent="space-between" alignItems={{ xs: 'stretch', sm: 'center' }}>
-                <Box sx={{ flexGrow: 1 }}>
+              <Stack
+                direction={{ xs: 'column', md: 'row' }}
+                spacing={2}
+                justifyContent="space-between"
+                alignItems={{ xs: 'stretch', md: 'center' }}
+                sx={{ width: '100%' }}
+              >
+                <Box sx={{ flex: 1, minWidth: 0 }}>
                   <Input
                     variant="soft"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="Thesis Title"
                     sx={{
-                      fontSize: '1.5rem',
+                      fontSize: { xs: '1.25rem', sm: '1.5rem' },
                       fontWeight: 800,
                       bgcolor: 'transparent',
+                      width: '100%',
+                      minWidth: 0,
                       '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' },
-                      '& input': { px: 0 }
+                      '& input': { px: 0, textOverflow: 'ellipsis' }
                     }}
                   />
                 </Box>
-                <Stack direction="row" spacing={1.5} alignItems="center">
+                <Stack
+                  direction="row"
+                  spacing={1.5}
+                  alignItems="center"
+                  justifyContent={{ xs: 'flex-end', md: 'flex-end' }}
+                  sx={{ flexShrink: 0, width: { xs: '100%', md: 'auto' } }}
+                >
                   <Button
                     variant="solid"
                     color="success"
@@ -376,19 +391,29 @@ export default function StockThesis({ symbol }: StockThesisProps) {
                     onClick={handleSaveThesis}
                     loading={saving}
                     disabled={saving}
-                    sx={{ borderRadius: '10px' }}
+                    sx={{
+                      borderRadius: '10px',
+                      flex: { xs: 1, sm: 'initial' },
+                      fontWeight: 700,
+                      whiteSpace: 'nowrap'
+                    }}
                   >
-                    Save Changes
+                    Save
                   </Button>
-                  <IconButton
+                  <Button
                     variant="soft"
                     color="danger"
-                    onClick={handleDeleteThesis}
+                    startDecorator={<Trash2 size={16} />}
+                    onClick={() => setDeleteConfirmOpen(true)}
                     disabled={saving}
-                    sx={{ borderRadius: '10px' }}
+                    sx={{
+                      borderRadius: '10px',
+                      fontWeight: 600,
+                      whiteSpace: 'nowrap'
+                    }}
                   >
-                    <Trash2 size={16} />
-                  </IconButton>
+                    Delete
+                  </Button>
                 </Stack>
               </Stack>
 
@@ -609,6 +634,40 @@ export default function StockThesis({ symbol }: StockThesisProps) {
           </Stack>
         )}
       </Grid>
+
+      {/* DELETE CONFIRMATION MODAL */}
+      <Modal open={deleteConfirmOpen} onClose={() => setDeleteConfirmOpen(false)}>
+        <ModalDialog role="alertdialog" variant="outlined" color="danger" sx={{ maxWidth: 450, borderRadius: '16px' }}>
+          <DialogTitle sx={{ gap: 1 }}>
+            <Trash2 size={20} color="var(--joy-palette-danger-solidBg)" />
+            Delete Thesis
+          </DialogTitle>
+          <Divider />
+          <DialogContent>
+            Are you sure you want to delete <strong>"{title || 'this thesis'}"</strong>? This action cannot be undone.
+          </DialogContent>
+          <DialogActions>
+            <Button
+              variant="solid"
+              color="danger"
+              onClick={handleDeleteThesis}
+              loading={saving}
+              sx={{ borderRadius: '8px' }}
+            >
+              Delete Thesis
+            </Button>
+            <Button
+              variant="plain"
+              color="neutral"
+              onClick={() => setDeleteConfirmOpen(false)}
+              disabled={saving}
+              sx={{ borderRadius: '8px' }}
+            >
+              Cancel
+            </Button>
+          </DialogActions>
+        </ModalDialog>
+      </Modal>
     </Grid>
   );
 }
