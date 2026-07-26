@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { Box, Typography, Card, CardContent, Divider, Switch, CardActions, Avatar, Stack, IconButton, Badge, Button } from '@mui/joy';
 import { Pencil, Bell, FileText } from 'lucide-react';
 import type { WatchlistItem } from './hooks/useWatchlist';
@@ -13,7 +13,7 @@ interface WatchlistCardProps {
   onTogglePortfolio: (symbol: string, currentPortfolioStatus: number) => Promise<void>;
 }
 
-export const WatchlistCard: React.FC<WatchlistCardProps> = ({
+export const WatchlistCard: React.FC<WatchlistCardProps> = React.memo(({
   item,
   onEdit,
   onAlertsClick,
@@ -160,4 +160,4 @@ export const WatchlistCard: React.FC<WatchlistCardProps> = ({
       </CardContent>
     </Card>
   );
-};
+});
