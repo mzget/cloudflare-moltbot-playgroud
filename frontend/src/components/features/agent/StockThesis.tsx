@@ -1,4 +1,4 @@
-﻿import * as React from 'react';
+import * as React from 'react';
 import {
   Box, Sheet, Typography, Stack, Divider, Input, Textarea, Button,
   Select, Option, Grid, IconButton, Alert, CircularProgress, Badge
@@ -44,6 +44,7 @@ export default function StockThesis({ symbol }: StockThesisProps) {
   const [loading, setLoading] = React.useState(true);
   const [journalLoading, setJournalLoading] = React.useState(false);
   const [saving, setSaving] = React.useState(false);
+  const [addingJournal, setAddingJournal] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
   // Form states for edits
@@ -203,6 +204,7 @@ export default function StockThesis({ symbol }: StockThesisProps) {
 
   const handleAddJournalEntry = async () => {
     if (!selectedThesis || !newJournalContent.trim()) return;
+    setAddingJournal(true);
     try {
       const res = await fetch(`${API_BASE_URL}/api/analysis/theses/${selectedThesis.id}/journal`, {
         method: 'POST',
@@ -215,6 +217,8 @@ export default function StockThesis({ symbol }: StockThesisProps) {
       }
     } catch (e) {
       console.error('Failed to add journal entry:', e);
+    } finally {
+      setAddingJournal(false);
     }
   };
 
@@ -249,6 +253,7 @@ export default function StockThesis({ symbol }: StockThesisProps) {
             color="success"
             startDecorator={<Plus size={16} />}
             onClick={handleCreateThesis}
+            loading={saving}
             disabled={saving}
             fullWidth
             sx={{ borderRadius: '12px', fontWeight: 700 }}
@@ -369,6 +374,7 @@ export default function StockThesis({ symbol }: StockThesisProps) {
                     color="success"
                     startDecorator={<Save size={16} />}
                     onClick={handleSaveThesis}
+                    loading={saving}
                     disabled={saving}
                     sx={{ borderRadius: '10px' }}
                   >
@@ -545,6 +551,8 @@ export default function StockThesis({ symbol }: StockThesisProps) {
                 <Button
                   color="primary"
                   onClick={handleAddJournalEntry}
+                  loading={addingJournal}
+                  disabled={addingJournal}
                   startDecorator={<Send size={15} />}
                   sx={{ borderRadius: '8px' }}
                 >
