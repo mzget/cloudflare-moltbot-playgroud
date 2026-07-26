@@ -4,9 +4,9 @@ This specification details the design and implementation of the optimized watchl
 
 ## 1. Overview & Architecture
 
-To prevent API rate limit collisions and minimize compute/network overhead, the sync system is split into two logical schedules running under Cloudflare Workers Workflows:
+To prevent API rate limit collisions and minimize compute/network overhead, the sync system is triggered every 15 minutes (`*/15 * * * *`) via Cloudflare Cron and handled by Cloudflare Workers Workflows:
 
-1. **Price-Only Mode (Every 30 mins, `*/30 * * * *`)**:
+1. **Price-Only Mode (Every 30 mins at Minute 30)**:
    - Updates real-time quotes (prices) for all active watchlist symbols.
    - Runs during US market hours and post-market grace period (9:30 AM – 4:30 PM ET). Exits early with 0 API calls when the market is closed or on weekends.
    - At 4:30 PM ET (`16:30`), the last price-only run executes to capture final post-close settlement prices.
