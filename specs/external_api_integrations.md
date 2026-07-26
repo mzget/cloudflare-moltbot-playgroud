@@ -1,4 +1,4 @@
-﻿# External API Integrations Specification
+# External API Integrations Specification
 
 This specification documents all external API integrations within the Oaktree Agent backend. It details the target API hosts, the functions executing the requests, their calling schedules, and any manual on-demand triggers.
 
@@ -94,7 +94,7 @@ Used to publish daily summaries, email digests, and custom posts directly to the
 * **Primary Function:** [processPendingFacebookPosts](file:///c:/Users/natta/Documents/oaktree-agent/backend/src/facebook.ts#L25) in [facebook.ts](file:///c:/Users/natta/Documents/oaktree-agent/backend/src/facebook.ts)
 * **API Endpoint:** `https://graph.facebook.com/v20.0/${pageId}/feed`
 * **Trigger & Frequency:**
-  * **Scheduled:** Runs **every 30 minutes** via the `*/30 * * * *` cron trigger.
+  * **Scheduled:** Runs **every 15 and 45 minutes** (`minute === 15 || minute === 45`) via the `*/15 * * * *` cron trigger.
   * **On-Demand:** Can be manually triggered during a full email sync by requesting the GET endpoint `/api/email-sync` (implemented in [index.ts#L831](file:///c:/Users/natta/Documents/oaktree-agent/backend/src/index.ts#L831)) which sets `syncFacebookPosts: true`.
 
 ### 5.2 Direct UI Publishing
