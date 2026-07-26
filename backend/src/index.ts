@@ -2676,7 +2676,9 @@ export default {
 
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
     const now = new Date();
-    const isMinuteZero = now.getUTCMinutes() === 0;
+    const minute = now.getUTCMinutes();
+    const isMinuteZero = minute === 0;
+    const isFacebookMinute = minute === 15 || minute === 45;
 
     if (isMinuteZero) {
       console.log("Running Hourly Sync Tasks...");
@@ -2700,7 +2702,7 @@ export default {
               fetchMarketEvents: isSixHourly,
               sendDailyEmailReport: false,
               purgeOldData: isSixHourly,
-              syncFacebookPosts: true,
+              syncFacebookPosts: false,
             }
           });
           console.log("Hourly sync workflow instance triggered successfully.");
@@ -2708,19 +2710,33 @@ export default {
           console.error("Failed to trigger Hourly Sync Workflow instance:", e);
         }
       })());
-    } else {
-      console.log("Running 30-min price & Facebook sync...");
+    } else if (isFacebookMinute) {
+      console.log("Running 15/45-min Facebook sync...");
       ctx.waitUntil((async () => {
         try {
           await env.OAKTREE_SYNC_WORKFLOW.create({
             id: `cron-fb-${Date.now()}`,
             params: {
               syncFacebookPosts: true,
+            }
+          });
+          console.log("15/45-min Facebook sync workflow instance triggered successfully.");
+        } catch (e) {
+          console.error("Failed to trigger Facebook Workflow instance:", e);
+        }
+      })());
+    } else if (minute === 30) {
+      console.log("Running 30-min price sync...");
+      ctx.waitUntil((async () => {
+        try {
+          await env.OAKTREE_SYNC_WORKFLOW.create({
+            id: `cron-price-${Date.now()}`,
+            params: {
               fetchMarketStats: true,
               priceOnly: true,
             }
           });
-          console.log("30-min sync workflow instance triggered successfully.");
+          console.log("30-min price sync workflow instance triggered successfully.");
         } catch (e) {
           console.error("Failed to trigger 30-min Workflow instance:", e);
         }
