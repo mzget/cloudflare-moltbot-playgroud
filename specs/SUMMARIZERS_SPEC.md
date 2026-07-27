@@ -19,9 +19,9 @@ The **News Summarizer** monitors company-specific news articles, processes headl
 1.  **News Retrieval:** Queries the local D1 SQLite database for news articles related to a specific symbol that were ingested in the last 24 hours (`created_at > datetime("now", "-1 day")`).
 2.  **Context Construction:** Slices the top 10 articles and formats their title and summary into a markdown text block.
 3.  **LLM Prompting:**
-    *   Instructs the model to write in the style of **Howard Marks' Oaktree memos** (cautious, insightful, long-term cycle-oriented).
-    *   Enforces a strict constraint of **2 to 3 sentences** for the final summary.
-    *   Requests a sentiment score and bullet points outlining key insights.
+    *   Synthesizes all news items into a comprehensive Thai summary covering every major point, event, and guidance (2 to 3 paragraphs, 8 to 12 sentences).
+    *   Provides 3 to 5 key takeaways in Thai written in the style of **Howard Marks' Oaktree memos** (cycle awareness, risk management, second-level thinking).
+    *   Requests a sentiment score float (-1.0 to 1.0) and JSON structure output.
 4.  **Parsing & Persistence:** Extracts the JSON response, validates its structure, and records a new entry in `daily_reports`.
 
 ### Database Schema (`daily_reports`)

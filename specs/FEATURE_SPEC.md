@@ -35,8 +35,8 @@ The system leverages Cloudflare Workers AI models for background synthesis and i
 
 1. **Daily Stock News Synthesis** ([summarizer.ts](file:///C:/Users/natta/.gemini/antigravity/worktrees/oaktree-agent/list-schedule-llm-tasks/backend/src/summarizer.ts#L43))
    * **Model**: `@cf/google/gemma-4-26b-a4b-it`
-   * **Description**: Takes raw titles/summaries (up to 10 latest articles in the last 24h) for a given symbol and compiles them into a 2-to-3 sentence professional report.
-   * **Format/Tone**: Howard Marks memo style (insightful, long-term oriented, risk-aware). Output is a JSON object in **Thai** containing the `summary`, `sentiment_score`, and bullet-pointed `key_takeaways`.
+   * **Description**: Takes raw titles/summaries (up to 10 latest articles in the last 24h) for a given symbol and compiles them into a comprehensive Thai report (2 to 3 paragraphs, 8 to 12 sentences) covering all news events in detail.
+   * **Format/Tone**: Howard Marks memo style (insightful, long-term oriented, risk-aware). Output is a JSON object in **Thai** containing the detailed `summary`, `sentiment_score`, and 3 to 5 `key_takeaways`.
 
 2. **Email Newsletter Digest Synthesis** ([emailSummarizer.ts](file:///C:/Users/natta/.gemini/antigravity/worktrees/oaktree-agent/list-schedule-llm-tasks/backend/src/emailSummarizer.ts#L205))
    * **Model**: `@cf/google/gemma-4-26b-a4b-it`

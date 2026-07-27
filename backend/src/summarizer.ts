@@ -43,37 +43,42 @@ export async function generateDailySummary(env: Env, symbol: string, force = fal
 	const context = news.slice(0, 10).map(n => `- ${n.title}\n  Summary: ${n.summary || 'No summary available.'}`).join('\n\n');
 
 	const prompt = `
-		You are the Oaktree Agent, an expert financial analyst. 
-		Summarize the following news headlines for ${symbol} into a concise, professional report (strictly 2 to 3 sentences) WRITTEN IN THAI.
-		Style: Howard Marks Memo (insightful, long-term oriented, cautious but clear).
-		
-		News Headlines:
-		${context}
-		
+		You are the Oaktree Agent, a senior financial analyst writing for a Thai investor.
+		Analyze all news headlines and summaries for ${symbol} collected over the past 24 hours.
+		Produce a JSON response with TWO distinct sections in THAI language:
+
+		SECTION 1 — COMPREHENSIVE DAILY NEWS SUMMARY (สรุปข่าวสารครอบคลุมทุกประเด็น):
+		- Synthesize all news items into a thorough, coherent summary IN THAI.
+		- Cover EVERY major point, event, corporate action, earnings report, or market guidance mentioned in the headlines.
+		- Do not omit key facts or figures. The reader should completely understand all news events for ${symbol} without reading raw articles (2 to 3 paragraphs, 8 to 12 sentences).
+
+		SECTION 2 — HOWARD MARKS STYLE CORE TAKEAWAYS (มุมมองสไตล์ Howard Marks Memo):
+		- Provide 3 to 5 "key_takeaways" IN THAI written in Howard Marks' memo style.
+		- Focus on: Market Cycle Positioning, Risk vs. Return Assessment, Second-Level Thinking (Contrarian perspective), and Long-Term Value Implications.
+
 		RESPONSE INSTRUCTIONS:
-		1. Return ONLY a JSON object.
+		1. Return ONLY a valid JSON object.
 		2. The "summary" and "key_takeaways" fields MUST be written in Thai language.
-		3. CRITICAL: Keep your internal reasoning/thinking process very short (under 100 words) so you do not run out of token space.
-		4. DO NOT include any introductory text, preamble, or comments.
-		5. Ensure the JSON is valid (double quotes for keys/values).
-		6. CRITICAL: Do NOT use double quotes (") inside any JSON string values (like 'summary' or 'key_takeaways'). Instead, use single quotes (') for any internal quotes or speech marks.
-		   Example: "summary": "รายงาน 'ความตึงเครียด' ทางภูมิรัฐศาสตร์" (valid)
-		   Example: "summary": "รายงาน "ความตึงเครียด" ทางภูมิรัฐศาสตร์" (INVALID)
-		
+		3. "sentiment_score" must be a float between -1.0 (very negative) and 1.0 (very positive).
+		4. CRITICAL: Keep your internal reasoning/thinking process very short (under 50 words) so you do not run out of token space.
+		5. DO NOT include any introductory text, preamble, or comments.
+		6. Ensure the JSON is strictly valid (double quotes for keys/values).
+		7. CRITICAL: Do NOT use double quotes (") inside any JSON string values (like 'summary' or 'key_takeaways'). Instead, use single quotes (') for any internal quotes or speech marks.
+
 		JSON Schema:
 		{
-			"summary": "...",
-			"sentiment_score": 0.5,
-			"key_takeaways": ["Point 1", "Point 2"]
+			"summary": "สรุปข่าวสารย่อยทุกประเด็นอย่างละเอียดเป็นภาษาไทย...",
+			"sentiment_score": 0.35,
+			"key_takeaways": ["ข้อคิดสไตล์ Howard Marks ข้อที่ 1...", "ข้อคิดสไตล์ Howard Marks ข้อที่ 2..."]
 		}
 	`;
 
 	try {
-		const response = await runAiWithRetry(env, env.facebook_summarize_model, {
+		const response = await runAiWithRetry(env, env.default_ai_model, {
 			messages: [
 				{ role: 'user', content: prompt }
 			],
-			max_tokens: 2048,
+			max_tokens: 8192,
 			response_format: {
 				type: 'json_object'
 			}
