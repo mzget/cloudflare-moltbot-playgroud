@@ -8,6 +8,7 @@ import { API_BASE_URL } from '../../../config';
 import type { CompanyStats } from '../../../types/companyStats';
 import { glassStyle } from '../../../styles/glass';
 import { useAnalysisCoverage } from '../../../hooks/useAnalysisCoverage';
+import { FundamentalsTabSkeleton } from './DashboardSkeletons';
 
 // ─── Default visible columns (spec: 6 on first load) ─────────────────────────
 
@@ -70,6 +71,10 @@ export default function FundamentalDashboard() {
     setStoreColumns(next);
   };
 
+  if (loading) {
+    return <FundamentalsTabSkeleton />;
+  }
+
   return (
     <Box>
       {/* ── Page header ───────────────────────────────────────── */}
@@ -98,13 +103,7 @@ export default function FundamentalDashboard() {
         <Divider sx={{ mb: 2, opacity: 0.1 }} />
 
         {/* Table */}
-        {loading ? (
-          <Box sx={{ py: 10, textAlign: 'center' }}>
-            <Typography level="body-md" sx={{ opacity: 0.5 }}>
-              Loading intelligence data...
-            </Typography>
-          </Box>
-        ) : data.length === 0 ? (
+        {data.length === 0 ? (
           <Box sx={{ py: 10, textAlign: 'center' }}>
             <Typography level="body-md" sx={{ opacity: 0.5 }}>
               No active watchlist items found.

@@ -213,7 +213,7 @@ export default function HoldingsTable({
               background: '#131313',
             },
           },
-          '& tbody tr .sticky-td': {
+          '& tbody tr .sticky-td, & tfoot tr .sticky-td': {
             background: '#ffffff',
             '[data-joy-color-scheme="dark"] &': {
               background: '#131313',
@@ -233,7 +233,19 @@ export default function HoldingsTable({
         <thead>
           <tr>
             {/* Chevron column */}
-            <th style={{ width: 36, textAlign: 'center' }}>&nbsp;</th>
+            <th
+              style={{
+                width: 36,
+                minWidth: 36,
+                maxWidth: 36,
+                textAlign: 'center',
+                position: 'sticky',
+                left: 0,
+                zIndex: 3,
+              }}
+            >
+              &nbsp;
+            </th>
 
             {COLUMNS.map((col) => (
               <th
@@ -241,6 +253,15 @@ export default function HoldingsTable({
                 onClick={() => onSort(col.key)}
                 style={{
                   textAlign: col.align === 'left' ? 'left' : 'right',
+                  ...(col.key === 'symbol'
+                    ? {
+                        position: 'sticky',
+                        left: 36,
+                        zIndex: 3,
+                        borderRight: '1px solid var(--joy-palette-divider)',
+                        minWidth: densityStyles.minWidth,
+                      }
+                    : {}),
                 }}
               >
                 <Box
@@ -267,7 +288,19 @@ export default function HoldingsTable({
                 {/* Main data row */}
                 <tr>
                   {/* Expand Chevron */}
-                  <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                  <td
+                    className="sticky-td"
+                    style={{
+                      width: 36,
+                      minWidth: 36,
+                      maxWidth: 36,
+                      textAlign: 'center',
+                      verticalAlign: 'middle',
+                      position: 'sticky',
+                      left: 0,
+                      zIndex: 1,
+                    }}
+                  >
                     <IconButton
                       size="sm"
                       variant="plain"
@@ -285,7 +318,16 @@ export default function HoldingsTable({
                   </td>
 
                   {/* Symbol */}
-                  <td style={{ minWidth: densityStyles.minWidth }}>
+                  <td
+                    className="sticky-td"
+                    style={{
+                      minWidth: densityStyles.minWidth,
+                      position: 'sticky',
+                      left: 36,
+                      zIndex: 1,
+                      borderRight: '1px solid var(--joy-palette-divider)',
+                    }}
+                  >
                     <Box>
                       <Stack direction="row" alignItems="center" spacing={0.75}>
                         <Link
@@ -509,10 +551,29 @@ export default function HoldingsTable({
           >
             <tr>
               {/* Chevron column */}
-              <td></td>
+              <td
+                className="sticky-td"
+                style={{
+                  width: 36,
+                  minWidth: 36,
+                  maxWidth: 36,
+                  position: 'sticky',
+                  left: 0,
+                  zIndex: 1,
+                }}
+              ></td>
 
               {/* Symbol */}
-              <td>
+              <td
+                className="sticky-td"
+                style={{
+                  minWidth: densityStyles.minWidth,
+                  position: 'sticky',
+                  left: 36,
+                  zIndex: 1,
+                  borderRight: '1px solid var(--joy-palette-divider)',
+                }}
+              >
                 <Typography level="body-sm" sx={{ fontWeight: 700, fontSize: densityStyles.fontSize }}>
                   Total
                 </Typography>
