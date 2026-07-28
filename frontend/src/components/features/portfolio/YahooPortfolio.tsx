@@ -8,6 +8,7 @@ import type { Holding } from './HoldingsTable';
 import FundamentalDashboard from './FundamentalDashboard';
 import SummaryTab from './SummaryTab';
 import HoldingsTab from './HoldingsTab';
+import { SummaryTabSkeleton, HoldingsTabSkeleton } from './DashboardSkeletons';
 import '../../../styles/yahooPortfolio.css';
 
 export interface PortfolioSummary {
@@ -143,12 +144,21 @@ export default function YahooPortfolio() {
     ? tabNameToIndex[search.tab]
     : 0; // Default to Fundamentals (0)
 
+  const [optimisticTab, setOptimisticTab] = React.useState<number>(activeTab);
+
+  React.useEffect(() => {
+    setOptimisticTab(activeTab);
+  }, [activeTab]);
+
   const setActiveTab = (index: number) => {
-    navigate({
-      search: {
-        ...search,
-        tab: tabIndexToName[index],
-      },
+    setOptimisticTab(index);
+    React.startTransition(() => {
+      navigate({
+        search: {
+          ...search,
+          tab: tabIndexToName[index],
+        },
+      });
     });
   };
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -263,7 +273,7 @@ export default function YahooPortfolio() {
 
       {/* Tabs */}
       <Box sx={{ mb: 2 }}>
-        <Tabs value={activeTab} onChange={(_, val) => setActiveTab(val as number)} sx={{ bgcolor: 'transparent' }}>
+        <Tabs value={optimisticTab} onChange={(_, val) => setActiveTab(val as number)} sx={{ bgcolor: 'transparent' }}>
           <TabList
             variant="soft"
             sx={{
@@ -302,27 +312,39 @@ export default function YahooPortfolio() {
       </Box>
 
       {/* Summary Tab */}
-      {activeTab === 2 && summary && (
-        <SummaryTab
-          summary={summary}
-          holdingsCount={holdings.length}
-          openPositionsCount={holdings.filter(h => h.status === 'Open').length}
-          holdings={holdings}
-        />
+      {optimisticTab === 2 && (
+        <Box className="tab-pane-active">
+          {summary ? (
+            <SummaryTab
+              summary={summary}
+              holdingsCount={holdings.length}
+              openPositionsCount={holdings.filter(h => h.status === 'Open').length}
+              holdings={holdings}
+            />
+          ) : (
+            <SummaryTabSkeleton />
+          )}
+        </Box>
       )}
 
       {/* Holdings Tab */}
-      {activeTab === 1 && (
-        <HoldingsTab
-          holdings={holdings}
-          loading={loading}
-          onAddTicker={() => setAddModalOpen(true)}
-          onDataChange={fetchAll}
-        />
+      {optimisticTab === 1 && (
+        <Box className="tab-pane-active">
+          {loading && holdings.length === 0 ? (
+            <HoldingsTabSkeleton />
+          ) : (
+            <HoldingsTab
+              holdings={holdings}
+              loading={loading}
+              onAddTicker={() => setAddModalOpen(true)}
+              onDataChange={fetchAll}
+            />
+          )}
+        </Box>
       )}
 
       {/* Fundamentals Tab */}
-      {activeTab === 0 && (
+      {optimisticTab === 0 && (
         <Box className="tab-pane-active">
           <FundamentalDashboard />
         </Box>

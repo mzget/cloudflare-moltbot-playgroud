@@ -51,3 +51,15 @@ All data tables across the frontend application **MUST** be implemented using MU
 All buttons that trigger asynchronous operations (e.g., Save, Submit, Create, Delete, Post) **MUST** incorporate a visible loading spinner state to inform the user of the ongoing action.
 - **MUI Joy UI Implementation**: Use the `loading={isSubmitting}` prop on MUI Joy UI `<Button>` or `<IconButton>`.
 - **User Feedback**: Never leave a submit or save button in a static state without a visual loading indicator during API calls or asynchronous actions.
+
+---
+
+## 📐 Default Grid Layout System
+
+Always use MUI Joy UI `<Grid container spacing={2}>` as the default layout mechanism for arranging card components, dashboards, and summary metrics.
+- **Responsive Grid Breakpoints**: Explicitly define responsive column spans across screen breakpoints (`xs`, `sm`, `md`, `lg`, `xl`):
+  - **`xl` (Extra Large >= 1536px)**: Use `xl={4}` for 3 cards per row, or `xl={8}` / `xl={12}` for wider cards/tables.
+  - **`lg` & `md` (Medium / Large 900px - 1535px)**: Use `lg={6} md={6}` for 2 cards per row.
+  - **`sm` & `xs` (Mobile / Small < 900px)**: Use `xs={12} sm={12}` for 1 card per row.
+- **Visual Harmony**: Combine Grid items with glassmorphic `<Sheet sx={{ ...glassStyle, p: 3, height: '100%' }}>` to ensure uniform card height and alignment across rows.
+
