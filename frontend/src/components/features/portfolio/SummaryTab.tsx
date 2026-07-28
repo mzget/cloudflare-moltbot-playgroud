@@ -434,10 +434,10 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
     return (
     <Box className="tab-pane-active" sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
 
-      {/* Top Metrics Cards (THB) */}
+      {/* Summary Cards Grid */}
       <Grid container spacing={2}>
-        {/* Stocks Only Card */}
-        <Grid xs={12} md={4}>
+        {/* 1. STOCKS ONLY Card */}
+        <Grid xs={12} sm={12} md={6} lg={6} xl={4}>
           <Sheet sx={{ ...glassStyle, p: 3, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 3 }}>
               <Box sx={{ width: '100%' }}>
@@ -494,8 +494,8 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
           </Sheet>
         </Grid>
 
-        {/* Pie chart to see percent of all assets */}
-        <Grid xs={12} md={4}>
+        {/* 2. Asset Allocation Card */}
+        <Grid xs={12} sm={12} md={6} lg={6} xl={4}>
           <Sheet sx={{ ...glassStyle, p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
             <Box sx={{ mb: 2 }}>
               <Typography level="title-md" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -511,8 +511,71 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
           </Sheet>
         </Grid>
 
-        {/* Daily TWR Performance vs S&P 500 (holdings stock) */}
-        <Grid xs={12} md={4}>
+        {/* 3. ALL ASSETS summarize Card */}
+        <Grid xs={12} sm={12} md={6} lg={6} xl={4}>
+          <Sheet sx={{ ...glassStyle, p: 3, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 3 }}>
+              <Box sx={{ width: '100%' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
+                  <Typography level="body-xs" sx={{ opacity: 0.6, fontWeight: 700, display: 'flex', alignItems: 'center' }}>
+                    <Box component="span" sx={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.solidBg', mr: 0.75 }} />
+                    ALL ASSETS (THB)
+                  </Typography>
+                  <Chip
+                    variant="soft"
+                    color="success"
+                    size="sm"
+                    startDecorator={<TrendingUp size={14} />}
+                    sx={{ borderRadius: '8px', fontWeight: 600 }}
+                  >
+                    Bullish
+                  </Chip>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                  <Typography level="h1" sx={{ fontWeight: 800, fontSize: '2.2rem', letterSpacing: '-0.02em', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', whiteSpace: 'nowrap' }}>
+                    {showMoneyValues ? formatCurrency(summary.total_market_value, false, '฿') : '••••••••'}
+                  </Typography>
+                  <IconButton
+                    size="sm"
+                    variant="plain"
+                    color="neutral"
+                    onClick={() => setShowMoneyValues(!showMoneyValues)}
+                    sx={{ borderRadius: '50%' }}
+                  >
+                    {showMoneyValues ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </IconButton>
+                </Box>
+                <Stack spacing={0.75}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1.5 }}>
+                    <Typography level="body-sm" sx={{ opacity: 0.7, whiteSpace: 'nowrap' }}>Total Cost</Typography>
+                    <Typography level="body-sm" sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
+                      {showMoneyValues ? formatCurrency(summary.total_cost, false, '฿') : '••••••••'}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1.5 }}>
+                    <Typography level="body-sm" sx={{ opacity: 0.7, whiteSpace: 'nowrap' }}>Unrealized Gain</Typography>
+                    <Typography level="body-sm" sx={{ fontWeight: 700, whiteSpace: 'nowrap' }} className={summary.unrealized_gain_amt >= 0 ? 'yf-positive' : 'yf-negative'}>
+                      {showMoneyValues ? formatCurrency(summary.unrealized_gain_amt, true, '฿') : '••••••••'} ({formatPct(summary.unrealized_gain_pct)})
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1.5 }}>
+                    <Typography level="body-sm" sx={{ opacity: 0.7, whiteSpace: 'nowrap' }}>Realized Gain</Typography>
+                    <Typography level="body-sm" sx={{ fontWeight: 700, whiteSpace: 'nowrap' }} className={summary.realized_gain_amt >= 0 ? 'yf-positive' : 'yf-negative'}>
+                      {showMoneyValues ? formatCurrency(summary.realized_gain_amt, true, '฿') : '••••••••'}
+                    </Typography>
+                  </Box>
+                </Stack>
+                <Divider sx={{ my: 1.5, opacity: 0.15 }} />
+                <Typography level="body-xs" sx={{ opacity: 0.5, fontWeight: 500 }}>
+                  Stocks, mutual funds & cash overrides
+                </Typography>
+              </Box>
+            </Box>
+          </Sheet>
+        </Grid>
+
+        {/* 4. Performance vs S&P 500 Card */}
+        <Grid xs={12} sm={12} md={6} lg={6} xl={4}>
           <Sheet sx={{ ...glassStyle, p: 3, height: '100%', display: 'flex', flexDirection: 'column' }}>
             <Typography level="title-md" sx={{ fontWeight: 800, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
               <BarChart2 size={18} color="#10b981" /> Daily TWR Performance vs S&P 500 (holdings stock)
@@ -522,14 +585,10 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
             </Box>
           </Sheet>
         </Grid>
-      </Grid>
 
-      {/* Portfolio Performance & Asset Allocation Grid */}
-      <Grid container spacing={2}>
-
-        {/* Broker Balances Table */}
-        <Grid xs={12} md={8}>
-          <Sheet sx={{ ...glassStyle, p: 3 }}>
+        {/* 5. Broker Balances Table */}
+        <Grid xs={12} sm={12} md={12} lg={12} xl={8}>
+          <Sheet sx={{ ...glassStyle, p: 3, height: '100%' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
               <Box>
                 <Typography level="title-lg" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -645,70 +704,6 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
             </Box>
           </Sheet>
         </Grid>
-
-        {/* All Assets Card */}
-        <Grid xs={12} md={4}>
-          <Sheet sx={{ ...glassStyle, p: 3, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 3 }}>
-              <Box sx={{ width: '100%' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5, flexWrap: 'wrap', gap: 1 }}>
-                  <Typography level="body-xs" sx={{ opacity: 0.6, fontWeight: 700, display: 'flex', alignItems: 'center' }}>
-                    <Box component="span" sx={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.solidBg', mr: 0.75 }} />
-                    ALL ASSETS (THB)
-                  </Typography>
-                  <Chip
-                    variant="soft"
-                    color="success"
-                    size="sm"
-                    startDecorator={<TrendingUp size={14} />}
-                    sx={{ borderRadius: '8px', fontWeight: 600 }}
-                  >
-                    Bullish
-                  </Chip>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
-                  <Typography level="h1" sx={{ fontWeight: 800, fontSize: '2.2rem', letterSpacing: '-0.02em', background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', whiteSpace: 'nowrap' }}>
-                    {showMoneyValues ? formatCurrency(summary.total_market_value, false, '฿') : '••••••••'}
-                  </Typography>
-                  <IconButton
-                    size="sm"
-                    variant="plain"
-                    color="neutral"
-                    onClick={() => setShowMoneyValues(!showMoneyValues)}
-                    sx={{ borderRadius: '50%' }}
-                  >
-                    {showMoneyValues ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </IconButton>
-                </Box>
-                <Stack spacing={0.75}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1.5 }}>
-                    <Typography level="body-sm" sx={{ opacity: 0.7, whiteSpace: 'nowrap' }}>Total Cost</Typography>
-                    <Typography level="body-sm" sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
-                      {showMoneyValues ? formatCurrency(summary.total_cost, false, '฿') : '••••••••'}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1.5 }}>
-                    <Typography level="body-sm" sx={{ opacity: 0.7, whiteSpace: 'nowrap' }}>Unrealized Gain</Typography>
-                    <Typography level="body-sm" sx={{ fontWeight: 700, whiteSpace: 'nowrap' }} className={summary.unrealized_gain_amt >= 0 ? 'yf-positive' : 'yf-negative'}>
-                      {showMoneyValues ? formatCurrency(summary.unrealized_gain_amt, true, '฿') : '••••••••'} ({formatPct(summary.unrealized_gain_pct)})
-                    </Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1.5 }}>
-                    <Typography level="body-sm" sx={{ opacity: 0.7, whiteSpace: 'nowrap' }}>Realized Gain</Typography>
-                    <Typography level="body-sm" sx={{ fontWeight: 700, whiteSpace: 'nowrap' }} className={summary.realized_gain_amt >= 0 ? 'yf-positive' : 'yf-negative'}>
-                      {showMoneyValues ? formatCurrency(summary.realized_gain_amt, true, '฿') : '••••••••'}
-                    </Typography>
-                  </Box>
-                </Stack>
-                <Divider sx={{ my: 1.5, opacity: 0.15 }} />
-                <Typography level="body-xs" sx={{ opacity: 0.5, fontWeight: 500 }}>
-                  Stocks, mutual funds & cash overrides
-                </Typography>
-              </Box>
-            </Box>
-          </Sheet>
-        </Grid>
-
       </Grid>
 
       {/* Fund Allocations Grid (Matrix) */}
