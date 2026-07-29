@@ -507,7 +507,9 @@ async function ensureSystemSettingsTable(db: D1Database) {
 		INSERT OR IGNORE INTO system_settings (key, value) VALUES 
 		('pause_daily_report_facebook', '0'),
 		('pause_email_digest_facebook', '0'),
-		('pause_custom_facebook', '0')
+		('pause_custom_facebook', '0'),
+		('pause_market_breakout_notifications', '0'),
+		('pause_market_breakout_scan', '0')
 	`).run();
 }
 
@@ -539,6 +541,18 @@ app.post('/api/settings', async (c) => {
         .run();
     }
     return c.json({ success: true });
+  } catch (e) {
+    return c.json({ error: (e as any).message }, 500);
+  }
+});
+
+app.post('/api/settings/clear-breakout-notifications', async (c) => {
+  try {
+    await c.env.DB.batch([
+      c.env.DB.prepare("DELETE FROM in_app_notifications WHERE metric IN ('ath', 'atl', '52w_high', '52w_low')"),
+      c.env.DB.prepare("DELETE FROM record_breaker_events WHERE event_type IN ('ath', 'atl', '52w_high', '52w_low')")
+    ]);
+    return c.json({ success: true, message: 'Breakout notifications cleared successfully' });
   } catch (e) {
     return c.json({ error: (e as any).message }, 500);
   }
