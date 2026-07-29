@@ -1,4 +1,4 @@
-﻿import { vi, describe, it, expect, beforeEach } from 'vitest';
+import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { scanMarketBreakouts } from './marketScanner';
 
 const mockFetch = vi.fn();
@@ -64,6 +64,7 @@ describe('scanMarketBreakouts', () => {
 
 	it('should return empty list immediately when watchlist is empty', async () => {
 		const mockStmt = {
+			first: vi.fn().mockResolvedValue(null),
 			all: vi.fn().mockResolvedValue({ results: [] })
 		};
 		const mockDb = {
@@ -117,5 +118,23 @@ describe('scanMarketBreakouts', () => {
 			right: ['stock', 'dr']
 		});
 		expect(body.range).toEqual([0, 25000]);
+	});
+
+	it('should abort scanning early when pause_market_breakout_scan is set to 1', async () => {
+		const mockStmt = {
+			bind: vi.fn().mockImplementation(() => mockStmt),
+			first: vi.fn().mockImplementation((query?: string) => {
+				return Promise.resolve({ value: '1' });
+			})
+		};
+
+		const mockDb = {
+			prepare: vi.fn().mockReturnValue(mockStmt)
+		};
+
+		const result = await scanMarketBreakouts(mockDb as any, 'dummy-api-key', 'watchlist');
+
+		expect(result).toEqual([]);
+		expect(mockFetch).not.toHaveBeenCalled();
 	});
 });

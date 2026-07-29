@@ -172,6 +172,7 @@ export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOpt
 
 	const todayDate = new Date().toISOString().split('T')[0];
 	const loggedEvents = new Set<string>();
+	let notificationsPaused = false;
 	try {
 		const dbEvents = await env.DB.prepare(`
 			SELECT symbol, event_type FROM record_breaker_events WHERE event_date = ?1
@@ -185,6 +186,15 @@ export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOpt
 		}
 	} catch (e) {
 		console.error("Failed to pre-fetch record_breaker_events:", e);
+	}
+
+	try {
+		const pauseRow = await env.DB.prepare("SELECT value FROM system_settings WHERE key = 'pause_market_breakout_notifications'").first() as { value: string } | null;
+		if (pauseRow && pauseRow.value === '1') {
+			notificationsPaused = true;
+		}
+	} catch (e) {
+		console.warn("Failed to check pause_market_breakout_notifications in marketData:", e);
 	}
 
 	console.log(`Fetching market stats from Finnhub for ${resultsToProcess.length} symbols (FetchQuotes: ${shouldFetchQuote}, FetchMetrics: ${shouldFetchMetrics})...`);
@@ -384,7 +394,7 @@ export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOpt
 						const key = `${symbol.toUpperCase()}:ath`;
 						const logged = loggedEvents.has(key);
 
-						if (!logged) {
+						if (!logged && !notificationsPaused) {
 							const msg = `${symbol} broke out to a new All-Time High of ${price}!`;
 							batchStatements.push(
 								env.DB.prepare(`
@@ -410,7 +420,7 @@ export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOpt
 						const key = `${symbol.toUpperCase()}:atl`;
 						const logged = loggedEvents.has(key);
 
-						if (!logged) {
+						if (!logged && !notificationsPaused) {
 							const msg = `${symbol} broke down to a new All-Time Low of ${price}!`;
 							batchStatements.push(
 								env.DB.prepare(`
@@ -436,7 +446,7 @@ export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOpt
 						const key = `${symbol.toUpperCase()}:52w_high`;
 						const logged = loggedEvents.has(key);
 
-						if (!logged) {
+						if (!logged && !notificationsPaused) {
 							const msg = `${symbol} broke out to a new 52-week high of ${price}!`;
 							batchStatements.push(
 								env.DB.prepare(`
@@ -459,7 +469,7 @@ export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOpt
 						const key = `${symbol.toUpperCase()}:52w_low`;
 						const logged = loggedEvents.has(key);
 
-						if (!logged) {
+						if (!logged && !notificationsPaused) {
 							const msg = `${symbol} broke down to a new 52-week low of ${price}!`;
 							batchStatements.push(
 								env.DB.prepare(`

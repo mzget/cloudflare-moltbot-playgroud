@@ -1,4 +1,4 @@
-﻿export interface BreakoutResult {
+export interface BreakoutResult {
 	symbol: string;
 	name: string;
 	price: number;
@@ -12,6 +12,16 @@ export async function scanMarketBreakouts(db: any, fmpApiKey: string, scope: 'wa
 	console.log(`[MarketScanner] Starting ${scope} breakout scan using TradingView API...`);
 	const allBreakouts: BreakoutResult[] = [];
 	const todayDate = new Date().toISOString().split('T')[0];
+
+	try {
+		const pauseScanRow = await db.prepare("SELECT value FROM system_settings WHERE key = 'pause_market_breakout_scan'").first() as { value: string } | null;
+		if (pauseScanRow && pauseScanRow.value === '1') {
+			console.log('[MarketScanner] Market breakout scanning is paused via system_settings. Skipping scan.');
+			return [];
+		}
+	} catch (e) {
+		console.warn('[MarketScanner] Failed to check pause_market_breakout_scan:', e);
+	}
 
 	// For watchlist scope, fetch watchlist symbols first
 	let watchlistSymbols: Set<string> | null = null;
@@ -154,6 +164,12 @@ export async function scanMarketBreakouts(db: any, fmpApiKey: string, scope: 'wa
 	// In watchlist mode: every breakout is a watchlisted stock, create notifications directly
 	// In market mode: cross-reference breakouts against watchlist
 	try {
+		const pauseRow = await db.prepare("SELECT value FROM system_settings WHERE key = 'pause_market_breakout_notifications'").first() as { value: string } | null;
+		if (pauseRow && pauseRow.value === '1') {
+			console.log('[MarketScanner] Market breakout notifications are paused via system_settings. Skipping notification creation.');
+			return allBreakouts;
+		}
+
 		const breakoutsToNotify: BreakoutResult[] = [];
 
 		if (scope === 'watchlist') {
