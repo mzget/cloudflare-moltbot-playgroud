@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { Box, Button, Typography, Sheet, CircularProgress, Divider, Stack, Tabs, TabList, Tab } from '@mui/joy';
-import { ArrowLeft, RotateCw, CheckCircle, AlertTriangle, Play, FileText, Calculator, BookOpen } from 'lucide-react';
+import { Box, Button, Typography, Sheet, CircularProgress, Divider, Stack, Tabs, TabList, Tab, Select, Option } from '@mui/joy';
+import { ArrowLeft, RotateCw, CheckCircle, AlertTriangle, Play, FileText, Calculator, BookOpen, TrendingUp } from 'lucide-react';
 import StockThesis from './StockThesis';
 import { useNavigate } from '@tanstack/react-router';
 import { API_BASE_URL } from '../../../config';
@@ -22,6 +22,31 @@ export default function AnalysisReport({ symbol, onBack, subTab }: AnalysisRepor
   const [report, setReport] = React.useState<any>(null);
   const [error, setError] = React.useState<string | null>(null);
   const activeToolTab = subTab === 'dcf-model' ? 1 : subTab === 'stock-thesis' ? 2 : 0;
+
+  const [symbolsList, setSymbolsList] = React.useState<string[]>(['MSFT', 'AAPL', 'NVDA', 'GOOGL', 'AMZN', 'META', 'TSLA']);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    const fetchWatchlist = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/watchlist`);
+        if (res.ok) {
+          const data = (await res.json()) as any[];
+          const active = data
+            .map((item: any) => item.symbol)
+            .filter(Boolean);
+          if (!cancelled && active.length > 0) {
+            const combined = Array.from(new Set(['MSFT', 'AAPL', 'NVDA', 'GOOGL', 'AMZN', 'META', 'TSLA', ...active, symbol])).sort();
+            setSymbolsList(combined);
+          }
+        }
+      } catch (e) {
+        console.error('Failed to fetch watchlist symbols for selector:', e);
+      }
+    };
+    fetchWatchlist();
+    return () => { cancelled = true; };
+  }, [symbol]);
 
   const fetchReport = async () => {
     setLoading(true);
@@ -156,59 +181,109 @@ export default function AnalysisReport({ symbol, onBack, subTab }: AnalysisRepor
 
   return (
     <Box>
-      {/* Tool Tabs */}
-      <Tabs
-        value={activeToolTab}
-        onChange={(_, val) => {
-          navigate({
-            to: '/analysis',
-            search: { symbol, tab: val === 2 ? 'stock-thesis' : val === 1 ? 'dcf-model' : 'report' },
-          });
-        }}
-        sx={{ mb: 3, bgcolor: 'transparent' }}
+      {/* Header Bar: Tabs (Left) & Stock Selector Dropdown (Right) */}
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        justifyContent="space-between"
+        alignItems={{ xs: 'stretch', sm: 'center' }}
+        spacing={2}
+        sx={{ mb: 3 }}
       >
-        <TabList
-          variant="soft"
-          size="sm"
-          sx={{
-            p: 0.5,
-            borderRadius: '14px',
-            bgcolor: 'rgba(255,255,255,0.04)',
-            border: '1px solid rgba(255,255,255,0.06)',
-            width: 'fit-content',
-            '& .MuiTab-root': {
-              fontWeight: 700,
-              fontSize: '0.8rem',
-              px: 2.5,
-              py: 1,
-              borderRadius: '10px',
-              minHeight: '36px',
-              color: 'text.secondary',
-              bgcolor: 'transparent',
-              gap: 1,
-              transition: 'all 0.2s ease',
-              '&.Mui-selected': {
-                color: 'primary.plainColor',
-                bgcolor: 'background.surface',
-                boxShadow: 'sm',
+        {/* Tool Tabs */}
+        <Tabs
+          value={activeToolTab}
+          onChange={(_, val) => {
+            navigate({
+              to: '/analysis',
+              search: { symbol, tab: val === 2 ? 'stock-thesis' : val === 1 ? 'dcf-model' : 'report' },
+            });
+          }}
+          sx={{ bgcolor: 'transparent' }}
+        >
+          <TabList
+            variant="soft"
+            size="sm"
+            sx={{
+              p: 0.5,
+              borderRadius: '14px',
+              bgcolor: 'rgba(255,255,255,0.04)',
+              border: '1px solid rgba(255,255,255,0.06)',
+              width: 'fit-content',
+              '& .MuiTab-root': {
+                fontWeight: 700,
+                fontSize: '0.8rem',
+                px: 2.5,
+                py: 1,
+                borderRadius: '10px',
+                minHeight: '36px',
+                color: 'text.secondary',
+                bgcolor: 'transparent',
+                gap: 1,
+                transition: 'all 0.2s ease',
+                '&.Mui-selected': {
+                  color: 'primary.plainColor',
+                  bgcolor: 'background.surface',
+                  boxShadow: 'sm',
+                },
               },
+            }}
+          >
+            <Tab disableIndicator>
+              <FileText size={15} />
+              Report
+            </Tab>
+            <Tab disableIndicator>
+              <Calculator size={15} />
+              DCF Model
+            </Tab>
+            <Tab disableIndicator>
+              <BookOpen size={15} />
+              Stock Thesis
+            </Tab>
+          </TabList>
+        </Tabs>
+
+        {/* Global Stock Symbol Dropdown (Right-aligned) */}
+        <Select
+          size="sm"
+          value={symbol}
+          onChange={(_, val) => {
+            if (val && val !== symbol) {
+              const currentTabName = subTab || (activeToolTab === 2 ? 'stock-thesis' : activeToolTab === 1 ? 'dcf-model' : 'report');
+              navigate({
+                to: '/analysis',
+                search: { symbol: val, tab: currentTabName },
+              });
+            }
+          }}
+          startDecorator={<TrendingUp size={15} color="#60a5fa" />}
+          sx={{
+            minWidth: 130,
+            fontWeight: 700,
+            fontSize: '0.85rem',
+            bgcolor: 'rgba(37, 99, 235, 0.15)',
+            borderColor: 'rgba(37, 99, 235, 0.3)',
+            color: 'primary.200',
+            borderRadius: '12px',
+            px: 1.5,
+            py: 0.8,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+            '&:hover': {
+              bgcolor: 'rgba(37, 99, 235, 0.25)',
+              borderColor: 'rgba(37, 99, 235, 0.5)',
+            },
+            '& .MuiSelect-indicator': {
+              color: 'primary.300',
             },
           }}
         >
-          <Tab disableIndicator>
-            <FileText size={15} />
-            Report
-          </Tab>
-          <Tab disableIndicator>
-            <Calculator size={15} />
-            DCF Model
-          </Tab>
-          <Tab disableIndicator>
-            <BookOpen size={15} />
-            Stock Thesis
-          </Tab>
-        </TabList>
-      </Tabs>
+          {symbolsList.map((s) => (
+            <Option key={s} value={s} sx={{ fontWeight: 700, fontSize: '0.85rem' }}>
+              {s}
+            </Option>
+          ))}
+        </Select>
+      </Stack>
 
       {/* Tab Content */}
       {activeToolTab === 0 && renderReportContent()}
