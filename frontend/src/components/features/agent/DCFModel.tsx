@@ -1,72 +1,187 @@
-﻿import * as React from 'react';
+import * as React from 'react';
 import {
   Box, Sheet, Typography, Stack, Slider, Input, Divider, Table,
-  FormLabel, FormControl, Tooltip, Button
+  FormLabel, FormControl, Tooltip, Button, Chip, Tabs, TabList, Tab, Grid
 } from '@mui/joy';
-import { Calculator, TrendingUp, DollarSign, BarChart3, Info } from 'lucide-react';
+import { Calculator, Info } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
 
-// ─── DCF Calculator Core (ported from interactive_dcf_model.html) ───────────
+// ─── DCF Calculator Core ──────────────────────────────────────────────────
 
 interface DCFParams {
-  baseRev: number;       // $B
-  revGrowth: number;     // decimal (e.g. 0.18)
-  baseGm: number;        // decimal (e.g. 0.34)
-  gmImprovement: number; // decimal per year
-  opexMargin: number;    // decimal
-  taxRate: number;       // decimal
-  fcfConversion: number; // decimal
-  wacc: number;          // decimal
-  terminalGrowth: number;// decimal
-  sharesOutstanding: number; // millions
+  baseYear: number;
+  baseRev: number;          // $B
+  baseEbit: number;         // $B
+  taxRate: number;          // percentage (e.g. 20)
+  wacc: number;             // percentage (e.g. 9)
+  terminalGrowth: number;   // percentage (e.g. 3.5)
+  netCash: number;          // $B
+  sharesOutstanding: number;// Millions (e.g. 7410)
+
+  mode: 'uniform' | 'detailed';
+
+  // Uniform Mode
+  revGrowth: number;        // percentage
+  opMargin: number;         // percentage
+  fcfConversion: number;    // percentage
+
+  // Detailed Mode (5-year arrays)
+  yearlyGrowth: number[];   // percentages [16, 15, 14, 13, 12]
+  yearlyOpMargin: number[]; // percentages [46.2, 46.5, 46.8, 47.0, 47.2]
+  yearlyFcfConv: number[];  // percentages [68, 72, 75, 78, 80]
+
+  // Exit Multiple Valuation
+  exitMultiple: number;     // e.g. 24.0
+  targetShares: number;     // Millions (e.g. 7200)
+  currentPrice: number | null;
+}
+
+interface BaseYearData {
+  yearLabel: string;
+  revenue: number;
+  ebit: number;
+  opMargin: number;
+  nopat: number;
 }
 
 interface YearlyData {
   year: number;
-  revenue: number;
-  grossMargin: number;
-  ebit: number;
-  fcf: number;
-  pvOfFcf: number;
+  yearLabel: string;
+  growth: number;        // %
+  revenue: number;       // $B
+  opMargin: number;      // %
+  ebit: number;          // $B
+  nopat: number;         // $B
+  fcfConv: number;       // %
+  fcf: number;           // $B
+  discountFactor: number;
+  pvOfFcf: number;       // $B
 }
 
 interface DCFResult {
+  baseYearData: BaseYearData;
   yearlyData: YearlyData[];
-  enterpriseValue: number;
-  impliedSharePrice: number;
+  sumPvFcf: number;
+  terminalValue: number;
   pvOfTerminalValue: number;
+  enterpriseValue: number;
+  netCash: number;
+  equityValue: number;
+  impliedSharePrice: number;
+  
+  // 5-Year Target Price / Future Exit Multiple Valuation
+  targetMarketCapYr5: number;
+  targetSharePriceYr5: number;
+  cagrYr5: number | null;
+  revenueCAGR: number;
+  avgOpMargin: number;
 }
 
 function calculateDCF(params: DCFParams): DCFResult {
-  const results: YearlyData[] = [];
+  const taxDecimal = params.taxRate / 100;
+  const waccDecimal = params.wacc / 100;
+  const termGrowthDecimal = params.terminalGrowth / 100;
+
+  const baseOpMargin = params.baseRev > 0 ? (params.baseEbit / params.baseRev) * 100 : 0;
+  const baseNopat = params.baseEbit * (1 - taxDecimal);
+
+  const baseYearData: BaseYearData = {
+    yearLabel: `FY${params.baseYear} (A)`,
+    revenue: params.baseRev,
+    ebit: params.baseEbit,
+    opMargin: baseOpMargin,
+    nopat: baseNopat,
+  };
+
+  const yearlyData: YearlyData[] = [];
   let currentRev = params.baseRev;
-  let pvOfFcfSum = 0;
+  let sumPvFcf = 0;
 
   for (let i = 0; i < 5; i++) {
-    const year = 2026 + i;
-    if (i > 0) {
-      currentRev = currentRev * (1 + params.revGrowth);
-    }
-    const currentGm = params.baseGm + i * params.gmImprovement;
-    const ebit = currentRev * (currentGm - params.opexMargin);
-    const nopat = ebit * (1 - params.taxRate);
-    const fcf = nopat * params.fcfConversion;
-    const discountFactor = Math.pow(1 + params.wacc, i + 1);
-    const pvOfFcf = fcf / discountFactor;
-    pvOfFcfSum += pvOfFcf;
+    const year = params.baseYear + 1 + i;
+    const yearLabel = `FY${year} (E)`;
 
-    results.push({ year, revenue: currentRev, grossMargin: currentGm, ebit, fcf, pvOfFcf });
+    const growth = params.mode === 'detailed' 
+      ? (params.yearlyGrowth[i] ?? 14) 
+      : params.revGrowth;
+    
+    const opMargin = params.mode === 'detailed'
+      ? (params.yearlyOpMargin[i] ?? 46.8)
+      : params.opMargin;
+
+    const fcfConv = params.mode === 'detailed'
+      ? (params.yearlyFcfConv[i] ?? 75)
+      : params.fcfConversion;
+
+    currentRev = currentRev * (1 + growth / 100);
+    const ebit = currentRev * (opMargin / 100);
+    const nopat = ebit * (1 - taxDecimal);
+    const fcf = nopat * (fcfConv / 100);
+
+    const discountFactor = 1 / Math.pow(1 + waccDecimal, i + 1);
+    const pvOfFcf = fcf * discountFactor;
+    sumPvFcf += pvOfFcf;
+
+    yearlyData.push({
+      year,
+      yearLabel,
+      growth,
+      revenue: currentRev,
+      opMargin,
+      ebit,
+      nopat,
+      fcfConv,
+      fcf,
+      discountFactor,
+      pvOfFcf,
+    });
   }
 
-  const lastFcf = results[4].fcf;
+  const lastFcf = yearlyData[4].fcf;
   const terminalValue =
-    (lastFcf * (1 + params.terminalGrowth)) / (params.wacc - params.terminalGrowth);
-  const pvOfTerminalValue = terminalValue / Math.pow(1 + params.wacc, 5);
-  const enterpriseValue = pvOfFcfSum + pvOfTerminalValue;
-  const impliedSharePrice = (enterpriseValue * 1000) / params.sharesOutstanding;
+    (lastFcf * (1 + termGrowthDecimal)) / Math.max(0.001, (waccDecimal - termGrowthDecimal));
+  const pvOfTerminalValue = terminalValue / Math.pow(1 + waccDecimal, 5);
+  const enterpriseValue = sumPvFcf + pvOfTerminalValue;
+  const equityValue = enterpriseValue + params.netCash;
 
-  return { yearlyData: results, enterpriseValue, impliedSharePrice, pvOfTerminalValue };
+  // Implied Share Price from Gordon Growth (Present Intrinsic Value)
+  const sharesInBillions = params.sharesOutstanding > 100 ? params.sharesOutstanding / 1000 : params.sharesOutstanding;
+  const impliedSharePrice = sharesInBillions > 0 ? equityValue / sharesInBillions : 0;
+
+  // 5-Year Target Price via Exit Multiple Valuation (FY2031 Market Cap & Share Price)
+  const targetMarketCapYr5 = lastFcf * params.exitMultiple;
+  const targetSharesInBillions = params.targetShares > 100 ? params.targetShares / 1000 : params.targetShares;
+  const targetSharePriceYr5 = targetSharesInBillions > 0 ? targetMarketCapYr5 / targetSharesInBillions : 0;
+
+  let cagrYr5: number | null = null;
+  if (params.currentPrice && params.currentPrice > 0 && targetSharePriceYr5 > 0) {
+    cagrYr5 = (Math.pow(targetSharePriceYr5 / params.currentPrice, 1 / 5) - 1) * 100;
+  }
+
+  // Calculate Revenue CAGR across the 5 years
+  const revenueCAGR = params.baseRev > 0
+    ? (Math.pow(yearlyData[4].revenue / params.baseRev, 1 / 5) - 1) * 100
+    : 0;
+
+  const avgOpMargin = yearlyData.reduce((acc, d) => acc + d.opMargin, 0) / 5;
+
+  return {
+    baseYearData,
+    yearlyData,
+    sumPvFcf,
+    terminalValue,
+    pvOfTerminalValue,
+    enterpriseValue,
+    netCash: params.netCash,
+    equityValue,
+    impliedSharePrice,
+    targetMarketCapYr5,
+    targetSharePriceYr5,
+    cagrYr5,
+    revenueCAGR,
+    avgOpMargin,
+  };
 }
 
 // ─── SVG Chart Component ────────────────────────────────────────────────────
@@ -85,10 +200,9 @@ function DCFChart({ data }: { data: YearlyData[] }) {
   const maxFcf = Math.max(...data.map((d) => d.fcf), 0.01);
   const maxVal = Math.max(maxRev, maxFcf) * 1.15;
 
-  const barW = chartW / data.length * 0.5;
+  const barW = (chartW / data.length) * 0.45;
   const gap = chartW / data.length;
 
-  // Build FCF line path
   const linePoints = data.map((d, i) => {
     const x = padL + i * gap + gap / 2;
     const y = padT + chartH - (d.fcf / maxVal) * chartH;
@@ -96,24 +210,18 @@ function DCFChart({ data }: { data: YearlyData[] }) {
   });
   const linePath = `M${linePoints.join(' L')}`;
 
-  // Area fill under FCF line
   const firstX = padL + gap / 2;
   const lastX = padL + (data.length - 1) * gap + gap / 2;
   const baseY = padT + chartH;
   const areaPath = `M${firstX},${baseY} L${linePoints.join(' L')} L${lastX},${baseY} Z`;
 
-  // Y-axis ticks
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((frac) => ({
     val: maxVal * frac,
     y: padT + chartH - frac * chartH,
   }));
 
   return (
-    <svg
-      viewBox={`0 0 ${width} ${height}`}
-      style={{ width: '100%', height: 'auto' }}
-    >
-      {/* Grid lines */}
+    <svg viewBox={`0 0 ${width} ${height}`} style={{ width: '100%', height: 'auto' }}>
       {ticks.map((t, i) => (
         <g key={i}>
           <line
@@ -130,14 +238,13 @@ function DCFChart({ data }: { data: YearlyData[] }) {
             textAnchor="end"
             fill="rgba(255,255,255,0.4)"
             fontSize="9"
-            fontFamily="inherit"
+            fontFamily="monospace"
           >
-            ${t.val.toFixed(1)}B
+            ${t.val.toFixed(0)}B
           </text>
         </g>
       ))}
 
-      {/* Revenue bars */}
       {data.map((d, i) => {
         const x = padL + i * gap + (gap - barW) / 2;
         const barH = (d.revenue / maxVal) * chartH;
@@ -158,17 +265,17 @@ function DCFChart({ data }: { data: YearlyData[] }) {
               x={padL + i * gap + gap / 2}
               y={padT + chartH + 16}
               textAnchor="middle"
-              fill="rgba(255,255,255,0.5)"
+              fill="rgba(255,255,255,0.6)"
               fontSize="10"
+              fontWeight="600"
               fontFamily="inherit"
             >
-              {d.year}
+              FY{d.year}
             </text>
           </g>
         );
       })}
 
-      {/* FCF area + line */}
       <path d={areaPath} fill="rgba(16, 185, 129, 0.12)" />
       <path d={linePath} fill="none" stroke="#10b981" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" />
       {data.map((d, i) => {
@@ -179,7 +286,6 @@ function DCFChart({ data }: { data: YearlyData[] }) {
         );
       })}
 
-      {/* Legend */}
       <rect x={padL} y={2} width={10} height={10} rx={2} fill="rgba(59, 130, 246, 0.5)" />
       <text x={padL + 14} y={11} fill="rgba(255,255,255,0.6)" fontSize="9" fontFamily="inherit">
         Revenue ($B)
@@ -262,26 +368,40 @@ interface DCFModelProps {
 }
 
 export default function DCFModel({ symbol }: DCFModelProps) {
-  // Input state
-  const [baseRev, setBaseRev] = React.useState(3.6);
-  const [revGrowth, setRevGrowth] = React.useState(18);
-  const [baseGm, setBaseGm] = React.useState(34);
-  const [gmImprovement, setGmImprovement] = React.useState(1.5);
-  const [opexMargin, setOpexMargin] = React.useState(18);
-  const [taxRate, setTaxRate] = React.useState(15);
-  const [fcfConversion, setFcfConversion] = React.useState(80);
-  const [wacc, setWacc] = React.useState(11);
-  const [terminalGrowth, setTerminalGrowth] = React.useState(2.5);
-  const [sharesOutstanding, setSharesOutstanding] = React.useState(228);
+  const [mode, setMode] = React.useState<'uniform' | 'detailed'>('detailed');
+  
+  // Base year setup
+  const [baseYear, setBaseYear] = React.useState(2026);
+  const [baseRev, setBaseRev] = React.useState(331.8);
+  const [baseEbit, setBaseEbit] = React.useState(155.2);
+  const [taxRate, setTaxRate] = React.useState(20.0);
+  const [wacc, setWacc] = React.useState(9.0);
+  const [terminalGrowth, setTerminalGrowth] = React.useState(3.5);
+  const [netCash, setNetCash] = React.useState(18.1);
+  const [sharesOutstanding, setSharesOutstanding] = React.useState(7410);
+
+  // Uniform Mode defaults
+  const [revGrowth, setRevGrowth] = React.useState(14.0);
+  const [opMargin, setOpMargin] = React.useState(46.8);
+  const [fcfConversion, setFcfConversion] = React.useState(75.0);
+
+  // Detailed Mode defaults (FY27 - FY31)
+  const [yearlyGrowth, setYearlyGrowth] = React.useState<number[]>([16.0, 15.0, 14.0, 13.0, 12.0]);
+  const [yearlyOpMargin, setYearlyOpMargin] = React.useState<number[]>([46.2, 46.5, 46.8, 47.0, 47.2]);
+  const [yearlyFcfConv, setYearlyFcfConv] = React.useState<number[]>([68.0, 72.0, 75.0, 78.0, 80.0]);
+
+  // Exit Multiple Valuation
+  const [exitMultiple, setExitMultiple] = React.useState(24.0);
+  const [targetShares, setTargetShares] = React.useState(7200);
+
   const [currentPrice, setCurrentPrice] = React.useState<number | null>(null);
   const [loadingDefaults, setLoadingDefaults] = React.useState(false);
   const [history, setHistory] = React.useState<any[]>([]);
-  const [loadingHistory, setLoadingHistory] = React.useState(false);
-  const [scenarioName, setScenarioName] = React.useState('Base Case');
+  const [scenarioName, setScenarioName] = React.useState('Base Case (กรณีฐาน)');
+  const [activePreset, setActivePreset] = React.useState<'base' | 'bear' | 'bull' | 'custom'>('base');
   const [isSaving, setIsSaving] = React.useState(false);
 
   const fetchHistory = React.useCallback(async () => {
-    setLoadingHistory(true);
     try {
       const res = await fetch(`${API_BASE_URL}/api/analysis/dcf-history?symbol=${symbol}`);
       if (res.ok) {
@@ -291,65 +411,25 @@ export default function DCFModel({ symbol }: DCFModelProps) {
       }
     } catch (e) {
       console.error('Failed to fetch DCF history:', e);
-    } finally {
-      setLoadingHistory(false);
     }
     return [];
   }, [symbol]);
 
-  // Fetch defaults and history from backend
+  // Load defaults / historical models
   React.useEffect(() => {
     let cancelled = false;
     const initData = async () => {
       setLoadingDefaults(true);
       try {
-        // 1. Fetch history first
-        const histData = await fetchHistory();
+        await fetchHistory();
         if (cancelled) return;
 
-        if (histData && histData.length > 0) {
-          // Initialize from the latest saved model
-          const latest = histData[0];
-          setBaseRev(latest.base_revenue);
-          setRevGrowth(latest.revenue_growth);
-          setBaseGm(latest.base_gross_margin);
-          setGmImprovement(latest.gross_margin_improvement);
-          setOpexMargin(latest.opex_margin);
-          setTaxRate(latest.tax_rate);
-          setFcfConversion(latest.fcf_conversion);
-          setWacc(latest.wacc);
-          setTerminalGrowth(latest.terminal_growth);
-          setSharesOutstanding(latest.shares_outstanding);
-          setScenarioName(latest.scenario_name);
-
-          // Still fetch defaults just to get the current price of the stock
-          const resDefaults = await fetch(`${API_BASE_URL}/api/analysis/dcf-defaults?symbol=${symbol}`);
-          if (resDefaults.ok) {
-            const d = await resDefaults.json() as any;
-            if (!cancelled && d.price != null) {
-              setCurrentPrice(d.price);
-            }
-          }
-        } else {
-          // Fallback: No history, fetch defaults from market data
-          const resDefaults = await fetch(`${API_BASE_URL}/api/analysis/dcf-defaults?symbol=${symbol}`);
-          if (!resDefaults.ok) return;
+        const resDefaults = await fetch(`${API_BASE_URL}/api/analysis/dcf-defaults?symbol=${symbol}`);
+        if (resDefaults.ok) {
           const d = await resDefaults.json() as any;
-          if (cancelled) return;
-
-          if (d.baseRevenue != null) setBaseRev(Math.round(d.baseRevenue * 100) / 100);
-          if (d.revenueGrowth != null) setRevGrowth(Math.round(d.revenueGrowth * 10) / 10);
-          if (d.grossMargin != null) setBaseGm(Math.round(d.grossMargin * 10) / 10);
-          if (d.opexMargin != null) setOpexMargin(Math.round(d.opexMargin * 10) / 10);
-          if (d.fcfMargin != null) {
-            const opMarg = d.operatingMargin ?? 18;
-            if (opMarg > 0) {
-              const conv = Math.min(100, Math.max(10, (d.fcfMargin / opMarg) * 100));
-              setFcfConversion(Math.round(conv * 10) / 10);
-            }
+          if (!cancelled && d.price != null) {
+            setCurrentPrice(d.price);
           }
-          if (d.sharesOutstanding != null) setSharesOutstanding(d.sharesOutstanding);
-          if (d.price != null) setCurrentPrice(d.price);
         }
       } catch (e) {
         console.error('Failed to initialize DCF data:', e);
@@ -362,24 +442,125 @@ export default function DCFModel({ symbol }: DCFModelProps) {
     return () => { cancelled = true; };
   }, [symbol, fetchHistory]);
 
+  // Scenario Presets
+  const applyPreset = (preset: 'base' | 'bear' | 'bull') => {
+    setActivePreset(preset);
+    setMode('detailed');
+    if (preset === 'base') {
+      setScenarioName('Base Case (กรณีฐาน)');
+      setBaseRev(331.8);
+      setBaseEbit(155.2);
+      setYearlyGrowth([16.0, 15.0, 14.0, 13.0, 12.0]);
+      setYearlyOpMargin([46.2, 46.5, 46.8, 47.0, 47.2]);
+      setYearlyFcfConv([68.0, 72.0, 75.0, 78.0, 80.0]);
+      setTaxRate(20.0);
+      setWacc(9.0);
+      setTerminalGrowth(3.5);
+      setNetCash(18.1);
+      setExitMultiple(24.0);
+      setSharesOutstanding(7410);
+      setTargetShares(7200);
+    } else if (preset === 'bear') {
+      setScenarioName('Bear Case (กรณีแย่)');
+      setBaseRev(331.8);
+      setBaseEbit(155.2);
+      setYearlyGrowth([12.0, 11.5, 11.0, 10.0, 8.5]);
+      setYearlyOpMargin([45.0, 44.8, 44.5, 44.2, 44.0]);
+      setYearlyFcfConv([65.0, 68.0, 70.0, 72.0, 75.0]);
+      setTaxRate(20.0);
+      setWacc(9.5);
+      setTerminalGrowth(3.0);
+      setNetCash(18.1);
+      setExitMultiple(19.0);
+      setSharesOutstanding(7410);
+      setTargetShares(7300);
+    } else if (preset === 'bull') {
+      setScenarioName('Bull Case (กรณีดีเยี่ยม)');
+      setBaseRev(331.8);
+      setBaseEbit(155.2);
+      setYearlyGrowth([20.0, 18.5, 17.0, 16.0, 16.0]);
+      setYearlyOpMargin([47.0, 47.5, 48.0, 48.5, 49.0]);
+      setYearlyFcfConv([72.0, 76.0, 80.0, 82.0, 85.0]);
+      setTaxRate(20.0);
+      setWacc(8.5);
+      setTerminalGrowth(4.0);
+      setNetCash(18.1);
+      setExitMultiple(28.5);
+      setSharesOutstanding(7410);
+      setTargetShares(7100);
+    }
+  };
+
+  const handleYearlyChange = (index: number, field: 'growth' | 'opMargin' | 'fcfConv', value: number) => {
+    setActivePreset('custom');
+    if (field === 'growth') {
+      const next = [...yearlyGrowth];
+      next[index] = value;
+      setYearlyGrowth(next);
+    } else if (field === 'opMargin') {
+      const next = [...yearlyOpMargin];
+      next[index] = value;
+      setYearlyOpMargin(next);
+    } else if (field === 'fcfConv') {
+      const next = [...yearlyFcfConv];
+      next[index] = value;
+      setYearlyFcfConv(next);
+    }
+  };
+
+  const result = React.useMemo<DCFResult>(
+    () =>
+      calculateDCF({
+        baseYear,
+        baseRev,
+        baseEbit,
+        taxRate,
+        wacc,
+        terminalGrowth,
+        netCash,
+        sharesOutstanding,
+        mode,
+        revGrowth,
+        opMargin,
+        fcfConversion,
+        yearlyGrowth,
+        yearlyOpMargin,
+        yearlyFcfConv,
+        exitMultiple,
+        targetShares,
+        currentPrice,
+      }),
+    [
+      baseYear, baseRev, baseEbit, taxRate, wacc, terminalGrowth, netCash, sharesOutstanding,
+      mode, revGrowth, opMargin, fcfConversion, yearlyGrowth, yearlyOpMargin, yearlyFcfConv,
+      exitMultiple, targetShares, currentPrice
+    ]
+  );
+
+  const fmt = (v: number) => '$' + v.toFixed(1);
+  const fmtFull = (v: number) => '$' + v.toFixed(2);
+  const fmtPct = (v: number) => v.toFixed(1) + '%';
+
+  const upsideIntrinsic = currentPrice && currentPrice > 0
+    ? ((result.impliedSharePrice - currentPrice) / currentPrice) * 100
+    : null;
+
   const handleSaveScenario = async () => {
     setIsSaving(true);
     try {
       const res = await fetch(`${API_BASE_URL}/api/analysis/dcf-save`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           symbol,
           scenarioName,
           baseRevenue: baseRev,
-          revenueGrowth: revGrowth,
-          baseGrossMargin: baseGm,
-          grossMarginImprovement: gmImprovement,
-          opexMargin,
+          revenueGrowth: result.revenueCAGR,
+          baseGrossMargin: result.avgOpMargin,
+          grossMarginImprovement: 0,
+          opexMargin: 0,
           taxRate,
-          fcfConversion,
+          fcfConversion: mode === 'uniform' ? fcfConversion : yearlyFcfConv[2],
           wacc,
           terminalGrowth,
           sharesOutstanding,
@@ -389,43 +570,13 @@ export default function DCFModel({ symbol }: DCFModelProps) {
 
       if (res.ok) {
         await fetchHistory();
-      } else {
-        const err = await res.json() as any;
-        alert(`Failed to save: ${err.error || 'Unknown error'}`);
       }
     } catch (e) {
       console.error('Error saving scenario:', e);
-      alert('Error saving scenario');
     } finally {
       setIsSaving(false);
     }
   };
-
-  // Calculate DCF
-  const result = React.useMemo<DCFResult>(
-    () =>
-      calculateDCF({
-        baseRev,
-        revGrowth: revGrowth / 100,
-        baseGm: baseGm / 100,
-        gmImprovement: gmImprovement / 100,
-        opexMargin: opexMargin / 100,
-        taxRate: taxRate / 100,
-        fcfConversion: fcfConversion / 100,
-        wacc: wacc / 100,
-        terminalGrowth: terminalGrowth / 100,
-        sharesOutstanding,
-      }),
-    [baseRev, revGrowth, baseGm, gmImprovement, opexMargin, taxRate, fcfConversion, wacc, terminalGrowth, sharesOutstanding]
-  );
-
-  const fmt = (v: number) => '$' + v.toFixed(2);
-  const fmtPct = (v: number) => v.toFixed(1) + '%';
-
-  // Upside/downside from current price
-  const upside = currentPrice && currentPrice > 0
-    ? ((result.impliedSharePrice - currentPrice) / currentPrice) * 100
-    : null;
 
   return (
     <Sheet sx={{ ...glassStyle, p: 0, overflow: 'hidden' }}>
@@ -433,108 +584,228 @@ export default function DCFModel({ symbol }: DCFModelProps) {
       <Box
         sx={{
           p: 3,
-          background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.15) 0%, rgba(16, 185, 129, 0.1) 100%)',
+          background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.18) 0%, rgba(16, 185, 129, 0.12) 100%)',
           borderBottom: '1px solid rgba(255,255,255,0.06)',
         }}
       >
-        <Stack direction="row" spacing={1.5} alignItems="center">
-          <Box
-            sx={{
-              width: 40,
-              height: 40,
-              borderRadius: '12px',
-              background: 'linear-gradient(135deg, #2563eb 0%, #10b981 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Calculator size={20} color="#fff" />
-          </Box>
-          <Box>
-            <Typography level="h3" sx={{ fontWeight: 800, fontSize: '1.25rem' }}>
-              Interactive DCF Model (2026–2030)
+        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2}>
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            <Box
+              sx={{
+                width: 44,
+                height: 44,
+                borderRadius: '12px',
+                background: 'linear-gradient(135deg, #2563eb 0%, #10b981 100%)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)',
+              }}
+            >
+              <Calculator size={22} color="#fff" />
+            </Box>
+            <Box>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <Typography level="h3" sx={{ fontWeight: 800, fontSize: '1.3rem' }}>
+                  Interactive DCF Valuation Model
+                </Typography>
+                <Chip size="sm" color="primary" variant="soft" sx={{ fontWeight: 700 }}>
+                  {symbol}
+                </Chip>
+              </Stack>
+              <Typography level="body-xs" sx={{ opacity: 0.6 }}>
+                5-Year Discounted Cash Flow & Exit Multiple Projection (FY{baseYear+1}–FY{baseYear+5})
+              </Typography>
+            </Box>
+          </Stack>
+
+          {/* Quick Scenario Preset Switcher */}
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Typography level="body-xs" sx={{ opacity: 0.5, display: { xs: 'none', md: 'block' } }}>
+              Preset Scenarios:
             </Typography>
-            <Typography level="body-xs" sx={{ opacity: 0.5 }}>
-              Discounted Cash Flow Valuation · {symbol}
-            </Typography>
-          </Box>
+            <Button
+              size="sm"
+              variant={activePreset === 'bear' ? 'solid' : 'outlined'}
+              color="danger"
+              onClick={() => applyPreset('bear')}
+              sx={{ borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700 }}
+            >
+              Bear Case
+            </Button>
+            <Button
+              size="sm"
+              variant={activePreset === 'base' ? 'solid' : 'outlined'}
+              color="primary"
+              onClick={() => applyPreset('base')}
+              sx={{ borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700 }}
+            >
+              Base Case
+            </Button>
+            <Button
+              size="sm"
+              variant={activePreset === 'bull' ? 'solid' : 'outlined'}
+              color="success"
+              onClick={() => applyPreset('bull')}
+              sx={{ borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700 }}
+            >
+              Bull Case
+            </Button>
+          </Stack>
         </Stack>
       </Box>
 
+      {/* Main Container */}
       <Box
         sx={{
           display: 'grid',
-          gridTemplateColumns: { xs: '1fr', lg: '340px 1fr' },
-          minHeight: '500px',
+          gridTemplateColumns: { xs: '1fr', lg: '380px 1fr' },
+          minHeight: '600px',
         }}
       >
-        {/* ─── Left Panel: Inputs ─── */}
+        {/* Left Control Panel */}
         <Box
           sx={{
             p: 3,
             borderRight: { lg: '1px solid rgba(255,255,255,0.06)' },
             borderBottom: { xs: '1px solid rgba(255,255,255,0.06)', lg: 'none' },
             overflowY: 'auto',
-            maxHeight: { lg: '700px' },
+            maxHeight: { lg: '850px' },
           }}
         >
+          {/* Mode Selector */}
+          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+            <Typography
+              level="title-sm"
+              sx={{ fontWeight: 700, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}
+            >
+              Model Configuration Mode
+            </Typography>
+          </Stack>
+
+          <Tabs
+            value={mode}
+            onChange={(_, val) => setMode(val as 'uniform' | 'detailed')}
+            sx={{ mb: 3, borderRadius: '8px', background: 'rgba(255,255,255,0.03)' }}
+          >
+            <TabList size="sm" disableUnderline sx={{ width: '100%', p: 0.5, gap: 0.5 }}>
+              <Tab value="detailed" sx={{ flex: 1, borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700 }}>
+                Detailed (Per-Year)
+              </Tab>
+              <Tab value="uniform" sx={{ flex: 1, borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700 }}>
+                Quick (Uniform)
+              </Tab>
+            </TabList>
+          </Tabs>
+
+          {/* Base Year & Key Parameters */}
           <Typography
             level="title-sm"
-            sx={{ fontWeight: 700, mb: 2, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}
+            sx={{ fontWeight: 700, mb: 1.5, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}
           >
-            Model Parameters
+            Base Financials (FY{baseYear})
           </Typography>
 
-          {/* Base Revenue input */}
-          <FormControl sx={{ mb: 2 }}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
-              <FormLabel sx={{ m: 0, fontSize: '0.8rem', fontWeight: 600 }}>Base Revenue 2026 ($B)</FormLabel>
-            </Stack>
-            <Input
-              type="number"
-              value={baseRev}
-              onChange={(e) => setBaseRev(parseFloat(e.target.value) || 0)}
-              slotProps={{ input: { step: 0.1, min: 0 } }}
-              sx={{ fontFamily: 'monospace', fontWeight: 600 }}
-              size="sm"
-            />
-          </FormControl>
+          <Grid container spacing={1.5} sx={{ mb: 2 }}>
+            <Grid xs={6}>
+              <FormControl size="sm">
+                <FormLabel sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Base Rev ($B)</FormLabel>
+                <Input
+                  type="number"
+                  value={baseRev}
+                  onChange={(e) => setBaseRev(parseFloat(e.target.value) || 0)}
+                  slotProps={{ input: { step: 0.1, min: 0 } }}
+                  sx={{ fontFamily: 'monospace', fontWeight: 600 }}
+                />
+              </FormControl>
+            </Grid>
+            <Grid xs={6}>
+              <FormControl size="sm">
+                <FormLabel sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Base EBIT ($B)</FormLabel>
+                <Input
+                  type="number"
+                  value={baseEbit}
+                  onChange={(e) => setBaseEbit(parseFloat(e.target.value) || 0)}
+                  slotProps={{ input: { step: 0.1, min: 0 } }}
+                  sx={{ fontFamily: 'monospace', fontWeight: 600 }}
+                />
+              </FormControl>
+            </Grid>
+          </Grid>
 
-          <SliderRow label="Revenue Growth %" value={revGrowth} min={5} max={50} step={0.5} format={fmtPct} onChange={setRevGrowth} tooltip="Annual revenue growth rate" />
-          <SliderRow label="Gross Margin 2026 %" value={baseGm} min={15} max={70} step={0.5} format={fmtPct} onChange={setBaseGm} tooltip="Starting gross margin" />
-          <SliderRow label="GM Improvement/yr %" value={gmImprovement} min={0} max={5} step={0.1} format={fmtPct} onChange={setGmImprovement} tooltip="Annual gross margin expansion" />
-          <SliderRow label="OpEx Margin %" value={opexMargin} min={10} max={40} step={0.5} format={fmtPct} onChange={setOpexMargin} tooltip="Operating expenses as % of revenue" />
-          <SliderRow label="Tax Rate %" value={taxRate} min={0} max={30} step={1} format={fmtPct} onChange={setTaxRate} />
-          <SliderRow label="FCF Conversion %" value={fcfConversion} min={10} max={100} step={1} format={fmtPct} onChange={setFcfConversion} tooltip="NOPAT to Free Cash Flow conversion" />
+          {/* Uniform Mode Sliders */}
+          {mode === 'uniform' && (
+            <Box sx={{ p: 2, borderRadius: '12px', background: 'rgba(255,255,255,0.02)', mb: 2, border: '1px solid rgba(255,255,255,0.05)' }}>
+              <SliderRow label="Revenue Growth %" value={revGrowth} min={2} max={40} step={0.5} format={fmtPct} onChange={setRevGrowth} tooltip="Average annual revenue growth" />
+              <SliderRow label="Operating Margin %" value={opMargin} min={10} max={60} step={0.5} format={fmtPct} onChange={setOpMargin} tooltip="Operating income margin" />
+              <SliderRow label="FCF Conversion %" value={fcfConversion} min={30} max={100} step={1} format={fmtPct} onChange={setFcfConversion} tooltip="FCF as % of NOPAT" />
+            </Box>
+          )}
+
+          {/* Discounting & Capital Parameters */}
+          <Typography
+            level="title-sm"
+            sx={{ fontWeight: 700, mb: 1.5, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}
+          >
+            Valuation & Capital Structure
+          </Typography>
+
+          <SliderRow label="Discount Rate (WACC) %" value={wacc} min={5} max={16} step={0.5} format={fmtPct} onChange={setWacc} tooltip="Weighted Average Cost of Capital" />
+          <SliderRow label="Terminal Growth (g) %" value={terminalGrowth} min={1} max={5} step={0.1} format={fmtPct} onChange={setTerminalGrowth} tooltip="Long-term growth rate for Terminal Value" />
+
+          <Grid container spacing={1.5} sx={{ mb: 2 }}>
+            <Grid xs={6}>
+              <FormControl size="sm">
+                <FormLabel sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Net Cash/Debt ($B)</FormLabel>
+                <Input
+                  type="number"
+                  value={netCash}
+                  onChange={(e) => setNetCash(parseFloat(e.target.value) || 0)}
+                  slotProps={{ input: { step: 0.1 } }}
+                  sx={{ fontFamily: 'monospace', fontWeight: 600 }}
+                />
+              </FormControl>
+            </Grid>
+            <Grid xs={6}>
+              <FormControl size="sm">
+                <FormLabel sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Shares (M)</FormLabel>
+                <Input
+                  type="number"
+                  value={sharesOutstanding}
+                  onChange={(e) => setSharesOutstanding(parseFloat(e.target.value) || 1)}
+                  slotProps={{ input: { step: 10, min: 1 } }}
+                  sx={{ fontFamily: 'monospace', fontWeight: 600 }}
+                />
+              </FormControl>
+            </Grid>
+          </Grid>
 
           <Divider sx={{ my: 2, opacity: 0.1 }} />
 
-          <SliderRow label="WACC %" value={wacc} min={6} max={20} step={0.5} format={fmtPct} onChange={setWacc} tooltip="Weighted Average Cost of Capital" />
-          <SliderRow label="Terminal Growth %" value={terminalGrowth} min={0} max={5} step={0.1} format={fmtPct} onChange={setTerminalGrowth} tooltip="Long-term growth rate (Gordon Growth)" />
+          {/* Exit Multiple Parameters */}
+          <Typography
+            level="title-sm"
+            sx={{ fontWeight: 700, mb: 1.5, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}
+          >
+            5-Year Exit Multiple Valuation
+          </Typography>
 
-          <FormControl sx={{ mb: 1 }}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
-              <FormLabel sx={{ m: 0, fontSize: '0.8rem', fontWeight: 600 }}>Shares Outstanding (M)</FormLabel>
-            </Stack>
+          <SliderRow label="Exit FCF Multiple" value={exitMultiple} min={10} max={40} step={0.5} format={(v) => v.toFixed(1) + 'x'} onChange={setExitMultiple} tooltip="Expected valuation multiple on FY31 FCF" />
+
+          <FormControl size="sm" sx={{ mb: 2 }}>
+            <FormLabel sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Target Shares in FY31 (M)</FormLabel>
             <Input
               type="number"
-              value={sharesOutstanding}
-              onChange={(e) => setSharesOutstanding(parseFloat(e.target.value) || 1)}
-              slotProps={{ input: { step: 1, min: 1 } }}
+              value={targetShares}
+              onChange={(e) => setTargetShares(parseFloat(e.target.value) || 1)}
+              slotProps={{ input: { step: 10, min: 1 } }}
               sx={{ fontFamily: 'monospace', fontWeight: 600 }}
-              size="sm"
             />
           </FormControl>
 
-          {loadingDefaults && (
-            <Typography level="body-xs" sx={{ opacity: 0.4, mt: 1, fontStyle: 'italic' }}>
-              Loading market data defaults...
-            </Typography>
-          )}
+          <Divider sx={{ my: 2, opacity: 0.1 }} />
 
-          <Divider sx={{ my: 3, opacity: 0.1 }} />
-
+          {/* Save Scenario */}
           <Typography
             level="title-sm"
             sx={{ fontWeight: 700, mb: 1.5, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}
@@ -544,12 +815,11 @@ export default function DCFModel({ symbol }: DCFModelProps) {
 
           <Stack spacing={1.5}>
             <FormControl>
-              <FormLabel sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Scenario Name</FormLabel>
               <Input
                 size="sm"
                 value={scenarioName}
                 onChange={(e) => setScenarioName(e.target.value)}
-                placeholder="e.g. Pessimistic Case"
+                placeholder="Scenario name..."
                 sx={{ background: 'rgba(255,255,255,0.03)' }}
               />
             </FormControl>
@@ -564,83 +834,11 @@ export default function DCFModel({ symbol }: DCFModelProps) {
               Save Scenario
             </Button>
           </Stack>
-
-          {history.length > 0 && (
-            <>
-              <Divider sx={{ my: 3, opacity: 0.1 }} />
-              <Typography
-                level="title-sm"
-                sx={{ fontWeight: 700, mb: 1.5, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem' }}
-              >
-                Saved Scenarios ({history.length})
-              </Typography>
-              <Stack spacing={1} sx={{ maxHeight: '250px', overflowY: 'auto' }}>
-                {history.map((h) => {
-                  const isActive = 
-                    Math.abs(baseRev - h.base_revenue) < 0.001 &&
-                    Math.abs(revGrowth - h.revenue_growth) < 0.001 &&
-                    Math.abs(baseGm - h.base_gross_margin) < 0.001 &&
-                    Math.abs(gmImprovement - h.gross_margin_improvement) < 0.001 &&
-                    Math.abs(opexMargin - h.opex_margin) < 0.001 &&
-                    Math.abs(taxRate - h.tax_rate) < 0.001 &&
-                    Math.abs(fcfConversion - h.fcf_conversion) < 0.001 &&
-                    Math.abs(wacc - h.wacc) < 0.001 &&
-                    Math.abs(terminalGrowth - h.terminal_growth) < 0.001 &&
-                    Math.abs(sharesOutstanding - h.shares_outstanding) < 0.001;
-
-                  return (
-                    <Sheet
-                      key={h.id}
-                      onClick={() => {
-                        setBaseRev(h.base_revenue);
-                        setRevGrowth(h.revenue_growth);
-                        setBaseGm(h.base_gross_margin);
-                        setGmImprovement(h.gross_margin_improvement);
-                        setOpexMargin(h.opex_margin);
-                        setTaxRate(h.tax_rate);
-                        setFcfConversion(h.fcf_conversion);
-                        setWacc(h.wacc);
-                        setTerminalGrowth(h.terminal_growth);
-                        setSharesOutstanding(h.shares_outstanding);
-                        setScenarioName(h.scenario_name);
-                      }}
-                      sx={{
-                        p: 1.5,
-                        borderRadius: '8px',
-                        cursor: 'pointer',
-                        background: isActive ? 'rgba(37, 99, 235, 0.12)' : 'rgba(255,255,255,0.02)',
-                        border: isActive ? '1px solid rgba(37, 99, 235, 0.3)' : '1px solid rgba(255,255,255,0.06)',
-                        transition: 'all 0.2s ease-out',
-                        '&:hover': {
-                          background: isActive ? 'rgba(37, 99, 235, 0.18)' : 'rgba(255,255,255,0.05)',
-                          borderColor: isActive ? 'rgba(37, 99, 235, 0.4)' : 'rgba(255,255,255,0.1)',
-                        }
-                      }}
-                    >
-                      <Stack direction="row" justifyContent="space-between" alignItems="center">
-                        <Box sx={{ minWidth: 0 }}>
-                          <Typography level="body-xs" sx={{ fontWeight: 700, color: 'text.primary', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {h.scenario_name}
-                          </Typography>
-                          <Typography level="body-xs" sx={{ opacity: 0.4, fontSize: '0.65rem' }}>
-                            {new Date(h.created_at + 'Z').toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}
-                          </Typography>
-                        </Box>
-                        <Typography level="body-xs" sx={{ fontWeight: 800, fontFamily: 'monospace', color: 'success.300', textAlign: 'right' }}>
-                          ${h.implied_share_price.toFixed(2)}
-                        </Typography>
-                      </Stack>
-                    </Sheet>
-                  );
-                })}
-              </Stack>
-            </>
-          )}
         </Box>
 
-        {/* ─── Right Panel: Outputs ─── */}
+        {/* Right Output Panel */}
         <Box sx={{ p: 3 }}>
-          {/* Output Cards */}
+          {/* Key Output Cards */}
           <Box
             sx={{
               display: 'grid',
@@ -649,24 +847,25 @@ export default function DCFModel({ symbol }: DCFModelProps) {
               mb: 3,
             }}
           >
-            {/* Implied Price Card */}
+            {/* Intrinsic Present Value Card */}
             <Sheet
               sx={{
                 p: 2.5,
                 borderRadius: '16px',
                 background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.15) 0%, rgba(37, 99, 235, 0.05) 100%)',
-                border: '1px solid rgba(37, 99, 235, 0.2)',
+                border: '1px solid rgba(37, 99, 235, 0.3)',
                 textAlign: 'center',
+                position: 'relative',
               }}
             >
-              <Typography level="body-xs" sx={{ fontWeight: 700, color: 'primary.400', mb: 0.5, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>
-                Implied Price
+              <Typography level="body-xs" sx={{ fontWeight: 700, color: 'primary.300', mb: 0.5, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>
+                Intrinsic Value Today
               </Typography>
               <Typography
                 level="h2"
                 sx={{
                   fontWeight: 900,
-                  fontSize: '2rem',
+                  fontSize: '1.9rem',
                   fontFamily: 'monospace',
                   background: 'linear-gradient(135deg, #60a5fa 0%, #34d399 100%)',
                   backgroundClip: 'text',
@@ -674,56 +873,95 @@ export default function DCFModel({ symbol }: DCFModelProps) {
                   color: 'transparent',
                 }}
               >
-                {fmt(result.impliedSharePrice)}
+                {fmtFull(result.impliedSharePrice)}
               </Typography>
-              {upside !== null && (
-                <Typography
-                  level="body-xs"
-                  sx={{
-                    mt: 0.5,
-                    fontWeight: 700,
-                    color: upside >= 0 ? '#10b981' : '#ef4444',
-                  }}
+
+              {upsideIntrinsic !== null && (
+                <Chip
+                  size="sm"
+                  color={upsideIntrinsic >= 0 ? 'success' : 'danger'}
+                  variant="soft"
+                  sx={{ mt: 1, fontWeight: 700, fontSize: '0.7rem' }}
                 >
-                  {upside >= 0 ? '▲' : '▼'} {Math.abs(upside).toFixed(1)}% vs ${currentPrice?.toFixed(2)}
-                </Typography>
+                  {upsideIntrinsic >= 0 ? '▲' : '▼'} {Math.abs(upsideIntrinsic).toFixed(1)}% vs ${currentPrice?.toFixed(2)}
+                </Chip>
               )}
+              <Typography level="body-xs" sx={{ opacity: 0.4, mt: 0.5, fontSize: '0.65rem' }}>
+                Gordon Growth @ {fmtPct(wacc)} WACC
+              </Typography>
             </Sheet>
 
-            {/* Enterprise Value Card */}
+            {/* 5-Year Target Price Card */}
+            <Sheet
+              sx={{
+                p: 2.5,
+                borderRadius: '16px',
+                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.05) 100%)',
+                border: '1px solid rgba(16, 185, 129, 0.3)',
+                textAlign: 'center',
+              }}
+            >
+              <Typography level="body-xs" sx={{ fontWeight: 700, color: 'success.300', mb: 0.5, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>
+                Target Price FY{baseYear+5}
+              </Typography>
+              <Typography
+                level="h2"
+                sx={{
+                  fontWeight: 900,
+                  fontSize: '1.9rem',
+                  fontFamily: 'monospace',
+                  color: '#10b981',
+                }}
+              >
+                {fmtFull(result.targetSharePriceYr5)}
+              </Typography>
+
+              {result.cagrYr5 !== null && (
+                <Chip
+                  size="sm"
+                  color="success"
+                  variant="soft"
+                  sx={{ mt: 1, fontWeight: 700, fontSize: '0.7rem' }}
+                >
+                  CAGR {fmtPct(result.cagrYr5)} / yr
+                </Chip>
+              )}
+              <Typography level="body-xs" sx={{ opacity: 0.4, mt: 0.5, fontSize: '0.65rem' }}>
+                Exit Multiple {exitMultiple.toFixed(1)}x FCF
+              </Typography>
+            </Sheet>
+
+            {/* Valuation Summary Card */}
             <Sheet
               sx={{
                 p: 2.5,
                 borderRadius: '16px',
                 background: 'rgba(255,255,255,0.03)',
                 border: '1px solid rgba(255,255,255,0.06)',
-                textAlign: 'center',
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
               }}
             >
-              <Typography level="body-xs" sx={{ fontWeight: 700, opacity: 0.5, mb: 0.5, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>
-                Enterprise Value
-              </Typography>
-              <Typography level="h3" sx={{ fontWeight: 800, fontFamily: 'monospace' }}>
-                {fmt(result.enterpriseValue)}B
-              </Typography>
-            </Sheet>
-
-            {/* FCF 2030 Card */}
-            <Sheet
-              sx={{
-                p: 2.5,
-                borderRadius: '16px',
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.06)',
-                textAlign: 'center',
-              }}
-            >
-              <Typography level="body-xs" sx={{ fontWeight: 700, opacity: 0.5, mb: 0.5, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>
-                FCF 2030
-              </Typography>
-              <Typography level="h3" sx={{ fontWeight: 800, fontFamily: 'monospace', color: '#10b981' }}>
-                {fmt(result.yearlyData[4].fcf)}B
-              </Typography>
+              <Stack spacing={1}>
+                <Stack direction="row" justifyContent="space-between">
+                  <Typography level="body-xs" sx={{ opacity: 0.6 }}>Enterprise Value (EV):</Typography>
+                  <Typography level="body-xs" sx={{ fontWeight: 700, fontFamily: 'monospace' }}>{fmt(result.enterpriseValue)}B</Typography>
+                </Stack>
+                <Stack direction="row" justifyContent="space-between">
+                  <Typography level="body-xs" sx={{ opacity: 0.6 }}>Net Cash / Debt:</Typography>
+                  <Typography level="body-xs" sx={{ fontWeight: 700, fontFamily: 'monospace', color: result.netCash >= 0 ? '#10b981' : '#ef4444' }}>
+                    {result.netCash >= 0 ? '+' : ''}{fmt(netCash)}B
+                  </Typography>
+                </Stack>
+                <Divider sx={{ opacity: 0.1 }} />
+                <Stack direction="row" justifyContent="space-between">
+                  <Typography level="body-xs" sx={{ fontWeight: 700 }}>Equity Value:</Typography>
+                  <Typography level="body-xs" sx={{ fontWeight: 800, fontFamily: 'monospace', color: 'primary.300' }}>
+                    {fmt(result.equityValue)}B
+                  </Typography>
+                </Stack>
+              </Stack>
             </Sheet>
           </Box>
 
@@ -746,21 +984,23 @@ export default function DCFModel({ symbol }: DCFModelProps) {
               borderRadius: '16px',
               overflow: 'hidden',
               border: '1px solid rgba(255,255,255,0.06)',
+              mb: 2,
             }}
           >
             <Table
               stripe="odd"
               size="sm"
+              borderAxis="xBetween"
               sx={{
                 '--TableCell-paddingX': '12px',
-                '--TableCell-paddingY': '8px',
+                '--TableCell-paddingY': '10px',
                 '& thead th': {
                   fontWeight: 700,
                   fontSize: '0.7rem',
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em',
-                  opacity: 0.6,
-                  background: 'rgba(255,255,255,0.03)',
+                  opacity: 0.7,
+                  background: 'rgba(255,255,255,0.04)',
                 },
                 '& tbody td': {
                   fontFamily: 'monospace',
@@ -771,51 +1011,197 @@ export default function DCFModel({ symbol }: DCFModelProps) {
             >
               <thead>
                 <tr>
-                  <th>Metric ($B)</th>
+                  <th style={{ width: '22%' }}>รายการ / Metric ($B)</th>
+                  <th style={{ textAlign: 'right' }}>{result.baseYearData.yearLabel}</th>
                   {result.yearlyData.map((d) => (
-                    <th key={d.year} style={{ textAlign: 'right' }}>{d.year}</th>
+                    <th key={d.year} style={{ textAlign: 'right' }}>{d.yearLabel}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
+                {/* Revenue Row */}
                 <tr>
-                  <td><strong>Revenue</strong></td>
+                  <td><strong>รายได้รวม (Revenue)</strong></td>
+                  <td style={{ textAlign: 'right' }}>{fmt(result.baseYearData.revenue)}</td>
                   {result.yearlyData.map((d) => (
-                    <td key={d.year} style={{ textAlign: 'right' }}>{fmt(d.revenue)}</td>
+                    <td key={d.year} style={{ textAlign: 'right' }}>
+                      <Typography level="body-xs" sx={{ fontWeight: 700, color: 'text.primary', fontFamily: 'monospace' }}>
+                        {fmt(d.revenue)}
+                      </Typography>
+                    </td>
                   ))}
                 </tr>
+
+                {/* YoY Growth Row */}
                 <tr>
-                  <td><strong>Gross Margin</strong></td>
-                  {result.yearlyData.map((d) => (
-                    <td key={d.year} style={{ textAlign: 'right' }}>{fmtPct(d.grossMargin * 100)}</td>
+                  <td style={{ paddingLeft: '24px', opacity: 0.7 }}><em>อัตราการเติบโต (YoY %)</em></td>
+                  <td style={{ textAlign: 'right', opacity: 0.5 }}>-</td>
+                  {result.yearlyData.map((d, i) => (
+                    <td key={d.year} style={{ textAlign: 'right' }}>
+                      {mode === 'detailed' ? (
+                        <Input
+                          size="sm"
+                          type="number"
+                          value={d.growth}
+                          onChange={(e) => handleYearlyChange(i, 'growth', parseFloat(e.target.value) || 0)}
+                          slotProps={{ input: { step: 0.5, style: { textAlign: 'right', padding: '2px 4px', fontSize: '0.75rem' } } }}
+                          sx={{ width: '65px', ml: 'auto', background: 'rgba(255,255,255,0.04)' }}
+                        />
+                      ) : (
+                        <span style={{ color: '#60a5fa' }}>{fmtPct(d.growth)}</span>
+                      )}
+                    </td>
                   ))}
                 </tr>
+
+                {/* EBIT Row */}
                 <tr>
-                  <td><strong>EBIT</strong></td>
+                  <td><strong>กำไรการดำเนินงาน (EBIT)</strong></td>
+                  <td style={{ textAlign: 'right' }}>{fmt(result.baseYearData.ebit)}</td>
                   {result.yearlyData.map((d) => (
-                    <td key={d.year} style={{ textAlign: 'right' }}>{fmt(d.ebit)}</td>
+                    <td key={d.year} style={{ textAlign: 'right' }}>
+                      {fmt(d.ebit)}
+                    </td>
                   ))}
                 </tr>
+
+                {/* Operating Margin Row */}
                 <tr>
-                  <td><strong>Free Cash Flow</strong></td>
-                  {result.yearlyData.map((d) => (
-                    <td key={d.year} style={{ textAlign: 'right', color: '#10b981' }}>{fmt(d.fcf)}</td>
+                  <td style={{ paddingLeft: '24px', opacity: 0.7 }}><em>อัตรากำไร (Op Margin %)</em></td>
+                  <td style={{ textAlign: 'right', opacity: 0.7 }}>{fmtPct(result.baseYearData.opMargin)}</td>
+                  {result.yearlyData.map((d, i) => (
+                    <td key={d.year} style={{ textAlign: 'right' }}>
+                      {mode === 'detailed' ? (
+                        <Input
+                          size="sm"
+                          type="number"
+                          value={d.opMargin}
+                          onChange={(e) => handleYearlyChange(i, 'opMargin', parseFloat(e.target.value) || 0)}
+                          slotProps={{ input: { step: 0.1, style: { textAlign: 'right', padding: '2px 4px', fontSize: '0.75rem' } } }}
+                          sx={{ width: '65px', ml: 'auto', background: 'rgba(255,255,255,0.04)' }}
+                        />
+                      ) : (
+                        <span>{fmtPct(d.opMargin)}</span>
+                      )}
+                    </td>
                   ))}
                 </tr>
+
+                {/* NOPAT Row */}
                 <tr>
-                  <td><strong>PV of FCF</strong></td>
+                  <td><strong>NOPAT (หลังภาษี {taxRate}%)</strong></td>
+                  <td style={{ textAlign: 'right' }}>{fmt(result.baseYearData.nopat)}</td>
                   {result.yearlyData.map((d) => (
-                    <td key={d.year} style={{ textAlign: 'right', opacity: 0.6 }}>{fmt(d.pvOfFcf)}</td>
+                    <td key={d.year} style={{ textAlign: 'right' }}>
+                      {fmt(d.nopat)}
+                    </td>
+                  ))}
+                </tr>
+
+                {/* FCF Conversion % Row */}
+                <tr>
+                  <td style={{ paddingLeft: '24px', opacity: 0.7 }}><em>FCF Conversion (% NOPAT)</em></td>
+                  <td style={{ textAlign: 'right', opacity: 0.5 }}>-</td>
+                  {result.yearlyData.map((d, i) => (
+                    <td key={d.year} style={{ textAlign: 'right' }}>
+                      {mode === 'detailed' ? (
+                        <Input
+                          size="sm"
+                          type="number"
+                          value={d.fcfConv}
+                          onChange={(e) => handleYearlyChange(i, 'fcfConv', parseFloat(e.target.value) || 0)}
+                          slotProps={{ input: { step: 1, style: { textAlign: 'right', padding: '2px 4px', fontSize: '0.75rem' } } }}
+                          sx={{ width: '65px', ml: 'auto', background: 'rgba(255,255,255,0.04)' }}
+                        />
+                      ) : (
+                        <span>{fmtPct(d.fcfConv)}</span>
+                      )}
+                    </td>
+                  ))}
+                </tr>
+
+                {/* FCF Row */}
+                <tr style={{ background: 'rgba(16, 185, 129, 0.06)' }}>
+                  <td><strong style={{ color: '#10b981' }}>กระแสเงินสดอิสระ (FCF)</strong></td>
+                  <td style={{ textAlign: 'right', color: '#10b981' }}>-</td>
+                  {result.yearlyData.map((d) => (
+                    <td key={d.year} style={{ textAlign: 'right', fontWeight: 700, color: '#10b981' }}>
+                      {fmt(d.fcf)}
+                    </td>
+                  ))}
+                </tr>
+
+                {/* Discount Factor Row */}
+                <tr>
+                  <td style={{ opacity: 0.6 }}>ปัจจัยคิดลด (Discount Factor)</td>
+                  <td style={{ textAlign: 'right', opacity: 0.4 }}>-</td>
+                  {result.yearlyData.map((d) => (
+                    <td key={d.year} style={{ textAlign: 'right', opacity: 0.6 }}>
+                      {d.discountFactor.toFixed(4)}
+                    </td>
+                  ))}
+                </tr>
+
+                {/* PV of FCF Row */}
+                <tr>
+                  <td><strong>มูลค่าปัจจุบัน FCF (PV of FCF)</strong></td>
+                  <td style={{ textAlign: 'right', opacity: 0.4 }}>-</td>
+                  {result.yearlyData.map((d) => (
+                    <td key={d.year} style={{ textAlign: 'right', fontWeight: 600 }}>
+                      {fmt(d.pvOfFcf)}
+                    </td>
                   ))}
                 </tr>
               </tbody>
             </Table>
           </Box>
 
-          {/* Terminal Value note */}
-          <Typography level="body-xs" sx={{ mt: 2, opacity: 0.4, fontStyle: 'italic' }}>
-            Terminal Value (PV): {fmt(result.pvOfTerminalValue)}B · Gordon Growth Model · WACC {fmtPct(wacc)} · Terminal Growth {fmtPct(terminalGrowth)}
-          </Typography>
+          {/* Valuation Calculations Breakdown */}
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid xs={12} md={6}>
+              <Sheet sx={{ p: 2, borderRadius: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <Typography level="title-sm" sx={{ fontWeight: 700, mb: 1, color: 'primary.300' }}>
+                  1. Sum of PV & Terminal Value (Gordon Growth)
+                </Typography>
+                <Stack spacing={0.5}>
+                  <Stack direction="row" justifyContent="space-between">
+                    <Typography level="body-xs" sx={{ opacity: 0.6 }}>Sum 5-Yr PV of FCF:</Typography>
+                    <Typography level="body-xs" sx={{ fontWeight: 700, fontFamily: 'monospace' }}>{fmt(result.sumPvFcf)}B</Typography>
+                  </Stack>
+                  <Stack direction="row" justifyContent="space-between">
+                    <Typography level="body-xs" sx={{ opacity: 0.6 }}>Terminal Value (at FY{baseYear+5}):</Typography>
+                    <Typography level="body-xs" sx={{ fontWeight: 700, fontFamily: 'monospace' }}>{fmt(result.terminalValue)}B</Typography>
+                  </Stack>
+                  <Stack direction="row" justifyContent="space-between">
+                    <Typography level="body-xs" sx={{ opacity: 0.6 }}>PV of Terminal Value:</Typography>
+                    <Typography level="body-xs" sx={{ fontWeight: 700, fontFamily: 'monospace' }}>{fmt(result.pvOfTerminalValue)}B</Typography>
+                  </Stack>
+                </Stack>
+              </Sheet>
+            </Grid>
+
+            <Grid xs={12} md={6}>
+              <Sheet sx={{ p: 2, borderRadius: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <Typography level="title-sm" sx={{ fontWeight: 700, mb: 1, color: 'success.300' }}>
+                  2. Exit Multiple Valuation (FY{baseYear+5} Target)
+                </Typography>
+                <Stack spacing={0.5}>
+                  <Stack direction="row" justifyContent="space-between">
+                    <Typography level="body-xs" sx={{ opacity: 0.6 }}>FY{baseYear+5} Expected FCF:</Typography>
+                    <Typography level="body-xs" sx={{ fontWeight: 700, fontFamily: 'monospace' }}>{fmt(result.yearlyData[4].fcf)}B</Typography>
+                  </Stack>
+                  <Stack direction="row" justifyContent="space-between">
+                    <Typography level="body-xs" sx={{ opacity: 0.6 }}>Target Market Cap (Exit {exitMultiple}x):</Typography>
+                    <Typography level="body-xs" sx={{ fontWeight: 700, fontFamily: 'monospace' }}>{fmt(result.targetMarketCapYr5)}B</Typography>
+                  </Stack>
+                  <Stack direction="row" justifyContent="space-between">
+                    <Typography level="body-xs" sx={{ opacity: 0.6 }}>Future Target Price / Share:</Typography>
+                    <Typography level="body-xs" sx={{ fontWeight: 800, fontFamily: 'monospace', color: '#10b981' }}>{fmtFull(result.targetSharePriceYr5)}</Typography>
+                  </Stack>
+                </Stack>
+              </Sheet>
+            </Grid>
+          </Grid>
         </Box>
       </Box>
     </Sheet>
