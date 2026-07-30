@@ -1,10 +1,9 @@
 import * as React from 'react';
 import {
   Box, Sheet, Typography, Stack, Slider, Input, Divider, Table,
-  FormLabel, FormControl, Tooltip, Button, Chip, Tabs, TabList, Tab, Grid, Select, Option
+  FormLabel, FormControl, Tooltip, Button, Chip, Tabs, TabList, Tab, Grid
 } from '@mui/joy';
-import { Calculator, Info, TrendingUp } from 'lucide-react';
-import { useNavigate } from '@tanstack/react-router';
+import { Calculator, Info } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
 
@@ -369,32 +368,7 @@ interface DCFModelProps {
 }
 
 export default function DCFModel({ symbol }: DCFModelProps) {
-  const navigate = useNavigate();
   const [mode, setMode] = React.useState<'uniform' | 'detailed'>('detailed');
-  const [symbolsList, setSymbolsList] = React.useState<string[]>(['MSFT', 'AAPL', 'NVDA', 'GOOGL', 'AMZN', 'META', 'TSLA']);
-
-  React.useEffect(() => {
-    let cancelled = false;
-    const fetchWatchlist = async () => {
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/watchlist`);
-        if (res.ok) {
-          const data = (await res.json()) as any[];
-          const active = data
-            .map((item: any) => item.symbol)
-            .filter(Boolean);
-          if (!cancelled && active.length > 0) {
-            const combined = Array.from(new Set(['MSFT', 'AAPL', 'NVDA', 'GOOGL', 'AMZN', 'META', 'TSLA', ...active, symbol])).sort();
-            setSymbolsList(combined);
-          }
-        }
-      } catch (e) {
-        console.error('Failed to fetch watchlist symbols for selector:', e);
-      }
-    };
-    fetchWatchlist();
-    return () => { cancelled = true; };
-  }, [symbol]);
   
   // Base year setup
   const [baseYear, setBaseYear] = React.useState(2026);
@@ -631,44 +605,13 @@ export default function DCFModel({ symbol }: DCFModelProps) {
               <Calculator size={22} color="#fff" />
             </Box>
             <Box>
-              <Stack direction="row" spacing={1.5} alignItems="center">
+              <Stack direction="row" spacing={1} alignItems="center">
                 <Typography level="h3" sx={{ fontWeight: 800, fontSize: '1.3rem' }}>
                   Interactive DCF Valuation Model
                 </Typography>
-                <Select
-                  size="sm"
-                  value={symbol}
-                  onChange={(_, val) => {
-                    if (val && val !== symbol) {
-                      navigate({
-                        to: '/analysis',
-                        search: { symbol: val, tab: 'dcf-model' },
-                      });
-                    }
-                  }}
-                  startDecorator={<TrendingUp size={14} color="#60a5fa" />}
-                  sx={{
-                    minWidth: 110,
-                    fontWeight: 700,
-                    fontSize: '0.8rem',
-                    bgcolor: 'rgba(37, 99, 235, 0.15)',
-                    borderColor: 'rgba(37, 99, 235, 0.3)',
-                    color: 'primary.200',
-                    borderRadius: '8px',
-                    '&:hover': {
-                      bgcolor: 'rgba(37, 99, 235, 0.25)',
-                    },
-                    '& .MuiSelect-indicator': {
-                      color: 'primary.300',
-                    },
-                  }}
-                >
-                  {symbolsList.map((s) => (
-                    <Option key={s} value={s} sx={{ fontWeight: 700, fontSize: '0.8rem' }}>
-                      {s}
-                    </Option>
-                  ))}
-                </Select>
+                <Chip size="sm" color="primary" variant="soft" sx={{ fontWeight: 700 }}>
+                  {symbol}
+                </Chip>
               </Stack>
               <Typography level="body-xs" sx={{ opacity: 0.6 }}>
                 5-Year Discounted Cash Flow & Exit Multiple Projection (FY{baseYear+1}–FY{baseYear+5})
