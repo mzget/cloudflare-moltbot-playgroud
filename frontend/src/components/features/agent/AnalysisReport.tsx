@@ -249,7 +249,7 @@ export default function AnalysisReport({ symbol, onBack, subTab }: AnalysisRepor
           value={symbol}
           onChange={(_, val) => {
             if (val && val !== symbol) {
-              const currentTabName = subTab || (activeToolTab === 2 ? 'stock-thesis' : activeToolTab === 1 ? 'dcf-model' : 'report');
+              const currentTabName = (subTab || (activeToolTab === 2 ? 'stock-thesis' : activeToolTab === 1 ? 'dcf-model' : 'report')) as 'report' | 'dcf-model' | 'stock-thesis';
               navigate({
                 to: '/analysis',
                 search: { symbol: val, tab: currentTabName },

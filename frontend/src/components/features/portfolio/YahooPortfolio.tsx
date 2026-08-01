@@ -9,6 +9,7 @@ import FundamentalDashboard from './FundamentalDashboard';
 import SummaryTab from './SummaryTab';
 import HoldingsTab from './HoldingsTab';
 import { SummaryTabSkeleton, HoldingsTabSkeleton } from './DashboardSkeletons';
+import { RotateCw } from 'lucide-react';
 import '../../../styles/yahooPortfolio.css';
 
 export interface PortfolioSummary {
@@ -180,6 +181,20 @@ export default function YahooPortfolio() {
     success: null,
   });
 
+  const [refreshingPrices, setRefreshingPrices] = useState(false);
+
+  const handleRefreshPrices = async () => {
+    setRefreshingPrices(true);
+    try {
+      await fetch(`${API_BASE_URL}/api/test-market-stats?force=true`);
+      fetchAll();
+    } catch (e) {
+      console.error('Failed to refresh market prices:', e);
+    } finally {
+      setRefreshingPrices(false);
+    }
+  };
+
   const handleFormChange = (field: keyof typeof form) => (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -271,8 +286,8 @@ export default function YahooPortfolio() {
   return (
     <Box className="yf-portfolio">
 
-      {/* Tabs */}
-      <Box sx={{ mb: 2 }}>
+      {/* Tabs Header with Right-Aligned Action */}
+      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5 }}>
         <Tabs value={optimisticTab} onChange={(_, val) => setActiveTab(val as number)} sx={{ bgcolor: 'transparent' }}>
           <TabList
             variant="soft"
@@ -309,6 +324,29 @@ export default function YahooPortfolio() {
             <Tab disableIndicator>Summary</Tab>
           </TabList>
         </Tabs>
+
+        <Button
+          variant="soft"
+          color="neutral"
+          size="sm"
+          loading={refreshingPrices}
+          startDecorator={<RotateCw size={15} />}
+          onClick={handleRefreshPrices}
+          sx={{
+            borderRadius: '10px',
+            fontWeight: 600,
+            fontSize: '0.8rem',
+            px: 2,
+            py: 0.75,
+            transition: 'all 0.2s ease-out',
+            boxShadow: 'xs',
+            '&:hover': {
+              bgcolor: 'background.level2',
+            }
+          }}
+        >
+          {refreshingPrices ? 'Refreshing...' : 'Refresh Prices'}
+        </Button>
       </Box>
 
       {/* Summary Tab */}
