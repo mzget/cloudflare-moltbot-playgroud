@@ -1145,8 +1145,8 @@ export default function DCFModel({ symbol }: DCFModelProps) {
                           type="number"
                           value={d.growth}
                           onChange={(e) => handleYearlyChange(i, 'growth', parseFloat(e.target.value) || 0)}
-                          slotProps={{ input: { step: 0.5, style: { textAlign: 'right', padding: '2px 4px', fontSize: '0.75rem' } } }}
-                          sx={{ width: '65px', ml: 'auto', background: 'rgba(255,255,255,0.04)' }}
+                          slotProps={{ input: { step: 0.5, style: { textAlign: 'right', padding: '2px 6px', fontSize: '0.8rem' } } }}
+                          sx={{ width: '85px', ml: 'auto', background: 'rgba(255,255,255,0.06)', '--Input-minHeight': '30px' }}
                         />
                       ) : (
                         <span style={{ color: '#60a5fa' }}>{fmtPct(d.growth)}</span>
@@ -1178,8 +1178,8 @@ export default function DCFModel({ symbol }: DCFModelProps) {
                           type="number"
                           value={d.opMargin}
                           onChange={(e) => handleYearlyChange(i, 'opMargin', parseFloat(e.target.value) || 0)}
-                          slotProps={{ input: { step: 0.1, style: { textAlign: 'right', padding: '2px 4px', fontSize: '0.75rem' } } }}
-                          sx={{ width: '65px', ml: 'auto', background: 'rgba(255,255,255,0.04)' }}
+                          slotProps={{ input: { step: 0.1, style: { textAlign: 'right', padding: '2px 6px', fontSize: '0.8rem' } } }}
+                          sx={{ width: '85px', ml: 'auto', background: 'rgba(255,255,255,0.06)', '--Input-minHeight': '30px' }}
                         />
                       ) : (
                         <span>{fmtPct(d.opMargin)}</span>
@@ -1211,8 +1211,8 @@ export default function DCFModel({ symbol }: DCFModelProps) {
                           type="number"
                           value={d.fcfConv}
                           onChange={(e) => handleYearlyChange(i, 'fcfConv', parseFloat(e.target.value) || 0)}
-                          slotProps={{ input: { step: 1, style: { textAlign: 'right', padding: '2px 4px', fontSize: '0.75rem' } } }}
-                          sx={{ width: '65px', ml: 'auto', background: 'rgba(255,255,255,0.04)' }}
+                          slotProps={{ input: { step: 1, style: { textAlign: 'right', padding: '2px 6px', fontSize: '0.8rem' } } }}
+                          sx={{ width: '85px', ml: 'auto', background: 'rgba(255,255,255,0.06)', '--Input-minHeight': '30px' }}
                         />
                       ) : (
                         <span>{fmtPct(d.fcfConv)}</span>
