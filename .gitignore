@@ -49,6 +49,7 @@ coverage/
 .agents/skills/**
 !.agents/skills/oaktree-frontend/**
 !.agents/skills/oaktree-backend/**
+!.agents/skills/dcf-valuation-model/**
 .agent/workflows/
 trace-tool/check-color.js
 trace-tool/package-lock.json
