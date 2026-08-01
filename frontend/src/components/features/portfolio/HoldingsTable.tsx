@@ -40,7 +40,8 @@ export interface Holding {
   tot_gain_amt: number | null;
   realized_gain_pct: number | null;
   realized_gain_amt: number | null;
-  price_updated_at?: string | null;
+  price_updated_at?: string | number | null;
+  stats_updated_at?: string | number | null;
 }
 
 export interface HoldingsTableProps {
@@ -89,22 +90,31 @@ function SortIcon({ dir }: { dir: 'asc' | 'desc' | 'none' }) {
   return <ArrowUpDown size={12} style={{ marginLeft: 4, flexShrink: 0, opacity: 0.3 }} />;
 }
 
-function formatRelativeTime(dateStr?: string | null): string {
-  if (!dateStr) return '';
+function formatRelativeTime(dateStr?: string | number | null): { text: string; isStale: boolean } {
+  if (!dateStr) return { text: '', isStale: false };
   try {
-    const utcStr = dateStr.includes('T') ? dateStr : dateStr.replace(' ', 'T') + 'Z';
-    const ms = Date.parse(utcStr);
-    if (isNaN(ms)) return '';
-    const diffSec = Math.floor((Date.now() - ms) / 1000);
-    if (diffSec < 60) return 'just now';
+    let ms = 0;
+    const num = Number(dateStr);
+    if (!isNaN(num) && num > 0) {
+      ms = num < 100000000000 ? num * 1000 : num;
+    } else {
+      const str = String(dateStr);
+      const utcStr = str.includes('T') ? str : str.replace(' ', 'T') + 'Z';
+      ms = Date.parse(utcStr);
+    }
+    if (!ms || isNaN(ms)) return { text: '', isStale: false };
+    const diffMs = Date.now() - ms;
+    const isStale = diffMs > 86400000;
+    const diffSec = Math.floor(diffMs / 1000);
+    if (diffSec < 60) return { text: 'just now', isStale };
     const diffMin = Math.floor(diffSec / 60);
-    if (diffMin < 60) return `${diffMin}m ago`;
+    if (diffMin < 60) return { text: `${diffMin}m ago`, isStale };
     const diffHr = Math.floor(diffMin / 60);
-    if (diffHr < 24) return `${diffHr}h ago`;
+    if (diffHr < 24) return { text: `${diffHr}h ago`, isStale };
     const diffDay = Math.floor(diffHr / 24);
-    return `${diffDay}d ago`;
+    return { text: `${diffDay}d ago`, isStale };
   } catch {
-    return '';
+    return { text: '', isStale: false };
   }
 }
 
@@ -434,11 +444,14 @@ export default function HoldingsTable({
                     <Typography level="body-sm" sx={{ fontVariantNumeric: 'tabular-nums', fontSize: densityStyles.fontSize }}>
                       {displayNum(h.last_price)}
                     </Typography>
-                    {h.price_updated_at && (
-                      <Typography level="body-xs" sx={{ color: 'text.tertiary', fontSize: '0.6rem', lineHeight: 1.2 }}>
-                        {formatRelativeTime(h.price_updated_at)}
-                      </Typography>
-                    )}
+                    {h.price_updated_at && (() => {
+                      const { text, isStale } = formatRelativeTime(h.price_updated_at);
+                      return (
+                        <Typography level="body-xs" sx={{ color: isStale ? 'danger.plainColor' : 'text.tertiary', fontSize: '0.6rem', lineHeight: 1.2 }}>
+                          {text}
+                        </Typography>
+                      );
+                    })()}
                   </td>
 
                   {/* AC/Share */}
