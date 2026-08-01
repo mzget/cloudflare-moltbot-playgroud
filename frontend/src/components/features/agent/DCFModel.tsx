@@ -370,35 +370,36 @@ interface DCFModelProps {
 export default function DCFModel({ symbol }: DCFModelProps) {
   const [mode, setMode] = React.useState<'uniform' | 'detailed'>('detailed');
   
-  // Base year setup
+  // Base year & financial parameters (defaults to 0 if no saved valuation exists)
   const [baseYear, setBaseYear] = React.useState(2026);
-  const [baseRev, setBaseRev] = React.useState(331.8);
-  const [baseEbit, setBaseEbit] = React.useState(155.2);
-  const [taxRate, setTaxRate] = React.useState(20.0);
-  const [wacc, setWacc] = React.useState(9.0);
-  const [terminalGrowth, setTerminalGrowth] = React.useState(3.5);
-  const [netCash, setNetCash] = React.useState(18.1);
-  const [sharesOutstanding, setSharesOutstanding] = React.useState(7410);
+  const [baseRev, setBaseRev] = React.useState(0);
+  const [baseEbit, setBaseEbit] = React.useState(0);
+  const [taxRate, setTaxRate] = React.useState(0);
+  const [wacc, setWacc] = React.useState(0);
+  const [terminalGrowth, setTerminalGrowth] = React.useState(0);
+  const [netCash, setNetCash] = React.useState(0);
+  const [sharesOutstanding, setSharesOutstanding] = React.useState(0);
 
-  // Uniform Mode defaults
-  const [revGrowth, setRevGrowth] = React.useState(14.0);
-  const [opMargin, setOpMargin] = React.useState(46.8);
-  const [fcfConversion, setFcfConversion] = React.useState(75.0);
+  // Uniform Mode parameters
+  const [revGrowth, setRevGrowth] = React.useState(0);
+  const [opMargin, setOpMargin] = React.useState(0);
+  const [fcfConversion, setFcfConversion] = React.useState(0);
 
-  // Detailed Mode defaults (FY27 - FY31)
-  const [yearlyGrowth, setYearlyGrowth] = React.useState<number[]>([16.0, 15.0, 14.0, 13.0, 12.0]);
-  const [yearlyOpMargin, setYearlyOpMargin] = React.useState<number[]>([46.2, 46.5, 46.8, 47.0, 47.2]);
-  const [yearlyFcfConv, setYearlyFcfConv] = React.useState<number[]>([68.0, 72.0, 75.0, 78.0, 80.0]);
+  // Detailed Mode parameters (5-year arrays)
+  const [yearlyGrowth, setYearlyGrowth] = React.useState<number[]>([0, 0, 0, 0, 0]);
+  const [yearlyOpMargin, setYearlyOpMargin] = React.useState<number[]>([0, 0, 0, 0, 0]);
+  const [yearlyFcfConv, setYearlyFcfConv] = React.useState<number[]>([0, 0, 0, 0, 0]);
 
   // Exit Multiple Valuation
-  const [exitMultiple, setExitMultiple] = React.useState(24.0);
-  const [targetShares, setTargetShares] = React.useState(7200);
+  const [exitMultiple, setExitMultiple] = React.useState(0);
+  const [targetShares, setTargetShares] = React.useState(0);
 
   const [currentPrice, setCurrentPrice] = React.useState<number | null>(null);
   const [loadingDefaults, setLoadingDefaults] = React.useState(false);
   const [history, setHistory] = React.useState<any[]>([]);
-  const [scenarioName, setScenarioName] = React.useState('Base Case (กรณีฐาน)');
-  const [activePreset, setActivePreset] = React.useState<'base' | 'bear' | 'bull' | 'custom'>('base');
+  const [scenarioName, setScenarioName] = React.useState('ยังไม่มีการประเมินมูลค่า');
+  const [activePreset, setActivePreset] = React.useState<'base' | 'bear' | 'bull' | 'custom' | null>(null);
+  const [hasSavedValuation, setHasSavedValuation] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
 
   const fetchHistory = React.useCallback(async () => {
@@ -415,13 +416,13 @@ export default function DCFModel({ symbol }: DCFModelProps) {
     return [];
   }, [symbol]);
 
-  // Load defaults / historical models
+  // Load saved historical models or reset to unvalued 0 state
   React.useEffect(() => {
     let cancelled = false;
     const initData = async () => {
       setLoadingDefaults(true);
       try {
-        await fetchHistory();
+        const historyData = await fetchHistory();
         if (cancelled) return;
 
         const resDefaults = await fetch(`${API_BASE_URL}/api/analysis/dcf-defaults?symbol=${symbol}`);
@@ -430,6 +431,65 @@ export default function DCFModel({ symbol }: DCFModelProps) {
           if (!cancelled && d.price != null) {
             setCurrentPrice(d.price);
           }
+        }
+
+        // If saved DCF calculation exists in database, auto-populate from the latest run
+        if (historyData && historyData.length > 0) {
+          const latest = historyData[0];
+          setHasSavedValuation(true);
+          setScenarioName(latest.scenario_name || 'Saved Valuation');
+          setBaseRev(latest.base_revenue || 0);
+          setRevGrowth(latest.revenue_growth || 0);
+          setTaxRate(latest.tax_rate || 16.0);
+          setFcfConversion(latest.fcf_conversion || 75.0);
+          setWacc(latest.wacc || 9.5);
+          setTerminalGrowth(latest.terminal_growth || 2.5);
+          setSharesOutstanding(latest.shares_outstanding || 0);
+          setTargetShares(latest.shares_outstanding || 0);
+
+          const gm = latest.base_gross_margin || 0;
+          const opex = latest.opex_margin || 0;
+          const imp = latest.gross_margin_improvement || 0;
+          const baseOp = gm > 0 ? (gm - opex) : 43.0;
+
+          setBaseEbit(latest.base_revenue ? latest.base_revenue * (baseOp / 100) : 0);
+          setOpMargin(baseOp);
+          setYearlyGrowth([
+            latest.revenue_growth || 0,
+            latest.revenue_growth || 0,
+            latest.revenue_growth || 0,
+            latest.revenue_growth || 0,
+            latest.revenue_growth || 0,
+          ]);
+          setYearlyOpMargin([baseOp, baseOp + imp, baseOp + imp * 2, baseOp + imp * 3, baseOp + imp * 4]);
+          setYearlyFcfConv([
+            latest.fcf_conversion || 75,
+            latest.fcf_conversion || 75,
+            latest.fcf_conversion || 75,
+            latest.fcf_conversion || 75,
+            latest.fcf_conversion || 75,
+          ]);
+          setActivePreset('base');
+        } else {
+          // No saved valuation: leave as unvalued (0 / empty)
+          setHasSavedValuation(false);
+          setScenarioName('ยังไม่มีการประเมินมูลค่า');
+          setBaseRev(0);
+          setBaseEbit(0);
+          setTaxRate(0);
+          setWacc(0);
+          setTerminalGrowth(0);
+          setNetCash(0);
+          setSharesOutstanding(0);
+          setRevGrowth(0);
+          setOpMargin(0);
+          setFcfConversion(0);
+          setYearlyGrowth([0, 0, 0, 0, 0]);
+          setYearlyOpMargin([0, 0, 0, 0, 0]);
+          setYearlyFcfConv([0, 0, 0, 0, 0]);
+          setExitMultiple(0);
+          setTargetShares(0);
+          setActivePreset(null);
         }
       } catch (e) {
         console.error('Failed to initialize DCF data:', e);
@@ -442,52 +502,58 @@ export default function DCFModel({ symbol }: DCFModelProps) {
     return () => { cancelled = true; };
   }, [symbol, fetchHistory]);
 
+  // Load actual market stats if user wants baseline data for an unvalued stock
+  const handleLoadMarketDefaults = async () => {
+    setLoadingDefaults(true);
+    try {
+      const resDefaults = await fetch(`${API_BASE_URL}/api/analysis/dcf-defaults?symbol=${symbol}`);
+      if (resDefaults.ok) {
+        const d = await resDefaults.json() as any;
+        if (d.baseRevenue) setBaseRev(d.baseRevenue);
+        if (d.revenueGrowth) {
+          setRevGrowth(d.revenueGrowth);
+          setYearlyGrowth([d.revenueGrowth, d.revenueGrowth, d.revenueGrowth, d.revenueGrowth, d.revenueGrowth]);
+        }
+        if (d.operatingMargin) {
+          setOpMargin(d.operatingMargin);
+          setBaseEbit(d.baseRevenue ? d.baseRevenue * (d.operatingMargin / 100) : 0);
+          setYearlyOpMargin([d.operatingMargin, d.operatingMargin, d.operatingMargin, d.operatingMargin, d.operatingMargin]);
+        }
+        if (d.fcfMargin) {
+          setFcfConversion(d.fcfMargin);
+          setYearlyFcfConv([d.fcfMargin, d.fcfMargin, d.fcfMargin, d.fcfMargin, d.fcfMargin]);
+        }
+        if (d.sharesOutstanding) {
+          setSharesOutstanding(d.sharesOutstanding);
+          setTargetShares(d.sharesOutstanding);
+        }
+        if (d.netDebt) setNetCash(-d.netDebt / 1e9);
+        setTaxRate(20.0);
+        setWacc(9.0);
+        setTerminalGrowth(2.5);
+        setExitMultiple(20.0);
+        setScenarioName('Market Stats Baseline');
+      }
+    } catch (e) {
+      console.error('Failed to load market defaults:', e);
+    } finally {
+      setLoadingDefaults(false);
+    }
+  };
+
   // Scenario Presets
   const applyPreset = (preset: 'base' | 'bear' | 'bull') => {
     setActivePreset(preset);
     setMode('detailed');
     if (preset === 'base') {
-      setScenarioName('Base Case (กรณีฐาน)');
-      setBaseRev(331.8);
-      setBaseEbit(155.2);
-      setYearlyGrowth([16.0, 15.0, 14.0, 13.0, 12.0]);
-      setYearlyOpMargin([46.2, 46.5, 46.8, 47.0, 47.2]);
-      setYearlyFcfConv([68.0, 72.0, 75.0, 78.0, 80.0]);
-      setTaxRate(20.0);
-      setWacc(9.0);
-      setTerminalGrowth(3.5);
-      setNetCash(18.1);
-      setExitMultiple(24.0);
-      setSharesOutstanding(7410);
-      setTargetShares(7200);
+      setScenarioName('Base Case Scenario');
+      if (baseRev === 0) handleLoadMarketDefaults();
     } else if (preset === 'bear') {
-      setScenarioName('Bear Case (กรณีแย่)');
-      setBaseRev(331.8);
-      setBaseEbit(155.2);
-      setYearlyGrowth([12.0, 11.5, 11.0, 10.0, 8.5]);
-      setYearlyOpMargin([45.0, 44.8, 44.5, 44.2, 44.0]);
-      setYearlyFcfConv([65.0, 68.0, 70.0, 72.0, 75.0]);
-      setTaxRate(20.0);
-      setWacc(9.5);
-      setTerminalGrowth(3.0);
-      setNetCash(18.1);
-      setExitMultiple(19.0);
-      setSharesOutstanding(7410);
-      setTargetShares(7300);
+      setScenarioName('Bear Case Scenario');
+      setYearlyGrowth(yearlyGrowth.map(g => Math.max(0, g * 0.7)));
     } else if (preset === 'bull') {
-      setScenarioName('Bull Case (กรณีดีเยี่ยม)');
-      setBaseRev(331.8);
-      setBaseEbit(155.2);
-      setYearlyGrowth([20.0, 18.5, 17.0, 16.0, 16.0]);
-      setYearlyOpMargin([47.0, 47.5, 48.0, 48.5, 49.0]);
-      setYearlyFcfConv([72.0, 76.0, 80.0, 82.0, 85.0]);
-      setTaxRate(20.0);
-      setWacc(8.5);
-      setTerminalGrowth(4.0);
-      setNetCash(18.1);
-      setExitMultiple(28.5);
-      setSharesOutstanding(7410);
-      setTargetShares(7100);
+      setScenarioName('Bull Case Scenario');
+      setYearlyGrowth(yearlyGrowth.map(g => g * 1.3));
     }
   };
 
@@ -838,6 +904,41 @@ export default function DCFModel({ symbol }: DCFModelProps) {
 
         {/* Right Output Panel */}
         <Box sx={{ p: 3 }}>
+          {!hasSavedValuation && baseRev === 0 && (
+            <Sheet
+              sx={{
+                p: 2.5,
+                mb: 3,
+                borderRadius: '16px',
+                background: 'rgba(234, 179, 8, 0.1)',
+                border: '1px solid rgba(234, 179, 8, 0.3)',
+              }}
+            >
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }} justifyContent="space-between">
+                <Stack direction="row" spacing={1.5} alignItems="center">
+                  <Info size={22} color="#eab308" />
+                  <Box>
+                    <Typography level="title-sm" sx={{ fontWeight: 700, color: '#eab308' }}>
+                      ยังไม่มีการประเมินมูลค่าสำหรับ {symbol} (Unvalued)
+                    </Typography>
+                    <Typography level="body-xs" sx={{ opacity: 0.8 }}>
+                      หุ้นนี้ยังไม่มีประวัติการประเมินมูลค่า DCF กรุณากรอกตัวเลขสมมติฐานทางด้านซ้าย หรือดึงสถิติตลาดเริ่มต้นเพื่อประเมิน
+                    </Typography>
+                  </Box>
+                </Stack>
+                <Button
+                  size="sm"
+                  color="warning"
+                  variant="soft"
+                  onClick={handleLoadMarketDefaults}
+                  loading={loadingDefaults}
+                  sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}
+                >
+                  ดึงสถิติตลาดเริ่มต้น
+                </Button>
+              </Stack>
+            </Sheet>
+          )}
           {/* Key Output Cards */}
           <Box
             sx={{
