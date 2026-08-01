@@ -41,6 +41,9 @@ Do NOT load domain-specific guidelines or all skills at the start of every turn.
 6. **Agents SDK**:
    - *Condition*: Working on stateful agent logic, agent-chat components, or durable workflows.
    - *Path*: [agents-sdk/SKILL.md](file:///c:/Users/natta/Documents/oaktree-agent/.agents/skills/agents-sdk/SKILL.md)
+7. **DCF Valuation Model Guidelines**:
+   - *Condition*: Working on stock valuation, DCF calculations, DCF parameters entry, or DCF UI components.
+   - *Path*: [dcf-valuation-model/SKILL.md](file:///c:/Users/natta/Documents/oaktree-agent/.agents/skills/dcf-valuation-model/SKILL.md)
 
 ---
 
