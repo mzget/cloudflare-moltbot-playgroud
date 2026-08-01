@@ -32,4 +32,5 @@ export interface CompanyStats {
   all_time_high_date?: string;
   all_time_low?: number;
   all_time_low_date?: string;
+  updated_at?: string;
 }

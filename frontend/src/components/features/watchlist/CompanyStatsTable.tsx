@@ -21,7 +21,7 @@ export type SortDir = 'asc' | 'desc' | 'none';
 export interface ColumnDef {
   id: keyof CompanyStats;
   label: string;
-  format: 'currency' | 'pct' | 'ratio' | 'pct2' | 'ratio2' | 'price';
+  format: 'currency' | 'pct' | 'ratio' | 'pct2' | 'ratio2' | 'price' | 'relative_date';
 }
 
 export const ALL_COLUMNS: ColumnDef[] = [
@@ -50,9 +50,47 @@ export const ALL_COLUMNS: ColumnDef[] = [
   { id: 'fifty_two_week_low', label: '52W Low', format: 'price' },
   { id: 'all_time_high', label: 'ATH', format: 'price' },
   { id: 'all_time_low', label: 'ATL', format: 'price' },
+  { id: 'updated_at', label: 'Last Update', format: 'relative_date' },
 ];
 
 // ─── Formatters ──────────────────────────────────────────────────────────────
+
+function formatRelativeTime(dateVal: string | number | undefined): { display: string; tooltip: string } {
+  if (!dateVal) return { display: '—', tooltip: 'No update timestamp' };
+
+  let date: Date;
+  if (typeof dateVal === 'number') {
+    date = new Date(dateVal > 1e11 ? dateVal : dateVal * 1000);
+  } else {
+    const isoString = dateVal.includes(' ') && !dateVal.includes('T') ? dateVal.replace(' ', 'T') + 'Z' : dateVal;
+    date = new Date(isoString);
+  }
+
+  if (isNaN(date.getTime())) {
+    return { display: '—', tooltip: 'Invalid date' };
+  }
+
+  const tooltip = `${date.toISOString().replace('T', ' ').slice(0, 19)} UTC`;
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+
+  if (diffMs < 0) {
+    return { display: 'Just now', tooltip };
+  }
+
+  const diffSec = Math.floor(diffMs / 1000);
+  const diffMin = Math.floor(diffSec / 60);
+  const diffHours = Math.floor(diffMin / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffSec < 60) return { display: 'Just now', tooltip };
+  if (diffMin < 60) return { display: `${diffMin}m ago`, tooltip };
+  if (diffHours < 24) return { display: `${diffHours}h ago`, tooltip };
+  if (diffDays < 30) return { display: `${diffDays}d ago`, tooltip };
+
+  const month = date.toLocaleString('default', { month: 'short' });
+  return { display: `${month} ${date.getDate()}`, tooltip };
+}
 
 const SCALE: Record<ScaleUnit, number> = { K: 1e3, M: 1e6, B: 1e9 };
 
@@ -245,11 +283,25 @@ export default function CompanyStatsTable({
   const sorted = React.useMemo(() => {
     if (!sortCol || sortDir === 'none') return data;
     return [...data].sort((a, b) => {
-      const av = a[sortCol] as number | undefined;
-      const bv = b[sortCol] as number | undefined;
-      if (av === undefined) return 1;
-      if (bv === undefined) return -1;
-      return sortDir === 'asc' ? av - bv : bv - av;
+      const av = a[sortCol];
+      const bv = b[sortCol];
+      if (av === undefined || av === null || av === '') return 1;
+      if (bv === undefined || bv === null || bv === '') return -1;
+
+      if (sortCol === 'updated_at' || (typeof av === 'string' && typeof bv === 'string')) {
+        const aStr = String(av);
+        const bStr = String(bv);
+        const aTime = new Date(aStr.includes(' ') && !aStr.includes('T') ? aStr.replace(' ', 'T') + 'Z' : aStr).getTime();
+        const bTime = new Date(bStr.includes(' ') && !bStr.includes('T') ? bStr.replace(' ', 'T') + 'Z' : bStr).getTime();
+        if (!isNaN(aTime) && !isNaN(bTime)) {
+          return sortDir === 'asc' ? aTime - bTime : bTime - aTime;
+        }
+        return sortDir === 'asc' ? aStr.localeCompare(bStr) : bStr.localeCompare(aStr);
+      }
+
+      const an = av as number;
+      const bn = bv as number;
+      return sortDir === 'asc' ? an - bn : bn - an;
     });
   }, [data, sortCol, sortDir]);
 
@@ -478,8 +530,35 @@ export default function CompanyStatsTable({
                 </td>
 
               {visibleCols.map(col => {
-                const rawVal = company[col.id] as number | undefined;
-                const color = getCellColor(rawVal, col);
+                const rawVal = company[col.id];
+                if (col.format === 'relative_date') {
+                  const { display, tooltip } = formatRelativeTime(rawVal as string | number | undefined);
+                  return (
+                    <td
+                      key={col.id}
+                      title={tooltip}
+                      style={{
+                        textAlign: 'right',
+                        padding: `${densityStyles.paddingY} ${densityStyles.paddingX}`
+                      }}
+                    >
+                      <Typography
+                        level={density === 'compact' ? 'body-xs' : density === 'comfort' ? 'body-md' : 'body-sm'}
+                        sx={{
+                          color: rawVal ? 'text.secondary' : 'text.tertiary',
+                          fontVariantNumeric: 'tabular-nums',
+                          fontWeight: 500,
+                          fontSize: densityStyles.fontSize,
+                        }}
+                      >
+                        {display}
+                      </Typography>
+                    </td>
+                  );
+                }
+
+                const numVal = rawVal as number | undefined;
+                const color = getCellColor(numVal, col);
                 return (
                   <td
                     key={col.id}
@@ -497,7 +576,7 @@ export default function CompanyStatsTable({
                         fontSize: densityStyles.fontSize,
                       }}
                     >
-                      {formatValue(rawVal, col.format, scale)}
+                      {formatValue(numVal, col.format, scale)}
                     </Typography>
                   </td>
                 );
