@@ -36,17 +36,18 @@ interface FinnhubResponse {
 export interface MarketStatsOptions {
 	priceOnly?: boolean;
 	metricsOnly?: boolean;
+	force?: boolean;
 }
 
 export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOptions = {}): Promise<{ symbol: string, success: boolean, price?: number | null, error?: string | null }[]> {
-	const { priceOnly = false, metricsOnly = false } = options;
+	const { priceOnly = false, metricsOnly = false, force = false } = options;
 	const apiKey = env.FINNHUB_API_KEY;
 	const runResults: { symbol: string, success: boolean, price?: number | null, error?: string | null }[] = [];
 	
 	const marketOpen = isUSMarketOpen();
 
-	// Price-only mode: skip entirely when US market is closed
-	if (priceOnly && !marketOpen) {
+	// Price-only mode: skip entirely when US market is closed (unless forced)
+	if (priceOnly && !marketOpen && !force) {
 		console.log('Market is closed. Skipping price-only update.');
 		return runResults;
 	}
@@ -154,7 +155,7 @@ export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOpt
 	};
 
 	// Determine fetch directives based on US market open hours and options
-	const shouldFetchQuote = marketOpen && !metricsOnly;
+	const shouldFetchQuote = (marketOpen || force) && !metricsOnly;
 	const shouldFetchMetrics = (metricsOnly || (!priceOnly && !marketOpen)) && metricsSymbolsToUpdate.size > 0;
 
 	// Filter active watchlist results based on options

@@ -597,7 +597,8 @@ app.get('/api/run-all', (c) => {
 // API: Trigger Market Stats Update Manually (Test)
 app.get('/api/test-market-stats', async (c) => {
   try {
-    const results = await fetchAndStoreMarketStats(c.env);
+    const force = c.req.query('force') === 'true';
+    const results = await fetchAndStoreMarketStats(c.env, { force });
     return c.json(results);
   } catch (e) {
     return c.json({ error: (e as any).message }, 500);
@@ -708,7 +709,7 @@ app.get('/api/market-intelligence', cache({ cacheName: 'oaktree-market-intellige
 			m.gross_profit_margin, m.operating_margin, m.ev_ebit, m.ev_sales,
 			m.p_ocf, m.p_fcf, m.capex_to_ocf, m.rd_to_revenue, m.debt_equity,
 			m.p_e, m.fcf_margin, m.total_cash, m.net_debt, m.total_debt, m.dividend_yield,
-			m.price
+			m.price, m.updated_at as updated_at
 		FROM watchlist w
 		LEFT JOIN market_stats m ON w.symbol = m.symbol
 		WHERE w.is_active = 1
