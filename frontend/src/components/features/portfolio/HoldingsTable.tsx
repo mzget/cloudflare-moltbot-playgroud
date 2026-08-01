@@ -40,6 +40,7 @@ export interface Holding {
   tot_gain_amt: number | null;
   realized_gain_pct: number | null;
   realized_gain_amt: number | null;
+  price_updated_at?: string | null;
 }
 
 export interface HoldingsTableProps {
@@ -86,6 +87,25 @@ function SortIcon({ dir }: { dir: 'asc' | 'desc' | 'none' }) {
   if (dir === 'asc') return <ArrowUp size={12} style={{ marginLeft: 4, flexShrink: 0 }} />;
   if (dir === 'desc') return <ArrowDown size={12} style={{ marginLeft: 4, flexShrink: 0 }} />;
   return <ArrowUpDown size={12} style={{ marginLeft: 4, flexShrink: 0, opacity: 0.3 }} />;
+}
+
+function formatRelativeTime(dateStr?: string | null): string {
+  if (!dateStr) return '';
+  try {
+    const utcStr = dateStr.includes('T') ? dateStr : dateStr.replace(' ', 'T') + 'Z';
+    const ms = Date.parse(utcStr);
+    if (isNaN(ms)) return '';
+    const diffSec = Math.floor((Date.now() - ms) / 1000);
+    if (diffSec < 60) return 'just now';
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return `${diffHr}h ago`;
+    const diffDay = Math.floor(diffHr / 24);
+    return `${diffDay}d ago`;
+  } catch {
+    return '';
+  }
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -414,6 +434,11 @@ export default function HoldingsTable({
                     <Typography level="body-sm" sx={{ fontVariantNumeric: 'tabular-nums', fontSize: densityStyles.fontSize }}>
                       {displayNum(h.last_price)}
                     </Typography>
+                    {h.price_updated_at && (
+                      <Typography level="body-xs" sx={{ color: 'text.tertiary', fontSize: '0.6rem', lineHeight: 1.2 }}>
+                        {formatRelativeTime(h.price_updated_at)}
+                      </Typography>
+                    )}
                   </td>
 
                   {/* AC/Share */}
