@@ -46,7 +46,8 @@ import {
   Sparkles,
   RotateCcw,
   BellOff,
-  TrendingUp
+  TrendingUp,
+  X
 } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
@@ -1134,7 +1135,11 @@ export default function SourceManager() {
                 <Alert
                   color={scanResult.type}
                   variant="soft"
-                  onClose={() => setScanResult(null)}
+                  endDecorator={
+                    <IconButton size="sm" variant="plain" color="neutral" onClick={() => setScanResult(null)}>
+                      <X size={16} />
+                    </IconButton>
+                  }
                   startDecorator={scanResult.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
                   sx={{ borderRadius: '12px' }}
                 >
