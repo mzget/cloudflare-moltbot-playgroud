@@ -492,6 +492,7 @@ export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOpt
 
 				const currentUtcString = new Date().toISOString().replace('T', ' ').slice(0, 19);
 				const updatedAtVal = shouldFetchMetrics ? currentUtcString : null;
+				const priceUpdatedAtVal = price !== null ? currentUtcString : null;
 
 				const stmt = env.DB.prepare(`
 					INSERT INTO market_stats (
@@ -501,8 +502,9 @@ export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOpt
 						p_e, fcf_margin, total_cash, net_debt, total_debt, dividend_yield,
 						price, previous_close, day_high, day_low, open_price, updated_at,
 						fifty_two_week_high, fifty_two_week_high_date, fifty_two_week_low, fifty_two_week_low_date,
-						all_time_high, all_time_high_date, all_time_low, all_time_low_date
-					) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+						all_time_high, all_time_high_date, all_time_low, all_time_low_date,
+						price_updated_at
+					) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 					ON CONFLICT(symbol) DO UPDATE SET
 						market_cap=CASE WHEN excluded.updated_at IS NOT NULL THEN excluded.market_cap ELSE market_stats.market_cap END,
 						revenues=CASE WHEN excluded.updated_at IS NOT NULL THEN excluded.revenues ELSE market_stats.revenues END,
@@ -537,7 +539,8 @@ export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOpt
 						all_time_high=CASE WHEN excluded.updated_at IS NOT NULL THEN excluded.all_time_high ELSE market_stats.all_time_high END,
 						all_time_high_date=CASE WHEN excluded.updated_at IS NOT NULL THEN excluded.all_time_high_date ELSE market_stats.all_time_high_date END,
 						all_time_low=CASE WHEN excluded.updated_at IS NOT NULL THEN excluded.all_time_low ELSE market_stats.all_time_low END,
-						all_time_low_date=CASE WHEN excluded.updated_at IS NOT NULL THEN excluded.all_time_low_date ELSE market_stats.all_time_low_date END
+						all_time_low_date=CASE WHEN excluded.updated_at IS NOT NULL THEN excluded.all_time_low_date ELSE market_stats.all_time_low_date END,
+						price_updated_at=COALESCE(excluded.price_updated_at, market_stats.price_updated_at)
 				`).bind(
 					symbol, market_cap, revenues, revenue_3y_cagr, revenue_1y_growth, revenue_5y_cagr,
 					gross_profit_margin, operating_margin, ev_ebit, ev_sales,
@@ -545,7 +548,8 @@ export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOpt
 					p_e, fcf_margin, total_cash, net_debt, total_debt, dividend_yield,
 					price, previous_close, day_high, day_low, open_price, updatedAtVal,
 					fifty_two_week_high, fifty_two_week_high_date, fifty_two_week_low, fifty_two_week_low_date,
-					all_time_high, all_time_high_date, all_time_low, all_time_low_date
+					all_time_high, all_time_high_date, all_time_low, all_time_low_date,
+					priceUpdatedAtVal
 				);
 
 				batchStatements.push(stmt);

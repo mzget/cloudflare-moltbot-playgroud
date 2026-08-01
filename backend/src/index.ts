@@ -1370,7 +1370,7 @@ app.get('/api/portfolio/holdings', async (c) => {
     SELECT 
       h.symbol, h.shares, h.avg_cost, h.total_cost, h.status,
       w.name,
-      m.price as last_price, m.previous_close, m.market_cap, m.p_e,
+      m.price as last_price, m.previous_close, m.market_cap, m.p_e, m.price_updated_at,
       COALESCE(d.total_dividends, 0) as tot_div_income,
       COALESCE(t.realized_gain_sum, 0) as realized_gain_amt,
       COALESCE(t.realized_cost_basis, 0) as realized_cost_basis
@@ -1432,6 +1432,7 @@ app.get('/api/portfolio/holdings', async (c) => {
       tot_gain_amt: totGainAmt,
       realized_gain_pct: realizedGainPct,
       realized_gain_amt: realizedGainAmt,
+      price_updated_at: row.price_updated_at || null,
     };
   });
 
