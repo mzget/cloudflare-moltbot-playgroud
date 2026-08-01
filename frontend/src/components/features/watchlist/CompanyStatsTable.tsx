@@ -55,8 +55,8 @@ export const ALL_COLUMNS: ColumnDef[] = [
 
 // ─── Formatters ──────────────────────────────────────────────────────────────
 
-function formatRelativeTime(dateVal: string | number | undefined): { display: string; tooltip: string } {
-  if (!dateVal) return { display: '—', tooltip: 'No update timestamp' };
+function formatRelativeTime(dateVal: string | number | undefined): { display: string; tooltip: string; isStale: boolean } {
+  if (!dateVal) return { display: '—', tooltip: 'No update timestamp', isStale: false };
 
   let date: Date;
   if (typeof dateVal === 'number') {
@@ -67,15 +67,16 @@ function formatRelativeTime(dateVal: string | number | undefined): { display: st
   }
 
   if (isNaN(date.getTime())) {
-    return { display: '—', tooltip: 'Invalid date' };
+    return { display: '—', tooltip: 'Invalid date', isStale: false };
   }
 
   const tooltip = `${date.toISOString().replace('T', ' ').slice(0, 19)} UTC`;
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
+  const isStale = diffMs > 86400000; // Older than 1 day (24 hours)
 
   if (diffMs < 0) {
-    return { display: 'Just now', tooltip };
+    return { display: 'Just now', tooltip, isStale: false };
   }
 
   const diffSec = Math.floor(diffMs / 1000);
@@ -83,13 +84,13 @@ function formatRelativeTime(dateVal: string | number | undefined): { display: st
   const diffHours = Math.floor(diffMin / 60);
   const diffDays = Math.floor(diffHours / 24);
 
-  if (diffSec < 60) return { display: 'Just now', tooltip };
-  if (diffMin < 60) return { display: `${diffMin}m ago`, tooltip };
-  if (diffHours < 24) return { display: `${diffHours}h ago`, tooltip };
-  if (diffDays < 30) return { display: `${diffDays}d ago`, tooltip };
+  if (diffSec < 60) return { display: 'Just now', tooltip, isStale };
+  if (diffMin < 60) return { display: `${diffMin}m ago`, tooltip, isStale };
+  if (diffHours < 24) return { display: `${diffHours}h ago`, tooltip, isStale };
+  if (diffDays < 30) return { display: `${diffDays}d ago`, tooltip, isStale };
 
   const month = date.toLocaleString('default', { month: 'short' });
-  return { display: `${month} ${date.getDate()}`, tooltip };
+  return { display: `${month} ${date.getDate()}`, tooltip, isStale };
 }
 
 const SCALE: Record<ScaleUnit, number> = { K: 1e3, M: 1e6, B: 1e9 };
@@ -532,7 +533,7 @@ export default function CompanyStatsTable({
               {visibleCols.map(col => {
                 const rawVal = company[col.id];
                 if (col.format === 'relative_date') {
-                  const { display, tooltip } = formatRelativeTime(rawVal as string | number | undefined);
+                  const { display, tooltip, isStale } = formatRelativeTime(rawVal as string | number | undefined);
                   return (
                     <td
                       key={col.id}
@@ -545,9 +546,9 @@ export default function CompanyStatsTable({
                       <Typography
                         level={density === 'compact' ? 'body-xs' : density === 'comfort' ? 'body-md' : 'body-sm'}
                         sx={{
-                          color: rawVal ? 'text.secondary' : 'text.tertiary',
+                          color: isStale ? 'danger.plainColor' : rawVal ? 'text.secondary' : 'text.tertiary',
                           fontVariantNumeric: 'tabular-nums',
-                          fontWeight: 500,
+                          fontWeight: isStale ? 600 : 500,
                           fontSize: densityStyles.fontSize,
                         }}
                       >
