@@ -2506,6 +2506,7 @@ app.post('/api/analysis/dcf-save', async (c) => {
       wacc,
       terminalGrowth,
       sharesOutstanding,
+      netCash,
       impliedSharePrice,
     } = body;
 
@@ -2516,8 +2517,8 @@ app.post('/api/analysis/dcf-save', async (c) => {
       `INSERT INTO dcf_calculations (
         symbol, scenario_name, base_revenue, revenue_growth, base_gross_margin,
         gross_margin_improvement, opex_margin, tax_rate, fcf_conversion,
-        wacc, terminal_growth, shares_outstanding, implied_share_price
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        wacc, terminal_growth, shares_outstanding, net_cash, implied_share_price
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       symbolUpper,
       scenarioName || 'Base Case',
@@ -2531,6 +2532,7 @@ app.post('/api/analysis/dcf-save', async (c) => {
       wacc,
       terminalGrowth,
       sharesOutstanding,
+      netCash ?? 0,
       impliedSharePrice
     ).run();
 
