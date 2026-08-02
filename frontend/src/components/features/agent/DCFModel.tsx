@@ -446,6 +446,7 @@ export default function DCFModel({ symbol }: DCFModelProps) {
           setTerminalGrowth(latest.terminal_growth || 2.5);
           setSharesOutstanding(latest.shares_outstanding || 0);
           setTargetShares(latest.shares_outstanding || 0);
+          setNetCash(latest.net_cash ?? 0);
 
           const gm = latest.base_gross_margin || 0;
           const opex = latest.opex_margin || 0;
@@ -630,6 +631,7 @@ export default function DCFModel({ symbol }: DCFModelProps) {
           wacc,
           terminalGrowth,
           sharesOutstanding,
+          netCash,
           impliedSharePrice: result.impliedSharePrice,
         }),
       });
