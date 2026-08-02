@@ -370,8 +370,8 @@ interface DCFModelProps {
 export default function DCFModel({ symbol }: DCFModelProps) {
   const [mode, setMode] = React.useState<'uniform' | 'detailed'>('detailed');
   
-  // Base year & financial parameters (defaults to 0 if no saved valuation exists)
-  const [baseYear, setBaseYear] = React.useState(2026);
+  // Base year & financial parameters (defaults to 2025 so 5-year forecast is FY2026-FY2030)
+  const [baseYear, setBaseYear] = React.useState(2025);
   const [baseRev, setBaseRev] = React.useState(0);
   const [baseEbit, setBaseEbit] = React.useState(0);
   const [taxRate, setTaxRate] = React.useState(0);
@@ -615,6 +615,10 @@ export default function DCFModel({ symbol }: DCFModelProps) {
   const handleSaveScenario = async () => {
     setIsSaving(true);
     try {
+      const firstOpMargin = mode === 'detailed' ? (yearlyOpMargin[0] ?? opMargin) : opMargin;
+      const secondOpMargin = mode === 'detailed' ? (yearlyOpMargin[1] ?? firstOpMargin) : firstOpMargin;
+      const gmImp = secondOpMargin - firstOpMargin;
+
       const res = await fetch(`${API_BASE_URL}/api/analysis/dcf-save`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -622,12 +626,12 @@ export default function DCFModel({ symbol }: DCFModelProps) {
           symbol,
           scenarioName,
           baseRevenue: baseRev,
-          revenueGrowth: result.revenueCAGR,
-          baseGrossMargin: result.avgOpMargin,
-          grossMarginImprovement: 0,
+          revenueGrowth: mode === 'detailed' ? (yearlyGrowth[0] ?? revGrowth) : revGrowth,
+          baseGrossMargin: firstOpMargin,
+          grossMarginImprovement: gmImp,
           opexMargin: 0,
           taxRate,
-          fcfConversion: mode === 'uniform' ? fcfConversion : yearlyFcfConv[2],
+          fcfConversion: mode === 'uniform' ? fcfConversion : yearlyFcfConv[0],
           wacc,
           terminalGrowth,
           sharesOutstanding,
