@@ -63,3 +63,4 @@ frontend/e2e/**
 frontend/playwright.config.ts
 frontend/test-results/.last-run.json
 tmp.md
+.gemini
