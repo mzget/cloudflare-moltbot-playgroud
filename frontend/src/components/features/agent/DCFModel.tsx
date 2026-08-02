@@ -370,8 +370,8 @@ interface DCFModelProps {
 export default function DCFModel({ symbol }: DCFModelProps) {
   const [mode, setMode] = React.useState<'uniform' | 'detailed'>('detailed');
   
-  // Base year & financial parameters (defaults to 2025 so 5-year forecast is FY2026-FY2030)
-  const [baseYear, setBaseYear] = React.useState(2025);
+  // Base year & financial parameters (FY2026 Base Year, FY2027-FY2031 Forecast)
+  const [baseYear, setBaseYear] = React.useState(2026);
   const [baseRev, setBaseRev] = React.useState(0);
   const [baseEbit, setBaseEbit] = React.useState(0);
   const [taxRate, setTaxRate] = React.useState(0);
@@ -462,7 +462,13 @@ export default function DCFModel({ symbol }: DCFModelProps) {
             latest.revenue_growth || 0,
             latest.revenue_growth || 0,
           ]);
-          setYearlyOpMargin([baseOp, baseOp + imp, baseOp + imp * 2, baseOp + imp * 3, baseOp + imp * 4]);
+          setYearlyOpMargin([
+            baseOp + imp,
+            baseOp + imp * 2,
+            baseOp + imp * 3,
+            baseOp + imp * 4,
+            baseOp + imp * 5,
+          ]);
           setYearlyFcfConv([
             latest.fcf_conversion || 75,
             latest.fcf_conversion || 75,
@@ -615,9 +621,10 @@ export default function DCFModel({ symbol }: DCFModelProps) {
   const handleSaveScenario = async () => {
     setIsSaving(true);
     try {
-      const firstOpMargin = mode === 'detailed' ? (yearlyOpMargin[0] ?? opMargin) : opMargin;
-      const secondOpMargin = mode === 'detailed' ? (yearlyOpMargin[1] ?? firstOpMargin) : firstOpMargin;
-      const gmImp = secondOpMargin - firstOpMargin;
+      const baseOp = baseRev > 0 ? (baseEbit / baseRev) * 100 : opMargin;
+      const gmImp = mode === 'detailed' && yearlyOpMargin.length >= 2 
+        ? Math.max(0, yearlyOpMargin[1] - yearlyOpMargin[0]) 
+        : 0;
 
       const res = await fetch(`${API_BASE_URL}/api/analysis/dcf-save`, {
         method: 'POST',
@@ -627,7 +634,7 @@ export default function DCFModel({ symbol }: DCFModelProps) {
           scenarioName,
           baseRevenue: baseRev,
           revenueGrowth: mode === 'detailed' ? (yearlyGrowth[0] ?? revGrowth) : revGrowth,
-          baseGrossMargin: firstOpMargin,
+          baseGrossMargin: baseOp,
           grossMarginImprovement: gmImp,
           opexMargin: 0,
           taxRate,
