@@ -1,7 +1,8 @@
 import * as React from 'react';
 import {
   Box, Sheet, Typography, Stack, Slider, Input, Divider, Table,
-  FormLabel, FormControl, Tooltip, Button, Chip, Tabs, TabList, Tab, Grid
+  FormLabel, FormControl, Tooltip, Button, Chip, Tabs, TabList, Tab, Grid,
+  Select, Option
 } from '@mui/joy';
 import { Calculator, Info } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
@@ -397,8 +398,9 @@ export default function DCFModel({ symbol }: DCFModelProps) {
   const [currentPrice, setCurrentPrice] = React.useState<number | null>(null);
   const [loadingDefaults, setLoadingDefaults] = React.useState(false);
   const [history, setHistory] = React.useState<any[]>([]);
-  const [scenarioName, setScenarioName] = React.useState('ยังไม่มีการประเมินมูลค่า');
-  const [activePreset, setActivePreset] = React.useState<'base' | 'bear' | 'bull' | 'custom' | null>(null);
+  type ScenarioPresetName = 'Base Case' | 'Bear Case' | 'Bull Case';
+  const [scenarioName, setScenarioName] = React.useState<ScenarioPresetName>('Base Case');
+  const [activePreset, setActivePreset] = React.useState<'base' | 'bear' | 'bull' | 'custom' | null>('base');
   const [hasSavedValuation, setHasSavedValuation] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
 
@@ -415,6 +417,84 @@ export default function DCFModel({ symbol }: DCFModelProps) {
     }
     return [];
   }, [symbol]);
+
+  const loadScenarioData = React.useCallback((targetScenario: ScenarioPresetName, historyList: any[]) => {
+    const match = historyList.find((h: any) => h.scenario_name === targetScenario);
+    if (match) {
+      setHasSavedValuation(true);
+      setBaseRev(match.base_revenue || 0);
+      setRevGrowth(match.revenue_growth || 0);
+      setTaxRate(match.tax_rate || 16.0);
+      setFcfConversion(match.fcf_conversion || 75.0);
+      setWacc(match.wacc || 9.5);
+      setTerminalGrowth(match.terminal_growth || 2.5);
+      setSharesOutstanding(match.shares_outstanding || 0);
+      setTargetShares(match.target_shares || match.shares_outstanding || 0);
+      setNetCash(match.net_cash ?? 0);
+      setExitMultiple(match.exit_multiple ?? 20.0);
+
+      const gm = match.base_gross_margin || 0;
+      const opex = match.opex_margin || 0;
+      const imp = match.gross_margin_improvement || 0;
+      const baseOp = gm > 0 ? (gm - opex) : 43.0;
+
+      setBaseEbit(match.base_revenue ? match.base_revenue * (baseOp / 100) : 0);
+      setOpMargin(baseOp);
+      setYearlyGrowth([
+        match.revenue_growth || 0,
+        match.revenue_growth || 0,
+        match.revenue_growth || 0,
+        match.revenue_growth || 0,
+        match.revenue_growth || 0,
+      ]);
+      setYearlyOpMargin([
+        baseOp + imp,
+        baseOp + imp * 2,
+        baseOp + imp * 3,
+        baseOp + imp * 4,
+        baseOp + imp * 5,
+      ]);
+      setYearlyFcfConv([
+        match.fcf_conversion || 75,
+        match.fcf_conversion || 75,
+        match.fcf_conversion || 75,
+        match.fcf_conversion || 75,
+        match.fcf_conversion || 75,
+      ]);
+    } else {
+      setHasSavedValuation(false);
+      setBaseRev(0);
+      setBaseEbit(0);
+      setTaxRate(0);
+      setWacc(0);
+      setTerminalGrowth(0);
+      setNetCash(0);
+      setSharesOutstanding(0);
+      setRevGrowth(0);
+      setOpMargin(0);
+      setFcfConversion(0);
+      setYearlyGrowth([0, 0, 0, 0, 0]);
+      setYearlyOpMargin([0, 0, 0, 0, 0]);
+      setYearlyFcfConv([0, 0, 0, 0, 0]);
+      setExitMultiple(0);
+      setTargetShares(0);
+    }
+  }, []);
+
+  const handleSelectScenario = React.useCallback((targetScenario: ScenarioPresetName, historyList?: any[]) => {
+    setScenarioName(targetScenario);
+    const presetMap: Record<ScenarioPresetName, 'base' | 'bear' | 'bull'> = {
+      'Base Case': 'base',
+      'Bear Case': 'bear',
+      'Bull Case': 'bull',
+    };
+    setActivePreset(presetMap[targetScenario]);
+    loadScenarioData(targetScenario, historyList || history);
+  }, [history, loadScenarioData]);
+
+  const getScenarioRecord = React.useCallback((scName: string) => {
+    return history.find((h: any) => h.scenario_name === scName);
+  }, [history]);
 
   // Load saved historical models or reset to unvalued 0 state
   React.useEffect(() => {
@@ -433,72 +513,10 @@ export default function DCFModel({ symbol }: DCFModelProps) {
           }
         }
 
-        // If saved DCF calculation exists in database, auto-populate from the latest run
-        if (historyData && historyData.length > 0) {
-          const latest = historyData[0];
-          setHasSavedValuation(true);
-          setScenarioName(latest.scenario_name || 'Saved Valuation');
-          setBaseRev(latest.base_revenue || 0);
-          setRevGrowth(latest.revenue_growth || 0);
-          setTaxRate(latest.tax_rate || 16.0);
-          setFcfConversion(latest.fcf_conversion || 75.0);
-          setWacc(latest.wacc || 9.5);
-          setTerminalGrowth(latest.terminal_growth || 2.5);
-          setSharesOutstanding(latest.shares_outstanding || 0);
-          setTargetShares(latest.target_shares || latest.shares_outstanding || 0);
-          setNetCash(latest.net_cash ?? 0);
-          setExitMultiple(latest.exit_multiple ?? 20.0);
-
-          const gm = latest.base_gross_margin || 0;
-          const opex = latest.opex_margin || 0;
-          const imp = latest.gross_margin_improvement || 0;
-          const baseOp = gm > 0 ? (gm - opex) : 43.0;
-
-          setBaseEbit(latest.base_revenue ? latest.base_revenue * (baseOp / 100) : 0);
-          setOpMargin(baseOp);
-          setYearlyGrowth([
-            latest.revenue_growth || 0,
-            latest.revenue_growth || 0,
-            latest.revenue_growth || 0,
-            latest.revenue_growth || 0,
-            latest.revenue_growth || 0,
-          ]);
-          setYearlyOpMargin([
-            baseOp + imp,
-            baseOp + imp * 2,
-            baseOp + imp * 3,
-            baseOp + imp * 4,
-            baseOp + imp * 5,
-          ]);
-          setYearlyFcfConv([
-            latest.fcf_conversion || 75,
-            latest.fcf_conversion || 75,
-            latest.fcf_conversion || 75,
-            latest.fcf_conversion || 75,
-            latest.fcf_conversion || 75,
-          ]);
-          setActivePreset('base');
-        } else {
-          // No saved valuation: leave as unvalued (0 / empty)
-          setHasSavedValuation(false);
-          setScenarioName('ยังไม่มีการประเมินมูลค่า');
-          setBaseRev(0);
-          setBaseEbit(0);
-          setTaxRate(0);
-          setWacc(0);
-          setTerminalGrowth(0);
-          setNetCash(0);
-          setSharesOutstanding(0);
-          setRevGrowth(0);
-          setOpMargin(0);
-          setFcfConversion(0);
-          setYearlyGrowth([0, 0, 0, 0, 0]);
-          setYearlyOpMargin([0, 0, 0, 0, 0]);
-          setYearlyFcfConv([0, 0, 0, 0, 0]);
-          setExitMultiple(0);
-          setTargetShares(0);
-          setActivePreset(null);
-        }
+        // Initialize with Base Case
+        setScenarioName('Base Case');
+        setActivePreset('base');
+        loadScenarioData('Base Case', historyData || []);
       } catch (e) {
         console.error('Failed to initialize DCF data:', e);
       } finally {
@@ -508,7 +526,7 @@ export default function DCFModel({ symbol }: DCFModelProps) {
 
     initData();
     return () => { cancelled = true; };
-  }, [symbol, fetchHistory]);
+  }, [symbol, fetchHistory, loadScenarioData]);
 
   // Load actual market stats if user wants baseline data for an unvalued stock
   const handleLoadMarketDefaults = async () => {
@@ -540,28 +558,11 @@ export default function DCFModel({ symbol }: DCFModelProps) {
         setWacc(9.0);
         setTerminalGrowth(2.5);
         setExitMultiple(20.0);
-        setScenarioName('Market Stats Baseline');
       }
     } catch (e) {
       console.error('Failed to load market defaults:', e);
     } finally {
       setLoadingDefaults(false);
-    }
-  };
-
-  // Scenario Presets
-  const applyPreset = (preset: 'base' | 'bear' | 'bull') => {
-    setActivePreset(preset);
-    setMode('detailed');
-    if (preset === 'base') {
-      setScenarioName('Base Case Scenario');
-      if (baseRev === 0) handleLoadMarketDefaults();
-    } else if (preset === 'bear') {
-      setScenarioName('Bear Case Scenario');
-      setYearlyGrowth(yearlyGrowth.map(g => Math.max(0, g * 0.7)));
-    } else if (preset === 'bull') {
-      setScenarioName('Bull Case Scenario');
-      setYearlyGrowth(yearlyGrowth.map(g => g * 1.3));
     }
   };
 
@@ -651,7 +652,8 @@ export default function DCFModel({ symbol }: DCFModelProps) {
       });
 
       if (res.ok) {
-        await fetchHistory();
+        const historyData = await fetchHistory();
+        loadScenarioData(scenarioName, historyData || []);
       }
     } catch (e) {
       console.error('Error saving scenario:', e);
@@ -706,33 +708,23 @@ export default function DCFModel({ symbol }: DCFModelProps) {
             <Typography level="body-xs" sx={{ opacity: 0.5, display: { xs: 'none', md: 'block' } }}>
               Preset Scenarios:
             </Typography>
-            <Button
-              size="sm"
-              variant={activePreset === 'bear' ? 'solid' : 'outlined'}
-              color="danger"
-              onClick={() => applyPreset('bear')}
-              sx={{ borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700 }}
-            >
-              Bear Case
-            </Button>
-            <Button
-              size="sm"
-              variant={activePreset === 'base' ? 'solid' : 'outlined'}
-              color="primary"
-              onClick={() => applyPreset('base')}
-              sx={{ borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700 }}
-            >
-              Base Case
-            </Button>
-            <Button
-              size="sm"
-              variant={activePreset === 'bull' ? 'solid' : 'outlined'}
-              color="success"
-              onClick={() => applyPreset('bull')}
-              sx={{ borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700 }}
-            >
-              Bull Case
-            </Button>
+            {(['Bear Case', 'Base Case', 'Bull Case'] as const).map((sc) => {
+              const rec = getScenarioRecord(sc);
+              const isSelected = scenarioName === sc;
+              const colorMap = { 'Bear Case': 'danger', 'Base Case': 'primary', 'Bull Case': 'success' } as const;
+              return (
+                <Button
+                  key={sc}
+                  size="sm"
+                  variant={isSelected ? 'solid' : 'outlined'}
+                  color={colorMap[sc]}
+                  onClick={() => handleSelectScenario(sc)}
+                  sx={{ borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700 }}
+                >
+                  {sc} {rec ? `($${rec.implied_share_price.toFixed(2)})` : '• ⚪'}
+                </Button>
+              );
+            })}
           </Stack>
         </Stack>
       </Box>
@@ -897,13 +889,24 @@ export default function DCFModel({ symbol }: DCFModelProps) {
 
           <Stack spacing={1.5}>
             <FormControl>
-              <Input
+              <FormLabel sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Select Scenario</FormLabel>
+              <Select
                 size="sm"
                 value={scenarioName}
-                onChange={(e) => setScenarioName(e.target.value)}
-                placeholder="Scenario name..."
+                onChange={(_, newValue) => {
+                  if (newValue) handleSelectScenario(newValue as ScenarioPresetName);
+                }}
                 sx={{ background: 'rgba(255,255,255,0.03)' }}
-              />
+              >
+                {(['Base Case', 'Bear Case', 'Bull Case'] as const).map((sc) => {
+                  const rec = getScenarioRecord(sc);
+                  return (
+                    <Option key={sc} value={sc}>
+                      {sc} {rec ? `🟢 ($${rec.implied_share_price.toFixed(2)})` : '⚪ (ยังไม่ได้ประเมิน)'}
+                    </Option>
+                  );
+                })}
+              </Select>
             </FormControl>
             <Button
               size="sm"
@@ -913,7 +916,7 @@ export default function DCFModel({ symbol }: DCFModelProps) {
               loading={isSaving}
               sx={{ fontWeight: 700 }}
             >
-              Save Scenario
+              Save Scenario ({scenarioName})
             </Button>
           </Stack>
         </Box>

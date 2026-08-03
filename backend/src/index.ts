@@ -2514,6 +2514,12 @@ app.post('/api/analysis/dcf-save', async (c) => {
 
     if (!symbol) return c.json({ error: 'symbol is required' }, 400);
     const symbolUpper = symbol.toUpperCase();
+    const finalScenarioName = scenarioName || 'Base Case';
+
+    // Delete existing calculation for this symbol and scenario_name to achieve overwrite persistence
+    await c.env.DB.prepare(
+      'DELETE FROM dcf_calculations WHERE symbol = ? AND scenario_name = ?'
+    ).bind(symbolUpper, finalScenarioName).run();
 
     await c.env.DB.prepare(
       `INSERT INTO dcf_calculations (
@@ -2523,7 +2529,7 @@ app.post('/api/analysis/dcf-save', async (c) => {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       symbolUpper,
-      scenarioName || 'Base Case',
+      finalScenarioName,
       baseRevenue,
       revenueGrowth,
       baseGrossMargin,
