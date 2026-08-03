@@ -435,6 +435,10 @@ export default function DCFModel({ symbol }: DCFModelProps) {
       setNetCash(match.net_cash ?? 0);
       setExitMultiple(match.exit_multiple ?? 20.0);
 
+      if (match.mode === 'uniform' || match.mode === 'detailed') {
+        setMode(match.mode);
+      }
+
       const gm = match.base_gross_margin || 0;
       const opex = match.opex_margin || 0;
       const imp = match.gross_margin_improvement || 0;
@@ -442,27 +446,63 @@ export default function DCFModel({ symbol }: DCFModelProps) {
 
       setBaseEbit(match.base_revenue ? match.base_revenue * (baseOp / 100) : 0);
       setOpMargin(baseOp);
-      setYearlyGrowth([
+
+      let parsedYearlyGrowth = [
         match.revenue_growth || 0,
         match.revenue_growth || 0,
         match.revenue_growth || 0,
         match.revenue_growth || 0,
         match.revenue_growth || 0,
-      ]);
-      setYearlyOpMargin([
+      ];
+      if (match.yearly_growth) {
+        try {
+          const arr = typeof match.yearly_growth === 'string' ? JSON.parse(match.yearly_growth) : match.yearly_growth;
+          if (Array.isArray(arr) && arr.length === 5) {
+            parsedYearlyGrowth = arr.map((v: any) => Number(v) || 0);
+          }
+        } catch (e) {
+          console.error('Failed to parse yearly_growth:', e);
+        }
+      }
+      setYearlyGrowth(parsedYearlyGrowth);
+
+      let parsedYearlyOpMargin = [
         baseOp + imp,
         baseOp + imp * 2,
         baseOp + imp * 3,
         baseOp + imp * 4,
         baseOp + imp * 5,
-      ]);
-      setYearlyFcfConv([
+      ];
+      if (match.yearly_op_margin) {
+        try {
+          const arr = typeof match.yearly_op_margin === 'string' ? JSON.parse(match.yearly_op_margin) : match.yearly_op_margin;
+          if (Array.isArray(arr) && arr.length === 5) {
+            parsedYearlyOpMargin = arr.map((v: any) => Number(v) || 0);
+          }
+        } catch (e) {
+          console.error('Failed to parse yearly_op_margin:', e);
+        }
+      }
+      setYearlyOpMargin(parsedYearlyOpMargin);
+
+      let parsedYearlyFcfConv = [
         match.fcf_conversion || 75,
         match.fcf_conversion || 75,
         match.fcf_conversion || 75,
         match.fcf_conversion || 75,
         match.fcf_conversion || 75,
-      ]);
+      ];
+      if (match.yearly_fcf_conv) {
+        try {
+          const arr = typeof match.yearly_fcf_conv === 'string' ? JSON.parse(match.yearly_fcf_conv) : match.yearly_fcf_conv;
+          if (Array.isArray(arr) && arr.length === 5) {
+            parsedYearlyFcfConv = arr.map((v: any) => Number(v) || 0);
+          }
+        } catch (e) {
+          console.error('Failed to parse yearly_fcf_conv:', e);
+        }
+      }
+      setYearlyFcfConv(parsedYearlyFcfConv);
     } else {
       setHasSavedValuation(false);
       setBaseRev(0);
@@ -650,6 +690,10 @@ export default function DCFModel({ symbol }: DCFModelProps) {
           exitMultiple,
           targetShares,
           impliedSharePrice: result.impliedSharePrice,
+          mode,
+          yearlyGrowth,
+          yearlyOpMargin,
+          yearlyFcfConv,
         }),
       });
 
