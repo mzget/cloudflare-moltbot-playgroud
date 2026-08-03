@@ -1,10 +1,31 @@
 import React from 'react';
-import { Box, Typography } from '@mui/joy';
+import { Box, Typography, Table, Sheet } from '@mui/joy';
 
 interface MarkdownRendererProps {
   text: string;
   themeColor?: 'primary' | 'neutral';
 }
+
+const splitTableLine = (line: string): string[] => {
+  const parts = line.split('|').map(c => c.trim());
+  if (parts.length > 0 && parts[0] === '') parts.shift();
+  if (parts.length > 0 && parts[parts.length - 1] === '') parts.pop();
+  return parts;
+};
+
+const isTableSeparator = (cells: string[]): boolean => {
+  return cells.length > 0 && cells.every(c => /^:?-+:?$/.test(c));
+};
+
+const parseAlignments = (cells: string[]): ('left' | 'center' | 'right')[] => {
+  return cells.map(c => {
+    const left = c.startsWith(':');
+    const right = c.endsWith(':');
+    if (left && right) return 'center';
+    if (right) return 'right';
+    return 'left';
+  });
+};
 
 export const parseInline = (text: string, themeColor: 'primary' | 'neutral' = 'neutral'): React.ReactNode[] => {
   // Matches:
@@ -117,15 +138,40 @@ export function renderMarkdown(md: string, themeColor: 'primary' | 'neutral' = '
   const flushTable = (key: string | number) => {
     if (tableRows.length > 0 || tableHeaders.length > 0) {
       elements.push(
-        <Box key={`table-wrapper-${key}`} sx={{ overflowX: 'auto', my: 2, borderRadius: '8px', border: '1px solid', borderColor: 'divider' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+        <Sheet
+          key={`table-wrapper-${key}`}
+          variant="outlined"
+          sx={{
+            overflowX: 'auto',
+            my: 2,
+            borderRadius: '8px',
+            bgcolor: 'rgba(255, 255, 255, 0.02)',
+            borderColor: 'rgba(255, 255, 255, 0.08)'
+          }}
+        >
+          <Table
+            borderAxis="bothBetween"
+            hoverRow
+            sx={{
+              '& th': {
+                bgcolor: 'rgba(255, 255, 255, 0.05)',
+                fontWeight: 700,
+                color: themeColor === 'primary' ? '#fff' : 'text.primary',
+                p: '10px 14px'
+              },
+              '& td': {
+                color: themeColor === 'primary' ? 'rgba(255,255,255,0.9)' : 'text.secondary',
+                p: '10px 14px'
+              }
+            }}
+          >
             {tableHeaders.length > 0 && (
               <thead>
-                <tr style={{ backgroundColor: 'var(--joy-palette-background-level1, rgba(255,255,255,0.05))', borderBottom: '1px solid var(--joy-palette-divider)' }}>
+                <tr>
                   {tableHeaders.map((th, idx) => {
                     const align = tableAlignments[idx] || 'left';
                     return (
-                      <th key={`th-${idx}`} style={{ padding: '10px 14px', fontSize: '14px', fontWeight: 600, textAlign: align, color: themeColor === 'primary' ? '#fff' : 'var(--joy-palette-text-primary)' }}>
+                      <th key={`th-${idx}`} style={{ textAlign: align }}>
                         {parseInline(th, themeColor)}
                       </th>
                     );
@@ -135,11 +181,11 @@ export function renderMarkdown(md: string, themeColor: 'primary' | 'neutral' = '
             )}
             <tbody>
               {tableRows.map((row, rowIdx) => (
-                <tr key={`tr-${rowIdx}`} style={{ borderBottom: '1px solid var(--joy-palette-divider)' }}>
+                <tr key={`tr-${rowIdx}`}>
                   {row.map((cell, cellIdx) => {
                     const align = tableAlignments[cellIdx] || 'left';
                     return (
-                      <td key={`td-${cellIdx}`} style={{ padding: '10px 14px', fontSize: '14px', color: themeColor === 'primary' ? 'rgba(255,255,255,0.9)' : 'var(--joy-palette-text-secondary)', textAlign: align }}>
+                      <td key={`td-${cellIdx}`} style={{ textAlign: align }}>
                         {parseInline(cell, themeColor)}
                       </td>
                     );
@@ -147,8 +193,8 @@ export function renderMarkdown(md: string, themeColor: 'primary' | 'neutral' = '
                 </tr>
               ))}
             </tbody>
-          </table>
-        </Box>
+          </Table>
+        </Sheet>
       );
       tableRows = [];
       tableHeaders = [];
@@ -203,6 +249,20 @@ export function renderMarkdown(md: string, themeColor: 'primary' | 'neutral' = '
       continue;
     }
 
+    if (inTable) {
+      if (line.includes('|') && line !== '') {
+        const cells = splitTableLine(line);
+        if (isTableSeparator(cells)) {
+          tableAlignments = parseAlignments(cells);
+        } else {
+          tableRows.push(cells);
+        }
+        continue;
+      } else {
+        flushTable(i);
+      }
+    }
+
     // Horizontal rule
     if (line === '---' || line === '***' || line === '___') {
       flushList(i);
@@ -213,33 +273,18 @@ export function renderMarkdown(md: string, themeColor: 'primary' | 'neutral' = '
       continue;
     }
 
-    // Tables
-    if (line.startsWith('|')) {
-      flushList(i);
-      
-      const cells = line.split('|').map(c => c.trim()).filter((_, idx, arr) => idx > 0 && idx < arr.length - 1);
-      const isSeparator = cells.every(c => c.replace(/[:-\s]/g, '') === '');
-      
-      if (isSeparator) {
-        tableAlignments = cells.map(c => {
-          const left = c.startsWith(':');
-          const right = c.endsWith(':');
-          if (left && right) return 'center';
-          if (right) return 'right';
-          return 'left';
-        });
+    // Tables (detection when NOT inTable)
+    if (line.includes('|') && i + 1 < lines.length && lines[i + 1].includes('|')) {
+      const nextCells = splitTableLine(lines[i + 1]);
+      if (isTableSeparator(nextCells)) {
+        flushList(i);
+        flushTable(i);
+        inTable = true;
+        tableHeaders = splitTableLine(line);
+        tableAlignments = parseAlignments(nextCells);
+        i++; // Consume separator line
         continue;
       }
-      
-      if (!inTable) {
-        inTable = true;
-        tableHeaders = cells;
-      } else {
-        tableRows.push(cells);
-      }
-      continue;
-    } else {
-      flushTable(i);
     }
 
     // Lists

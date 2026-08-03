@@ -58,7 +58,7 @@ export default function StockThesis({ symbol }: StockThesisProps) {
   const [catalysts, setCatalysts] = React.useState('');
   const [risks, setRisks] = React.useState('');
   const [note, setNote] = React.useState('');
-  const [previewMode, setPreviewMode] = React.useState(false);
+  const [previewMode, setPreviewMode] = React.useState(true);
 
   // New Journal Entry state
   const [newJournalContent, setNewJournalContent] = React.useState('');
@@ -111,7 +111,7 @@ export default function StockThesis({ symbol }: StockThesisProps) {
     setCatalysts(thesis.catalysts || '');
     setRisks(thesis.risks || '');
     setNote(thesis.note || '');
-    setPreviewMode(false);
+    setPreviewMode(true);
     setNewJournalContent('');
     fetchJournal(thesis.id);
   };
@@ -178,6 +178,7 @@ export default function StockThesis({ symbol }: StockThesisProps) {
         note,
         updated_at: new Date().toISOString()
       } : t));
+      setPreviewMode(true);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -522,7 +523,7 @@ export default function StockThesis({ symbol }: StockThesisProps) {
                   startDecorator={previewMode ? <Edit2 size={14} /> : <Eye size={14} />}
                   onClick={() => setPreviewMode(!previewMode)}
                 >
-                  {previewMode ? 'Write Markdown' : 'Preview Output'}
+                  {previewMode ? 'Edit Markdown' : 'Preview Output'}
                 </Button>
               </Stack>
 

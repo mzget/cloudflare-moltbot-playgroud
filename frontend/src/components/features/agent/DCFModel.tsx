@@ -7,6 +7,7 @@ import {
 import { Calculator, Info } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
+import DebouncedInput from '../../common/DebouncedInput';
 
 // ─── DCF Calculator Core ──────────────────────────────────────────────────
 
@@ -830,10 +831,10 @@ export default function DCFModel({ symbol }: DCFModelProps) {
             <Grid xs={6}>
               <FormControl size="sm">
                 <FormLabel sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Base Rev ($B)</FormLabel>
-                <Input
+                <DebouncedInput
                   type="number"
                   value={baseRev}
-                  onChange={(e) => setBaseRev(parseFloat(e.target.value) || 0)}
+                  onChange={(val) => setBaseRev(parseFloat(val) || 0)}
                   slotProps={{ input: { step: 0.1, min: 0 } }}
                   sx={{ fontFamily: 'monospace', fontWeight: 600 }}
                 />
@@ -842,10 +843,10 @@ export default function DCFModel({ symbol }: DCFModelProps) {
             <Grid xs={6}>
               <FormControl size="sm">
                 <FormLabel sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Base EBIT ($B)</FormLabel>
-                <Input
+                <DebouncedInput
                   type="number"
                   value={baseEbit}
-                  onChange={(e) => setBaseEbit(parseFloat(e.target.value) || 0)}
+                  onChange={(val) => setBaseEbit(parseFloat(val) || 0)}
                   slotProps={{ input: { step: 0.1, min: 0 } }}
                   sx={{ fontFamily: 'monospace', fontWeight: 600 }}
                 />
@@ -877,10 +878,10 @@ export default function DCFModel({ symbol }: DCFModelProps) {
             <Grid xs={6}>
               <FormControl size="sm">
                 <FormLabel sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Net Cash/Debt ($B)</FormLabel>
-                <Input
+                <DebouncedInput
                   type="number"
                   value={netCash}
-                  onChange={(e) => setNetCash(parseFloat(e.target.value) || 0)}
+                  onChange={(val) => setNetCash(parseFloat(val) || 0)}
                   slotProps={{ input: { step: 0.1 } }}
                   sx={{ fontFamily: 'monospace', fontWeight: 600 }}
                 />
@@ -889,10 +890,10 @@ export default function DCFModel({ symbol }: DCFModelProps) {
             <Grid xs={6}>
               <FormControl size="sm">
                 <FormLabel sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Shares (M)</FormLabel>
-                <Input
+                <DebouncedInput
                   type="number"
                   value={sharesOutstanding}
-                  onChange={(e) => setSharesOutstanding(parseFloat(e.target.value) || 1)}
+                  onChange={(val) => setSharesOutstanding(parseFloat(val) || 1)}
                   slotProps={{ input: { step: 10, min: 1 } }}
                   sx={{ fontFamily: 'monospace', fontWeight: 600 }}
                 />
@@ -914,10 +915,10 @@ export default function DCFModel({ symbol }: DCFModelProps) {
 
           <FormControl size="sm" sx={{ mb: 2 }}>
             <FormLabel sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Target Shares in FY31 (M)</FormLabel>
-            <Input
+            <DebouncedInput
               type="number"
               value={targetShares}
-              onChange={(e) => setTargetShares(parseFloat(e.target.value) || 1)}
+              onChange={(val) => setTargetShares(parseFloat(val) || 1)}
               slotProps={{ input: { step: 10, min: 1 } }}
               sx={{ fontFamily: 'monospace', fontWeight: 600 }}
             />
@@ -1205,11 +1206,11 @@ export default function DCFModel({ symbol }: DCFModelProps) {
                   {result.yearlyData.map((d, i) => (
                     <td key={d.year} style={{ textAlign: 'right' }}>
                       {mode === 'detailed' ? (
-                        <Input
+                        <DebouncedInput
                           size="sm"
                           type="number"
                           value={d.growth}
-                          onChange={(e) => handleYearlyChange(i, 'growth', parseFloat(e.target.value) || 0)}
+                          onChange={(val) => handleYearlyChange(i, 'growth', parseFloat(val) || 0)}
                           slotProps={{ input: { step: 0.5, style: { textAlign: 'right', padding: '2px 6px', fontSize: '0.8rem' } } }}
                           sx={{ width: '85px', ml: 'auto', background: 'rgba(255,255,255,0.06)', '--Input-minHeight': '30px' }}
                         />
@@ -1238,11 +1239,11 @@ export default function DCFModel({ symbol }: DCFModelProps) {
                   {result.yearlyData.map((d, i) => (
                     <td key={d.year} style={{ textAlign: 'right' }}>
                       {mode === 'detailed' ? (
-                        <Input
+                        <DebouncedInput
                           size="sm"
                           type="number"
                           value={d.opMargin}
-                          onChange={(e) => handleYearlyChange(i, 'opMargin', parseFloat(e.target.value) || 0)}
+                          onChange={(val) => handleYearlyChange(i, 'opMargin', parseFloat(val) || 0)}
                           slotProps={{ input: { step: 0.1, style: { textAlign: 'right', padding: '2px 6px', fontSize: '0.8rem' } } }}
                           sx={{ width: '85px', ml: 'auto', background: 'rgba(255,255,255,0.06)', '--Input-minHeight': '30px' }}
                         />
@@ -1271,11 +1272,11 @@ export default function DCFModel({ symbol }: DCFModelProps) {
                   {result.yearlyData.map((d, i) => (
                     <td key={d.year} style={{ textAlign: 'right' }}>
                       {mode === 'detailed' ? (
-                        <Input
+                        <DebouncedInput
                           size="sm"
                           type="number"
                           value={d.fcfConv}
-                          onChange={(e) => handleYearlyChange(i, 'fcfConv', parseFloat(e.target.value) || 0)}
+                          onChange={(val) => handleYearlyChange(i, 'fcfConv', parseFloat(val) || 0)}
                           slotProps={{ input: { step: 1, style: { textAlign: 'right', padding: '2px 6px', fontSize: '0.8rem' } } }}
                           sx={{ width: '85px', ml: 'auto', background: 'rgba(255,255,255,0.06)', '--Input-minHeight': '30px' }}
                         />
