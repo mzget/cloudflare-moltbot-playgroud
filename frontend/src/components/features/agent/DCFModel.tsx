@@ -419,7 +419,9 @@ export default function DCFModel({ symbol }: DCFModelProps) {
   }, [symbol]);
 
   const loadScenarioData = React.useCallback((targetScenario: ScenarioPresetName, historyList: any[]) => {
-    const match = historyList.find((h: any) => h.scenario_name === targetScenario);
+    const match = historyList.find((h: any) => h.scenario_name === targetScenario)
+      || historyList.find((h: any) => h.scenario_name?.startsWith(targetScenario))
+      || (targetScenario === 'Base Case' && historyList.length > 0 ? historyList[0] : undefined);
     if (match) {
       setHasSavedValuation(true);
       setBaseRev(match.base_revenue || 0);
