@@ -2510,6 +2510,10 @@ app.post('/api/analysis/dcf-save', async (c) => {
       exitMultiple,
       targetShares,
       impliedSharePrice,
+      mode,
+      yearlyGrowth,
+      yearlyOpMargin,
+      yearlyFcfConv,
     } = body;
 
     if (!symbol) return c.json({ error: 'symbol is required' }, 400);
@@ -2525,8 +2529,9 @@ app.post('/api/analysis/dcf-save', async (c) => {
       `INSERT INTO dcf_calculations (
         symbol, scenario_name, base_revenue, revenue_growth, base_gross_margin,
         gross_margin_improvement, opex_margin, tax_rate, fcf_conversion,
-        wacc, terminal_growth, shares_outstanding, net_cash, exit_multiple, target_shares, implied_share_price
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        wacc, terminal_growth, shares_outstanding, net_cash, exit_multiple, target_shares, implied_share_price,
+        mode, yearly_growth, yearly_op_margin, yearly_fcf_conv
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       symbolUpper,
       finalScenarioName,
@@ -2543,7 +2548,11 @@ app.post('/api/analysis/dcf-save', async (c) => {
       netCash ?? 0,
       exitMultiple ?? 20.0,
       targetShares ?? sharesOutstanding ?? 0,
-      impliedSharePrice
+      impliedSharePrice,
+      mode ?? 'detailed',
+      typeof yearlyGrowth === 'object' ? JSON.stringify(yearlyGrowth) : (yearlyGrowth ?? null),
+      typeof yearlyOpMargin === 'object' ? JSON.stringify(yearlyOpMargin) : (yearlyOpMargin ?? null),
+      typeof yearlyFcfConv === 'object' ? JSON.stringify(yearlyFcfConv) : (yearlyFcfConv ?? null)
     ).run();
 
     return c.json({ success: true });
