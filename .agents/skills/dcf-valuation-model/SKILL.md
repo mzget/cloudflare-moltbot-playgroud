@@ -1,6 +1,6 @@
 ---
 name: dcf-valuation-model
-description: Guidelines and procedures for performing Discounted Cash Flow (DCF) stock valuations, handling both Basic (Uniform) and Detailed (Per-Year) input modes, D1 database persistence, and frontend DCFModel integration. Load when working on stock valuation, DCF calculations, or DCF UI data entry.
+description: Guidelines and procedures for performing Discounted Cash Flow (DCF) stock valuations, handling both Basic (Uniform) and Detailed (Per-Year) input modes, 3 preset scenario management (Base Case, Bear Case, Bull Case) with overwrite D1 persistence, and frontend DCFModel integration. Load when working on stock valuation, DCF calculations, or DCF UI data entry.
 ---
 
 # 📈 DCF Valuation Model Skill
@@ -51,19 +51,24 @@ Use when year-by-year granular projections (FY+1, FY+2, FY+3, FY+4, FY+5) are pr
 
 ---
 
-## 💾 Database Persistence Protocol
+## 🎭 3 Preset Scenarios & Overwrite Protocol
 
-When saving a DCF calculation run to Cloudflare D1:
+The system manages exactly 3 fixed preset scenarios per stock symbol:
+1. `Base Case` (Default)
+2. `Bear Case`
+3. `Bull Case`
+
+### 💾 Database Persistence Protocol
 - **API Endpoint**: `POST /api/analysis/dcf-save`
-- **CLI Command**:
-  ```bash
-  npx wrangler d1 execute moltbot-db --remote --command="INSERT INTO dcf_calculations (symbol, scenario_name, base_revenue, revenue_growth, base_gross_margin, gross_margin_improvement, opex_margin, tax_rate, fcf_conversion, wacc, terminal_growth, shares_outstanding, implied_share_price) VALUES ('SYMBOL', 'Scenario Name', ...);"
-  ```
+- **Overwrite Behavior**: Each stock (`symbol`) maintains at most 1 saved record per scenario name in `dcf_calculations`. Saving a scenario executes a `DELETE` for `(symbol, scenario_name)` prior to `INSERT`ing the updated parameter set.
+- **Max Rows Per Symbol**: Exactly 3 rows max (`Base Case`, `Bear Case`, `Bull Case`).
 
 ---
 
 ## 🖥️ Frontend UX Rules
 
-- **Unvalued Stocks**: Stocks without saved calculations in D1 **MUST** start with zero/blank inputs and display an "Unvalued" banner rather than showing fake hardcoded defaults.
-- **Saved History**: When saved calculations exist for a symbol, automatically load the latest saved calculation from D1 on initial view.
+- **Bidirectional Sync**: The Top Preset Switcher buttons (`Bear Case`, `Base Case`, `Bull Case`) and the Save Scenario Dropdown (`<Select>`) MUST remain synchronized to control the active scenario.
+- **Unvalued Zero-State UX**: Selecting an unsaved scenario **MUST** display zeroed inputs (`0`) and an "Unvalued (ยังไม่ได้ประเมิน)" indicator so users clearly know it has not been calculated yet. Do NOT auto-populate fake arbitrary default numbers.
+- **Saved Scenario Loading**: When switching to a scenario that has a saved calculation in D1, auto-populate the sliders and recalculate intrinsic price immediately.
+- **Status Badges**: Render visual status indicators (e.g. `🟢 ($245.50)` for saved vs `⚪ (ยังไม่ได้ประเมิน)` for unsaved) on preset buttons and inside dropdown options.
 - **Input Field Dimensions**: Projection table input fields must maintain a minimum width of `85px` to prevent text truncation/ellipsis.
