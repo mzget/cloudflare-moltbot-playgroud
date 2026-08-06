@@ -31,7 +31,7 @@
                 <h2 class="text-lg font-bold text-gray-800 mb-4 border-b pb-2">สมมติฐานทางธุรกิจ (Inputs)</h2>
                 
                 <div class="slider-container">
-                    <div class="slider-label"><span>รายได้เริ่มต้นปี 2026 (พันล้าน $)</span> <input type="number" id="in-rev" value="3.6" step="0.1"></div>
+                    <div class="slider-label"><span>รายได้เริ่มต้นปี 2026 (พันล้าน $)</span> <input type="number" id="in-rev" value="5.0" step="0.1"></div>
                 </div>
                 
                 <div class="slider-container">
@@ -40,18 +40,18 @@
                 </div>
 
                 <div class="slider-container">
-                    <div class="slider-label"><span>อัตรากำไรขั้นต้นปี 2026 (%)</span> <span id="val-gm" class="text-blue-700">34.0%</span></div>
-                    <input type="range" id="in-gm" min="15" max="50" step="0.5" value="34">
+                    <div class="slider-label"><span>อัตรากำไรขั้นต้นปี 2026 (%)</span> <span id="val-gm" class="text-blue-700">55.0%</span></div>
+                    <input type="range" id="in-gm" min="15" max="80" step="0.5" value="55">
                 </div>
 
                 <div class="slider-container">
-                    <div class="slider-label"><span>กำไรขั้นต้นเพิ่มขึ้นต่อปี (%)</span> <span id="val-gm-imp" class="text-blue-700">1.5%</span></div>
-                    <input type="range" id="in-gm-imp" min="0" max="5" step="0.1" value="1.5">
+                    <div class="slider-label"><span>กำไรขั้นต้นเพิ่มขึ้นต่อปี (%)</span> <span id="val-gm-imp" class="text-blue-700">1.0%</span></div>
+                    <input type="range" id="in-gm-imp" min="0" max="5" step="0.1" value="1.0">
                 </div>
 
                 <div class="slider-container">
-                    <div class="slider-label"><span>สัดส่วนค่าใช้จ่าย (OpEx % ต่อรายได้)</span> <span id="val-opex" class="text-blue-700">18.0%</span></div>
-                    <input type="range" id="in-opex" min="10" max="40" step="0.5" value="18">
+                    <div class="slider-label"><span>สัดส่วนค่าใช้จ่าย (OpEx % ต่อรายได้)</span> <span id="val-opex" class="text-blue-700">25.0%</span></div>
+                    <input type="range" id="in-opex" min="10" max="50" step="0.5" value="25">
                 </div>
 
                 <div class="slider-container">
@@ -60,8 +60,8 @@
                 </div>
 
                 <div class="slider-container">
-                    <div class="slider-label"><span>การแปลงกำไรเป็นเงินสด (FCF Conversion %)</span> <span id="val-fcf-conv" class="text-blue-700">80.0%</span></div>
-                    <input type="range" id="in-fcf-conv" min="10" max="100" step="1" value="80">
+                    <div class="slider-label"><span>การแปลงกำไรเป็นเงินสด (FCF Conversion %)</span> <span id="val-fcf-conv" class="text-blue-700">85.0%</span></div>
+                    <input type="range" id="in-fcf-conv" min="10" max="100" step="1" value="85">
                 </div>
 
                 <div class="slider-container">
@@ -75,7 +75,11 @@
                 </div>
 
                 <div class="slider-container">
-                    <div class="slider-label"><span>จำนวนหุ้นจดทะเบียน (ล้านหุ้น)</span> <input type="number" id="in-shares" value="228"></div>
+                    <div class="slider-label"><span>เงินสดสุทธิ (Net Cash - พันล้าน $)</span> <input type="number" id="in-netcash" value="8.60" step="0.1"></div>
+                </div>
+
+                <div class="slider-container">
+                    <div class="slider-label"><span>จำนวนหุ้นจดทะเบียน (ล้านหุ้น)</span> <input type="number" id="in-shares" value="240"></div>
                 </div>
             </div>
 
@@ -185,8 +189,11 @@
                 // คำนวณ Enterprise Value (Billion $)
                 const enterpriseValue = pvOfFcfSum + pvOfTerminalValue;
 
-                // คำนวณราคาหุ้น (EV * 1000 เพื่อแปลง Billion เป็น Million ให้สอดคล้องกับจำนวนหุ้น)
-                const impliedSharePrice = (enterpriseValue * 1000) / this.params.sharesOutstanding;
+                // คำนวณ Equity Value รวม Net Cash ($8.6B)
+                const equityValue = enterpriseValue + (this.params.netCash || 0);
+
+                // คำนวณราคาหุ้น ((EV + Net Cash) * 1000 เพื่อแปลง Billion เป็น Million ให้สอดคล้องกับจำนวนหุ้น)
+                const impliedSharePrice = (equityValue * 1000) / this.params.sharesOutstanding;
 
                 return {
                     yearlyData: results,
@@ -216,6 +223,7 @@
                 fcfConversion: parseFloat(document.getElementById('in-fcf-conv').value) / 100,
                 wacc: parseFloat(document.getElementById('in-wacc').value) / 100,
                 terminalGrowth: parseFloat(document.getElementById('in-tg').value) / 100,
+                netCash: parseFloat(document.getElementById('in-netcash')?.value) || 0,
                 sharesOutstanding: parseFloat(document.getElementById('in-shares').value) || 1
             };
         }
