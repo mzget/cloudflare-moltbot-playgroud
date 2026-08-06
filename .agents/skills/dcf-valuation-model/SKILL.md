@@ -63,6 +63,19 @@ The system manages exactly 3 fixed preset scenarios per stock symbol:
 - **Overwrite Behavior**: Each stock (`symbol`) maintains at most 1 saved record per scenario name in `dcf_calculations`. Saving a scenario executes a `DELETE` for `(symbol, scenario_name)` prior to `INSERT`ing the updated parameter set.
 - **Max Rows Per Symbol**: Exactly 3 rows max (`Base Case`, `Bear Case`, `Bull Case`).
 
+### 🔄 Staged Database Execution Protocol (Local-First Validation)
+When executing CLI/SQL database operations or seeding DCF scenario data:
+1. **Step 1 (Local First)**: Always run the SQL execution command against the local D1 database first:
+   ```bash
+   npx wrangler d1 execute DB --local --command "<SQL_COMMAND>"
+   ```
+2. **Step 2 (Verification)**: Verify that the local command completed with exit code `0` and returned clean execution results without schema/table errors.
+3. **Step 3 (Remote Execution)**: ONLY if Step 1 succeeds completely, run the exact same operation against the remote D1 database:
+   ```bash
+   npx wrangler d1 execute DB --remote --command "<SQL_COMMAND>"
+   ```
+4. **Error Handling**: If Step 1 fails (e.g. missing table, migration error, constraint violation), **STOP IMMEDIATELY**. Diagnose and fix the root cause locally before attempting any remote database command.
+
 ---
 
 ## 🖥️ Frontend UX Rules

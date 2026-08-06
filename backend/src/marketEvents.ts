@@ -238,4 +238,99 @@ export async function fetchAndStoreMarketEvents(env: Env): Promise<void> {
 			console.error(`Error fetching market events for ${symbol}:`, symbolError);
 		}
 	}
+
+	// Generate today's event notifications for active watchlist stocks
+	await generateTodayMarketEventNotifications(env);
 }
+
+export async function generateTodayMarketEventNotifications(env: Env): Promise<{ count: number }> {
+	const todayStr = new Date().toISOString().split('T')[0];
+	
+	try {
+		// 1. Ensure in_app_notifications table exists
+		await env.DB.prepare(`
+			CREATE TABLE IF NOT EXISTS in_app_notifications (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				symbol TEXT NOT NULL,
+				metric TEXT NOT NULL,
+				condition_type TEXT NOT NULL,
+				target_value REAL NOT NULL,
+				trigger_value REAL NOT NULL,
+				message TEXT NOT NULL,
+				is_read INTEGER DEFAULT 0,
+				created_at INTEGER DEFAULT (strftime('%s', 'now'))
+			)
+		`).run();
+
+		// 2. Fetch today's market events for active watchlist symbols
+		const dbResults = await env.DB.prepare(`
+			SELECT e.id, e.symbol, e.event_type, e.event_date, e.title, e.description, e.metadata
+			FROM market_events e
+			JOIN watchlist w ON UPPER(e.symbol) = UPPER(w.symbol)
+			WHERE w.is_active = 1 AND e.event_date = ?
+		`).bind(todayStr).all();
+
+		const events = (dbResults.results || []) as any[];
+		if (events.length === 0) {
+			return { count: 0 };
+		}
+
+		// 3. Fetch existing today_event notifications in last 24 hours to prevent duplicate alerts
+		const existingResult = await env.DB.prepare(`
+			SELECT symbol, condition_type
+			FROM in_app_notifications
+			WHERE metric = 'today_event' AND created_at >= strftime('%s', 'now', '-24 hours')
+		`).all();
+
+		const existingNotifications = (existingResult.results || []) as any[];
+		const existingSet = new Set(existingNotifications.map(n => `${n.symbol.toUpperCase()}_${n.condition_type}`));
+
+		const batchStatements: any[] = [];
+		let createdCount = 0;
+
+		for (const evt of events) {
+			const symbolUpper = evt.symbol.toUpperCase();
+			const eventType = evt.event_type; // 'earnings', 'dividend', 'split'
+			const key = `${symbolUpper}_${eventType}`;
+
+			if (existingSet.has(key)) {
+				continue;
+			}
+
+			let triggerMessage = '';
+			if (eventType === 'earnings') {
+				triggerMessage = `📅 [${symbolUpper}] ประกาศงบวันนี้: ${evt.title}`;
+				if (evt.description) {
+					triggerMessage += ` (${evt.description})`;
+				}
+			} else if (eventType === 'dividend') {
+				triggerMessage = `💰 [${symbolUpper}] วันขึ้น XD ปันผลวันนี้: ${evt.title}`;
+			} else if (eventType === 'split') {
+				triggerMessage = `✂️ [${symbolUpper}] มีผลแตกหุ้นวันนี้: ${evt.title}`;
+			} else {
+				triggerMessage = `📢 [${symbolUpper}] มี Event ตลาดวันนี้: ${evt.title}`;
+			}
+
+			batchStatements.push(
+				env.DB.prepare(`
+					INSERT INTO in_app_notifications (symbol, metric, condition_type, target_value, trigger_value, message)
+					VALUES (?, 'today_event', ?, 0, 0, ?)
+				`).bind(symbolUpper, eventType, triggerMessage)
+			);
+
+			existingSet.add(key);
+			createdCount++;
+		}
+
+		if (batchStatements.length > 0) {
+			await env.DB.batch(batchStatements);
+			console.log(`[MarketEvents] Generated ${createdCount} today event notifications.`);
+		}
+
+		return { count: createdCount };
+	} catch (error) {
+		console.error("Error generating today market event notifications:", error);
+		return { count: 0 };
+	}
+}
+

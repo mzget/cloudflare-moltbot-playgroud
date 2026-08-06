@@ -50,7 +50,34 @@ export default function MyWatchlist() {
   const [toastMessage, setToastMessage] = useState('');
   const [toastColor, setToastColor] = useState<'success' | 'danger'>('success');
 
+  // Today Market Events State for UI Badging
+  const [todayEventsMap, setTodayEventsMap] = useState<Record<string, any[]>>({});
+
+  useEffect(() => {
+    async function fetchTodayEvents() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/market-events/today`);
+        if (res.ok) {
+          const events = await res.json();
+          const map: Record<string, any[]> = {};
+          if (Array.isArray(events)) {
+            for (const evt of events) {
+              const sym = evt.symbol.toUpperCase();
+              if (!map[sym]) map[sym] = [];
+              map[sym].push(evt);
+            }
+          }
+          setTodayEventsMap(map);
+        }
+      } catch (e) {
+        console.error('Failed to fetch today market events:', e);
+      }
+    }
+    fetchTodayEvents();
+  }, []);
+
   // Edit Security Modal State
+
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -330,12 +357,14 @@ export default function MyWatchlist() {
           <Grid key={item.symbol} xs={12} sm={12} md={4}>
             <WatchlistCard
               item={item}
+              todayEvents={todayEventsMap[item.symbol.toUpperCase()] || []}
               onEdit={handleOpenEditModal}
               onAlertsClick={handleOpenAlertsModal}
               onViewAnalysis={handleViewAnalysis}
               onToggleActive={handleToggleActive}
               onTogglePortfolio={handleTogglePortfolio}
             />
+
           </Grid>
         ))}
       </Grid>

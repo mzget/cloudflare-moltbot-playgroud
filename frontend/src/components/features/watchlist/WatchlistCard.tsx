@@ -6,6 +6,7 @@ import { glassStyle } from '../../../styles/glass';
 
 interface WatchlistCardProps {
   item: WatchlistItem;
+  todayEvents?: { id: string; symbol: string; event_type: string; title: string; description?: string }[];
   onEdit: (item: WatchlistItem) => void;
   onAlertsClick: (symbol: string) => void;
   onViewAnalysis: (symbol: string) => void;
@@ -15,6 +16,7 @@ interface WatchlistCardProps {
 
 export const WatchlistCard: React.FC<WatchlistCardProps> = React.memo(({
   item,
+  todayEvents = [],
   onEdit,
   onAlertsClick,
   onViewAnalysis,
@@ -54,7 +56,7 @@ export const WatchlistCard: React.FC<WatchlistCardProps> = React.memo(({
               {item.symbol.substring(0, 2)}
             </Avatar>
             <Box>
-              <Stack direction="row" spacing={1} alignItems="center">
+              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
                 <Typography level="title-lg" sx={{ fontWeight: '700', letterSpacing: '0.5px', lineHeight: 1.2 }}>{item.symbol}</Typography>
                 <Box
                   sx={{
@@ -72,10 +74,32 @@ export const WatchlistCard: React.FC<WatchlistCardProps> = React.memo(({
                 >
                   {item.type || 'stock'}
                 </Box>
+                {todayEvents.length > 0 && (
+                  <Box
+                    sx={{
+                      fontSize: '9px',
+                      fontWeight: '800',
+                      textTransform: 'uppercase',
+                      px: 1,
+                      py: 0.25,
+                      borderRadius: '4px',
+                      backgroundColor: 'rgba(234, 88, 12, 0.15)',
+                      color: '#f97316',
+                      border: '1px solid rgba(234, 88, 12, 0.35)',
+                      lineHeight: 1.2,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 0.5
+                    }}
+                  >
+                    🔥 {todayEvents.map(e => e.event_type.toUpperCase()).join(' & ')} TODAY
+                  </Box>
+                )}
               </Stack>
               <Typography level="body-sm" sx={{ opacity: 0.7, fontWeight: '500' }}>{item.name}</Typography>
             </Box>
           </Stack>
+
           <Stack direction="row" spacing={0.5}>
             <IconButton 
               color="neutral" 
