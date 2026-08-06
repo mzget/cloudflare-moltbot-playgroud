@@ -689,6 +689,21 @@ app.get('/api/market-events', cache({ cacheName: 'oaktree-market-events', cacheC
   }
 });
 
+app.get('/api/market-events/today', async (c) => {
+  const targetDate = c.req.query('date') || new Date().toISOString().split('T')[0];
+  try {
+    const { results } = await c.env.DB.prepare(`
+      SELECT id, symbol, event_type, event_date, title, description, metadata
+      FROM market_events
+      WHERE event_date = ?
+    `).bind(targetDate).all();
+    return c.json(results || []);
+  } catch (e) {
+    return c.json({ error: (e as any).message }, 500);
+  }
+});
+
+
 app.delete('/api/market-events', async (c) => {
   try {
     await c.env.DB.prepare("DELETE FROM market_events WHERE created_at < strftime('%s', 'now', '-30 days')").run();

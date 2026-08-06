@@ -380,7 +380,18 @@ export default function MarketEventsTimeline({ inSidebar = false }: { inSidebar?
                     >
                       {styles.label}
                     </Chip>
+                    {evt.event_date === todayStr && (
+                      <Chip
+                        variant="solid"
+                        color="warning"
+                        size="sm"
+                        sx={{ fontWeight: 800, fontSize: '10px', px: 1 }}
+                      >
+                        ⚡ TODAY
+                      </Chip>
+                    )}
                   </Stack>
+
                   <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
                     {formattedDate}
                   </Typography>
