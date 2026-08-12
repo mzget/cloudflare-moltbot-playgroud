@@ -14,6 +14,49 @@ interface WatchlistCardProps {
   onTogglePortfolio: (symbol: string, currentPortfolioStatus: number) => Promise<void>;
 }
 
+function areWatchlistCardPropsEqual(
+  prevProps: WatchlistCardProps,
+  nextProps: WatchlistCardProps
+): boolean {
+  if (prevProps.item === nextProps.item && prevProps.todayEvents === nextProps.todayEvents) {
+    return true;
+  }
+
+  const prevItem = prevProps.item;
+  const nextItem = nextProps.item;
+
+  if (
+    prevItem.symbol !== nextItem.symbol ||
+    prevItem.name !== nextItem.name ||
+    prevItem.is_active !== nextItem.is_active ||
+    prevItem.in_portfolio !== nextItem.in_portfolio ||
+    prevItem.type !== nextItem.type ||
+    prevItem.active_alerts_count !== nextItem.active_alerts_count ||
+    prevItem.sector_label !== nextItem.sector_label ||
+    prevItem.sector_label_color !== nextItem.sector_label_color
+  ) {
+    return false;
+  }
+
+  const prevEvents = prevProps.todayEvents || [];
+  const nextEvents = nextProps.todayEvents || [];
+
+  if (prevEvents.length !== nextEvents.length) {
+    return false;
+  }
+
+  for (let i = 0; i < prevEvents.length; i++) {
+    if (
+      prevEvents[i].id !== nextEvents[i].id ||
+      prevEvents[i].event_type !== nextEvents[i].event_type
+    ) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 export const WatchlistCard: React.FC<WatchlistCardProps> = React.memo(({
   item,
   todayEvents = [],
@@ -193,4 +236,4 @@ export const WatchlistCard: React.FC<WatchlistCardProps> = React.memo(({
       </CardContent>
     </Card>
   );
-});
+}, areWatchlistCardPropsEqual);

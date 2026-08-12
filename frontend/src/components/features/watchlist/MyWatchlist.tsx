@@ -1,24 +1,30 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { useWatchlist } from './hooks/useWatchlist';
+import { useWatchlist, type WatchlistItem } from './hooks/useWatchlist';
 import { useAlertRules } from './hooks/useAlertRules';
 import { WatchlistCard } from './WatchlistCard';
 import AddSecurityBox from './AddSecurityBox';
-import { Box, Typography, Sheet, IconButton, Button, Input, Stack, Card, CardContent, Divider, Switch, Grid, CardActions, Avatar, Modal, ModalDialog, DialogTitle, DialogContent, ModalClose, FormControl, FormLabel, Select, Option, FormHelperText, Badge, Snackbar, Alert } from '@mui/joy';
-import { Trash2, Bell, Pencil, FileText, AlertTriangle, Check } from 'lucide-react';
+import { EditSecurityModal } from './EditSecurityModal';
+import { AlertsManagerModal } from './AlertsManagerModal';
+import {
+  Typography,
+  Select,
+  Option,
+  Grid,
+  Modal,
+  ModalDialog,
+  DialogTitle,
+  DialogContent,
+  Stack,
+  Button,
+  Snackbar,
+  Alert,
+} from '@mui/joy';
+import { Trash2, Check, AlertTriangle } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
 import { API_BASE_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
 
-interface WatchlistItem {
-  symbol: string;
-  name: string;
-  is_active: number;
-  in_portfolio: number;
-  type: string;
-  active_alerts_count?: number;
-  sector_label?: string | null;
-  sector_label_color?: string | null;
-}
+const EMPTY_EVENTS: any[] = [];
 
 export default function MyWatchlist() {
   const navigate = useNavigate();
@@ -28,6 +34,7 @@ export default function MyWatchlist() {
       search: { symbol, tab: 'report' },
     });
   }, [navigate]);
+
   const {
     watchlist,
     marketStats,
@@ -36,7 +43,7 @@ export default function MyWatchlist() {
     deleteWatchlist,
     toggleActive,
     togglePortfolioStatus,
-    fetchWatchlist
+    fetchWatchlist,
   } = useWatchlist();
 
   const {
@@ -44,7 +51,7 @@ export default function MyWatchlist() {
     fetchRulesForSymbol,
     createRule,
     toggleRule,
-    deleteRule
+    deleteRule,
   } = useAlertRules(fetchWatchlist);
 
   // Toast state
@@ -79,45 +86,48 @@ export default function MyWatchlist() {
   }, []);
 
   // Edit Security Modal State
-
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<WatchlistItem | null>(null);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-  const [editForm, setEditForm] = useState({
-    symbol: '',
-    name: '',
-    type: 'stock',
-    sector_label: '',
-    sector_label_color: '',
-  });
 
   const handleOpenEditModal = useCallback((item: WatchlistItem) => {
-    setEditForm({
-      symbol: item.symbol,
-      name: item.name || '',
-      type: item.type || 'stock',
-      sector_label: item.sector_label || '',
-      sector_label_color: item.sector_label_color || '',
-    });
+    setEditingItem(item);
     setIsEditModalOpen(true);
   }, []);
 
-  const handleSaveEdit = useCallback(async () => {
-    if (!editForm.symbol) return;
-    try {
-      const res = await updateWatchlistDetails(
-        editForm.symbol,
-        editForm.name,
-        editForm.type,
-        editForm.sector_label || null,
-        editForm.sector_label_color || null,
-      );
-      if (res.ok) {
-        setIsEditModalOpen(false);
+  const handleCloseEditModal = useCallback(() => {
+    setIsEditModalOpen(false);
+    setEditingItem(null);
+  }, []);
+
+  const handleSaveEdit = useCallback(
+    async (
+      symbol: string,
+      name: string,
+      type: string,
+      sectorLabel: string | null,
+      sectorLabelColor: string | null
+    ) => {
+      if (!symbol) return;
+      try {
+        const res = await updateWatchlistDetails(
+          symbol,
+          name,
+          type,
+          sectorLabel,
+          sectorLabelColor
+        );
+        if (res.ok) {
+          setIsEditModalOpen(false);
+          setEditingItem(null);
+        }
+      } catch (e) {
+        console.error('Failed to update watchlist item', e);
+        throw e;
       }
-    } catch (e) {
-      console.error("Failed to update watchlist item", e);
-    }
-  }, [editForm, updateWatchlistDetails]);
+    },
+    [updateWatchlistDetails]
+  );
 
   const [sortBy, setSortBy] = useState<string>(() => {
     if (typeof window !== 'undefined') {
@@ -148,13 +158,13 @@ export default function MyWatchlist() {
       }
       if (sortBy === 'in_portfolio') {
         if (a.in_portfolio !== b.in_portfolio) {
-          return b.in_portfolio - a.in_portfolio; // In Portfolio (1) first
+          return b.in_portfolio - a.in_portfolio;
         }
         return a.symbol.localeCompare(b.symbol);
       }
       if (sortBy === 'is_active') {
         if (a.is_active !== b.is_active) {
-          return b.is_active - a.is_active; // Active (1) first
+          return b.is_active - a.is_active;
         }
         return a.symbol.localeCompare(b.symbol);
       }
@@ -166,121 +176,63 @@ export default function MyWatchlist() {
   const [isAlertsModalOpen, setIsAlertsModalOpen] = useState(false);
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
 
-  // Group rule form state
-  const [ruleForm, setRuleForm] = useState({
-    metric: 'price',
-    condition: 'cross_up',
-    target: ''
-  });
-
-  const handleOpenAlertsModal = useCallback((symbol: string) => {
-    setSelectedSymbol(symbol);
-    fetchRulesForSymbol(symbol);
-    setRuleForm({
-      metric: 'price',
-      condition: 'cross_up',
-      target: ''
-    });
-    setIsAlertsModalOpen(true);
-  }, [fetchRulesForSymbol]);
-
-  const handleCreateRule = useCallback(async () => {
-    if (!selectedSymbol || !ruleForm.target || isNaN(Number(ruleForm.target))) return;
-    
-    let targetVal = Number(ruleForm.target);
-    if (ruleForm.metric === 'market_cap') {
-      // User inputs in Billions, DB stores in Millions
-      targetVal = targetVal * 1000;
-    }
-
-    try {
-      const res = await createRule(selectedSymbol, ruleForm.metric, ruleForm.condition, targetVal);
-      if (res.ok) {
-        setRuleForm(prev => ({ ...prev, target: '' }));
-      }
-    } catch (e) {
-      console.error("Failed to create alert rule", e);
-    }
-  }, [selectedSymbol, ruleForm, createRule]);
-
-  const handleToggleRule = useCallback(async (ruleId: number, currentStatus: number) => {
-    try {
-      if (selectedSymbol) {
-        await toggleRule(selectedSymbol, ruleId, currentStatus);
-      }
-    } catch (e) {
-      console.error("Failed to toggle alert rule", e);
-    }
-  }, [selectedSymbol, toggleRule]);
-
-  const handleDeleteRule = useCallback(async (ruleId: number) => {
-    try {
-      if (selectedSymbol) {
-        await deleteRule(selectedSymbol, ruleId);
-      }
-    } catch (e) {
-      console.error("Failed to delete alert rule", e);
-    }
-  }, [selectedSymbol, deleteRule]);
-
-  const formatMetricLabel = (m: string) => {
-    switch(m) {
-      case 'price': return 'Price';
-      case 'market_cap': return 'Market Cap';
-      case 'p_e': return 'P/E';
-      case 'ev_ebit': return 'EV/EBIT';
-      case 'ev_sales': return 'EV/Sales';
-      default: return m;
-    }
-  };
-
-  const formatTargetValue = (val: number | null | undefined, metric: string) => {
-    if (val === null || val === undefined) {
-      return 'N/A';
-    }
-    if (metric === 'market_cap') {
-      return `$${(val / 1000).toFixed(2)}B`;
-    }
-    if (metric === 'price') {
-      return `$${val.toFixed(2)}`;
-    }
-    return val.toFixed(2);
-  };
-
-  const formatConditionLabel = (cond: string) => {
-    return cond === 'cross_up' ? 'Crosses Up' : 'Crosses Down';
-  };
-
-  const currentSymbolStats = useMemo(
-    () => marketStats.find(s => s.symbol === selectedSymbol),
-    [marketStats, selectedSymbol]
+  const handleOpenAlertsModal = useCallback(
+    (symbol: string) => {
+      setSelectedSymbol(symbol);
+      fetchRulesForSymbol(symbol);
+      setIsAlertsModalOpen(true);
+    },
+    [fetchRulesForSymbol]
   );
 
-  const getHelperTextForMetric = useCallback((metric: string) => {
-    if (!currentSymbolStats) return 'No current data available';
-    let val: number | null | undefined = null;
-    if (metric === 'price') {
-      val = currentSymbolStats.price;
-      return val !== null && val !== undefined ? `Current Price: $${val.toFixed(2)}` : 'Current Price: N/A';
-    }
-    if (metric === 'market_cap') {
-      val = currentSymbolStats.market_cap;
-      return val !== null && val !== undefined ? `Current Market Cap: $${(val / 1000).toFixed(2)}B` : 'Current Market Cap: N/A';
-    }
-    if (metric === 'p_e') {
-      val = currentSymbolStats.p_e;
-      return val !== null && val !== undefined ? `Current P/E: ${val.toFixed(2)}` : 'Current P/E: N/A';
-    }
-    if (metric === 'ev_ebit') {
-      val = currentSymbolStats.ev_ebit;
-      return val !== null && val !== undefined ? `Current EV/EBIT: ${val.toFixed(2)}` : 'Current EV/EBIT: N/A';
-    }
-    if (metric === 'ev_sales') {
-      val = currentSymbolStats.ev_sales;
-      return val !== null && val !== undefined ? `Current EV/Sales: ${val.toFixed(2)}` : 'Current EV/Sales: N/A';
-    }
-    return '';
-  }, [currentSymbolStats]);
+  const handleCloseAlertsModal = useCallback(() => {
+    setIsAlertsModalOpen(false);
+    setSelectedSymbol(null);
+  }, []);
+
+  const handleCreateRule = useCallback(
+    async (metric: string, condition: string, targetVal: number) => {
+      if (!selectedSymbol) return;
+      try {
+        await createRule(selectedSymbol, metric, condition, targetVal);
+      } catch (e) {
+        console.error('Failed to create alert rule', e);
+        throw e;
+      }
+    },
+    [selectedSymbol, createRule]
+  );
+
+  const handleToggleRule = useCallback(
+    async (ruleId: number, currentStatus: number) => {
+      try {
+        if (selectedSymbol) {
+          await toggleRule(selectedSymbol, ruleId, currentStatus);
+        }
+      } catch (e) {
+        console.error('Failed to toggle alert rule', e);
+      }
+    },
+    [selectedSymbol, toggleRule]
+  );
+
+  const handleDeleteRule = useCallback(
+    async (ruleId: number) => {
+      try {
+        if (selectedSymbol) {
+          await deleteRule(selectedSymbol, ruleId);
+        }
+      } catch (e) {
+        console.error('Failed to delete alert rule', e);
+      }
+    },
+    [selectedSymbol, deleteRule]
+  );
+
+  const currentSymbolStats = useMemo(
+    () => marketStats.find((s) => s.symbol === selectedSymbol),
+    [marketStats, selectedSymbol]
+  );
 
   // Stable callbacks for AddSecurityBox
   const handleAddSuccess = useCallback(() => {
@@ -295,29 +247,38 @@ export default function MyWatchlist() {
     setToastOpen(true);
   }, []);
 
-  const handleDelete = useCallback(async (symbol: string) => {
-    try {
-      await deleteWatchlist(symbol);
-    } catch (e) {
-      console.error("Failed to delete from watchlist", e);
-    }
-  }, [deleteWatchlist]);
+  const handleDelete = useCallback(
+    async (symbol: string) => {
+      try {
+        await deleteWatchlist(symbol);
+      } catch (e) {
+        console.error('Failed to delete from watchlist', e);
+      }
+    },
+    [deleteWatchlist]
+  );
 
-  const handleToggleActive = useCallback(async (symbol: string, currentStatus: number) => {
-    try {
-      await toggleActive(symbol, currentStatus);
-    } catch (e) {
-      console.error("Failed to toggle watchlist status", e);
-    }
-  }, [toggleActive]);
+  const handleToggleActive = useCallback(
+    async (symbol: string, currentStatus: number) => {
+      try {
+        await toggleActive(symbol, currentStatus);
+      } catch (e) {
+        console.error('Failed to toggle watchlist status', e);
+      }
+    },
+    [toggleActive]
+  );
 
-  const handleTogglePortfolio = useCallback(async (symbol: string, currentPortfolioStatus: number) => {
-    try {
-      await togglePortfolioStatus(symbol, currentPortfolioStatus);
-    } catch (e) {
-      console.error("Failed to toggle portfolio status", e);
-    }
-  }, [togglePortfolioStatus]);
+  const handleTogglePortfolio = useCallback(
+    async (symbol: string, currentPortfolioStatus: number) => {
+      try {
+        await togglePortfolioStatus(symbol, currentPortfolioStatus);
+      } catch (e) {
+        console.error('Failed to toggle portfolio status', e);
+      }
+    },
+    [togglePortfolioStatus]
+  );
 
   return (
     <>
@@ -327,10 +288,10 @@ export default function MyWatchlist() {
         onError={handleAddError}
       />
 
-      <Stack 
-        direction={{ xs: 'column', sm: 'row' }} 
-        justifyContent="space-between" 
-        alignItems={{ xs: 'flex-start', sm: 'center' }} 
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        justifyContent="space-between"
+        alignItems={{ xs: 'flex-start', sm: 'center' }}
         spacing={2}
         sx={{ mb: 3 }}
       >
@@ -338,21 +299,23 @@ export default function MyWatchlist() {
           {watchlist.length} {watchlist.length === 1 ? 'Security' : 'Securities'}
         </Typography>
         <Stack direction="row" spacing={1.5} alignItems="center" sx={{ width: { xs: '100%', sm: 'auto' } }}>
-          <Typography level="body-sm" sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>Sort By:</Typography>
+          <Typography level="body-sm" sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
+            Sort By:
+          </Typography>
           <Select
             value={sortBy}
             onChange={(_, val) => setSortBy(val || 'symbol')}
             size="sm"
-            sx={{ 
-              minWidth: 180, 
+            sx={{
+              minWidth: 180,
               flex: { xs: 1, sm: 'none' },
               ...glassStyle,
               backgroundColor: 'rgba(255, 255, 255, 0.05)',
               border: '1px solid rgba(255, 255, 255, 0.1)',
               '&:hover': {
                 backgroundColor: 'rgba(255, 255, 255, 0.08)',
-                borderColor: 'rgba(255, 255, 255, 0.15)'
-              }
+                borderColor: 'rgba(255, 255, 255, 0.15)',
+              },
             }}
           >
             <Option value="symbol">Symbol (A-Z)</Option>
@@ -369,283 +332,37 @@ export default function MyWatchlist() {
           <Grid key={item.symbol} xs={12} sm={12} md={4}>
             <WatchlistCard
               item={item}
-              todayEvents={todayEventsMap[item.symbol.toUpperCase()] || []}
+              todayEvents={todayEventsMap[item.symbol.toUpperCase()] || EMPTY_EVENTS}
               onEdit={handleOpenEditModal}
               onAlertsClick={handleOpenAlertsModal}
               onViewAnalysis={handleViewAnalysis}
               onToggleActive={handleToggleActive}
               onTogglePortfolio={handleTogglePortfolio}
             />
-
           </Grid>
         ))}
       </Grid>
 
       {/* Alert Rules Manager Modal */}
-      <Modal open={isAlertsModalOpen} onClose={() => setIsAlertsModalOpen(false)}>
-        <ModalDialog
-          sx={{
-            ...glassStyle,
-            minWidth: { xs: '90%', sm: 480 },
-            maxWidth: 500,
-            borderRadius: '20px',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            boxShadow: '0 25px 50px rgba(0,0,0,0.3)',
-            p: 3,
-          }}
-        >
-          <ModalClose />
-          <DialogTitle sx={{ fontWeight: 800, fontSize: '1.4rem', letterSpacing: '-0.02em', mb: 1 }}>
-            Alert Manager: {selectedSymbol}
-          </DialogTitle>
-          <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-            {/* Create Rule Form */}
-            <Box sx={{ p: 2, borderRadius: '12px', border: '1px solid', borderColor: 'divider', bgcolor: 'rgba(0,0,0,0.02)' }}>
-              <Typography level="title-sm" sx={{ mb: 1.5, fontWeight: 700 }}>Create New Alert</Typography>
-              <Stack spacing={2}>
-                <Stack direction="row" spacing={1.5}>
-                  <FormControl sx={{ flex: 1 }}>
-                    <FormLabel sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Metric</FormLabel>
-                    <Select
-                      value={ruleForm.metric}
-                      onChange={(_, val) => setRuleForm(prev => ({ ...prev, metric: val || 'price' }))}
-                      size="sm"
-                    >
-                      <Option value="price">Price ($)</Option>
-                      <Option value="market_cap">Market Cap ($B)</Option>
-                      <Option value="p_e">P/E Ratio</Option>
-                      <Option value="ev_ebit">EV/EBIT</Option>
-                      <Option value="ev_sales">EV/Sales</Option>
-                    </Select>
-                  </FormControl>
-
-                  <FormControl sx={{ flex: 1 }}>
-                    <FormLabel sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Condition</FormLabel>
-                    <Select
-                      value={ruleForm.condition}
-                      onChange={(_, val) => setRuleForm(prev => ({ ...prev, condition: val || 'cross_up' }))}
-                      size="sm"
-                    >
-                      <Option value="cross_up">Crosses Up</Option>
-                      <Option value="cross_down">Crosses Down</Option>
-                    </Select>
-                  </FormControl>
-                </Stack>
-
-                <FormControl>
-                  <FormLabel sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Target Value</FormLabel>
-                  <Stack direction="row" spacing={1}>
-                    <Input
-                      type="number"
-                      placeholder="e.g. 150"
-                      value={ruleForm.target}
-                      onChange={e => setRuleForm(prev => ({ ...prev, target: e.target.value }))}
-                      size="sm"
-                      sx={{ flex: 1 }}
-                    />
-                    <Button
-                      variant="solid"
-                      color="success"
-                      onClick={handleCreateRule}
-                      size="sm"
-                    >
-                      Add
-                    </Button>
-                  </Stack>
-                  <FormHelperText sx={{ fontSize: '0.72rem', color: 'text.secondary', fontWeight: 500, mt: 0.5 }}>
-                    {getHelperTextForMetric(ruleForm.metric)}
-                  </FormHelperText>
-                </FormControl>
-              </Stack>
-            </Box>
-
-            {/* Existing Rules List */}
-            <Box>
-              <Typography level="title-sm" sx={{ mb: 1.5, fontWeight: 700 }}>Active Rules</Typography>
-              {symbolRules.length === 0 ? (
-                <Typography level="body-sm" sx={{ color: 'text.tertiary', fontStyle: 'italic', textAlign: 'center', py: 2 }}>
-                  No alert rules set for this symbol.
-                </Typography>
-              ) : (
-                <Stack spacing={1} sx={{ maxHeight: 200, overflowY: 'auto', pr: 0.5 }}>
-                  {symbolRules.map(rule => (
-                    <Box
-                      key={rule.id}
-                      sx={{
-                        p: 1.5,
-                        borderRadius: '10px',
-                        border: '1px solid',
-                        borderColor: 'divider',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        bgcolor: rule.is_active ? 'transparent' : 'rgba(0,0,0,0.02)',
-                        opacity: rule.is_active ? 1 : 0.7
-                      }}
-                    >
-                      <Box>
-                        <Typography level="body-sm" sx={{ fontWeight: 600 }}>
-                          {formatMetricLabel(rule.metric)} {formatConditionLabel(rule.condition_type)} {formatTargetValue(rule.target_value, rule.metric)}
-                        </Typography>
-                        {rule.last_checked_value !== null && rule.last_checked_value !== undefined && (
-                          <Typography level="body-xs" sx={{ color: 'text.tertiary', mt: 0.25 }}>
-                            Last Checked: {formatTargetValue(rule.last_checked_value, rule.metric)}
-                          </Typography>
-                        )}
-                      </Box>
-                      <Stack direction="row" spacing={1.5} alignItems="center">
-                        <Switch
-                          size="sm"
-                          checked={rule.is_active === 1}
-                          onChange={() => handleToggleRule(rule.id, rule.is_active)}
-                          color={rule.is_active === 1 ? 'success' : 'neutral'}
-                        />
-                        <IconButton
-                          size="sm"
-                          color="danger"
-                          variant="plain"
-                          onClick={() => handleDeleteRule(rule.id)}
-                          sx={{ '&:hover': { bgcolor: 'rgba(231, 76, 60, 0.1)' } }}
-                        >
-                          <Trash2 size={16} />
-                        </IconButton>
-                      </Stack>
-                    </Box>
-                  ))}
-                </Stack>
-              )}
-            </Box>
-          </DialogContent>
-        </ModalDialog>
-      </Modal>
+      <AlertsManagerModal
+        open={isAlertsModalOpen}
+        symbol={selectedSymbol}
+        symbolRules={symbolRules}
+        currentSymbolStats={currentSymbolStats}
+        onClose={handleCloseAlertsModal}
+        onCreateRule={handleCreateRule}
+        onToggleRule={handleToggleRule}
+        onDeleteRule={handleDeleteRule}
+      />
 
       {/* Edit Symbol Detail Modal */}
-      <Modal open={isEditModalOpen} onClose={() => setIsEditModalOpen(false)}>
-        <ModalDialog
-          sx={{
-            ...glassStyle,
-            minWidth: { xs: '90%', sm: 400 },
-            maxWidth: 450,
-            borderRadius: '20px',
-            border: '1px solid rgba(255, 255, 255, 0.2)',
-            boxShadow: '0 25px 50px rgba(0,0,0,0.3)',
-            p: 3,
-          }}
-        >
-          <ModalClose />
-          <DialogTitle sx={{ fontWeight: 800, fontSize: '1.4rem', letterSpacing: '-0.02em', mb: 1 }}>
-            Edit Security: {editForm.symbol}
-          </DialogTitle>
-          <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
-            <FormControl>
-              <FormLabel sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Company Name</FormLabel>
-              <Input
-                placeholder="Company Name"
-                value={editForm.name}
-                onChange={e => setEditForm(prev => ({ ...prev, name: e.target.value }))}
-                size="sm"
-              />
-            </FormControl>
-
-            <FormControl>
-              <FormLabel sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Symbol Type</FormLabel>
-              <Select
-                value={editForm.type}
-                onChange={(_, val) => setEditForm(prev => ({ ...prev, type: val || 'stock' }))}
-                size="sm"
-              >
-                <Option value="stock">Stock</Option>
-                <Option value="etf">ETF</Option>
-              </Select>
-            </FormControl>
-
-            <FormControl>
-              <FormLabel sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Sector / Business Type Label</FormLabel>
-              <Input
-                placeholder="e.g. Healthcare, Tech Growth, REIT"
-                value={editForm.sector_label}
-                onChange={e => setEditForm(prev => ({ ...prev, sector_label: e.target.value }))}
-                size="sm"
-                endDecorator={
-                  editForm.sector_label ? (
-                    <Typography level="body-xs" sx={{ color: editForm.sector_label_color || 'text.tertiary', fontWeight: 600 }}>
-                      preview
-                    </Typography>
-                  ) : null
-                }
-              />
-            </FormControl>
-
-            <FormControl>
-              <FormLabel sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Label Color</FormLabel>
-              <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mt: 0.5 }}>
-                {[
-                  { color: '', label: 'Default' },
-                  { color: '#10b981', label: 'Green' },
-                  { color: '#3b82f6', label: 'Blue' },
-                  { color: '#f59e0b', label: 'Amber' },
-                  { color: '#ef4444', label: 'Red' },
-                  { color: '#8b5cf6', label: 'Purple' },
-                  { color: '#06b6d4', label: 'Cyan' },
-                  { color: '#f97316', label: 'Orange' },
-                  { color: '#ec4899', label: 'Pink' },
-                ].map(({ color, label }) => (
-                  <Box
-                    key={label}
-                    onClick={() => setEditForm(prev => ({ ...prev, sector_label_color: color }))}
-                    title={label}
-                    sx={{
-                      width: 24,
-                      height: 24,
-                      borderRadius: '50%',
-                      bgcolor: color || 'text.tertiary',
-                      cursor: 'pointer',
-                      border: editForm.sector_label_color === color
-                        ? '2.5px solid white'
-                        : '2px solid transparent',
-                      boxShadow: editForm.sector_label_color === color
-                        ? '0 0 0 2px ' + (color || '#888')
-                        : 'none',
-                      transition: 'all 0.15s ease',
-                      '&:hover': { transform: 'scale(1.15)' },
-                    }}
-                  />
-                ))}
-              </Box>
-            </FormControl>
-
-            <Stack direction="row" spacing={1.5} justifyContent="space-between" sx={{ mt: 1 }}>
-              <Button
-                variant="outlined"
-                color="danger"
-                startDecorator={<Trash2 size={16} />}
-                onClick={() => setIsDeleteConfirmOpen(true)}
-                size="sm"
-              >
-                Delete
-              </Button>
-              <Stack direction="row" spacing={1.5}>
-                <Button
-                  variant="plain"
-                  color="neutral"
-                  onClick={() => setIsEditModalOpen(false)}
-                  size="sm"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="solid"
-                  color="success"
-                  onClick={handleSaveEdit}
-                  size="sm"
-                >
-                  Save
-                </Button>
-              </Stack>
-            </Stack>
-          </DialogContent>
-        </ModalDialog>
-      </Modal>
+      <EditSecurityModal
+        open={isEditModalOpen}
+        item={editingItem}
+        onClose={handleCloseEditModal}
+        onSave={handleSaveEdit}
+        onDeleteClick={() => setIsDeleteConfirmOpen(true)}
+      />
 
       {/* Delete Confirm Dialog */}
       <Modal open={isDeleteConfirmOpen} onClose={() => setIsDeleteConfirmOpen(false)}>
@@ -667,7 +384,7 @@ export default function MyWatchlist() {
             <Typography level="body-sm" sx={{ opacity: 0.8 }}>
               คุณแน่ใจหรือไม่ว่าต้องการลบ{' '}
               <Typography component="span" fontWeight="bold" sx={{ color: '#ef4444' }}>
-                {editForm.symbol}
+                {editingItem?.symbol}
               </Typography>{' '}
               ออกจาก Watchlist?
             </Typography>
@@ -687,9 +404,11 @@ export default function MyWatchlist() {
               size="sm"
               startDecorator={<Trash2 size={14} />}
               onClick={() => {
-                handleDelete(editForm.symbol);
+                if (editingItem?.symbol) {
+                  handleDelete(editingItem.symbol);
+                }
                 setIsDeleteConfirmOpen(false);
-                setIsEditModalOpen(false);
+                handleCloseEditModal();
               }}
             >
               Delete
@@ -706,13 +425,17 @@ export default function MyWatchlist() {
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         variant="soft"
         color={toastColor}
-        sx={{ 
-          borderRadius: '12px', 
+        sx={{
+          borderRadius: '12px',
           backgroundColor: 'rgba(20, 20, 20, 0.85)',
           backdropFilter: 'blur(12px)',
-          border: '1px solid ' + (toastColor === 'success' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'),
-          boxShadow: '0 8px 32px ' + (toastColor === 'success' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)'),
-          p: 0.5
+          border:
+            '1px solid ' +
+            (toastColor === 'success' ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)'),
+          boxShadow:
+            '0 8px 32px ' +
+            (toastColor === 'success' ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)'),
+          p: 0.5,
         }}
       >
         <Alert
