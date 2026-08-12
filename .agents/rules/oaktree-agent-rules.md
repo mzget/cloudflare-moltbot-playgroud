@@ -52,3 +52,28 @@ Do NOT load domain-specific guidelines or all skills at the start of every turn.
 When editing or writing code files containing non-ASCII text (e.g., Thai labels, placeholders, or comments) via PowerShell command runner:
 - Strictly **avoid** using standard `Set-Content` or `Out-File` without explicitly setting encoding, as they default to ANSI/ASCII and will corrupt characters to `?`.
 - Always use `[System.IO.File]::WriteAllText($path, $content, [System.Text.Encoding]::UTF8)` to write files with proper UTF-8 encoding.
+
+---
+
+## 🧪 Unit Test Coverage Rule (Mandatory)
+
+After writing or modifying any backend logic (Workers, API routes, utility functions, or database queries), you MUST:
+
+1. **Write or update unit tests** covering the changed behavior before considering the task done.
+2. **Run `npm test`** in the relevant package directory and confirm all tests pass.
+3. **Cover at minimum**:
+   - The happy path (expected input → expected output)
+   - Null/empty/missing field cases (edge cases most likely to surface in production)
+   - Any conditional branches introduced by the change
+
+### Scope
+- Applies to: backend (`/backend/src/`) changes that introduce or modify logic.
+- Exempt: pure config changes (e.g., `wrangler.jsonc`), schema-only migrations with no logic, or changes the user explicitly says to skip tests for.
+
+### Test file naming
+- Co-locate tests: `src/<featureName>.test.ts` next to the source file.
+- Match the pattern already used by `marketEvents.test.ts`, `portfolioUtils.test.ts`, `sectorLabel.test.ts`, etc.
+
+### Frontend
+- Frontend React component tests are **not required** unless the user explicitly asks.
+- However, **pure utility/display logic** (e.g., fallback label resolution) should be tested in the backend test file or a shared utility test file when feasible.

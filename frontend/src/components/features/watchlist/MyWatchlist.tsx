@@ -16,6 +16,8 @@ interface WatchlistItem {
   in_portfolio: number;
   type: string;
   active_alerts_count?: number;
+  sector_label?: string | null;
+  sector_label_color?: string | null;
 }
 
 export default function MyWatchlist() {
@@ -83,14 +85,18 @@ export default function MyWatchlist() {
   const [editForm, setEditForm] = useState({
     symbol: '',
     name: '',
-    type: 'stock'
+    type: 'stock',
+    sector_label: '',
+    sector_label_color: '',
   });
 
   const handleOpenEditModal = useCallback((item: WatchlistItem) => {
     setEditForm({
       symbol: item.symbol,
       name: item.name || '',
-      type: item.type || 'stock'
+      type: item.type || 'stock',
+      sector_label: item.sector_label || '',
+      sector_label_color: item.sector_label_color || '',
     });
     setIsEditModalOpen(true);
   }, []);
@@ -98,7 +104,13 @@ export default function MyWatchlist() {
   const handleSaveEdit = useCallback(async () => {
     if (!editForm.symbol) return;
     try {
-      const res = await updateWatchlistDetails(editForm.symbol, editForm.name, editForm.type);
+      const res = await updateWatchlistDetails(
+        editForm.symbol,
+        editForm.name,
+        editForm.type,
+        editForm.sector_label || null,
+        editForm.sector_label_color || null,
+      );
       if (res.ok) {
         setIsEditModalOpen(false);
       }
@@ -545,6 +557,61 @@ export default function MyWatchlist() {
                 <Option value="stock">Stock</Option>
                 <Option value="etf">ETF</Option>
               </Select>
+            </FormControl>
+
+            <FormControl>
+              <FormLabel sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Sector / Business Type Label</FormLabel>
+              <Input
+                placeholder="e.g. Healthcare, Tech Growth, REIT"
+                value={editForm.sector_label}
+                onChange={e => setEditForm(prev => ({ ...prev, sector_label: e.target.value }))}
+                size="sm"
+                endDecorator={
+                  editForm.sector_label ? (
+                    <Typography level="body-xs" sx={{ color: editForm.sector_label_color || 'text.tertiary', fontWeight: 600 }}>
+                      preview
+                    </Typography>
+                  ) : null
+                }
+              />
+            </FormControl>
+
+            <FormControl>
+              <FormLabel sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Label Color</FormLabel>
+              <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap', mt: 0.5 }}>
+                {[
+                  { color: '', label: 'Default' },
+                  { color: '#10b981', label: 'Green' },
+                  { color: '#3b82f6', label: 'Blue' },
+                  { color: '#f59e0b', label: 'Amber' },
+                  { color: '#ef4444', label: 'Red' },
+                  { color: '#8b5cf6', label: 'Purple' },
+                  { color: '#06b6d4', label: 'Cyan' },
+                  { color: '#f97316', label: 'Orange' },
+                  { color: '#ec4899', label: 'Pink' },
+                ].map(({ color, label }) => (
+                  <Box
+                    key={label}
+                    onClick={() => setEditForm(prev => ({ ...prev, sector_label_color: color }))}
+                    title={label}
+                    sx={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: '50%',
+                      bgcolor: color || 'text.tertiary',
+                      cursor: 'pointer',
+                      border: editForm.sector_label_color === color
+                        ? '2.5px solid white'
+                        : '2px solid transparent',
+                      boxShadow: editForm.sector_label_color === color
+                        ? '0 0 0 2px ' + (color || '#888')
+                        : 'none',
+                      transition: 'all 0.15s ease',
+                      '&:hover': { transform: 'scale(1.15)' },
+                    }}
+                  />
+                ))}
+              </Box>
             </FormControl>
 
             <Stack direction="row" spacing={1.5} justifyContent="space-between" sx={{ mt: 1 }}>

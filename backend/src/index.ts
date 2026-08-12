@@ -416,7 +416,7 @@ app.post('/api/watchlist', async (c) => {
 });
 
 app.put('/api/watchlist', async (c) => {
-  const { symbol, is_active, in_portfolio, name, type } = await c.req.json() as any;
+  const { symbol, is_active, in_portfolio, name, type, sector_label, sector_label_color } = await c.req.json() as any;
   if (is_active !== undefined) {
     await c.env.DB.prepare('UPDATE watchlist SET is_active = ? WHERE symbol = ?')
       .bind(is_active ? 1 : 0, symbol).run();
@@ -428,6 +428,14 @@ app.put('/api/watchlist', async (c) => {
   if (type !== undefined) {
     await c.env.DB.prepare('UPDATE watchlist SET type = ? WHERE symbol = ?')
       .bind(type, symbol).run();
+  }
+  if (sector_label !== undefined) {
+    await c.env.DB.prepare('UPDATE watchlist SET sector_label = ? WHERE symbol = ?')
+      .bind(sector_label || null, symbol).run();
+  }
+  if (sector_label_color !== undefined) {
+    await c.env.DB.prepare('UPDATE watchlist SET sector_label_color = ? WHERE symbol = ?')
+      .bind(sector_label_color || null, symbol).run();
   }
   if (in_portfolio !== undefined) {
     if (in_portfolio) {
@@ -1385,7 +1393,7 @@ app.get('/api/portfolio/holdings', async (c) => {
   const { results } = await c.env.DB.prepare(`
     SELECT 
       h.symbol, h.shares, h.avg_cost, h.total_cost, h.status,
-      w.name,
+      w.name, w.sector_label, w.sector_label_color,
       m.price as last_price, m.previous_close, m.market_cap, m.p_e, m.price_updated_at, m.updated_at as stats_updated_at,
       COALESCE(d.total_dividends, 0) as tot_div_income,
       COALESCE(t.realized_gain_sum, 0) as realized_gain_amt,
@@ -1450,6 +1458,8 @@ app.get('/api/portfolio/holdings', async (c) => {
       realized_gain_amt: realizedGainAmt,
       price_updated_at: row.price_updated_at || null,
       stats_updated_at: row.stats_updated_at || null,
+      sector_label: row.sector_label || null,
+      sector_label_color: row.sector_label_color || null,
     };
   });
 
