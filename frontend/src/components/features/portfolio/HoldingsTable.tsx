@@ -42,6 +42,8 @@ export interface Holding {
   realized_gain_amt: number | null;
   price_updated_at?: string | number | null;
   stats_updated_at?: string | number | null;
+  sector_label?: string | null;
+  sector_label_color?: string | null;
 }
 
 export interface HoldingsTableProps {
@@ -422,12 +424,14 @@ export default function HoldingsTable({
                       <Typography
                         level="body-xs"
                         sx={{
-                          opacity: 0.5,
                           mt: 0.2,
                           fontSize: densityStyles.nameSize,
+                          opacity: h.sector_label ? 1 : 0.5,
+                          color: h.sector_label && h.sector_label_color ? h.sector_label_color : undefined,
+                          fontWeight: h.sector_label ? 600 : 400,
                         }}
                       >
-                        {h.name}
+                        {h.sector_label || h.name}
                       </Typography>
                     </Box>
                   </td>

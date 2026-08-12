@@ -96,7 +96,16 @@ export const WatchlistCard: React.FC<WatchlistCardProps> = React.memo(({
                   </Box>
                 )}
               </Stack>
-              <Typography level="body-sm" sx={{ opacity: 0.7, fontWeight: '500' }}>{item.name}</Typography>
+              <Typography
+                level="body-sm"
+                sx={{
+                  opacity: item.sector_label ? 1 : 0.7,
+                  fontWeight: item.sector_label ? 600 : 500,
+                  color: item.sector_label && item.sector_label_color ? item.sector_label_color : undefined,
+                }}
+              >
+                {item.sector_label || item.name}
+              </Typography>
             </Box>
           </Stack>
 
