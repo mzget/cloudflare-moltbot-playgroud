@@ -21,3 +21,6 @@ An In-App Notification generated automatically during daily market sync for any 
 
 ### Today Event Badge (Watchlist UI)
 A visual badge/chip indicator displayed next to the stock symbol in the Watchlist table and Event Calendar dashboard when a stock has a Market Event occurring today.
+
+### Sector Label
+A user-defined short text tag stored on a Watchlist entry (`sector_label`) that describes the business type or sector of a stock (e.g. "Tech Growth", "REIT", "Healthcare"). Displayed as the secondary label under the symbol in the Holdings table and WatchlistCard — replacing the company `name` in those UI surfaces. Falls back to `name` when not set. An optional accompanying `sector_label_color` (hex string) controls the font color of the label.

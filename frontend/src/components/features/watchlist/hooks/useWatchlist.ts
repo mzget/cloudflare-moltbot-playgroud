@@ -12,6 +12,8 @@ export interface WatchlistItem {
   in_portfolio: number;
   type: string;
   active_alerts_count?: number;
+  sector_label?: string | null;
+  sector_label_color?: string | null;
 }
 
 const WATCHLIST_KEY = 'watchlist';
@@ -69,22 +71,22 @@ export function useWatchlist() {
 
   // --- updateWatchlistDetails ---
   const { mutateAsync: updateWatchlistDetails } = useMutation(
-    async ({ symbol, name, type }: { symbol: string; name: string; type: string }) => {
+    async ({ symbol, name, type, sector_label, sector_label_color }: { symbol: string; name: string; type: string; sector_label?: string | null; sector_label_color?: string | null }) => {
       const res = await fetch(`${API_BASE_URL}/api/watchlist`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbol, name, type }),
+        body: JSON.stringify({ symbol, name, type, sector_label, sector_label_color }),
       });
       if (!res.ok) throw res;
       return res;
     },
     {
-      onMutate: ({ symbol, name, type }) => {
+      onMutate: ({ symbol, name, type, sector_label, sector_label_color }) => {
         const { getEntry, setEntry } = useQueryCache.getState();
         const prev = getEntry<WatchlistItem[]>(WATCHLIST_KEY).data ?? [];
         setEntry(WATCHLIST_KEY, {
           data: prev.map(item =>
-            item.symbol === symbol ? { ...item, name, type } : item
+            item.symbol === symbol ? { ...item, name, type, sector_label, sector_label_color } : item
           ) as unknown[],
         });
         return prev;
@@ -192,8 +194,8 @@ export function useWatchlist() {
     return addWatchlist({ symbol, name, type });
   }, [addWatchlist]);
 
-  const updateWatchlistDetailsFn = useCallback((symbol: string, name: string, type: string) => {
-    return updateWatchlistDetails({ symbol, name, type });
+  const updateWatchlistDetailsFn = useCallback((symbol: string, name: string, type: string, sector_label?: string | null, sector_label_color?: string | null) => {
+    return updateWatchlistDetails({ symbol, name, type, sector_label, sector_label_color });
   }, [updateWatchlistDetails]);
 
   return {

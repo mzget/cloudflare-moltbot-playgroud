@@ -63,7 +63,7 @@ export default function AssetAllocationChart({
   rate,
   holdings,
 }: AssetAllocationChartProps) {
-  const [viewMode, setViewMode] = useState<number>(0); // 0 = By Platform, 1 = By Category
+  const [viewMode, setViewMode] = useState<number>(0); // 0 = By Platform, 1 = By Category, 2 = Stocks only
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
 
   // Group data based on viewMode
@@ -79,14 +79,11 @@ export default function AssetAllocationChart({
         }))
         .filter(item => item.value > 0)
         .sort((a, b) => b.value - a.value);
-    } else {
-      // Individual stocks list (open positions with positive shares/market value)
-      const stocksList = (holdings || [])
+    } else if (viewMode === 1) {
+      // Aggregate all open stock positions into a single "Stocks" item
+      const stocksTotalThb = (holdings || [])
         .filter(h => h.status === 'Open' && h.shares > 0 && (h.market_value || 0) > 0)
-        .map(h => ({
-          name: h.symbol,
-          value: (h.market_value || 0) * rate,
-        }));
+        .reduce((sum, h) => sum + (h.market_value || 0) * rate, 0);
 
       // Asset Category View
       const categoryAllocations = categories.map(cat => {
@@ -105,7 +102,7 @@ export default function AssetAllocationChart({
         .reduce((sum, b) => sum + b.balance, 0);
 
       const items = [
-        ...stocksList,
+        ...(stocksTotalThb > 0 ? [{ name: 'Stocks', value: stocksTotalThb }] : []),
         ...categoryAllocations,
         ...(otherVal > 0 ? [{ name: 'Other / Crypto', value: otherVal }] : []),
       ];
@@ -118,6 +115,14 @@ export default function AssetAllocationChart({
           ...item,
           color: PALETTE[idx % PALETTE.length],
         }));
+    } else {
+      // Stocks-only view: open stock positions by market value
+      return (holdings || [])
+        .filter(h => h.status === 'Open' && h.shares > 0 && (h.market_value || 0) > 0)
+        .map(h => ({ name: h.symbol, value: (h.market_value || 0) * rate }))
+        .filter(item => item.value > 0)
+        .sort((a, b) => b.value - a.value)
+        .map((item, idx) => ({ ...item, color: PALETTE[idx % PALETTE.length] }));
     }
   }, [viewMode, brokers, categories, allocations, summary, rate, holdings]);
 
@@ -130,7 +135,7 @@ export default function AssetAllocationChart({
     let currentAngle = 0;
     return chartData.map(item => {
       const percentage = totalValue > 0 ? (item.value / totalValue) * 100 : 0;
-      const angle = (item.value / totalValue) * 360;
+      const angle = totalValue > 0 ? (item.value / totalValue) * 360 : 0;
       const startAngle = currentAngle;
       const endAngle = currentAngle + angle;
       currentAngle = endAngle;
@@ -193,6 +198,7 @@ export default function AssetAllocationChart({
         >
           <Tab disableIndicator>Platform</Tab>
           <Tab disableIndicator>Category</Tab>
+          <Tab disableIndicator>Stocks</Tab>
         </TabList>
       </Tabs>
 
