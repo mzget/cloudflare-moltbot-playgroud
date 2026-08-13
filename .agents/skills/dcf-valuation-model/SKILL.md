@@ -48,6 +48,11 @@ Use when year-by-year granular projections (FY+1, FY+2, FY+3, FY+4, FY+5) are pr
    $$\text{EV} = \sum_{i=1}^5 \text{PV of FCF}_i + \text{PV of TV}$$
 9. **Implied Intrinsic Share Price**:
    $$\text{Implied Price} = \frac{\text{EV} + \text{Net Cash}}{\text{Diluted Shares Outstanding (in Billions)}}$$
+10. **Share Count Unit Conversion (Strict Rule)**:
+    - Input parameters `sharesOutstanding` and `targetShares` MUST ALWAYS be provided in **Millions ($M$)**.
+    - Always convert Millions to Billions directly by dividing by 1,000:
+      $$\text{Shares (in Billions)} = \frac{\text{Shares (in Millions)}}{1000}$$
+    - **NEVER** use conditional threshold logic (e.g. `shares > 100 ? shares / 1000 : shares`), as this causes catastrophic 1,000x valuation errors for companies with $\le 100$ Million shares.
 
 ---
 
