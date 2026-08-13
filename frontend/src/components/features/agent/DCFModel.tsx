@@ -148,12 +148,12 @@ function calculateDCF(params: DCFParams): DCFResult {
   const equityValue = enterpriseValue + params.netCash;
 
   // Implied Share Price from Gordon Growth (Present Intrinsic Value)
-  const sharesInBillions = params.sharesOutstanding > 100 ? params.sharesOutstanding / 1000 : params.sharesOutstanding;
+  const sharesInBillions = params.sharesOutstanding / 1000;
   const impliedSharePrice = sharesInBillions > 0 ? equityValue / sharesInBillions : 0;
 
   // 5-Year Target Price via Exit Multiple Valuation (FY2031 Market Cap & Share Price)
   const targetMarketCapYr5 = lastFcf * params.exitMultiple;
-  const targetSharesInBillions = params.targetShares > 100 ? params.targetShares / 1000 : params.targetShares;
+  const targetSharesInBillions = params.targetShares / 1000;
   const targetSharePriceYr5 = targetSharesInBillions > 0 ? targetMarketCapYr5 / targetSharesInBillions : 0;
 
   let cagrYr5: number | null = null;
