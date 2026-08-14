@@ -39,6 +39,37 @@ export interface MarketStatsOptions {
 	force?: boolean;
 }
 
+export function parseDbTimestamp(val: any): number {
+	if (!val) return 0;
+	const num = Number(val);
+	if (!isNaN(num)) {
+		return num < 100000000000 ? num * 1000 : num;
+	}
+	const str = String(val).trim();
+	const utcStr = str.replace(' ', 'T') + (str.endsWith('Z') ? '' : 'Z');
+	return Date.parse(utcStr) || 0;
+}
+
+export function prioritizeForPriceUpdate<T extends { price_updated_at?: any }>(rows: T[]): T[] {
+	return [...rows].sort((a, b) => {
+		const aTime = parseDbTimestamp(a.price_updated_at);
+		const bTime = parseDbTimestamp(b.price_updated_at);
+		return aTime - bTime;
+	});
+}
+
+export function prioritizeForMetricsUpdate<T extends { updated_at?: any; market_cap?: any }>(rows: T[]): T[] {
+	return [...rows].sort((a, b) => {
+		const aHasStats = a.updated_at !== null && a.updated_at !== undefined && a.market_cap !== null && a.market_cap !== undefined;
+		const bHasStats = b.updated_at !== null && b.updated_at !== undefined && b.market_cap !== null && b.market_cap !== undefined;
+		if (!aHasStats && bHasStats) return -1;
+		if (aHasStats && !bHasStats) return 1;
+		if (!aHasStats && !bHasStats) return 0;
+		
+		return parseDbTimestamp(a.updated_at) - parseDbTimestamp(b.updated_at);
+	});
+}
+
 export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOptions = {}): Promise<{ symbol: string, success: boolean, price?: number | null, error?: string | null }[]> {
 	const { priceOnly = false, metricsOnly = false, force = false } = options;
 	const apiKey = env.FINNHUB_API_KEY;
@@ -55,7 +86,7 @@ export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOpt
 	let results: any[] = [];
 	try {
 		const dbResults = await env.DB.prepare(`
-			SELECT w.symbol, m.updated_at, m.market_cap,
+			SELECT w.symbol, m.updated_at, m.price_updated_at, m.market_cap,
 			       m.fifty_two_week_high, m.fifty_two_week_high_date,
 			       m.fifty_two_week_low, m.fifty_two_week_low_date,
 			       m.all_time_high, m.all_time_high_date,
@@ -63,6 +94,7 @@ export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOpt
 			FROM watchlist w
 			LEFT JOIN market_stats m ON w.symbol = m.symbol
 			WHERE w.is_active = 1
+			ORDER BY CASE WHEN m.price_updated_at IS NULL THEN 0 ELSE 1 END, m.price_updated_at ASC
 			LIMIT 100
 		`).all();
 		results = dbResults.results || [];
@@ -76,25 +108,7 @@ export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOpt
 	const metricsSymbolsToUpdate = new Set<string>();
 
 	// Sort a copy of the results to prioritize which ones need metrics update (missing first, then oldest updated)
-	const prioritizedForMetrics = [...results].sort((a, b) => {
-		const aHasStats = a.updated_at !== null && a.market_cap !== null;
-		const bHasStats = b.updated_at !== null && b.market_cap !== null;
-		if (!aHasStats && bHasStats) return -1;
-		if (aHasStats && !bHasStats) return 1;
-		if (!aHasStats && !bHasStats) return 0;
-		
-		const parseTime = (val: any) => {
-			if (!val) return 0;
-			const num = Number(val);
-			if (!isNaN(num)) {
-				return num < 100000000000 ? num * 1000 : num;
-			}
-			const utcStr = String(val).replace(' ', 'T') + 'Z';
-			return Date.parse(utcStr) || 0;
-		};
-
-		return parseTime(a.updated_at) - parseTime(b.updated_at);
-	});
+	const prioritizedForMetrics = prioritizeForMetricsUpdate(results);
 
 	let metricFetchCount = 0;
 	const oneDayAgoMs = Date.now() - 24 * 60 * 60 * 1000;
@@ -107,14 +121,7 @@ export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOpt
 		if (!lastUpdated || !row.market_cap) {
 			needsMetrics = true;
 		} else {
-			let lastUpdatedMs = 0;
-			const num = Number(lastUpdated);
-			if (!isNaN(num)) {
-				lastUpdatedMs = num < 100000000000 ? num * 1000 : num;
-			} else {
-				const utcStr = String(lastUpdated).replace(' ', 'T') + 'Z';
-				lastUpdatedMs = Date.parse(utcStr) || 0;
-			}
+			const lastUpdatedMs = parseDbTimestamp(lastUpdated);
 			if (lastUpdatedMs < oneDayAgoMs) {
 				needsMetrics = true;
 			}
@@ -158,12 +165,13 @@ export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOpt
 	const shouldFetchQuote = (marketOpen || force) && !metricsOnly;
 	const shouldFetchMetrics = (metricsOnly || (!priceOnly && !marketOpen)) && metricsSymbolsToUpdate.size > 0;
 
-	// Filter active watchlist results based on options
+	// Filter active watchlist results based on options:
+	// Prioritize stalest price updates first so round-robin rotation works correctly across runs
 	const resultsToProcess = shouldFetchQuote
-		? results // Fetch quotes for all 100 symbols
+		? prioritizeForPriceUpdate(results)
 		: (shouldFetchMetrics
-			? results.filter(row => metricsSymbolsToUpdate.has(row.symbol as string)) // Fetch metrics for up to 15 symbols
-			: [] // Do nothing if market is closed and no metrics need updating
+			? results.filter(row => metricsSymbolsToUpdate.has(row.symbol as string))
+			: []
 		  );
 
 	if (resultsToProcess.length === 0) {

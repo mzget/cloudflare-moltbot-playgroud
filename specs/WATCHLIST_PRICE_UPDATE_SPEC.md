@@ -56,6 +56,12 @@ To minimize database connection overhead and latency, database writes are batche
 ### F. Pre-fetching Breakout Events
 To avoid sequential, inline database `SELECT` queries inside the breakout detection loop for each symbol, all `record_breaker_events` recorded for the current date are pre-fetched at the start of the execution in [marketData.ts](file:///c:/Users/natta/Documents/oaktree-agent/backend/src/marketData.ts) and stored in an in-memory `Set`. The loop queries this `Set` for event existence, reducing sequential breakout check `SELECT` queries to zero.
 
+### G. Staleness-Based Round-Robin Price & Metrics Prioritization
+To prevent processing the same initial stocks while starving others when rate limits, errors, or delays occur:
+* **Price Fetching**: Symbols are sorted by `price_updated_at ASC NULLS FIRST` using `prioritizeForPriceUpdate()`. Stocks that have never had a price recorded or have the oldest timestamps are processed first.
+* **Metrics Fetching**: Symbols are sorted by `updated_at ASC NULLS FIRST` using `prioritizeForMetricsUpdate()`. Missing stats/fundamentals are processed before older ones.
+* Once a stock is successfully updated, its timestamp is refreshed, pushing it to the back of the queue on subsequent runs and ensuring a continuous round-robin rotation.
+
 ---
 
 ## 3. Data Flow & Invocation
