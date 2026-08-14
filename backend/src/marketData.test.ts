@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { isUSMarketOpen } from './marketData';
+import {
+	isUSMarketOpen,
+	parseDbTimestamp,
+	prioritizeForPriceUpdate,
+	prioritizeForMetricsUpdate,
+} from './marketData';
 
 describe('isUSMarketOpen', () => {
 	it('should accurately calculate market open status during EDT (Daylight Saving Time)', () => {
@@ -38,3 +43,83 @@ describe('isUSMarketOpen', () => {
 		expect(isUSMarketOpen(saturdayMidday)).toBe(false);
 	});
 });
+
+describe('parseDbTimestamp', () => {
+	it('should handle falsy values gracefully', () => {
+		expect(parseDbTimestamp(null)).toBe(0);
+		expect(parseDbTimestamp(undefined)).toBe(0);
+		expect(parseDbTimestamp('')).toBe(0);
+	});
+
+	it('should parse Unix epoch seconds and milliseconds', () => {
+		const epochSec = 1770000000;
+		expect(parseDbTimestamp(epochSec)).toBe(epochSec * 1000);
+
+		const epochMs = 1770000000000;
+		expect(parseDbTimestamp(epochMs)).toBe(epochMs);
+	});
+
+	it('should parse SQLite UTC datetime string YYYY-MM-DD HH:MM:SS', () => {
+		const sqliteDate = '2026-08-14 10:00:00';
+		const expected = Date.parse('2026-08-14T10:00:00Z');
+		expect(parseDbTimestamp(sqliteDate)).toBe(expected);
+	});
+
+	it('should parse ISO 8601 string', () => {
+		const isoDate = '2026-08-14T10:00:00.000Z';
+		const expected = Date.parse(isoDate);
+		expect(parseDbTimestamp(isoDate)).toBe(expected);
+	});
+});
+
+describe('prioritizeForPriceUpdate', () => {
+	it('should prioritize stocks with null price_updated_at first, then oldest price_updated_at', () => {
+		const rows = [
+			{ symbol: 'AAPL', price_updated_at: '2026-08-14 15:00:00' }, // newest
+			{ symbol: 'TSLA', price_updated_at: null },                  // never updated (should be 1st or 2nd)
+			{ symbol: 'MSFT', price_updated_at: '2026-08-14 10:00:00' }, // oldest date (after nulls)
+			{ symbol: 'NVDA', price_updated_at: undefined },             // never updated
+			{ symbol: 'GOOGL', price_updated_at: '2026-08-14 12:00:00' },// middle date
+		];
+
+		const sorted = prioritizeForPriceUpdate(rows);
+		const symbols = sorted.map(r => r.symbol);
+
+		// First two must be TSLA and NVDA (null/undefined)
+		expect(symbols.slice(0, 2)).toEqual(expect.arrayContaining(['TSLA', 'NVDA']));
+		// Next must be MSFT (10:00), then GOOGL (12:00), then AAPL (15:00)
+		expect(symbols.slice(2)).toEqual(['MSFT', 'GOOGL', 'AAPL']);
+	});
+
+	it('should return a new array without mutating the original', () => {
+		const rows = [
+			{ symbol: 'AAPL', price_updated_at: '2026-08-14 15:00:00' },
+			{ symbol: 'MSFT', price_updated_at: '2026-08-14 10:00:00' },
+		];
+		const originalOrder = [...rows];
+		const sorted = prioritizeForPriceUpdate(rows);
+
+		expect(sorted).not.toBe(rows);
+		expect(rows).toEqual(originalOrder);
+	});
+});
+
+describe('prioritizeForMetricsUpdate', () => {
+	it('should prioritize stocks with missing stats first, then oldest updated_at', () => {
+		const rows = [
+			{ symbol: 'AAPL', updated_at: '2026-08-14 15:00:00', market_cap: 3000000000000 },
+			{ symbol: 'NEW_STOCK', updated_at: null, market_cap: null },
+			{ symbol: 'MSFT', updated_at: '2026-08-14 08:00:00', market_cap: 2500000000000 },
+			{ symbol: 'NO_MC', updated_at: '2026-08-14 07:00:00', market_cap: null },
+		];
+
+		const sorted = prioritizeForMetricsUpdate(rows);
+		const symbols = sorted.map(r => r.symbol);
+
+		// NEW_STOCK and NO_MC have missing stats, should be prioritized first
+		expect(symbols.slice(0, 2)).toEqual(expect.arrayContaining(['NEW_STOCK', 'NO_MC']));
+		// Then MSFT (08:00:00), then AAPL (15:00:00)
+		expect(symbols.slice(2)).toEqual(['MSFT', 'AAPL']);
+	});
+});
+
