@@ -15,6 +15,7 @@ import { calculatePerformanceComparison } from './historicalPrices';
 import { runFullAnalysis, getOrUpdateMarketStats } from './analysisEngine';
 import okfRoutes from './okfRoutes';
 import { initializeAllTimeRecords } from './athSeeding';
+import { getScheduledWorkflowParams } from './scheduler';
 
 
 import { Hono } from 'hono';
@@ -2738,73 +2739,20 @@ export default {
   fetch: app.fetch,
 
   async scheduled(event: ScheduledEvent, env: Env, ctx: ExecutionContext) {
-    const now = new Date();
-    const minute = now.getUTCMinutes();
-    const isMinuteZero = minute === 0;
-    const isFacebookMinute = minute === 15 || minute === 45;
+    const decision = getScheduledWorkflowParams(event);
+    console.log(`[Scheduled] Target minute: ${decision.targetMinute} - ${decision.description}`);
 
-    if (isMinuteZero) {
-      console.log("Running Hourly Sync Tasks...");
-      const hour = now.getUTCHours();
-      const isSixHourly = hour % 6 === 0;
-
-      ctx.waitUntil((async () => {
-        try {
-          await env.OAKTREE_SYNC_WORKFLOW.create({
-            id: `cron-hourly-${Date.now()}`,
-            params: {
-              fetchMarketStats: true, // Fetch prices (when open) or metrics (when closed)
-              priceOnly: false,       // Allows rolling metrics sync during off-hours
-              checkAlertRules: true,
-              syncEmails: true,
-              generateEmailDigests: true,
-              emailDigestsManual: false,
-              runCrawler: isSixHourly,
-              generateDailySummaries: isSixHourly,
-              scanMarketBreakouts: true,
-              fetchMarketEvents: isSixHourly,
-              sendDailyEmailReport: false,
-              purgeOldData: isSixHourly,
-              syncFacebookPosts: false,
-            }
-          });
-          console.log("Hourly sync workflow instance triggered successfully.");
-        } catch (e) {
-          console.error("Failed to trigger Hourly Sync Workflow instance:", e);
-        }
-      })());
-    } else if (isFacebookMinute) {
-      console.log("Running 15/45-min Facebook sync...");
-      ctx.waitUntil((async () => {
-        try {
-          await env.OAKTREE_SYNC_WORKFLOW.create({
-            id: `cron-fb-${Date.now()}`,
-            params: {
-              syncFacebookPosts: true,
-            }
-          });
-          console.log("15/45-min Facebook sync workflow instance triggered successfully.");
-        } catch (e) {
-          console.error("Failed to trigger Facebook Workflow instance:", e);
-        }
-      })());
-    } else if (minute === 30) {
-      console.log("Running 30-min price sync...");
-      ctx.waitUntil((async () => {
-        try {
-          await env.OAKTREE_SYNC_WORKFLOW.create({
-            id: `cron-price-${Date.now()}`,
-            params: {
-              fetchMarketStats: true,
-              priceOnly: true,
-            }
-          });
-          console.log("30-min price sync workflow instance triggered successfully.");
-        } catch (e) {
-          console.error("Failed to trigger 30-min Workflow instance:", e);
-        }
-      })());
-    }
+    ctx.waitUntil((async () => {
+      try {
+        await env.OAKTREE_SYNC_WORKFLOW.create({
+          id: decision.workflowId,
+          params: decision.params,
+        });
+        console.log(`Workflow instance ${decision.workflowId} triggered successfully.`);
+      } catch (e) {
+        console.error(`Failed to trigger workflow instance ${decision.workflowId}:`, e);
+      }
+    })());
   },
 };
 

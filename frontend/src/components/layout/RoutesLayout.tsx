@@ -1,8 +1,7 @@
 import * as React from 'react';
-import { Box, Grid, Sheet, Typography, Divider, Drawer, Stack, Button, CircularProgress } from '@mui/joy';
+import { Box, Typography, Divider, Drawer, Stack, Button, CircularProgress, Sheet } from '@mui/joy';
 import { useSearch, useNavigate, useLocation } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
-import gsap from 'gsap';
 import { useColorScheme } from '@mui/joy/styles';
 import Header from './Header';
 import Sidebar from './Sidebar';
@@ -35,8 +34,6 @@ export default function RoutesLayout() {
   const activeTab = location.pathname.replace(/^\/|\/$/g, '') || 'dashboard';
   const { symbol, tab: subTab } = useSearch({ strict: false });
   const navigate = useNavigate();
-  const [sidebarCollapsed, setSidebarCollapsed] = React.useState(true);
-  const [sidebarHidden, setSidebarHidden] = React.useState(false);
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const { user, logout } = React.useContext(AuthContext);
   const theme = useSettingsStore(state => state.theme);
@@ -123,17 +120,11 @@ export default function RoutesLayout() {
   }, []);
 
   return (
-    <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: { xs: '1600px', xl: '100%' }, margin: '0 auto', minHeight: '100vh' }}>
+    <Box sx={{ px: { xs: 1.5, sm: 2.5, md: 3.5, lg: 4 }, py: { xs: 1.5, md: 2.5 }, width: '100%', minHeight: '100vh', boxSizing: 'border-box' }}>
       <Header 
-        onToggleSidebar={() => {
-          if (sidebarHidden) {
-            setSidebarHidden(false);
-          } else {
-            setSidebarCollapsed(!sidebarCollapsed);
-          }
-        }} 
-        sidebarCollapsed={sidebarCollapsed} 
-        sidebarHidden={sidebarHidden}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        reportsCount={reports.length + digests.length}
         onOpenSidebar={() => setMobileOpen(true)}
       />
 
@@ -236,66 +227,30 @@ export default function RoutesLayout() {
         </Box>
       </Drawer>
 
-      <Box sx={{ 
-        display: 'flex', 
-        gap: sidebarHidden ? 0 : 4,
-        transition: 'gap 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
-      }}>
-        {/* Sidebar Container */}
-        <Box 
-          sx={{ 
-            width: sidebarHidden ? '0px' : (sidebarCollapsed ? '80px' : { md: '280px', lg: '320px' }),
-            transition: 'width 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.4s ease, visibility 0.4s ease',
-            flexShrink: 0,
-            opacity: sidebarHidden ? 0 : 1,
-            visibility: sidebarHidden ? 'hidden' : 'visible',
-            display: { xs: 'none', md: 'block' }
-          }}
-        >
-          <Sheet sx={{ 
-            ...glassStyle, 
-            p: sidebarHidden ? 0 : 2, 
-            borderWidth: sidebarHidden ? 0 : '1px',
-            transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
-            position: 'sticky', 
-            top: 24, 
-            height: 'fit-content',
-            overflow: 'hidden'
-          }}>
-            <Sidebar 
-              activeTab={activeTab} 
-              setActiveTab={setActiveTab} 
-              reportsCount={reports.length + digests.length} 
-              collapsed={sidebarCollapsed}
-              onHide={() => setSidebarHidden(true)}
-            />
-          </Sheet>
-        </Box>
-
-        {/* Main Content Container */}
-        <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+      <Box sx={{ display: 'flex', gap: { xs: 0, lg: 3 }, width: '100%' }}>
+        {/* Main Content Area */}
+        <Box sx={{ flexGrow: 1, minWidth: 0, width: '100%' }}>
           <React.Suspense fallback={LoadingFallback}>
             {activeTab === 'dashboard' && <YahooPortfolio />}
-          {activeTab === 'market' && <MarketIntelligence />}
-
-          {activeTab === 'watchlist' && <Watchlist />}
-          {activeTab === 'agent' && <KnowledgeChat />}
-          {activeTab === 'analysis' && symbol && <AnalysisReport symbol={symbol} subTab={subTab} hospitality={undefined} />}
-          {activeTab === 'analysis' && !symbol && <Box sx={{ py: 4, textAlign: 'center' }}><Typography level="h3">กรุณาระบุสัญลักษณ์หุ้นที่ต้องการวิเคราะห์</Typography></Box>}
-          {activeTab === 'db-agent' && <DatabaseChat />}
-          {activeTab === 'command-center' && <SourceManager />}
-          {activeTab === 'about' && (
-            <Sheet sx={{ ...glassStyle, p: 4 }}>
-              <Typography level="h2" sx={{ mb: 2 }}>{t('about.title')}</Typography>
-              <Typography sx={{ mb: 2, lineHeight: 1.8 }}>
-                {t('about.description')}
-              </Typography>
-              <Divider sx={{ my: 3, opacity: 0.1 }} />
-              <Typography level="body-sm" sx={{ opacity: 0.5 }}>
-                {t('about.footer')}
-              </Typography>
-            </Sheet>
-          )}
+            {activeTab === 'market' && <MarketIntelligence />}
+            {activeTab === 'watchlist' && <Watchlist />}
+            {activeTab === 'agent' && <KnowledgeChat />}
+            {activeTab === 'analysis' && symbol && <AnalysisReport symbol={symbol} subTab={subTab} hospitality={undefined} />}
+            {activeTab === 'analysis' && !symbol && <Box sx={{ py: 4, textAlign: 'center' }}><Typography level="h3">กรุณาระบุสัญลักษณ์หุ้นที่ต้องการวิเคราะห์</Typography></Box>}
+            {activeTab === 'db-agent' && <DatabaseChat />}
+            {activeTab === 'command-center' && <SourceManager />}
+            {activeTab === 'about' && (
+              <Sheet sx={{ ...glassStyle, p: 4, borderRadius: '18px' }}>
+                <Typography level="h2" sx={{ mb: 2 }}>{t('about.title')}</Typography>
+                <Typography sx={{ mb: 2, lineHeight: 1.8 }}>
+                  {t('about.description')}
+                </Typography>
+                <Divider sx={{ my: 3, opacity: 0.1 }} />
+                <Typography level="body-sm" sx={{ opacity: 0.5 }}>
+                  {t('about.footer')}
+                </Typography>
+              </Sheet>
+            )}
           </React.Suspense>
         </Box>
 
@@ -308,7 +263,7 @@ export default function RoutesLayout() {
               display: { xs: 'none', lg: 'block' }
             }}
           >
-            <Box sx={{ position: 'sticky', top: 24 }}>
+            <Box sx={{ position: 'sticky', top: 72 }}>
               <React.Suspense fallback={LoadingFallback}>
                 <MarketEventsTimeline inSidebar />
               </React.Suspense>
