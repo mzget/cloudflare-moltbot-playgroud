@@ -73,7 +73,7 @@ function formatRelativeTime(dateVal: string | number | undefined): { display: st
   const tooltip = `${date.toISOString().replace('T', ' ').slice(0, 19)} UTC`;
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
-  const isStale = diffMs > 86400000; // Older than 1 day (24 hours)
+  const isStale = diffMs > 2 * 86400000; // Older than 2 days (48 hours)
 
   if (diffMs < 0) {
     return { display: 'Just now', tooltip, isStale: false };

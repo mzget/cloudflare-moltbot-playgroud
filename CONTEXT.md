@@ -24,3 +24,10 @@ A visual badge/chip indicator displayed next to the stock symbol in the Watchlis
 
 ### Sector Label
 A user-defined short text tag stored on a Watchlist entry (`sector_label`) that describes the business type or sector of a stock (e.g. "Tech Growth", "REIT", "Healthcare"). Displayed as the secondary label under the symbol in the Holdings table and WatchlistCard — replacing the company `name` in those UI surfaces. Falls back to `name` when not set. An optional accompanying `sector_label_color` (hex string) controls the font color of the label.
+
+### Market Quote Sync (Price Recency)
+The real-time or delayed price quote synchronization (`price_updated_at`) that updates live market prices (last price, previous close, day high/low, open) for active watchlist stocks during US market trading hours (Mon–Fri 9:30–16:30 ET).
+
+### Fundamental Metrics Sync (Fundamentals Recency)
+The financial statistics and valuation metrics synchronization (`updated_at`) that refreshes quarterly/annual financial ratios (P/E, Market Cap, Margins, Debt/Equity, 52-week High/Low) on a rolling 24-hour cycle during off-market hours.
+

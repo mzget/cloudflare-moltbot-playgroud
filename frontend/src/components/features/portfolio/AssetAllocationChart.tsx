@@ -116,13 +116,32 @@ export default function AssetAllocationChart({
           color: PALETTE[idx % PALETTE.length],
         }));
     } else {
-      // Stocks-only view: open stock positions by market value
-      return (holdings || [])
+      // Stocks view: open stock positions calculated as % of Total Assets
+      const stockItems = (holdings || [])
         .filter(h => h.status === 'Open' && h.shares > 0 && (h.market_value || 0) > 0)
         .map(h => ({ name: h.symbol, value: (h.market_value || 0) * rate }))
         .filter(item => item.value > 0)
-        .sort((a, b) => b.value - a.value)
-        .map((item, idx) => ({ ...item, color: PALETTE[idx % PALETTE.length] }));
+        .sort((a, b) => b.value - a.value);
+
+      const stocksTotalThb = stockItems.reduce((sum, item) => sum + item.value, 0);
+
+      const totalPortfolio = summary?.total_market_value && summary.total_market_value > 0
+        ? summary.total_market_value
+        : (brokers || [])
+            .filter((b: any) => b.broker_name !== 'Cash')
+            .reduce((sum: number, b: any) => sum + (b.balance || 0), 0) || stocksTotalThb;
+
+      const otherVal = Math.max(0, totalPortfolio - stocksTotalThb);
+
+      const items = [
+        ...stockItems.map((item, idx) => ({
+          ...item,
+          color: PALETTE[idx % PALETTE.length],
+        })),
+        ...(otherVal > 0 ? [{ name: 'Other Assets', value: otherVal, color: '#64748b' }] : []),
+      ];
+
+      return items;
     }
   }, [viewMode, brokers, categories, allocations, summary, rate, holdings]);
 
