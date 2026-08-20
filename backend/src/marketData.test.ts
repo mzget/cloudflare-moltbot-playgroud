@@ -4,6 +4,7 @@ import {
 	parseDbTimestamp,
 	prioritizeForPriceUpdate,
 	prioritizeForMetricsUpdate,
+	extractQuarterlyMetrics,
 } from './marketData';
 
 describe('isUSMarketOpen', () => {
@@ -122,4 +123,96 @@ describe('prioritizeForMetricsUpdate', () => {
 		expect(symbols.slice(2)).toEqual(['MSFT', 'AAPL']);
 	});
 });
+
+describe('extractQuarterlyMetrics', () => {
+	it('should return nulls when input is null, undefined, or empty object', () => {
+		expect(extractQuarterlyMetrics(null)).toEqual({
+			gross_margin_quarterly: null,
+			revenue_growth_quarterly_yoy: null,
+			ebit_margin_quarterly: null,
+		});
+
+		expect(extractQuarterlyMetrics(undefined)).toEqual({
+			gross_margin_quarterly: null,
+			revenue_growth_quarterly_yoy: null,
+			ebit_margin_quarterly: null,
+		});
+
+		expect(extractQuarterlyMetrics({})).toEqual({
+			gross_margin_quarterly: null,
+			revenue_growth_quarterly_yoy: null,
+			ebit_margin_quarterly: null,
+		});
+	});
+
+	it('should extract quarterly metrics from series.quarterly and metric', () => {
+		const finnhubData = {
+			metric: {
+				revenueGrowthQuarterlyYoy: 34.32,
+			},
+			series: {
+				quarterly: {
+					grossMargin: [
+						{ period: '2026-03-31', v: 0.4877 },
+						{ period: '2025-12-31', v: 0.4611 },
+					],
+					operatingMargin: [
+						{ period: '2026-03-31', v: 0.1205 },
+						{ period: '2025-12-31', v: 0.1718 },
+					],
+				},
+			},
+		};
+
+		const result = extractQuarterlyMetrics(finnhubData);
+		expect(result.gross_margin_quarterly).toBeCloseTo(0.4877);
+		expect(result.revenue_growth_quarterly_yoy).toBeCloseTo(0.3432);
+		expect(result.ebit_margin_quarterly).toBeCloseTo(0.1205);
+	});
+
+	it('should normalize percentage numbers (>1 or <-1) to decimals', () => {
+		const finnhubData = {
+			metric: {
+				revenueGrowthQuarterlyYoy: -15.5,
+			},
+			series: {
+				quarterly: {
+					grossMargin: [
+						{ period: '2026-03-31', v: 48.77 },
+					],
+					operatingMargin: [
+						{ period: '2026-03-31', v: -12.05 },
+					],
+				},
+			},
+		};
+
+		const result = extractQuarterlyMetrics(finnhubData);
+		expect(result.gross_margin_quarterly).toBeCloseTo(0.4877);
+		expect(result.revenue_growth_quarterly_yoy).toBeCloseTo(-0.155);
+		expect(result.ebit_margin_quarterly).toBeCloseTo(-0.1205);
+	});
+
+	it('should fallback to metric object if series.quarterly is empty or missing', () => {
+		const finnhubData = {
+			metric: {
+				grossMarginQuarterly: 42.5,
+				operatingMarginQuarterly: 18.2,
+				revenueGrowthQuarterlyYoy: 25.0,
+			},
+			series: {
+				quarterly: {
+					grossMargin: [],
+					operatingMargin: [],
+				},
+			},
+		};
+
+		const result = extractQuarterlyMetrics(finnhubData);
+		expect(result.gross_margin_quarterly).toBeCloseTo(0.425);
+		expect(result.revenue_growth_quarterly_yoy).toBeCloseTo(0.25);
+		expect(result.ebit_margin_quarterly).toBeCloseTo(0.182);
+	});
+});
+
 

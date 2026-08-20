@@ -1,7 +1,1 @@
-{
-  "toprod": {
-    "category": "git",
-    "description": "Merge current branch into develop and main, then push both branches.",
-    "tags": ["git", "release", "deploy", "merge"]
-  }
-}
+{}

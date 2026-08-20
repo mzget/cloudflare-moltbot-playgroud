@@ -70,6 +70,68 @@ export function prioritizeForMetricsUpdate<T extends { updated_at?: any; market_
 	});
 }
 
+export function extractQuarterlyMetrics(finnhubData: { metric?: Record<string, any>; series?: Record<string, any> } | null | undefined): {
+	gross_margin_quarterly: number | null;
+	revenue_growth_quarterly_yoy: number | null;
+	ebit_margin_quarterly: number | null;
+} {
+	if (!finnhubData) {
+		return {
+			gross_margin_quarterly: null,
+			revenue_growth_quarterly_yoy: null,
+			ebit_margin_quarterly: null,
+		};
+	}
+
+	const m = finnhubData.metric;
+	const seriesQuarterly = finnhubData.series?.quarterly;
+
+	// 1. Gross Margin (Quarterly)
+	let gross_margin_quarterly: number | null = null;
+	const qGrossMargin = seriesQuarterly?.grossMargin;
+	if (Array.isArray(qGrossMargin) && qGrossMargin.length > 0) {
+		const latest = [...qGrossMargin]
+			.filter(item => item && typeof item.v === 'number')
+			.sort((a, b) => (b.period || '').localeCompare(a.period || ''))[0];
+		if (latest && typeof latest.v === 'number') {
+			const v = latest.v;
+			gross_margin_quarterly = Math.abs(v) > 1 ? v / 100 : v;
+		}
+	} else if (typeof m?.grossMarginQuarterly === 'number') {
+		const v = m.grossMarginQuarterly;
+		gross_margin_quarterly = Math.abs(v) > 1 ? v / 100 : v;
+	}
+
+	// 2. Revenue Growth (Quarterly YoY)
+	let revenue_growth_quarterly_yoy: number | null = null;
+	if (typeof m?.revenueGrowthQuarterlyYoy === 'number') {
+		const v = m.revenueGrowthQuarterlyYoy;
+		revenue_growth_quarterly_yoy = Math.abs(v) > 1 ? v / 100 : v;
+	}
+
+	// 3. EBIT Margin (Operating Margin Quarterly)
+	let ebit_margin_quarterly: number | null = null;
+	const qOpMargin = seriesQuarterly?.operatingMargin;
+	if (Array.isArray(qOpMargin) && qOpMargin.length > 0) {
+		const latest = [...qOpMargin]
+			.filter(item => item && typeof item.v === 'number')
+			.sort((a, b) => (b.period || '').localeCompare(a.period || ''))[0];
+		if (latest && typeof latest.v === 'number') {
+			const v = latest.v;
+			ebit_margin_quarterly = Math.abs(v) > 1 ? v / 100 : v;
+		}
+	} else if (typeof m?.operatingMarginQuarterly === 'number') {
+		const v = m.operatingMarginQuarterly;
+		ebit_margin_quarterly = Math.abs(v) > 1 ? v / 100 : v;
+	}
+
+	return {
+		gross_margin_quarterly,
+		revenue_growth_quarterly_yoy,
+		ebit_margin_quarterly,
+	};
+}
+
 export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOptions = {}): Promise<{ symbol: string, success: boolean, price?: number | null, error?: string | null }[]> {
 	const { priceOnly = false, metricsOnly = false, force = false } = options;
 	const apiKey = env.FINNHUB_API_KEY;
@@ -499,6 +561,9 @@ export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOpt
 
 				console.log(`Final stats for ${symbol}: price=${price}, mc=${market_cap}, p_e=${p_e}`);
 
+				// Extract quarterly metrics from Finnhub data
+				const { gross_margin_quarterly, revenue_growth_quarterly_yoy, ebit_margin_quarterly } = extractQuarterlyMetrics(data);
+
 				const currentUtcString = new Date().toISOString().replace('T', ' ').slice(0, 19);
 				const updatedAtVal = shouldFetchMetrics ? currentUtcString : null;
 				const priceUpdatedAtVal = price !== null ? currentUtcString : null;
@@ -512,8 +577,9 @@ export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOpt
 						price, previous_close, day_high, day_low, open_price, updated_at,
 						fifty_two_week_high, fifty_two_week_high_date, fifty_two_week_low, fifty_two_week_low_date,
 						all_time_high, all_time_high_date, all_time_low, all_time_low_date,
-						price_updated_at
-					) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+						price_updated_at,
+						gross_margin_quarterly, revenue_growth_quarterly_yoy, ebit_margin_quarterly
+					) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 					ON CONFLICT(symbol) DO UPDATE SET
 						market_cap=CASE WHEN excluded.updated_at IS NOT NULL THEN excluded.market_cap ELSE market_stats.market_cap END,
 						revenues=CASE WHEN excluded.updated_at IS NOT NULL THEN excluded.revenues ELSE market_stats.revenues END,
@@ -549,7 +615,10 @@ export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOpt
 						all_time_high_date=CASE WHEN excluded.updated_at IS NOT NULL THEN excluded.all_time_high_date ELSE market_stats.all_time_high_date END,
 						all_time_low=CASE WHEN excluded.updated_at IS NOT NULL THEN excluded.all_time_low ELSE market_stats.all_time_low END,
 						all_time_low_date=CASE WHEN excluded.updated_at IS NOT NULL THEN excluded.all_time_low_date ELSE market_stats.all_time_low_date END,
-						price_updated_at=COALESCE(excluded.price_updated_at, market_stats.price_updated_at)
+						price_updated_at=COALESCE(excluded.price_updated_at, market_stats.price_updated_at),
+						gross_margin_quarterly=CASE WHEN excluded.updated_at IS NOT NULL THEN excluded.gross_margin_quarterly ELSE market_stats.gross_margin_quarterly END,
+						revenue_growth_quarterly_yoy=CASE WHEN excluded.updated_at IS NOT NULL THEN excluded.revenue_growth_quarterly_yoy ELSE market_stats.revenue_growth_quarterly_yoy END,
+						ebit_margin_quarterly=CASE WHEN excluded.updated_at IS NOT NULL THEN excluded.ebit_margin_quarterly ELSE market_stats.ebit_margin_quarterly END
 				`).bind(
 					symbol, market_cap, revenues, revenue_3y_cagr, revenue_1y_growth, revenue_5y_cagr,
 					gross_profit_margin, operating_margin, ev_ebit, ev_sales,
@@ -558,7 +627,8 @@ export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOpt
 					price, previous_close, day_high, day_low, open_price, updatedAtVal,
 					fifty_two_week_high, fifty_two_week_high_date, fifty_two_week_low, fifty_two_week_low_date,
 					all_time_high, all_time_high_date, all_time_low, all_time_low_date,
-					priceUpdatedAtVal
+					priceUpdatedAtVal,
+					gross_margin_quarterly, revenue_growth_quarterly_yoy, ebit_margin_quarterly
 				);
 
 				batchStatements.push(stmt);
