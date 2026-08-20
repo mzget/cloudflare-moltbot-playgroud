@@ -19,8 +19,8 @@ import gsap from 'gsap';
 import { API_BASE_URL } from '../config';
 import { glassStyle } from '../styles/glass';
 import { dotaColors, dotaStoneStyle } from '../styles/dotaTheme';
-import { AuthContext } from './AuthContext';
-import OaktreeIcon from './OaktreeIcon';
+import { AuthContext } from './common/AuthContext';
+import OaktreeIcon from './common/OaktreeIcon';
 
 interface TopResourceBarProps {
   activeHero: string;
@@ -74,7 +74,7 @@ export default function TopResourceBar({
       const res = await fetch(`${API_BASE_URL}/api/notifications`);
       if (res.ok) {
         const data = await res.json();
-        setNotifications(data);
+        setNotifications(data as Notification[]);
       }
     } catch (e) {
       console.error('Failed to fetch notifications', e);

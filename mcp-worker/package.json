@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "wrangler dev --persist-to=../.d1-data",
     "deploy": "wrangler deploy",
-    "cf-typegen": "wrangler types"
+    "cf-typegen": "wrangler types",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@cloudflare/ai-chat": "^0.9.0",

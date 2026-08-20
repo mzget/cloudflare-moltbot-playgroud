@@ -24,6 +24,9 @@ export interface MarketStatsData {
   net_debt: number | null;
   total_debt: number | null;
   dividend_yield: number | null;
+  gross_margin_quarterly?: number | null;
+  revenue_growth_quarterly_yoy?: number | null;
+  ebit_margin_quarterly?: number | null;
   updated_at: string | null;
 }
 

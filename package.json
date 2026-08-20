@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "ci:typecheck": "npm --prefix backend run cf-typegen && npx --prefix backend tsc --noEmit && npm --prefix frontend run type-check && npx --prefix mcp-worker tsc --noEmit",
+    "ci:typecheck": "npm --prefix backend run cf-typegen && npm --prefix backend run type-check && npm --prefix frontend run type-check && npm --prefix mcp-worker run type-check",
     "type-check": "npm run ci:typecheck"
   }
 }
