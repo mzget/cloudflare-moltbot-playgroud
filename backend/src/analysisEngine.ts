@@ -1,5 +1,6 @@
 import { Env } from './index';
 import { getFrameworkByCategory } from './okf';
+import { extractQuarterlyMetrics } from './marketData';
 import { 
   MarketStatsData, 
   formatMetricsForPrompt, 
@@ -161,6 +162,7 @@ export async function getOrUpdateMarketStats(env: Env, symbol: string): Promise<
   }
   
   const currentUtc = new Date().toISOString().replace('T', ' ').slice(0, 19);
+  const { gross_margin_quarterly, revenue_growth_quarterly_yoy, ebit_margin_quarterly } = extractQuarterlyMetrics(mResponse);
   
   await env.DB.prepare(`
     INSERT INTO market_stats (
@@ -168,8 +170,9 @@ export async function getOrUpdateMarketStats(env: Env, symbol: string): Promise<
       gross_profit_margin, operating_margin, ev_ebit, ev_sales,
       p_ocf, p_fcf, capex_to_ocf, rd_to_revenue, debt_equity,
       p_e, fcf_margin, total_cash, net_debt, total_debt, dividend_yield,
-      price, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      price, updated_at,
+      gross_margin_quarterly, revenue_growth_quarterly_yoy, ebit_margin_quarterly
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(symbol) DO UPDATE SET
       market_cap=excluded.market_cap, revenues=excluded.revenues,
       revenue_3y_cagr=excluded.revenue_3y_cagr, revenue_1y_growth=excluded.revenue_1y_growth,
@@ -179,19 +182,24 @@ export async function getOrUpdateMarketStats(env: Env, symbol: string): Promise<
       rd_to_revenue=excluded.rd_to_revenue, debt_equity=excluded.debt_equity, p_e=excluded.p_e,
       fcf_margin=excluded.fcf_margin, total_cash=excluded.total_cash, net_debt=excluded.net_debt,
       total_debt=excluded.total_debt, dividend_yield=excluded.dividend_yield,
-      price=excluded.price, updated_at=excluded.updated_at
+      price=excluded.price, updated_at=excluded.updated_at,
+      gross_margin_quarterly=excluded.gross_margin_quarterly,
+      revenue_growth_quarterly_yoy=excluded.revenue_growth_quarterly_yoy,
+      ebit_margin_quarterly=excluded.ebit_margin_quarterly
   `).bind(
     symbolUpper, market_cap, revenues, revenue_3y_cagr, revenue_1y_growth, revenue_5y_cagr,
     gross_profit_margin, operating_margin, ev_ebit, ev_sales,
     p_ocf, p_fcf, capex_to_ocf, rd_to_revenue, debt_equity,
     p_e, fcf_margin, total_cash, net_debt, total_debt, dividend_yield,
-    price, currentUtc
+    price, currentUtc,
+    gross_margin_quarterly, revenue_growth_quarterly_yoy, ebit_margin_quarterly
   ).run();
   
   return {
     symbol: symbolUpper, price, market_cap, revenues, revenue_1y_growth, revenue_3y_cagr, revenue_5y_cagr,
     gross_profit_margin, operating_margin, ev_ebit, ev_sales, p_ocf, p_fcf, capex_to_ocf,
     rd_to_revenue, debt_equity, p_e, fcf_margin, total_cash, net_debt, total_debt, dividend_yield,
+    gross_margin_quarterly, revenue_growth_quarterly_yoy, ebit_margin_quarterly,
     updated_at: currentUtc
   };
 }

@@ -44,6 +44,9 @@ Do NOT load domain-specific guidelines or all skills at the start of every turn.
 7. **DCF Valuation Model Guidelines**:
    - *Condition*: Working on stock valuation, DCF calculations, DCF parameters entry, or DCF UI components.
    - *Path*: [dcf-valuation-model/SKILL.md](file:///c:/Users/natta/Documents/oaktree-agent/.agents/skills/dcf-valuation-model/SKILL.md)
+8. **Release Management Guidelines (tostaging / tomain)**:
+   - *Condition*: Merging branches, preparing staging/production releases, or executing release commands.
+   - *Path*: [release/SKILL.md](file:///c:/Users/natta/Documents/oaktree-agent/.agents/skills/release/SKILL.md)
 
 ---
 

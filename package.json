@@ -1,0 +1,9 @@
+{
+  "name": "oaktree-agent-workspace",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "ci:typecheck": "npm --prefix backend run cf-typegen && npx --prefix backend tsc --noEmit && npm --prefix frontend run type-check && npx --prefix mcp-worker tsc --noEmit",
+    "type-check": "npm run ci:typecheck"
+  }
+}

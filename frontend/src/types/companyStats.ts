@@ -11,6 +11,9 @@ export interface CompanyStats {
   revenue_1y_growth?: number;  // decimal
   gross_profit_margin?: number;// decimal
   operating_margin?: number;   // decimal
+  gross_margin_quarterly?: number;        // decimal: latest quarter gross margin
+  revenue_growth_quarterly_yoy?: number;  // decimal: latest quarter YoY revenue growth
+  ebit_margin_quarterly?: number;         // decimal: latest quarter operating/EBIT margin
   ev_ebit?: number;
   ev_sales?: number;
   p_ocf?: number;

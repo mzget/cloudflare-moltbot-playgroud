@@ -31,8 +31,11 @@ export const ALL_COLUMNS: ColumnDef[] = [
   { id: 'revenue_5y_cagr', label: 'Rev 5Y CAGR', format: 'pct' },
   { id: 'revenue_3y_cagr', label: 'Rev 3Y CAGR', format: 'pct' },
   { id: 'revenue_1y_growth', label: 'Rev 1Y Growth', format: 'pct' },
+  { id: 'revenue_growth_quarterly_yoy', label: 'Rev Growth (Q YoY)', format: 'pct' },
   { id: 'gross_profit_margin', label: 'Gross Profit', format: 'pct' },
+  { id: 'gross_margin_quarterly', label: 'Gross Margin (Q)', format: 'pct' },
   { id: 'operating_margin', label: 'Op. Margin', format: 'pct' },
+  { id: 'ebit_margin_quarterly', label: 'EBIT Margin (Q)', format: 'pct' },
   { id: 'fcf_margin', label: 'FCF Margin', format: 'pct' },
   { id: 'p_e', label: 'P/E', format: 'ratio' },
   { id: 'ev_ebit', label: 'EV/EBIT', format: 'ratio' },
@@ -138,12 +141,12 @@ function getCellColor(val: number | undefined, col: ColumnDef): string {
   }
 
   // 2. Margin Columns
-  if (col.id === 'gross_profit_margin') {
+  if (col.id === 'gross_profit_margin' || col.id === 'gross_margin_quarterly') {
     if (val < 0.20) return 'danger.plainColor'; // Low gross margin
     if (val >= 0.40) return 'success.plainColor'; // High gross margin
     return 'text.primary';
   }
-  if (col.id === 'operating_margin') {
+  if (col.id === 'operating_margin' || col.id === 'ebit_margin_quarterly') {
     if (val < 0.05) return 'danger.plainColor'; // Weak operational margin
     if (val >= 0.15) return 'success.plainColor'; // Strong operational margin
     return 'text.primary';
@@ -155,7 +158,7 @@ function getCellColor(val: number | undefined, col: ColumnDef): string {
   }
 
   // 3. Growth & CAGR Columns
-  if (col.id === 'revenue_3y_cagr' || col.id === 'revenue_5y_cagr' || col.id === 'revenue_1y_growth') {
+  if (col.id === 'revenue_3y_cagr' || col.id === 'revenue_5y_cagr' || col.id === 'revenue_1y_growth' || col.id === 'revenue_growth_quarterly_yoy') {
     if (val < 0) return 'danger.plainColor'; // Negative growth
     if (val >= 0.15) return 'success.plainColor'; // High growth (15%+)
     return 'text.primary';
