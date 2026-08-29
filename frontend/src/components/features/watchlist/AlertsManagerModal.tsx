@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Modal,
   ModalDialog,
@@ -17,6 +17,7 @@ import {
   FormHelperText,
   Switch,
   IconButton,
+  CircularProgress,
 } from '@mui/joy';
 import { Trash2 } from 'lucide-react';
 import { glassStyle } from '../../../styles/glass';
@@ -35,6 +36,7 @@ interface AlertsManagerModalProps {
   symbol: string | null;
   symbolRules: AlertRule[];
   currentSymbolStats: any;
+  isLoading?: boolean;
   onClose: () => void;
   onCreateRule: (metric: string, condition: string, targetVal: number) => Promise<void>;
   onToggleRule: (ruleId: number, currentStatus: number) => Promise<void>;
@@ -74,6 +76,7 @@ export const AlertsManagerModal = React.memo<AlertsManagerModalProps>(({
   symbol,
   symbolRules,
   currentSymbolStats,
+  isLoading = false,
   onClose,
   onCreateRule,
   onToggleRule,
@@ -83,6 +86,14 @@ export const AlertsManagerModal = React.memo<AlertsManagerModalProps>(({
   const [condition, setCondition] = useState('cross_up');
   const [target, setTarget] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setTarget('');
+      setMetric('price');
+      setCondition('cross_up');
+    }
+  }, [open, symbol]);
 
   const getHelperText = useCallback((m: string) => {
     if (!currentSymbolStats) return 'No current data available';
@@ -211,7 +222,11 @@ export const AlertsManagerModal = React.memo<AlertsManagerModalProps>(({
           {/* Existing Rules List */}
           <Box>
             <Typography level="title-sm" sx={{ mb: 1.5, fontWeight: 700 }}>Active Rules</Typography>
-            {symbolRules.length === 0 ? (
+            {isLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
+                <CircularProgress size="sm" variant="plain" />
+              </Box>
+            ) : symbolRules.length === 0 ? (
               <Typography level="body-sm" sx={{ color: 'text.tertiary', fontStyle: 'italic', textAlign: 'center', py: 2 }}>
                 No alert rules set for this symbol.
               </Typography>

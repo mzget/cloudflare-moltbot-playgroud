@@ -1,34 +1,39 @@
+import { useCallback } from 'react';
 import { API_BASE_URL } from '../../../../config';
 import { useQuery } from '../../../../utils/useQuery';
 import { useMutation } from '../../../../utils/useMutation';
 import { invalidateQueries } from '../../../../utils/invalidateQueries';
 import { useQueryCache } from '../../../../store/queryCache';
 
-export function useAlertRules(onAlertRulesChanged?: () => void) {
+export interface AlertRule {
+  id: number;
+  symbol: string;
+  metric: string;
+  condition_type: string;
+  target_value: number;
+  is_active: number;
+  last_checked_value?: number | null;
+}
 
-  // symbolRules are loaded on-demand (enabled=false initially; callers call refetch).
-  // We expose fetchRulesForSymbol which sets the active key and triggers a load.
-  // To keep the same external API we use a simple approach: store the current symbol
-  // in a ref-like query key and expose a manual refetch.
-  const [activeSymbol, setActiveSymbol] = useActiveSymbol();
-
+export function useAlertRules(activeSymbol: string | null, onAlertRulesChanged?: () => void) {
   const alertsKey = activeSymbol ? `alerts:${activeSymbol}` : null;
 
-  const { data: symbolRules = [], refetch: _refetch } = useQuery<any[]>(
+  const { data: rawSymbolRules = [], isLoading, refetch } = useQuery<AlertRule[]>(
     alertsKey ?? '__alerts_disabled__',
     async () => {
+      if (!activeSymbol) return [];
       const res = await fetch(`${API_BASE_URL}/api/alerts?symbol=${activeSymbol}`);
       if (!res.ok) throw new Error('Failed to fetch alert rules');
-      return res.json();
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
     },
-    { enabled: !!alertsKey }
+    {
+      enabled: !!alertsKey,
+      staleTime: 0, // Always fresh when modal is opened for a symbol
+    }
   );
 
-  const fetchRulesForSymbol = async (symbol: string) => {
-    setActiveSymbol(symbol);
-    // If the symbol changed the query will auto-fetch; if same symbol force-refetch.
-    if (symbol === activeSymbol) await _refetch();
-  };
+  const symbolRules = Array.isArray(rawSymbolRules) ? rawSymbolRules : [];
 
   // --- createRule ---
   const { mutateAsync: createRule } = useMutation(
@@ -130,17 +135,11 @@ export function useAlertRules(onAlertRulesChanged?: () => void) {
   }, [_deleteRule]);
 
   return {
-    symbolRules,
-    fetchRulesForSymbol,
+    symbolRules: activeSymbol ? symbolRules : [],
+    isLoading: !!activeSymbol && isLoading,
+    refetch,
     createRule: createRuleFn,
     toggleRule: toggleRuleFn,
     deleteRule: deleteRuleFn,
   };
-}
-
-// Tiny local hook to track which symbol is currently active.
-import { useState, useCallback } from 'react';
-function useActiveSymbol(): [string | null, (s: string) => void] {
-  const [sym, setSym] = useState<string | null>(null);
-  return [sym, setSym];
 }

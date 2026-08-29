@@ -46,13 +46,17 @@ export default function MyWatchlist() {
     fetchWatchlist,
   } = useWatchlist();
 
+  // Alert Modal State
+  const [isAlertsModalOpen, setIsAlertsModalOpen] = useState(false);
+  const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
+
   const {
     symbolRules,
-    fetchRulesForSymbol,
+    isLoading: isRulesLoading,
     createRule,
     toggleRule,
     deleteRule,
-  } = useAlertRules(fetchWatchlist);
+  } = useAlertRules(selectedSymbol, fetchWatchlist);
 
   // Toast state
   const [toastOpen, setToastOpen] = useState(false);
@@ -172,18 +176,10 @@ export default function MyWatchlist() {
     });
   }, [watchlist, sortBy]);
 
-  // Alert Modal State
-  const [isAlertsModalOpen, setIsAlertsModalOpen] = useState(false);
-  const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
-
-  const handleOpenAlertsModal = useCallback(
-    (symbol: string) => {
-      setSelectedSymbol(symbol);
-      fetchRulesForSymbol(symbol);
-      setIsAlertsModalOpen(true);
-    },
-    [fetchRulesForSymbol]
-  );
+  const handleOpenAlertsModal = useCallback((symbol: string) => {
+    setSelectedSymbol(symbol);
+    setIsAlertsModalOpen(true);
+  }, []);
 
   const handleCloseAlertsModal = useCallback(() => {
     setIsAlertsModalOpen(false);
@@ -349,6 +345,7 @@ export default function MyWatchlist() {
         symbol={selectedSymbol}
         symbolRules={symbolRules}
         currentSymbolStats={currentSymbolStats}
+        isLoading={isRulesLoading}
         onClose={handleCloseAlertsModal}
         onCreateRule={handleCreateRule}
         onToggleRule={handleToggleRule}

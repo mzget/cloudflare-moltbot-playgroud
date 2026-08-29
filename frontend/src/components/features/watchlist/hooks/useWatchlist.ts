@@ -32,15 +32,18 @@ async function fetchMarketStatsFn(): Promise<any[]> {
 }
 
 export function useWatchlist() {
-  const { data: watchlist = [], refetch: fetchWatchlist } = useQuery<WatchlistItem[]>(
+  const { data: rawWatchlist = [], refetch: fetchWatchlist } = useQuery<WatchlistItem[]>(
     WATCHLIST_KEY,
     fetchWatchlistFn
   );
 
-  const { data: marketStats = [], refetch: fetchMarketStats } = useQuery<any[]>(
+  const { data: rawMarketStats = [], refetch: fetchMarketStats } = useQuery<any[]>(
     MARKET_STATS_KEY,
     fetchMarketStatsFn
   );
+
+  const watchlist = Array.isArray(rawWatchlist) ? rawWatchlist : [];
+  const marketStats = Array.isArray(rawMarketStats) ? rawMarketStats : [];
 
   // --- addWatchlist ---
   const { mutateAsync: addWatchlist } = useMutation(
