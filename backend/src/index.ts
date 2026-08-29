@@ -757,18 +757,18 @@ app.get('/api/alerts', async (c) => {
 });
 
 app.post('/api/alerts', async (c) => {
-  const { symbol, metric, condition_type, target_value } = await c.req.json() as any;
+  const { symbol, metric, condition_type, target_value, note } = await c.req.json() as any;
   if (!symbol || !metric || !condition_type || target_value === undefined) {
     return c.text('Missing required fields', 400);
   }
   await c.env.DB.prepare(
-    'INSERT INTO alert_rules (symbol, metric, condition_type, target_value, is_active) VALUES (?, ?, ?, ?, 1)'
-  ).bind(symbol.toUpperCase(), metric, condition_type, target_value).run();
+    'INSERT INTO alert_rules (symbol, metric, condition_type, target_value, is_active, note) VALUES (?, ?, ?, ?, 1, ?)'
+  ).bind(symbol.toUpperCase(), metric, condition_type, target_value, note ? String(note).trim() : null).run();
   return c.text('Alert rule created');
 });
 
 app.put('/api/alerts', async (c) => {
-  const { id, is_active, target_value } = await c.req.json() as any;
+  const { id, is_active, target_value, note } = await c.req.json() as any;
   if (id === undefined) {
     return c.text('Missing rule ID', 400);
   }
@@ -779,6 +779,10 @@ app.put('/api/alerts', async (c) => {
   if (target_value !== undefined) {
     await c.env.DB.prepare('UPDATE alert_rules SET target_value = ?, last_checked_state = NULL WHERE id = ?')
       .bind(target_value, id).run();
+  }
+  if (note !== undefined) {
+    await c.env.DB.prepare('UPDATE alert_rules SET note = ?, updated_at = (strftime(\'%s\', \'now\')) WHERE id = ?')
+      .bind(note ? String(note).trim() : null, id).run();
   }
   return c.text('Alert rule updated');
 });

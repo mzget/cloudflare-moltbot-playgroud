@@ -13,6 +13,7 @@ export interface AlertRule {
   target_value: number;
   is_active: number;
   last_checked_value?: number | null;
+  note?: string | null;
 }
 
 export function useAlertRules(activeSymbol: string | null, onAlertRulesChanged?: () => void) {
@@ -37,22 +38,22 @@ export function useAlertRules(activeSymbol: string | null, onAlertRulesChanged?:
 
   // --- createRule ---
   const { mutateAsync: createRule } = useMutation(
-    async ({ symbol, metric, condition, targetValue }: { symbol: string; metric: string; condition: string; targetValue: number }) => {
+    async ({ symbol, metric, condition, targetValue, note }: { symbol: string; metric: string; condition: string; targetValue: number; note?: string }) => {
       const res = await fetch(`${API_BASE_URL}/api/alerts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbol, metric, condition_type: condition, target_value: targetValue }),
+        body: JSON.stringify({ symbol, metric, condition_type: condition, target_value: targetValue, note }),
       });
       if (!res.ok) throw res;
       return res;
     },
     {
-      onMutate: ({ symbol, metric, condition, targetValue }) => {
+      onMutate: ({ symbol, metric, condition, targetValue, note }) => {
         const key = `alerts:${symbol}`;
         const { getEntry, setEntry } = useQueryCache.getState();
         const prev = getEntry<any[]>(key).data ?? [];
         setEntry(key, {
-          data: [...prev, { symbol, metric, condition_type: condition, target_value: targetValue, is_active: 1, last_checked_value: null }] as unknown[],
+          data: [...prev, { symbol, metric, condition_type: condition, target_value: targetValue, is_active: 1, note: note || null, last_checked_value: null }] as unknown[],
         });
         return prev;
       },
@@ -97,6 +98,68 @@ export function useAlertRules(activeSymbol: string | null, onAlertRulesChanged?:
     }
   );
 
+  // --- updateRuleNote ---
+  const { mutateAsync: _updateRuleNote } = useMutation(
+    async ({ ruleId, note }: { symbol: string; ruleId: number; note: string }) => {
+      const res = await fetch(`${API_BASE_URL}/api/alerts`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: ruleId, note }),
+      });
+      if (!res.ok) throw res;
+      return res;
+    },
+    {
+      onMutate: ({ symbol, ruleId, note }) => {
+        const key = `alerts:${symbol}`;
+        const { getEntry, setEntry } = useQueryCache.getState();
+        const prev = getEntry<any[]>(key).data ?? [];
+        setEntry(key, {
+          data: prev.map(r => r.id === ruleId ? { ...r, note } : r) as unknown[],
+        });
+        return prev;
+      },
+      onError: (_err, vars, snapshot) => {
+        useQueryCache.getState().setEntry(`alerts:${vars.symbol}`, { data: snapshot as unknown[] });
+      },
+      onSuccess: (_data, vars) => {
+        invalidateQueries(`alerts:${vars.symbol}`);
+        onAlertRulesChanged?.();
+      },
+    }
+  );
+
+  // --- updateRuleTarget ---
+  const { mutateAsync: _updateRuleTarget } = useMutation(
+    async ({ ruleId, targetValue }: { symbol: string; ruleId: number; targetValue: number }) => {
+      const res = await fetch(`${API_BASE_URL}/api/alerts`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: ruleId, target_value: targetValue }),
+      });
+      if (!res.ok) throw res;
+      return res;
+    },
+    {
+      onMutate: ({ symbol, ruleId, targetValue }) => {
+        const key = `alerts:${symbol}`;
+        const { getEntry, setEntry } = useQueryCache.getState();
+        const prev = getEntry<any[]>(key).data ?? [];
+        setEntry(key, {
+          data: prev.map(r => r.id === ruleId ? { ...r, target_value: targetValue } : r) as unknown[],
+        });
+        return prev;
+      },
+      onError: (_err, vars, snapshot) => {
+        useQueryCache.getState().setEntry(`alerts:${vars.symbol}`, { data: snapshot as unknown[] });
+      },
+      onSuccess: (_data, vars) => {
+        invalidateQueries(`alerts:${vars.symbol}`);
+        onAlertRulesChanged?.();
+      },
+    }
+  );
+
   // --- deleteRule ---
   const { mutateAsync: _deleteRule } = useMutation(
     async ({ ruleId }: { symbol: string; ruleId: number }) => {
@@ -122,13 +185,21 @@ export function useAlertRules(activeSymbol: string | null, onAlertRulesChanged?:
     }
   );
 
-  const createRuleFn = useCallback((symbol: string, metric: string, condition: string, targetValue: number) => {
-    return createRule({ symbol, metric, condition, targetValue });
+  const createRuleFn = useCallback((symbol: string, metric: string, condition: string, targetValue: number, note?: string) => {
+    return createRule({ symbol, metric, condition, targetValue, note });
   }, [createRule]);
 
   const toggleRuleFn = useCallback((symbol: string, ruleId: number, currentStatus: number) => {
     return _toggleRule({ symbol, ruleId, currentStatus });
   }, [_toggleRule]);
+
+  const updateRuleTargetFn = useCallback((symbol: string, ruleId: number, targetValue: number) => {
+    return _updateRuleTarget({ symbol, ruleId, targetValue });
+  }, [_updateRuleTarget]);
+
+  const updateRuleNoteFn = useCallback((symbol: string, ruleId: number, note: string) => {
+    return _updateRuleNote({ symbol, ruleId, note });
+  }, [_updateRuleNote]);
 
   const deleteRuleFn = useCallback((symbol: string, ruleId: number) => {
     return _deleteRule({ symbol, ruleId });
@@ -140,6 +211,8 @@ export function useAlertRules(activeSymbol: string | null, onAlertRulesChanged?:
     refetch,
     createRule: createRuleFn,
     toggleRule: toggleRuleFn,
+    updateRuleTarget: updateRuleTargetFn,
+    updateRuleNote: updateRuleNoteFn,
     deleteRule: deleteRuleFn,
   };
 }

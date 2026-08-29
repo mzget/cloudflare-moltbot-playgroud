@@ -55,6 +55,8 @@ export default function MyWatchlist() {
     isLoading: isRulesLoading,
     createRule,
     toggleRule,
+    updateRuleTarget,
+    updateRuleNote,
     deleteRule,
   } = useAlertRules(selectedSymbol, fetchWatchlist);
 
@@ -187,10 +189,10 @@ export default function MyWatchlist() {
   }, []);
 
   const handleCreateRule = useCallback(
-    async (metric: string, condition: string, targetVal: number) => {
+    async (metric: string, condition: string, targetVal: number, note?: string) => {
       if (!selectedSymbol) return;
       try {
-        await createRule(selectedSymbol, metric, condition, targetVal);
+        await createRule(selectedSymbol, metric, condition, targetVal, note);
       } catch (e) {
         console.error('Failed to create alert rule', e);
         throw e;
@@ -210,6 +212,34 @@ export default function MyWatchlist() {
       }
     },
     [selectedSymbol, toggleRule]
+  );
+
+  const handleUpdateRuleTarget = useCallback(
+    async (ruleId: number, targetValue: number) => {
+      try {
+        if (selectedSymbol) {
+          await updateRuleTarget(selectedSymbol, ruleId, targetValue);
+        }
+      } catch (e) {
+        console.error('Failed to update alert rule target', e);
+        throw e;
+      }
+    },
+    [selectedSymbol, updateRuleTarget]
+  );
+
+  const handleUpdateRuleNote = useCallback(
+    async (ruleId: number, note: string) => {
+      try {
+        if (selectedSymbol) {
+          await updateRuleNote(selectedSymbol, ruleId, note);
+        }
+      } catch (e) {
+        console.error('Failed to update alert rule note', e);
+        throw e;
+      }
+    },
+    [selectedSymbol, updateRuleNote]
   );
 
   const handleDeleteRule = useCallback(
@@ -349,6 +379,8 @@ export default function MyWatchlist() {
         onClose={handleCloseAlertsModal}
         onCreateRule={handleCreateRule}
         onToggleRule={handleToggleRule}
+        onUpdateRuleTarget={handleUpdateRuleTarget}
+        onUpdateRuleNote={handleUpdateRuleNote}
         onDeleteRule={handleDeleteRule}
       />
 

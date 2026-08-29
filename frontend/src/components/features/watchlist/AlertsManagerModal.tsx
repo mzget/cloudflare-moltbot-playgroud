@@ -18,8 +18,9 @@ import {
   Switch,
   IconButton,
   CircularProgress,
+  Chip,
 } from '@mui/joy';
-import { Trash2 } from 'lucide-react';
+import { Trash2, TrendingUp, TrendingDown, Edit2, Check, X } from 'lucide-react';
 import { glassStyle } from '../../../styles/glass';
 
 interface AlertRule {
@@ -28,6 +29,7 @@ interface AlertRule {
   condition_type: string;
   target_value: number;
   is_active: number;
+  note?: string | null;
   last_checked_value?: number | null;
 }
 
@@ -38,9 +40,11 @@ interface AlertsManagerModalProps {
   currentSymbolStats: any;
   isLoading?: boolean;
   onClose: () => void;
-  onCreateRule: (metric: string, condition: string, targetVal: number) => Promise<void>;
+  onCreateRule: (metric: string, condition: string, targetVal: number, note?: string) => Promise<void>;
   onToggleRule: (ruleId: number, currentStatus: number) => Promise<void>;
   onDeleteRule: (ruleId: number) => Promise<void>;
+  onUpdateRuleTarget?: (ruleId: number, targetValue: number) => Promise<void>;
+  onUpdateRuleNote?: (ruleId: number, note: string) => Promise<void>;
 }
 
 const formatMetricLabel = (m: string) => {
@@ -81,17 +85,35 @@ export const AlertsManagerModal = React.memo<AlertsManagerModalProps>(({
   onCreateRule,
   onToggleRule,
   onDeleteRule,
+  onUpdateRuleTarget,
+  onUpdateRuleNote,
 }) => {
   const [metric, setMetric] = useState('price');
   const [condition, setCondition] = useState('cross_up');
   const [target, setTarget] = useState('');
+  const [newRuleNote, setNewRuleNote] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Note inline editing
+  const [editingRuleId, setEditingRuleId] = useState<number | null>(null);
+  const [editingNoteText, setEditingNoteText] = useState('');
+  const [isSavingNote, setIsSavingNote] = useState(false);
+
+  // Target value inline editing
+  const [editingTargetRuleId, setEditingTargetRuleId] = useState<number | null>(null);
+  const [editingTargetText, setEditingTargetText] = useState('');
+  const [isSavingTarget, setIsSavingTarget] = useState(false);
 
   useEffect(() => {
     if (open) {
       setTarget('');
+      setNewRuleNote('');
       setMetric('price');
       setCondition('cross_up');
+      setEditingRuleId(null);
+      setEditingNoteText('');
+      setEditingTargetRuleId(null);
+      setEditingTargetText('');
     }
   }, [open, symbol]);
 
@@ -129,14 +151,56 @@ export const AlertsManagerModal = React.memo<AlertsManagerModalProps>(({
     }
     setIsSubmitting(true);
     try {
-      await onCreateRule(metric, condition, targetVal);
+      await onCreateRule(metric, condition, targetVal, newRuleNote.trim());
       setTarget('');
+      setNewRuleNote('');
     } catch (e) {
       console.error('Failed to create rule', e);
     } finally {
       setIsSubmitting(false);
     }
-  }, [metric, condition, target, onCreateRule]);
+  }, [metric, condition, target, newRuleNote, onCreateRule]);
+
+  const handleStartEditNote = useCallback((rule: AlertRule) => {
+    setEditingRuleId(rule.id);
+    setEditingNoteText(rule.note || '');
+  }, []);
+
+  const handleSaveNote = useCallback(async (ruleId: number) => {
+    if (!onUpdateRuleNote) return;
+    setIsSavingNote(true);
+    try {
+      await onUpdateRuleNote(ruleId, editingNoteText.trim());
+      setEditingRuleId(null);
+    } catch (e) {
+      console.error('Failed to update rule note', e);
+    } finally {
+      setIsSavingNote(false);
+    }
+  }, [editingNoteText, onUpdateRuleNote]);
+
+  const handleStartEditTarget = useCallback((rule: AlertRule) => {
+    setEditingTargetRuleId(rule.id);
+    const displayVal = rule.metric === 'market_cap' ? (rule.target_value / 1000).toString() : rule.target_value.toString();
+    setEditingTargetText(displayVal);
+  }, []);
+
+  const handleSaveTarget = useCallback(async (rule: AlertRule) => {
+    if (!onUpdateRuleTarget || !editingTargetText || isNaN(Number(editingTargetText))) return;
+    let targetVal = Number(editingTargetText);
+    if (rule.metric === 'market_cap') {
+      targetVal = targetVal * 1000;
+    }
+    setIsSavingTarget(true);
+    try {
+      await onUpdateRuleTarget(rule.id, targetVal);
+      setEditingTargetRuleId(null);
+    } catch (e) {
+      console.error('Failed to update rule target value', e);
+    } finally {
+      setIsSavingTarget(false);
+    }
+  }, [editingTargetText, onUpdateRuleTarget]);
 
   if (!symbol) return null;
 
@@ -146,7 +210,7 @@ export const AlertsManagerModal = React.memo<AlertsManagerModalProps>(({
         sx={{
           ...glassStyle,
           minWidth: { xs: '90%', sm: 480 },
-          maxWidth: 500,
+          maxWidth: 520,
           borderRadius: '20px',
           border: '1px solid rgba(255, 255, 255, 0.2)',
           boxShadow: '0 25px 50px rgba(0,0,0,0.3)',
@@ -161,7 +225,7 @@ export const AlertsManagerModal = React.memo<AlertsManagerModalProps>(({
           {/* Create Rule Form */}
           <Box sx={{ p: 2, borderRadius: '12px', border: '1px solid', borderColor: 'divider', bgcolor: 'rgba(0,0,0,0.02)' }}>
             <Typography level="title-sm" sx={{ mb: 1.5, fontWeight: 700 }}>Create New Alert</Typography>
-            <Stack spacing={2}>
+            <Stack spacing={1.5}>
               <Stack direction="row" spacing={1.5}>
                 <FormControl sx={{ flex: 1 }}>
                   <FormLabel sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Metric</FormLabel>
@@ -184,21 +248,54 @@ export const AlertsManagerModal = React.memo<AlertsManagerModalProps>(({
                     value={condition}
                     onChange={(_, val) => setCondition(val || 'cross_up')}
                     size="sm"
+                    renderValue={(selected) => (
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                        {selected?.value === 'cross_up' ? (
+                          <TrendingUp size={16} color="var(--joy-palette-success-500, #22c55e)" />
+                        ) : (
+                          <TrendingDown size={16} color="var(--joy-palette-danger-500, #ef4444)" />
+                        )}
+                        <Typography level="body-sm">{selected?.label}</Typography>
+                      </Box>
+                    )}
                   >
-                    <Option value="cross_up">Crosses Up</Option>
-                    <Option value="cross_down">Crosses Down</Option>
+                    <Option value="cross_up" label="Crosses Up">
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <TrendingUp size={16} color="var(--joy-palette-success-500, #22c55e)" />
+                        <span>Crosses Up</span>
+                      </Stack>
+                    </Option>
+                    <Option value="cross_down" label="Crosses Down">
+                      <Stack direction="row" spacing={1} alignItems="center">
+                        <TrendingDown size={16} color="var(--joy-palette-danger-500, #ef4444)" />
+                        <span>Crosses Down</span>
+                      </Stack>
+                    </Option>
                   </Select>
                 </FormControl>
               </Stack>
 
               <FormControl>
                 <FormLabel sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Target Value</FormLabel>
+                <Input
+                  type="number"
+                  placeholder="e.g. 150"
+                  value={target}
+                  onChange={(e) => setTarget(e.target.value)}
+                  size="sm"
+                />
+                <FormHelperText sx={{ fontSize: '0.72rem', color: 'text.secondary', fontWeight: 500, mt: 0.5 }}>
+                  {getHelperText(metric)}
+                </FormHelperText>
+              </FormControl>
+
+              <FormControl>
+                <FormLabel sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Note (Optional)</FormLabel>
                 <Stack direction="row" spacing={1}>
                   <Input
-                    type="number"
-                    placeholder="e.g. 150"
-                    value={target}
-                    onChange={(e) => setTarget(e.target.value)}
+                    placeholder="e.g. Target dip buy price, take profit level"
+                    value={newRuleNote}
+                    onChange={(e) => setNewRuleNote(e.target.value)}
                     size="sm"
                     sx={{ flex: 1 }}
                   />
@@ -212,9 +309,6 @@ export const AlertsManagerModal = React.memo<AlertsManagerModalProps>(({
                     Add
                   </Button>
                 </Stack>
-                <FormHelperText sx={{ fontSize: '0.72rem', color: 'text.secondary', fontWeight: 500, mt: 0.5 }}>
-                  {getHelperText(metric)}
-                </FormHelperText>
               </FormControl>
             </Stack>
           </Box>
@@ -231,7 +325,7 @@ export const AlertsManagerModal = React.memo<AlertsManagerModalProps>(({
                 No alert rules set for this symbol.
               </Typography>
             ) : (
-              <Stack spacing={1} sx={{ maxHeight: 200, overflowY: 'auto', pr: 0.5 }}>
+              <Stack spacing={1} sx={{ maxHeight: 240, overflowY: 'auto', pr: 0.5 }}>
                 {symbolRules.map((rule) => (
                   <Box
                     key={rule.id}
@@ -243,21 +337,195 @@ export const AlertsManagerModal = React.memo<AlertsManagerModalProps>(({
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
+                      gap: 1.5,
                       bgcolor: rule.is_active ? 'transparent' : 'rgba(0,0,0,0.02)',
                       opacity: rule.is_active ? 1 : 0.7,
                     }}
                   >
-                    <Box>
-                      <Typography level="body-sm" sx={{ fontWeight: 600 }}>
-                        {formatMetricLabel(rule.metric)} {formatConditionLabel(rule.condition_type)} {formatTargetValue(rule.target_value, rule.metric)}
-                      </Typography>
-                      {rule.last_checked_value !== null && rule.last_checked_value !== undefined && (
-                        <Typography level="body-xs" sx={{ color: 'text.tertiary', mt: 0.25 }}>
-                          Last Checked: {formatTargetValue(rule.last_checked_value, rule.metric)}
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flex: 1, minWidth: 0 }}>
+                      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                        <Typography level="body-sm" sx={{ fontWeight: 600 }}>
+                          {formatMetricLabel(rule.metric)}
                         </Typography>
+                        <Chip
+                          size="sm"
+                          variant="soft"
+                          color={rule.condition_type === 'cross_up' ? 'success' : 'danger'}
+                          startDecorator={
+                            rule.condition_type === 'cross_up' ? (
+                              <TrendingUp size={14} />
+                            ) : (
+                              <TrendingDown size={14} />
+                            )
+                          }
+                          sx={{ fontWeight: 600, fontSize: '0.75rem', px: 0.75, py: 0.2 }}
+                        >
+                          {formatConditionLabel(rule.condition_type)}
+                        </Chip>
+                        {/* Editable Target Value */}
+                        {editingTargetRuleId === rule.id ? (
+                          <Stack direction="row" spacing={0.5} alignItems="center">
+                            <Input
+                              type="number"
+                              size="sm"
+                              value={editingTargetText}
+                              onChange={(e) => setEditingTargetText(e.target.value)}
+                              placeholder="Target"
+                              autoFocus
+                              onKeyDown={async (e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault();
+                                  await handleSaveTarget(rule);
+                                } else if (e.key === 'Escape') {
+                                  setEditingTargetRuleId(null);
+                                }
+                              }}
+                              sx={{ width: 85, height: 26, fontSize: '0.75rem', px: 1 }}
+                            />
+                            <IconButton
+                              size="sm"
+                              variant="soft"
+                              color="success"
+                              onClick={() => handleSaveTarget(rule)}
+                              loading={isSavingTarget}
+                              sx={{ minWidth: 24, minHeight: 24, p: 0.25 }}
+                            >
+                              <Check size={13} />
+                            </IconButton>
+                            <IconButton
+                              size="sm"
+                              variant="plain"
+                              color="neutral"
+                              onClick={() => setEditingTargetRuleId(null)}
+                              disabled={isSavingTarget}
+                              sx={{ minWidth: 24, minHeight: 24, p: 0.25 }}
+                            >
+                              <X size={13} />
+                            </IconButton>
+                          </Stack>
+                        ) : (
+                          <Box
+                            onClick={() => handleStartEditTarget(rule)}
+                            title="Click to edit target value"
+                            sx={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: 0.5,
+                              cursor: 'pointer',
+                              px: 0.5,
+                              py: 0.2,
+                              borderRadius: '4px',
+                              transition: 'all 0.15s ease',
+                              '&:hover': {
+                                bgcolor: 'rgba(255, 255, 255, 0.08)',
+                                color: 'primary.softColor',
+                              },
+                            }}
+                          >
+                            <Typography level="body-sm" sx={{ fontWeight: 700, color: 'inherit' }}>
+                              {formatTargetValue(rule.target_value, rule.metric)}
+                            </Typography>
+                            <Edit2 size={11} style={{ opacity: 0.45, flexShrink: 0 }} />
+                          </Box>
+                        )}
+                      </Stack>
+
+                      {/* Editable Note Subtitle */}
+                      {editingRuleId === rule.id ? (
+                        <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.5 }}>
+                          <Input
+                            size="sm"
+                            value={editingNoteText}
+                            onChange={(e) => setEditingNoteText(e.target.value)}
+                            placeholder="Add note..."
+                            autoFocus
+                            onKeyDown={async (e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault();
+                                await handleSaveNote(rule.id);
+                              } else if (e.key === 'Escape') {
+                                setEditingRuleId(null);
+                              }
+                            }}
+                            sx={{ flex: 1, minWidth: 120, height: 28, fontSize: '0.75rem' }}
+                          />
+                          <IconButton
+                            size="sm"
+                            variant="soft"
+                            color="success"
+                            onClick={() => handleSaveNote(rule.id)}
+                            loading={isSavingNote}
+                            sx={{ minWidth: 28, minHeight: 28 }}
+                          >
+                            <Check size={14} />
+                          </IconButton>
+                          <IconButton
+                            size="sm"
+                            variant="plain"
+                            color="neutral"
+                            onClick={() => setEditingRuleId(null)}
+                            disabled={isSavingNote}
+                            sx={{ minWidth: 28, minHeight: 28 }}
+                          >
+                            <X size={14} />
+                          </IconButton>
+                        </Stack>
+                      ) : (
+                        <Box
+                          sx={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: 0.5,
+                            mt: 0.25,
+                            cursor: 'pointer',
+                            borderRadius: '4px',
+                            py: 0.2,
+                            px: 0.4,
+                            mx: -0.4,
+                            width: 'fit-content',
+                            '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.08)' },
+                          }}
+                          onClick={() => handleStartEditNote(rule)}
+                          title="Click to edit note"
+                        >
+                          {rule.note ? (
+                            <>
+                              <Typography
+                                level="body-xs"
+                                sx={{
+                                  color: 'text.secondary',
+                                  fontWeight: 500,
+                                  fontStyle: 'italic',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap',
+                                  maxWidth: { xs: 180, sm: 260 },
+                                }}
+                              >
+                                {rule.note}
+                              </Typography>
+                              <Edit2 size={11} style={{ opacity: 0.5, flexShrink: 0 }} />
+                            </>
+                          ) : (
+                            <Typography
+                              level="body-xs"
+                              sx={{
+                                color: 'primary.plainColor',
+                                opacity: 0.8,
+                                fontSize: '0.72rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 0.5,
+                              }}
+                            >
+                              <Edit2 size={10} /> + Add note
+                            </Typography>
+                          )}
+                        </Box>
                       )}
                     </Box>
-                    <Stack direction="row" spacing={1.5} alignItems="center">
+
+                    <Stack direction="row" spacing={1.5} alignItems="center" sx={{ flexShrink: 0 }}>
                       <Switch
                         size="sm"
                         checked={rule.is_active === 1}
@@ -284,3 +552,4 @@ export const AlertsManagerModal = React.memo<AlertsManagerModalProps>(({
     </Modal>
   );
 });
+
