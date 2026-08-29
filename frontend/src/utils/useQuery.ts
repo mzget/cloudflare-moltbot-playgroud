@@ -58,16 +58,23 @@ export function useQuery<T>(
   // to avoid new object references when the key is missing.
   const entry = useQueryCache(state => state.entries[key] as CacheEntry<T> | undefined);
 
-  // Trigger fetch on mount or when key/enabled/staleTime change.
-  // Reads cache state IMPERATIVELY (not reactively) to avoid the needsFetch feedback loop.
+  // Track explicit invalidation (updatedAt === 0)
+  const isInvalidated = entry?.updatedAt === 0;
+
+  // Trigger fetch on mount, when key/enabled/staleTime change, or when explicitly invalidated.
+  // Reads cache state IMPERATIVELY to prevent infinite feedback loops.
   useEffect(() => {
     if (!enabled) return;
     const current = useQueryCache.getState().getEntry<T>(key);
-    const isStale = Date.now() - (current.updatedAt ?? 0) > staleTime;
-    if ((current.status === 'idle' || isStale) && !current.promise) {
+    if (current.promise) return;
+
+    const timeSinceUpdate = Date.now() - (current.updatedAt ?? 0);
+    const isStale = (current.updatedAt ?? 0) === 0 || timeSinceUpdate > Math.max(staleTime, 100);
+
+    if (current.status === 'idle' || isStale || isInvalidated) {
       doFetch();
     }
-  }, [key, enabled, staleTime, doFetch, entry?.updatedAt, entry?.status]);
+  }, [key, enabled, staleTime, doFetch, isInvalidated]);
 
   return {
     data: entry?.data as T | undefined,

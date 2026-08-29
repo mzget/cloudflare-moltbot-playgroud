@@ -9,6 +9,7 @@ interface AlertRule {
   last_checked_value: number | null;
   last_checked_state: string | null;
   is_active: number;
+  note?: string | null;
 }
 
 interface MarketStats {
