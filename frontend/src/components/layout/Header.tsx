@@ -788,9 +788,16 @@ export default function Header({ activeTab, setActiveTab, reportsCount, onOpenSi
               return (
                 <Button
                   key={item.id}
+                  component="a"
+                  href={`/${item.id}`}
                   variant={isSelected ? 'soft' : 'plain'}
                   color={isSelected ? 'primary' : 'neutral'}
-                  onClick={() => setActiveTab?.(item.id)}
+                  onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                    if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
+                      e.preventDefault();
+                      setActiveTab?.(item.id);
+                    }
+                  }}
                   startDecorator={item.icon}
                   sx={{
                     borderRadius: '12px',
@@ -799,6 +806,7 @@ export default function Header({ activeTab, setActiveTab, reportsCount, onOpenSi
                     px: { md: 1.75, lg: 2.25 },
                     py: 0.85,
                     whiteSpace: 'nowrap',
+                    textDecoration: 'none',
                     color: isSelected ? 'primary.plainColor' : 'text.secondary',
                     bgcolor: isSelected ? 'var(--joy-palette-primary-softBg)' : 'transparent',
                     transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
@@ -806,6 +814,7 @@ export default function Header({ activeTab, setActiveTab, reportsCount, onOpenSi
                       bgcolor: isSelected ? 'var(--joy-palette-primary-softHoverBg)' : 'background.level1',
                       color: 'text.primary',
                       transform: 'translateY(-1px)',
+                      textDecoration: 'none',
                     },
                     ...(isSelected && {
                       boxShadow: '0 2px 8px rgba(16, 185, 129, 0.15)',
