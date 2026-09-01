@@ -44,18 +44,27 @@ export default function Sidebar({ activeTab, setActiveTab, reportsCount }: Sideb
             return (
               <ListItem key={item.id}>
                 <ListItemButton
+                  component="a"
+                  href={`/${item.id}`}
                   selected={isSelected}
-                  onClick={() => setActiveTab(item.id)}
+                  onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                    if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
+                      e.preventDefault();
+                      setActiveTab(item.id);
+                    }
+                  }}
                   sx={{
                     px: 1.75,
                     py: 1.25,
                     borderRadius: '12px',
+                    textDecoration: 'none',
                     color: isSelected ? 'primary.plainColor' : 'text.secondary',
                     bgcolor: isSelected ? 'var(--joy-palette-primary-softBg)' : 'transparent',
                     transition: 'all 0.2s ease',
                     '&:hover': {
                       bgcolor: isSelected ? 'var(--joy-palette-primary-softHoverBg)' : 'background.level1',
                       color: 'text.primary',
+                      textDecoration: 'none',
                     },
                     '&.Mui-selected': {
                       borderLeft: '3px solid var(--joy-palette-primary-solidBg)',
