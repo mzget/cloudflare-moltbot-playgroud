@@ -17,13 +17,12 @@ import {
   Alert,
 } from '@mui/joy';
 import { useColorScheme } from '@mui/joy/styles';
-import { Send, Bot, Trash2, Plus, ChevronLeft, MessageSquare, AlertCircle } from 'lucide-react';
+import { Send, Bot, Trash2, Plus, ChevronLeft, MessageSquare, AlertCircle, Square } from 'lucide-react';
 import { useAgent } from 'agents/react';
 import { useAgentChat } from '@cloudflare/ai-chat/react';
 import { MCP_WORKER_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
 import MarkdownRenderer from '../../common/MarkdownRenderer';
-import InteractiveWaitingState from './InteractiveWaitingState';
 
 interface ChatSession {
   id: string;
@@ -364,21 +363,6 @@ function ChatWindow({ sessionId }: { sessionId: string }) {
 
   const isLoading = status === 'submitted' || status === 'streaming';
 
-  const pendingToolCall = messages[messages.length - 1]?.parts?.find(p => {
-    if (p.type === 'tool-invocation') {
-      return (p as any).toolInvocation?.state !== 'result';
-    }
-    if (p.type.startsWith('tool-')) {
-      return (p as any).state !== 'output-available' && (p as any).state !== 'result';
-    }
-    return false;
-  });
-  const activeTool = pendingToolCall
-    ? (pendingToolCall.type === 'tool-invocation'
-        ? (pendingToolCall as any).toolInvocation?.toolName
-        : pendingToolCall.type.slice(5))
-    : undefined;
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
@@ -388,10 +372,6 @@ function ChatWindow({ sessionId }: { sessionId: string }) {
     });
     setInput('');
   };
-
-  const lastMessageText = messages[messages.length - 1]?.parts
-    ?.map(p => p.type === 'text' ? p.text : '')
-    ?.join('') || '';
 
   useEffect(() => {
     const container = chatContainerRef.current;
@@ -469,115 +449,188 @@ function ChatWindow({ sessionId }: { sessionId: string }) {
               </Sheet>
             )}
 
-            {messages.map((m) => (
+            {messages.map((m, mIndex) => {
+              const isLastAssistantMessage = m.role !== 'user' && mIndex === messages.length - 1;
+              return (
+                <Box
+                  key={m.id}
+                  sx={{
+                    display: 'flex',
+                    gap: 1.5,
+                    alignItems: 'flex-start',
+                    flexDirection: m.role === 'user' ? 'row-reverse' : 'row',
+                  }}
+                >
+                  {m.role !== 'user' && (
+                    <Box sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: 32,
+                      height: 32,
+                      borderRadius: '50%',
+                      bgcolor: 'rgba(16, 185, 129, 0.15)',
+                      border: '1px solid rgba(16, 185, 129, 0.25)',
+                      flexShrink: 0,
+                      mt: 0.5
+                    }}>
+                      <Bot size={18} style={{ color: 'var(--joy-palette-success-plainColor, #10b981)' }} />
+                    </Box>
+                  )}
+                  <Sheet
+                    variant={m.role === 'user' ? 'solid' : 'outlined'}
+                    color={m.role === 'user' ? 'primary' : 'neutral'}
+                    sx={{
+                      px: 2,
+                      py: 1.5,
+                      borderRadius: '16px',
+                      borderBottomRightRadius: m.role === 'user' ? '4px' : '16px',
+                      borderBottomLeftRadius: m.role === 'user' ? '16px' : '4px',
+                      maxWidth: '85%',
+                      bgcolor: m.role === 'user' 
+                        ? 'primary.solidBg' 
+                        : (mode === 'dark' ? 'rgba(255, 255, 255, 0.04)' : 'background.surface'),
+                      backdropFilter: m.role === 'user' ? 'none' : 'blur(12px)',
+                      borderColor: m.role === 'user' 
+                        ? 'transparent' 
+                        : (mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'divider'),
+                      boxShadow: m.role === 'user' ? 'var(--joy-shadow-md)' : 'var(--joy-shadow-sm)',
+                      transition: 'all 0.3s ease-out',
+                    }}
+                  >
+                    <Box sx={{ color: m.role === 'user' ? 'common.white' : 'text.primary' }}>
+                      {m.parts.map((part, i) =>
+                        part.type === 'text' ? (
+                          <MarkdownRenderer key={i} text={part.text} themeColor={m.role === 'user' ? 'primary' : 'neutral'} />
+                        ) : null
+                      )}
+                      {isLastAssistantMessage && status === 'streaming' && (
+                        <Box
+                          component="span"
+                          sx={{
+                            display: 'inline-block',
+                            width: '7px',
+                            height: '14px',
+                            bgcolor: 'success.solidBg',
+                            ml: 0.5,
+                            verticalAlign: 'middle',
+                            borderRadius: '2px',
+                            animation: 'streaming-cursor 0.8s infinite alternate',
+                            '@keyframes streaming-cursor': {
+                              '0%': { opacity: 0.2 },
+                              '100%': { opacity: 1 },
+                            }
+                          }}
+                        />
+                      )}
+                      {m.parts.map((part, i) => {
+                        const isTool = part.type === 'tool-invocation' || part.type.startsWith('tool-');
+                        if (!isTool) return null;
+                        const toolInvocation = part.type === 'tool-invocation'
+                          ? (part as any).toolInvocation
+                          : {
+                              toolName: part.type.slice(5),
+                              result: (part as any).output,
+                              state: (part as any).state === 'output-available' ? 'result' : (part as any).state,
+                              error: (part as any).errorText || (part as any).error
+                            };
+                        
+                        const state = toolInvocation?.state;
+                        const isError = state === 'output-error' || state === 'error';
+                        const isSuccess = state === 'result' || state === 'success';
+
+                        return (
+                          <Box 
+                            key={i} 
+                            sx={{ 
+                              mt: 1, 
+                              p: 1.5, 
+                              bgcolor: isError 
+                                ? (mode === 'dark' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.05)')
+                                : (mode === 'dark' ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.03)'), 
+                              borderRadius: 'md', 
+                              border: '1px solid',
+                              borderColor: isError 
+                                ? 'rgba(239, 68, 68, 0.2)' 
+                                : (mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'),
+                              opacity: 0.9 
+                            }}
+                          >
+                            <Typography 
+                              level="body-xs" 
+                              color={isError ? 'danger' : (isSuccess ? 'neutral' : 'primary')} 
+                              sx={{ fontWeight: 600 }}
+                            >
+                              {isError ? (
+                                `Error: ${toolInvocation?.toolName} (${toolInvocation?.error || 'Failed'})`
+                              ) : isSuccess ? (
+                                `Called: ${toolInvocation?.toolName}`
+                              ) : (
+                                `Calling: ${toolInvocation?.toolName}...`
+                              )}
+                            </Typography>
+                          </Box>
+                        );
+                      })}
+                    </Box>
+                  </Sheet>
+                </Box>
+              );
+            })}
+
+            {status === 'submitted' && (
               <Box
-                key={m.id}
                 sx={{
                   display: 'flex',
                   gap: 1.5,
                   alignItems: 'flex-start',
-                  flexDirection: m.role === 'user' ? 'row-reverse' : 'row',
                 }}
               >
-                {m.role !== 'user' && (
-                  <Box sx={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    width: 32,
-                    height: 32,
-                    borderRadius: '50%',
-                    bgcolor: 'rgba(16, 185, 129, 0.15)',
-                    border: '1px solid rgba(16, 185, 129, 0.25)',
-                    flexShrink: 0,
-                    mt: 0.5
-                  }}>
-                    <Bot size={18} style={{ color: 'var(--joy-palette-success-plainColor, #10b981)' }} />
-                  </Box>
-                )}
+                <Box sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: 32,
+                  height: 32,
+                  borderRadius: '50%',
+                  bgcolor: 'rgba(16, 185, 129, 0.15)',
+                  border: '1px solid rgba(16, 185, 129, 0.25)',
+                  flexShrink: 0,
+                  mt: 0.5
+                }}>
+                  <Bot size={18} style={{ color: 'var(--joy-palette-success-plainColor, #10b981)' }} />
+                </Box>
                 <Sheet
-                  variant={m.role === 'user' ? 'solid' : 'outlined'}
-                  color={m.role === 'user' ? 'primary' : 'neutral'}
+                  variant="outlined"
                   sx={{
                     px: 2,
                     py: 1.5,
                     borderRadius: '16px',
-                    borderBottomRightRadius: m.role === 'user' ? '4px' : '16px',
-                    borderBottomLeftRadius: m.role === 'user' ? '16px' : '4px',
+                    borderBottomLeftRadius: '4px',
                     maxWidth: '85%',
-                    bgcolor: m.role === 'user' 
-                      ? 'primary.solidBg' 
-                      : (mode === 'dark' ? 'rgba(255, 255, 255, 0.04)' : 'background.surface'),
-                    backdropFilter: m.role === 'user' ? 'none' : 'blur(12px)',
-                    borderColor: m.role === 'user' 
-                      ? 'transparent' 
-                      : (mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'divider'),
-                    boxShadow: m.role === 'user' ? 'var(--joy-shadow-md)' : 'var(--joy-shadow-sm)',
-                    transition: 'all 0.3s ease-out',
+                    bgcolor: mode === 'dark' ? 'rgba(255, 255, 255, 0.04)' : 'background.surface',
+                    backdropFilter: 'blur(12px)',
+                    borderColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'divider',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1.5,
                   }}
                 >
-                  <Box sx={{ color: m.role === 'user' ? 'common.white' : 'text.primary' }}>
-                    {m.parts.map((part, i) =>
-                      part.type === 'text' ? (
-                        <MarkdownRenderer key={i} text={part.text} themeColor={m.role === 'user' ? 'primary' : 'neutral'} />
-                      ) : null
-                    )}
-                    {m.parts.map((part, i) => {
-                      const isTool = part.type === 'tool-invocation' || part.type.startsWith('tool-');
-                      if (!isTool) return null;
-                      const toolInvocation = part.type === 'tool-invocation'
-                        ? (part as any).toolInvocation
-                        : {
-                            toolName: part.type.slice(5),
-                            result: (part as any).output,
-                            state: (part as any).state === 'output-available' ? 'result' : (part as any).state,
-                            error: (part as any).errorText || (part as any).error
-                          };
-                      
-                      const state = toolInvocation?.state;
-                      const isError = state === 'output-error' || state === 'error';
-                      const isSuccess = state === 'result' || state === 'success';
-
-                      return (
-                        <Box 
-                          key={i} 
-                          sx={{ 
-                            mt: 1, 
-                            p: 1.5, 
-                            bgcolor: isError 
-                              ? (mode === 'dark' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.05)')
-                              : (mode === 'dark' ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.03)'), 
-                            borderRadius: 'md', 
-                            border: '1px solid',
-                            borderColor: isError 
-                              ? 'rgba(239, 68, 68, 0.2)' 
-                              : (mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'),
-                            opacity: 0.9 
-                          }}
-                        >
-                          <Typography 
-                            level="body-xs" 
-                            color={isError ? 'danger' : (isSuccess ? 'neutral' : 'primary')} 
-                            sx={{ fontWeight: 600 }}
-                          >
-                            {isError ? (
-                              `Error: ${toolInvocation?.toolName} (${toolInvocation?.error || 'Failed'})`
-                            ) : isSuccess ? (
-                              `Called: ${toolInvocation?.toolName}`
-                            ) : (
-                              `Calling: ${toolInvocation?.toolName}...`
-                            )}
-                          </Typography>
-                        </Box>
-                      );
-                    })}
-                  </Box>
+                  <CircularProgress size="sm" color="success" />
+                  <Typography level="body-sm" sx={{ opacity: 0.8, fontStyle: 'italic' }}>
+                    Oaktree AI กำลังคิดและเตรียมคำตอบ...
+                  </Typography>
+                  <Button
+                    size="sm"
+                    variant="plain"
+                    color="danger"
+                    onClick={() => stop()}
+                    sx={{ ml: 1, px: 1, py: 0.25, minHeight: 0, fontSize: '0.75rem' }}
+                  >
+                    ยกเลิก
+                  </Button>
                 </Sheet>
               </Box>
-            ))}
-
-            {isLoading && (
-              <InteractiveWaitingState activeTool={activeTool} onStop={stop} />
             )}
 
             {agent.connectionError && (
@@ -620,7 +673,7 @@ function ChatWindow({ sessionId }: { sessionId: string }) {
             placeholder="Ask a question..."
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            disabled={isLoading || isStateLoading}
+            disabled={isStateLoading}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -636,21 +689,39 @@ function ChatWindow({ sessionId }: { sessionId: string }) {
               }
             }}
           />
-          <Button 
-            type="submit" 
-            disabled={isLoading || isStateLoading || !input.trim()}
-            variant="solid"
-            color="success"
-            sx={{
-              transition: 'all 0.2s',
-              '&:hover': {
-                transform: 'translateY(-1px)',
-                boxShadow: 'var(--joy-shadow-md)',
-              }
-            }}
-          >
-            <Send size={18} />
-          </Button>
+          {isLoading ? (
+            <Button 
+              type="button" 
+              onClick={() => stop()}
+              variant="solid"
+              color="danger"
+              sx={{
+                transition: 'all 0.2s',
+                '&:hover': {
+                  transform: 'translateY(-1px)',
+                  boxShadow: 'var(--joy-shadow-md)',
+                }
+              }}
+            >
+              <Square size={16} style={{ fill: 'currentColor' }} />
+            </Button>
+          ) : (
+            <Button 
+              type="submit" 
+              disabled={isStateLoading || !input.trim()}
+              variant="solid"
+              color="success"
+              sx={{
+                transition: 'all 0.2s',
+                '&:hover': {
+                  transform: 'translateY(-1px)',
+                  boxShadow: 'var(--joy-shadow-md)',
+                }
+              }}
+            >
+              <Send size={18} />
+            </Button>
+          )}
         </Stack>
       </Box>
     </Box>
