@@ -379,6 +379,34 @@ function ChatWindow({ sessionId }: { sessionId: string }) {
     }
   }, [messages, status]);
 
+  // Merge consecutive assistant messages into a single seamless chat bubble
+  const groupedMessages = React.useMemo(() => {
+    const groups: { id: string; role: string; text: string; tools: any[] }[] = [];
+    for (const m of messages) {
+      const textParts = m.parts
+        ?.filter(p => p.type === 'text')
+        ?.map(p => (p as any).text) || [];
+      const text = textParts.join('');
+
+      const toolParts = m.parts
+        ?.filter(p => p.type === 'tool-invocation' || p.type.startsWith('tool-')) || [];
+
+      const lastGroup = groups[groups.length - 1];
+      if (lastGroup && lastGroup.role === m.role) {
+        lastGroup.text = lastGroup.text ? `${lastGroup.text}\n${text}` : text;
+        lastGroup.tools.push(...toolParts);
+      } else {
+        groups.push({
+          id: m.id,
+          role: m.role,
+          text,
+          tools: [...toolParts]
+        });
+      }
+    }
+    return groups;
+  }, [messages]);
+
   const isStateLoading = !agent.identified && !agent.connectionError;
 
   return (
@@ -393,7 +421,7 @@ function ChatWindow({ sessionId }: { sessionId: string }) {
           </Box>
         ) : (
           <>
-            {messages.length === 0 && (
+            {groupedMessages.length === 0 && (
               <Sheet 
                 variant="outlined" 
                 color="neutral" 
@@ -412,8 +440,8 @@ function ChatWindow({ sessionId }: { sessionId: string }) {
               </Sheet>
             )}
 
-            {messages.map((m, mIndex) => {
-              const isLastAssistantMessage = m.role !== 'user' && mIndex === messages.length - 1;
+            {groupedMessages.map((m, mIndex) => {
+              const isLastAssistantMessage = m.role !== 'user' && mIndex === groupedMessages.length - 1;
               return (
                 <Box
                   key={m.id}
@@ -462,10 +490,8 @@ function ChatWindow({ sessionId }: { sessionId: string }) {
                     }}
                   >
                     <Box sx={{ color: m.role === 'user' ? 'common.white' : 'text.primary' }}>
-                      {m.parts.map((part, i) =>
-                        part.type === 'text' ? (
-                          <MarkdownRenderer key={i} text={part.text} themeColor={m.role === 'user' ? 'primary' : 'neutral'} />
-                        ) : null
+                      {m.text && (
+                        <MarkdownRenderer text={m.text} themeColor={m.role === 'user' ? 'primary' : 'neutral'} />
                       )}
                       {isLastAssistantMessage && status === 'streaming' && (
                         <Box
@@ -486,55 +512,6 @@ function ChatWindow({ sessionId }: { sessionId: string }) {
                           }}
                         />
                       )}
-                      {m.parts.map((part, i) => {
-                        const isTool = part.type === 'tool-invocation' || part.type.startsWith('tool-');
-                        if (!isTool) return null;
-                        const toolInvocation = part.type === 'tool-invocation'
-                          ? (part as any).toolInvocation
-                          : {
-                              toolName: part.type.slice(5),
-                              result: (part as any).output,
-                              state: (part as any).state === 'output-available' ? 'result' : (part as any).state,
-                              error: (part as any).errorText || (part as any).error
-                            };
-                        
-                        const state = toolInvocation?.state;
-                        const isError = state === 'output-error' || state === 'error';
-                        const isSuccess = state === 'result' || state === 'success';
-
-                        return (
-                          <Box 
-                            key={i} 
-                            sx={{ 
-                              mt: 1, 
-                              p: 1.5, 
-                              bgcolor: isError 
-                                ? (mode === 'dark' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(239, 68, 68, 0.05)')
-                                : (mode === 'dark' ? 'rgba(0, 0, 0, 0.2)' : 'rgba(0, 0, 0, 0.03)'), 
-                              borderRadius: 'md', 
-                              border: '1px solid',
-                              borderColor: isError 
-                                ? 'rgba(239, 68, 68, 0.2)' 
-                                : (mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)'),
-                              opacity: 0.9 
-                            }}
-                          >
-                            <Typography 
-                              level="body-xs" 
-                              color={isError ? 'danger' : (isSuccess ? 'neutral' : 'primary')} 
-                              sx={{ fontWeight: 600 }}
-                            >
-                              {isError ? (
-                                `Error: ${toolInvocation?.toolName} (${toolInvocation?.error || 'Failed'})`
-                              ) : isSuccess ? (
-                                `Called: ${toolInvocation?.toolName}`
-                              ) : (
-                                `Calling: ${toolInvocation?.toolName}...`
-                              )}
-                            </Typography>
-                          </Box>
-                        );
-                      })}
                     </Box>
                   </Sheet>
                 </Box>

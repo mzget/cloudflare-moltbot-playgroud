@@ -89,11 +89,6 @@ export class OaktreeMCP extends McpAgent {
 }
 
 export class OaktreeChat extends AIChatAgent<any> {
-  // Enable recovery from DO eviction and interrupted streams
-  override chatRecovery = true;
-  // Detect hung model/transport streams after 30s of silence
-  override chatStreamStallTimeoutMs = 30_000;
-
   @callable()
   async deleteSession() {
     await this.destroy();
@@ -145,7 +140,7 @@ export class OaktreeChat extends AIChatAgent<any> {
     const systemPrompt = "คุณคือ Oaktree AI ผู้ช่วยวิเคราะห์ข้อมูลการลงทุนแบบเน้นคุณค่า (Value Investing) ตามหลักการลงทุนของ Warren Buffett, Charlie Munger, Howard Marks, Benjamin Graham, Peter Lynch และ Seth Klarman\n" +
       "หน้าที่ของคุณคือให้คำแนะนำ วิเคราะห์หุ้น พอร์ตการลงทุน และตอบคำถามด้านการลงทุนอย่างกระชับ ชัดเจน มีเหตุผลทางธุรกิจและหลักการลงทุนรองรับ\n" +
       "กฎข้อสำคัญอย่างยิ่ง:\n" +
-      "1. ตอบคำถามเป็นภาษาไทยให้จบครบถ้วนอย่างเป็นธรรมชาติ\n" +
+      "1. ตอบคำถามเป็นภาษาไทยให้จบครบถ้วนในข้อความเดียวอย่างเป็นธรรมชาติ\n" +
       "2. ห้ามสร้างแท็กคำสั่งฟังก์ชัน เช่น <|tool_call|> หรือ SQL โค้ดหลอก ให้ตอบข้อมูลจากบริบทที่มีให้หรือความรู้ที่มีทันที\n" +
       "3. ใช้ markdown จัดหัวข้อ ตาราง หรือ bullet points ให้อ่านง่าย สวยงาม และน่าติดตาม\n" +
       dataContext;
