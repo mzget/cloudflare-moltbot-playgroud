@@ -89,7 +89,7 @@ export class OaktreeMCP extends McpAgent {
 }
 
 export class OaktreeChat extends AIChatAgent<any> {
-  // Enable recovery from DO eviction and interrupted tool calls
+  // Enable recovery from DO eviction and interrupted streams
   override chatRecovery = true;
   // Detect hung model/transport streams after 30s of silence
   override chatStreamStallTimeoutMs = 30_000;
@@ -104,126 +104,40 @@ export class OaktreeChat extends AIChatAgent<any> {
     const workersai = createWorkersAI({ binding: this.env.AI });
     const model = workersai(this.env.chat_ai_model);
 
-    const systemPrompt = "คุณคือ Oaktree AI ผู้ช่วยวิเคราะห์ข้อมูลการลงทุนแบบเน้นคุณค่า (Value Investing) ตามหลักการลงทุนของ Warren Buffett, Charlie Munger, Howard Marks, และอื่น ๆ กรุณาตอบข้อมูลต่าง ๆ โดยอ้างอิงจากข้อมูลที่มีอยู่ในฐานข้อมูล หรือใช้เครื่องมือเสริมการค้นหาที่มีให้ (เช่น getAnalysisReport, getPortfolio, getKnowledge) ตอบคำถามให้ตรงประเด็นและกระชับที่สุด\n" +
-      "You also have read-only access to the full database via queryDatabase and listTables tools.\n" +
-      "If the fixed tools do not contain the necessary information to answer a question (e.g., about specific broker balances, new tables, or complex queries), use listTables to understand the available tables and columns, then write and run SELECT queries using queryDatabase. Only SELECT queries are permitted.";
+    // Fetch portfolio context dynamically so the model has real-time holdings context
+    let portfolioContext = "";
+    try {
+      const holdings = await getPortfolio(this.env as any);
+      if (holdings && Array.isArray(holdings) && holdings.length > 0) {
+        portfolioContext = "\n\n[ข้อมูลพอร์ตการลงทุนปัจจุบันของผู้ใช้ (User's Current Portfolio)]:\n" +
+          JSON.stringify(holdings.map((h: any) => ({
+            symbol: h.symbol,
+            shares: h.shares,
+            avg_cost: h.avg_cost,
+            current_price: h.current_price,
+            current_value: h.current_value,
+            unrealized_gain_loss_pct: h.unrealized_gain_loss_pct,
+            target_weight: h.target_weight,
+            thesis: h.thesis,
+            category: h.category
+          })), null, 2);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch portfolio context for prompt:", err);
+    }
 
-    const result = (streamText as any)({
+    const systemPrompt = "คุณคือ Oaktree AI ผู้ช่วยวิเคราะห์ข้อมูลการลงทุนแบบเน้นคุณค่า (Value Investing) ตามหลักการลงทุนของ Warren Buffett, Charlie Munger, Howard Marks, Benjamin Graham, Peter Lynch และ Seth Klarman\n" +
+      "หน้าที่ของคุณคือให้คำแนะนำ วิเคราะห์หุ้น พอร์ตการลงทุน และตอบคำถามด้านการลงทุนอย่างกระชับ ชัดเจน มีเหตุผลทางธุรกิจและหลักการลงทุนรองรับ\n" +
+      "ตอบเป็นภาษาไทยอย่างเป็นมิตรและเป็นมืออาชีพ ใช้ markdown จัดหัวข้อ ตาราง หรือ bullet points ให้อ่านง่าย สวยงาม และน่าติดตาม\n" +
+      portfolioContext;
+
+    const result = streamText({
       model,
       messages: await convertToModelMessages(this.messages),
       system: systemPrompt,
-      tools: {
-        getPortfolio: tool({
-          description: "Get all portfolio holdings",
-          parameters: z.object({}),
-          execute: async () => getPortfolio(this.env as any),
-        } as any) as any,
-        getPortfolioHistory: tool({
-          description: "Get portfolio history",
-          parameters: z.object({}),
-          execute: async () => getPortfolioHistory(this.env as any),
-        } as any) as any,
-        getKnowledge: tool({
-          description: "Get investment knowledge by category",
-          parameters: z.object({ category: z.string() }),
-          execute: async ({ category }: any) => getKnowledgeByCategory(this.env as any, category),
-        } as any) as any,
-        searchKnowledge: tool({
-          description: "Search knowledge base stored in D1",
-          parameters: z.object({ query: z.string() }),
-          execute: async ({ query }: any) => searchKnowledge(this.env as any, query),
-        } as any) as any,
-        getAnalysisReport: tool({
-          description: "Get the latest value investor deep analysis report for a stock symbol",
-          parameters: z.object({ symbol: z.string() }),
-          execute: async ({ symbol }: any) => getLatestAnalysisReport(this.env as any, symbol),
-        } as any) as any,
-        queryNotebookLM: tool({
-          description: "Query the user's NotebookLM notebooks for deep research context. Use this for earnings calls, 10-K/10-Q filings, company analysis, and detailed investment research that goes beyond the local knowledge base.",
-          parameters: z.object({
-            question: z.string().describe("The research question to ask NotebookLM"),
-            notebookId: z.string().optional().describe("Optional specific notebook ID to query"),
-          }),
-          execute: async ({ question, notebookId }: any) => {
-            const env = this.env as any;
-            const bridgeUrl = env.NOTEBOOKLM_BRIDGE_URL;
-            if (!bridgeUrl) {
-              return { error: "NotebookLM bridge not configured. NOTEBOOKLM_BRIDGE_URL is not set." };
-            }
-            try {
-              const body: Record<string, string> = { question };
-              if (notebookId) body.notebookId = notebookId;
-
-              const response = await fetch(`${bridgeUrl}/ask`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  ...(env.BRIDGE_SECRET ? { Authorization: `Bearer ${env.BRIDGE_SECRET}` } : {}),
-                },
-                body: JSON.stringify(body),
-                signal: AbortSignal.timeout(30000), // 30s timeout
-              });
-
-              if (!response.ok) {
-                const err = await response.text();
-                return { error: `Bridge error ${response.status}: ${err}` };
-              }
-
-              const data = await response.json() as { answer?: string; error?: string };
-              return data.answer ? { answer: data.answer } : { error: data.error || "No answer returned" };
-            } catch (err: any) {
-              return { error: `Failed to reach NotebookLM bridge: ${err.message}` };
-            }
-          },
-        } as any) as any,
-        queryDatabase: tool({
-          description: "Execute a read-only SQL query against the D1 database. Use this to answer questions about portfolio, holdings, market data, knowledge, news, or any other data. Only SELECT queries are allowed.",
-          parameters: z.object({
-            sql: z.string().optional().describe("A SELECT SQL query to execute"),
-            query: z.string().optional().describe("A SELECT SQL query to execute (alias for sql)")
-          }),
-          execute: async ({ sql, query }: any) => {
-            const sqlToRun = sql || query;
-            if (!sqlToRun) {
-              return { error: "Missing SQL query parameter (sql or query)" };
-            }
-            console.log(`[queryDatabase] Tool execution started for query: "${sqlToRun}"`);
-            if (!sqlToRun.trim().toLowerCase().startsWith("select")) {
-              console.log("[queryDatabase] Validation failed: query is not a SELECT statement.");
-              return { error: "Only SELECT queries are allowed. This tool is read-only." };
-            }
-            try {
-              console.log("[queryDatabase] Attempting D1 database prepare...");
-              const statement = (this.env as any).DB.prepare(sqlToRun);
-              console.log("[queryDatabase] D1 database prepared. Executing statement.all()...");
-              const { results } = await statement.all();
-              console.log(`[queryDatabase] D1 statement.all() finished successfully. Returned ${results.length} rows.`);
-              return { results: results.slice(0, 50) };
-            } catch (e: any) {
-              console.error("[queryDatabase] Error during D1 execution:", e.message);
-              return { error: e.message };
-            }
-          },
-        } as any) as any,
-        listTables: tool({
-          description: "List all database tables and their SQL schemas. Use this to understand what data is available before writing SQL queries.",
-          parameters: z.object({}),
-          execute: async () => {
-            try {
-              const { results } = await (this.env as any).DB.prepare(
-                "SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf_%'"
-              ).all();
-              return { tables: results };
-            } catch (e: any) {
-              return { error: e.message };
-            }
-          },
-        } as any) as any,
-      },
-      maxSteps: 10,
       abortSignal: options?.abortSignal,
       onFinish,
-    } as any);
+    });
 
     return result.toUIMessageStreamResponse();
   }
