@@ -2,7 +2,7 @@ import { McpAgent } from "agents/mcp";
 // @ts-ignore
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { getPortfolio, getPortfolioHistory, getKnowledgeByCategory, searchKnowledge, getLatestAnalysisReport } from "./knowledge";
+import { getPortfolio, getPortfolioHistory, getKnowledgeByCategory, searchKnowledge, getLatestAnalysisReport, getWatchlist } from "./knowledge";
 import { createWorkersAI } from "workers-ai-provider";
 import { streamText, tool, convertToModelMessages, UIMessage } from "ai";
 import { AIChatAgent } from "@cloudflare/ai-chat";
@@ -104,12 +104,16 @@ export class OaktreeChat extends AIChatAgent<any> {
     const workersai = createWorkersAI({ binding: this.env.AI });
     const model = workersai(this.env.chat_ai_model);
 
-    // Fetch portfolio context dynamically so the model has real-time holdings context
-    let portfolioContext = "";
+    // Fetch portfolio and watchlist context dynamically so the model has real-time data
+    let dataContext = "";
     try {
-      const holdings = await getPortfolio(this.env as any);
+      const [holdings, watchlist] = await Promise.all([
+        getPortfolio(this.env as any).catch(() => []),
+        getWatchlist(this.env as any).catch(() => [])
+      ]);
+
       if (holdings && Array.isArray(holdings) && holdings.length > 0) {
-        portfolioContext = "\n\n[ข้อมูลพอร์ตการลงทุนปัจจุบันของผู้ใช้ (User's Current Portfolio)]:\n" +
+        dataContext += "\n\n[ข้อมูลพอร์ตการลงทุนปัจจุบันของผู้ใช้ (User's Current Portfolio)]:\n" +
           JSON.stringify(holdings.map((h: any) => ({
             symbol: h.symbol,
             shares: h.shares,
@@ -122,14 +126,29 @@ export class OaktreeChat extends AIChatAgent<any> {
             category: h.category
           })), null, 2);
       }
+
+      if (watchlist && Array.isArray(watchlist) && watchlist.length > 0) {
+        dataContext += "\n\n[ข้อมูลหุ้นใน Watchlist ของผู้ใช้ (User's Watchlist)]:\n" +
+          JSON.stringify(watchlist.map((w: any) => ({
+            symbol: w.symbol,
+            name: w.name,
+            sector: w.sector,
+            current_price: w.current_price,
+            target_price: w.target_price,
+            thesis: w.thesis
+          })), null, 2);
+      }
     } catch (err) {
-      console.warn("Failed to fetch portfolio context for prompt:", err);
+      console.warn("Failed to fetch context for prompt:", err);
     }
 
     const systemPrompt = "คุณคือ Oaktree AI ผู้ช่วยวิเคราะห์ข้อมูลการลงทุนแบบเน้นคุณค่า (Value Investing) ตามหลักการลงทุนของ Warren Buffett, Charlie Munger, Howard Marks, Benjamin Graham, Peter Lynch และ Seth Klarman\n" +
       "หน้าที่ของคุณคือให้คำแนะนำ วิเคราะห์หุ้น พอร์ตการลงทุน และตอบคำถามด้านการลงทุนอย่างกระชับ ชัดเจน มีเหตุผลทางธุรกิจและหลักการลงทุนรองรับ\n" +
-      "ตอบเป็นภาษาไทยอย่างเป็นมิตรและเป็นมืออาชีพ ใช้ markdown จัดหัวข้อ ตาราง หรือ bullet points ให้อ่านง่าย สวยงาม และน่าติดตาม\n" +
-      portfolioContext;
+      "กฎข้อสำคัญอย่างยิ่ง:\n" +
+      "1. ตอบคำถามเป็นภาษาไทยให้จบครบถ้วนอย่างเป็นธรรมชาติ\n" +
+      "2. ห้ามสร้างแท็กคำสั่งฟังก์ชัน เช่น <|tool_call|> หรือ SQL โค้ดหลอก ให้ตอบข้อมูลจากบริบทที่มีให้หรือความรู้ที่มีทันที\n" +
+      "3. ใช้ markdown จัดหัวข้อ ตาราง หรือ bullet points ให้อ่านง่าย สวยงาม และน่าติดตาม\n" +
+      dataContext;
 
     const result = streamText({
       model,

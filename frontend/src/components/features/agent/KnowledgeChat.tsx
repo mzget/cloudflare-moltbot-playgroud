@@ -357,8 +357,7 @@ function ChatWindow({ sessionId }: { sessionId: string }) {
   });
 
   const { messages, sendMessage, status, stop } = useAgentChat({
-    agent,
-    experimental_throttle: 50,
+    agent
   });
 
   const isLoading = status === 'submitted' || status === 'streaming';
@@ -375,46 +374,10 @@ function ChatWindow({ sessionId }: { sessionId: string }) {
 
   useEffect(() => {
     const container = chatContainerRef.current;
-    if (!container) return;
-
-    const handleScroll = () => {
-      const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
-      if (isNearBottom || isLoading) {
-        container.scrollTo({
-          top: container.scrollHeight,
-          behavior: 'smooth'
-        });
-      }
-    };
-
-    const resizeObserver = new ResizeObserver(handleScroll);
-    
-    // Observe the container itself and all its current children
-    resizeObserver.observe(container);
-    Array.from(container.children).forEach(child => resizeObserver.observe(child));
-
-    // Observe any new children that might be added
-    const mutationObserver = new MutationObserver((mutations) => {
-      mutations.forEach(mutation => {
-        mutation.addedNodes.forEach(node => {
-          if (node instanceof HTMLElement) {
-            resizeObserver.observe(node);
-          }
-        });
-      });
-      handleScroll();
-    });
-
-    mutationObserver.observe(container, { childList: true });
-
-    // Initial scroll
-    handleScroll();
-
-    return () => {
-      resizeObserver.disconnect();
-      mutationObserver.disconnect();
-    };
-  }, [messages.length, isLoading]);
+    if (container) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }, [messages, status]);
 
   const isStateLoading = !agent.identified && !agent.connectionError;
 

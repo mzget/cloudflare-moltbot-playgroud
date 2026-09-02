@@ -77,3 +77,32 @@ export async function getLatestAnalysisReport(env: any, symbol: string) {
   ).bind(symbolUpper).first();
   return result;
 }
+
+export async function getWatchlist(env: Env) {
+  try {
+    const { results } = await env.DB.prepare(`
+      SELECT 
+        w.symbol,
+        w.name,
+        w.sector,
+        w.target_price,
+        w.thesis,
+        m.price as current_price,
+        m.pe_ratio,
+        m.fifty_two_week_high,
+        m.fifty_two_week_low
+      FROM watchlist w
+      LEFT JOIN market_stats m ON w.symbol = m.symbol
+      WHERE w.is_active = 1 OR w.is_active IS NULL
+    `).all();
+    return results;
+  } catch (error) {
+    try {
+      const { results } = await env.DB.prepare('SELECT * FROM watchlist').all();
+      return results;
+    } catch (e) {
+      console.error('Failed to query watchlist:', e);
+      return [];
+    }
+  }
+}
