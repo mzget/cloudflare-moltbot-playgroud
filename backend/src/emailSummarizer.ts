@@ -269,7 +269,7 @@ ${emailContext}
           }];
 
           await env.DB.prepare(
-            'INSERT INTO email_digests (category, summary, key_takeaways, source_emails) VALUES (?, ?, ?, ?)'
+            'INSERT INTO email_digests (category, summary, key_takeaways, source_emails, is_readed) VALUES (?, ?, ?, ?, 0)'
           ).bind(
             digest.category,
             digest.summary,

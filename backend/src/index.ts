@@ -1183,13 +1183,14 @@ app.post('/api/facebook/posts/:id/post-now', async (c) => {
 app.post('/api/email-digests/mark-read', async (c) => {
   try {
     const { id } = await c.req.json() as any;
-    if (!id) {
-      return c.json({ error: 'Missing digest ID' }, 400);
+    if (id === undefined || id === null || isNaN(Number(id))) {
+      return c.json({ error: 'Missing or invalid digest ID' }, 400);
     }
-    await c.env.DB.prepare(
+    const digestId = Number(id);
+    const result = await c.env.DB.prepare(
       'UPDATE email_digests SET is_readed = 1 WHERE id = ?'
-    ).bind(id).run();
-    return c.json({ success: true, message: 'Digest marked as read' });
+    ).bind(digestId).run();
+    return c.json({ success: true, message: 'Digest marked as read', changes: result.meta?.changes ?? 0 });
   } catch (e) {
     return c.json({ error: (e as any).message }, 500);
   }
@@ -1223,14 +1224,14 @@ app.get('/api/email-digests', async (c) => {
         e.key_takeaways, 
         e.source_emails, 
         e.digest_date, 
-        e.is_readed, 
+        COALESCE(e.is_readed, 0) as is_readed, 
         CAST(strftime('%s', e.created_at) as INTEGER) as created_at,
         f.status as facebook_status,
         f.facebook_post_id,
         f.error_message as facebook_error
       FROM email_digests e
       LEFT JOIN facebook_posts f ON f.source_type = 'email_digest' AND f.source_id = e.id
-      WHERE e.is_readed = 0 
+      WHERE COALESCE(e.is_readed, 0) = 0 
       ORDER BY e.created_at DESC 
       LIMIT 50
     `).all();

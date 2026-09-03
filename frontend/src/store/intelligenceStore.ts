@@ -64,6 +64,10 @@ export const useIntelligenceStore = create<IntelligenceStore>((set, get) => ({
   },
 
   onDigestRead: async (id: number) => {
+    // Optimistic UI update: remove digest immediately
+    set(state => ({
+      digests: state.digests.filter(d => d.id !== id)
+    }));
     try {
       const res = await fetch(`${API_BASE_URL}/api/email-digests/mark-read`, {
         method: 'POST',
@@ -73,10 +77,6 @@ export const useIntelligenceStore = create<IntelligenceStore>((set, get) => ({
       if (!res.ok) {
         throw new Error(await res.text());
       }
-      set(state => ({
-        digests: state.digests.filter(d => d.id !== id)
-      }));
-      await get().fetchReports();
     } catch (e) {
       console.error("Failed to mark digest as read:", e);
       await get().fetchReports();
