@@ -93,8 +93,10 @@ export function EmailDigestCard({
     }
   }, [digest.source_emails]);
 
+  const isRead = digest.is_readed === 1;
+
   return (
-    <Card sx={{ ...glassStyle, p: 1 }}>
+    <Card sx={{ ...glassStyle, p: 1, opacity: isRead ? 0.6 : 1, transition: 'opacity 0.3s ease' }}>
       <CardContent sx={{ p: 3 }}>
         <Stack 
           direction={{ xs: 'column', sm: 'row' }} 
@@ -116,14 +118,19 @@ export function EmailDigestCard({
               >
                 Email Digest
               </Chip>
+              {isRead && (
+                <Chip variant="soft" color="neutral" size="sm" startDecorator={<Check size={12} />}>
+                  Read
+                </Chip>
+              )}
             </Stack>
             <Typography level="body-xs" sx={{ color: 'text.tertiary', textTransform: 'uppercase', letterSpacing: '0.1em', display: 'flex', alignItems: 'center', gap: 1 }}>
               <Calendar size={12} />
               Compiled on {new Date(digest.digest_date).toLocaleDateString()}
             </Typography>
           </Box>
-                    <Stack direction="row" spacing={1.5} alignItems="center">
-            {onMarkAsRead && (
+          <Stack direction="row" spacing={1.5} alignItems="center">
+            {onMarkAsRead && !isRead && (
               <Button
                 variant="outlined"
                 color="neutral"
