@@ -9,13 +9,46 @@ export interface ScheduledTaskDecision {
 
 /**
  * Maps a given date/time to the nearest 15-minute interval (0, 15, 30, or 45).
- * This eliminates issues caused by execution jitter or minute drifts (e.g. executing at :01, :16, :31, :46).
+ * Kept for backwards compatibility.
  */
 export function getNearest15Minute(targetDate: Date): number {
 	const rawMinute = targetDate.getUTCMinutes();
 	const rawSecond = targetDate.getUTCSeconds();
 	const totalMinutes = rawMinute + rawSecond / 60;
 	return (Math.round(totalMinutes / 15) * 15) % 60;
+}
+
+/**
+ * Maps a given date/time (and optional cron trigger string) to the nearest scheduled target minute:
+ * - Market data & regular sync crons ("0,15,30,45 * * * *"): target minutes 0, 15, 30, 45.
+ * - Watchlist breakout scanner crons ("5,20,35,50 * * * *"): target minutes 5, 20, 35, 50.
+ * If cron is omitted or unrecognized, it maps to the closest of all 8 target slots.
+ */
+export function getNearestScheduledMinute(targetDate: Date, cron?: string): number {
+	const rawMinute = targetDate.getUTCMinutes();
+	const rawSecond = targetDate.getUTCSeconds();
+	const totalMinutes = rawMinute + rawSecond / 60;
+
+	let targets = [0, 5, 15, 20, 30, 35, 45, 50];
+	if (cron && cron.includes('5,20,35,50')) {
+		targets = [5, 20, 35, 50];
+	} else if (cron && (cron.includes('0,15,30,45') || cron.includes('*/15'))) {
+		targets = [0, 15, 30, 45];
+	}
+
+	let bestTarget = targets[0];
+	let minDistance = 60;
+
+	for (const t of targets) {
+		const diff = Math.abs(totalMinutes - t) % 60;
+		const distance = diff > 30 ? 60 - diff : diff;
+		if (distance < minDistance) {
+			minDistance = distance;
+			bestTarget = t;
+		}
+	}
+
+	return bestTarget;
 }
 
 /**
@@ -51,11 +84,23 @@ export function getScheduledWorkflowParams(
 		? new Date(event.scheduledTime)
 		: fallbackNow;
 
-	const targetMinute = getNearest15Minute(scheduledDate);
+	const targetMinute = getNearestScheduledMinute(scheduledDate, event?.cron);
 	const hour = scheduledDate.getUTCHours();
 	const isSixHourly = hour % 6 === 0;
 	const isDaytime = isDaytimeWindow(scheduledDate);
 	const timestamp = Date.now();
+
+	// Watchlist Breakout Scanner: runs staggered every 15 minutes at minutes :05, :20, :35, :50
+	if (targetMinute === 5 || targetMinute === 20 || targetMinute === 35 || targetMinute === 50) {
+		return {
+			workflowId: `cron-breakout-${timestamp}`,
+			targetMinute,
+			description: `${targetMinute}-min Watchlist Breakouts Scanner`,
+			params: {
+				scanMarketBreakouts: true,
+			}
+		};
+	}
 
 	if (targetMinute === 0) {
 		return {
@@ -71,7 +116,7 @@ export function getScheduledWorkflowParams(
 				emailDigestsManual: false,
 				runCrawler: false,
 				generateDailySummaries: false,
-				scanMarketBreakouts: true,
+				scanMarketBreakouts: false, // Handled separately at :05, :20, :35, :50
 				fetchMarketEvents: isSixHourly,
 				sendDailyEmailReport: false,
 				purgeOldData: isSixHourly,

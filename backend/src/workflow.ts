@@ -205,11 +205,7 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 			try {
 				await step.do('scan-market-breakouts', STEP_CONFIG, async () => {
 					console.log('[Workflow] Starting step: scan-market-breakouts');
-					const fmpKey = this.env.FMP_API_KEY;
-					if (!fmpKey) {
-						console.warn("FMP_API_KEY is not configured.");
-						return { count: 0, error: "FMP_API_KEY is not configured" };
-					}
+					const fmpKey = this.env.FMP_API_KEY || '';
 					const { scanMarketBreakouts } = await import('./marketScanner');
 					const breakouts = await scanMarketBreakouts(this.env.DB, fmpKey, 'watchlist');
 					return { count: (breakouts || []).length };
