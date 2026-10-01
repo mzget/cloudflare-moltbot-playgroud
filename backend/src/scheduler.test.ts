@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getNearest15Minute, isDaytimeWindow, getScheduledWorkflowParams } from './scheduler';
+import { getNearest15Minute, getNearestScheduledMinute, isDaytimeWindow, getScheduledWorkflowParams } from './scheduler';
 
 describe('scheduler - getNearest15Minute', () => {
 	it('should return exact 15-minute marks on the dot', () => {
@@ -26,6 +26,35 @@ describe('scheduler - getNearest15Minute', () => {
 		// Minute 45 interval with drift / delay
 		expect(getNearest15Minute(new Date('2026-08-14T12:46:02Z'))).toBe(45);
 		expect(getNearest15Minute(new Date('2026-08-14T12:44:55Z'))).toBe(45);
+	});
+});
+
+describe('scheduler - getNearestScheduledMinute', () => {
+	it('should resolve exact staggered breakout intervals (:05, :20, :35, :50)', () => {
+		expect(getNearestScheduledMinute(new Date('2026-08-14T12:05:00Z'))).toBe(5);
+		expect(getNearestScheduledMinute(new Date('2026-08-14T12:20:00Z'))).toBe(20);
+		expect(getNearestScheduledMinute(new Date('2026-08-14T12:35:00Z'))).toBe(35);
+		expect(getNearestScheduledMinute(new Date('2026-08-14T12:50:00Z'))).toBe(50);
+	});
+
+	it('should handle slight jitter/drift around breakout minutes', () => {
+		expect(getNearestScheduledMinute(new Date('2026-08-14T12:04:45Z'))).toBe(5);
+		expect(getNearestScheduledMinute(new Date('2026-08-14T12:05:30Z'))).toBe(5);
+		expect(getNearestScheduledMinute(new Date('2026-08-14T12:19:55Z'))).toBe(20);
+		expect(getNearestScheduledMinute(new Date('2026-08-14T12:20:40Z'))).toBe(20);
+		expect(getNearestScheduledMinute(new Date('2026-08-14T12:34:50Z'))).toBe(35);
+		expect(getNearestScheduledMinute(new Date('2026-08-14T12:35:25Z'))).toBe(35);
+		expect(getNearestScheduledMinute(new Date('2026-08-14T12:49:50Z'))).toBe(50);
+		expect(getNearestScheduledMinute(new Date('2026-08-14T12:50:35Z'))).toBe(50);
+	});
+
+	it('should accurately resolve based on cron filter when provided', () => {
+		const dateAround05 = new Date('2026-08-14T12:03:00Z');
+		// When cron is explicitly the breakout schedule, should map to 5 even if slightly earlier
+		expect(getNearestScheduledMinute(dateAround05, '5,20,35,50 * * * *')).toBe(5);
+
+		// When cron is standard schedule, should map to 0
+		expect(getNearestScheduledMinute(dateAround05, '0,15,30,45 * * * *')).toBe(0);
 	});
 });
 
@@ -66,6 +95,7 @@ describe('scheduler - getScheduledWorkflowParams', () => {
 		expect(decision.params.generateEmailDigests).toBe(true);
 		expect(decision.params.runCrawler).toBe(false);
 		expect(decision.params.generateDailySummaries).toBe(false);
+		expect(decision.params.scanMarketBreakouts).toBe(false);
 	});
 
 	it('should schedule hourly tasks at minute 0 during nighttime with email sync enabled but digest disabled', () => {
@@ -79,6 +109,23 @@ describe('scheduler - getScheduledWorkflowParams', () => {
 		expect(decision.params.generateEmailDigests).toBe(false);
 		expect(decision.params.runCrawler).toBe(false);
 		expect(decision.params.generateDailySummaries).toBe(false);
+		expect(decision.params.scanMarketBreakouts).toBe(false);
+	});
+
+	it('should schedule breakout scans at minutes :05, :20, :35, :50 with scanMarketBreakouts enabled only', () => {
+		for (const minute of [5, 20, 35, 50]) {
+			const scheduledTime = new Date(`2026-08-14T13:${minute.toString().padStart(2, '0')}:00Z`).getTime();
+			const decision = getScheduledWorkflowParams({ scheduledTime, cron: '5,20,35,50 * * * *' });
+
+			expect(decision.targetMinute).toBe(minute);
+			expect(decision.workflowId).toMatch(/^cron-breakout-\d+$/);
+			expect(decision.description).toBe(`${minute}-min Watchlist Breakouts Scanner`);
+			expect(decision.params.scanMarketBreakouts).toBe(true);
+			// Does NOT trigger regular price or metrics updates
+			expect(decision.params.fetchMarketStats).toBeUndefined();
+			expect(decision.params.syncEmails).toBeUndefined();
+			expect(decision.params.syncFacebookPosts).toBeUndefined();
+		}
 	});
 
 	it('should schedule 30-minute sync during daytime with price sync AND email digest enabled', () => {

@@ -29,7 +29,7 @@ name = "EMAIL"
 destination_address = "rattajak.n@gmail.com"
 
 [triggers]
-crons = ["*/15 * * * *"]
+crons = ["0,15,30,45 * * * *", "5,20,35,50 * * * *"]
 
 [[workflows]]
 name = "oaktree-sync-workflow"
