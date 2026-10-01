@@ -52,6 +52,9 @@ cd mcp-worker && npx tsc --noEmit
 
 **Objective**: Merge the current active working branch into `develop` and push to remote.
 
+> [!NOTE]
+> The workspace runs on a single production Cloudflare environment. Pushing to `develop` runs Continuous Integration (testing, typecheck, dry-run build) only; Continuous Deployment (CD) occurs exclusively upon pushing to `main`.
+
 ### Step-by-Step Procedure
 
 1. **Inspect Working Tree & Active Branch**:
