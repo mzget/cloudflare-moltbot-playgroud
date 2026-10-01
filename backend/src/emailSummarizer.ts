@@ -50,14 +50,14 @@ export async function syncAndIngestEmails(env: Env): Promise<number> {
       // Determine the query
       let query = '';
       if (sub.raw_query) {
-        query = `${sub.raw_query} is:unread`;
+        query = sub.raw_query.trim();
       } else {
         const parts = [];
         if (sub.sender) parts.push(`from:${sub.sender}`);
         if (sub.subject_filter) parts.push(`subject:(${sub.subject_filter})`);
         if (sub.label_filter) parts.push(`label:${sub.label_filter}`);
         if (parts.length > 0) {
-          parts.push('is:unread');
+          parts.push('newer_than:2d');
           query = parts.join(' ');
         }
       }
@@ -113,47 +113,30 @@ export async function syncAndIngestEmails(env: Env): Promise<number> {
 }
 
 export async function generateEmailDigests(env: Env, isManual = false): Promise<void> {
-  // Check active subscriptions to see which are due
+  // Check active subscriptions
   const { results: activeSubs } = await env.DB.prepare(
-    'SELECT * FROM email_subscriptions WHERE is_active = 1'
+    'SELECT id FROM email_subscriptions WHERE is_active = 1'
   ).all() as { results: any[] };
 
-  if (activeSubs.length === 0) {
+  if (!activeSubs || activeSubs.length === 0) {
     console.log('No active email subscriptions found.');
     return;
   }
 
-  const now = new Date();
-  const currentHour = now.getUTCHours();
-  const currentDay = now.getUTCDay();
+  const activeSubIds = activeSubs.map(sub => sub.id);
+  const placeholders = activeSubIds.map(() => '?').join(',');
 
-  const dueSubIds = activeSubs
-    .filter(sub => {
-      if (isManual) return true;
-      if (sub.frequency === 'hourly') return true;
-      if (sub.frequency === 'daily' && currentHour === 6) return true; // Daily check at 6:00 UTC
-      if (sub.frequency === 'weekly' && currentDay === 0 && currentHour === 6) return true; // Weekly check Sunday 6:00 UTC
-      return false;
-    })
-    .map(sub => sub.id);
-
-  if (dueSubIds.length === 0) {
-    console.log('No email subscriptions are due for summarization in this hour.');
-    return;
-  }
-
-  // Fetch unprocessed emails for due subscriptions
-  const placeholders = dueSubIds.map(() => '?').join(',');
+  // Fetch the oldest unprocessed email (FIFO, Limit 1 per cycle for quality preservation)
   const { results: emails } = await env.DB.prepare(
-    `SELECT * FROM ingested_emails WHERE processed = 0 AND subscription_id IN (${placeholders}) ORDER BY received_at ASC`
-  ).bind(...dueSubIds).all() as { results: any[] };
+    `SELECT * FROM ingested_emails WHERE processed = 0 AND subscription_id IN (${placeholders}) ORDER BY received_at ASC LIMIT 1`
+  ).bind(...activeSubIds).all() as { results: any[] };
 
-  if (emails.length === 0) {
-    console.log('No unprocessed emails found for the due subscriptions.');
+  if (!emails || emails.length === 0) {
+    console.log('No unprocessed emails found in queue.');
     return;
   }
 
-  console.log(`Processing and summarizing ${emails.length} ingested emails for due subscriptions (1-by-1)...`);
+  console.log(`Processing and summarizing 1 ingested email from queue (ID: ${emails[0].id} — Subject: ${emails[0].subject})...`);
 
   for (const email of emails) {
     console.log(`Processing email ID: ${email.id} — Subject: ${email.subject}`);

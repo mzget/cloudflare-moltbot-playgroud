@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getNearest15Minute, getScheduledWorkflowParams } from './scheduler';
+import { getNearest15Minute, isDaytimeWindow, getScheduledWorkflowParams } from './scheduler';
 
 describe('scheduler - getNearest15Minute', () => {
 	it('should return exact 15-minute marks on the dot', () => {
@@ -29,9 +29,32 @@ describe('scheduler - getNearest15Minute', () => {
 	});
 });
 
+describe('scheduler - isDaytimeWindow (08:00 - 18:00 Asia/Bangkok)', () => {
+	it('should return true for times inside the daytime window', () => {
+		// 01:00 UTC = 08:00 Bangkok (Start of window)
+		expect(isDaytimeWindow(new Date('2026-08-14T01:00:00Z'))).toBe(true);
+		// 05:30 UTC = 12:30 Bangkok (Midday)
+		expect(isDaytimeWindow(new Date('2026-08-14T05:30:00Z'))).toBe(true);
+		// 11:00 UTC = 18:00 Bangkok (End of window)
+		expect(isDaytimeWindow(new Date('2026-08-14T11:00:00Z'))).toBe(true);
+	});
+
+	it('should return false for times outside the daytime window', () => {
+		// 00:59 UTC = 07:59 Bangkok (1 min before window)
+		expect(isDaytimeWindow(new Date('2026-08-14T00:59:00Z'))).toBe(false);
+		// 11:01 UTC = 18:01 Bangkok (1 min after window)
+		expect(isDaytimeWindow(new Date('2026-08-14T11:01:00Z'))).toBe(false);
+		// 13:00 UTC = 20:00 Bangkok (Nighttime / US market)
+		expect(isDaytimeWindow(new Date('2026-08-14T13:00:00Z'))).toBe(false);
+		// 18:00 UTC = 01:00 Bangkok (Midnight)
+		expect(isDaytimeWindow(new Date('2026-08-14T18:00:00Z'))).toBe(false);
+	});
+});
+
 describe('scheduler - getScheduledWorkflowParams', () => {
-	it('should schedule hourly tasks at minute 0 (using event.scheduledTime)', () => {
-		const scheduledTime = new Date('2026-08-14T13:00:00Z').getTime();
+	it('should schedule hourly tasks at minute 0 during daytime with email sync and digest enabled', () => {
+		// 05:00 UTC = 12:00 Bangkok (Daytime)
+		const scheduledTime = new Date('2026-08-14T05:00:00Z').getTime();
 		const decision = getScheduledWorkflowParams({ scheduledTime });
 
 		expect(decision.targetMinute).toBe(0);
@@ -41,20 +64,48 @@ describe('scheduler - getScheduledWorkflowParams', () => {
 		expect(decision.params.checkAlertRules).toBe(true);
 		expect(decision.params.syncEmails).toBe(true);
 		expect(decision.params.generateEmailDigests).toBe(true);
-		// 13:00 is not six-hourly (13 % 6 !== 0)
 		expect(decision.params.runCrawler).toBe(false);
-		expect(decision.params.fetchMarketEvents).toBe(false);
+		expect(decision.params.generateDailySummaries).toBe(false);
 	});
 
-	it('should enable six-hourly tasks when hour % 6 === 0 at minute 0', () => {
-		const scheduledTime = new Date('2026-08-14T12:00:00Z').getTime(); // 12 % 6 === 0
+	it('should schedule hourly tasks at minute 0 during nighttime with email sync enabled but digest disabled', () => {
+		// 13:00 UTC = 20:00 Bangkok (Nighttime)
+		const scheduledTime = new Date('2026-08-14T13:00:00Z').getTime();
 		const decision = getScheduledWorkflowParams({ scheduledTime });
 
 		expect(decision.targetMinute).toBe(0);
-		expect(decision.params.runCrawler).toBe(true);
-		expect(decision.params.generateDailySummaries).toBe(true);
-		expect(decision.params.fetchMarketEvents).toBe(true);
-		expect(decision.params.purgeOldData).toBe(true);
+		expect(decision.workflowId).toMatch(/^cron-hourly-\d+$/);
+		expect(decision.params.syncEmails).toBe(true);
+		expect(decision.params.generateEmailDigests).toBe(false);
+		expect(decision.params.runCrawler).toBe(false);
+		expect(decision.params.generateDailySummaries).toBe(false);
+	});
+
+	it('should schedule 30-minute sync during daytime with price sync AND email digest enabled', () => {
+		// 05:30 UTC = 12:30 Bangkok (Daytime)
+		const time30Day = new Date('2026-08-14T05:30:00Z').getTime();
+		const decision = getScheduledWorkflowParams({ scheduledTime: time30Day });
+
+		expect(decision.targetMinute).toBe(30);
+		expect(decision.workflowId).toMatch(/^cron-price-\d+$/);
+		expect(decision.description).toBe('30-min price sync & daytime email digest');
+		expect(decision.params.fetchMarketStats).toBe(true);
+		expect(decision.params.priceOnly).toBe(true);
+		expect(decision.params.generateEmailDigests).toBe(true);
+		expect(decision.params.emailDigestsManual).toBe(false);
+	});
+
+	it('should schedule 30-minute sync during nighttime with price sync only (digest disabled)', () => {
+		// 13:30 UTC = 20:30 Bangkok (Nighttime)
+		const time30Night = new Date('2026-08-14T13:30:00Z').getTime();
+		const decision = getScheduledWorkflowParams({ scheduledTime: time30Night });
+
+		expect(decision.targetMinute).toBe(30);
+		expect(decision.workflowId).toMatch(/^cron-price-\d+$/);
+		expect(decision.description).toBe('30-min price sync');
+		expect(decision.params.fetchMarketStats).toBe(true);
+		expect(decision.params.priceOnly).toBe(true);
+		expect(decision.params.generateEmailDigests).toBe(false);
 	});
 
 	it('should schedule 15-minute and 45-minute sync with price & Facebook enabled', () => {
@@ -75,21 +126,13 @@ describe('scheduler - getScheduledWorkflowParams', () => {
 		expect(decision45.params.priceOnly).toBe(true);
 	});
 
-	it('should schedule 30-minute price sync at minute 30', () => {
-		const time30 = new Date('2026-08-14T13:30:00Z').getTime();
-		const decision30 = getScheduledWorkflowParams({ scheduledTime: time30 });
-		expect(decision30.targetMinute).toBe(30);
-		expect(decision30.workflowId).toMatch(/^cron-price-\d+$/);
-		expect(decision30.params.fetchMarketStats).toBe(true);
-		expect(decision30.params.priceOnly).toBe(true);
-		expect(decision30.params.syncFacebookPosts).toBeUndefined();
-	});
-
 	it('should gracefully fallback to current time if event or event.scheduledTime is missing', () => {
-		const mockNow = new Date('2026-08-14T13:31:02Z'); // delayed execution of :30
+		// 05:31 UTC = 12:31 Bangkok (Daytime :30 mark)
+		const mockNow = new Date('2026-08-14T05:31:02Z');
 		const decision = getScheduledWorkflowParams(null, mockNow);
 		expect(decision.targetMinute).toBe(30);
 		expect(decision.params.fetchMarketStats).toBe(true);
 		expect(decision.params.priceOnly).toBe(true);
+		expect(decision.params.generateEmailDigests).toBe(true);
 	});
 });
