@@ -17,7 +17,7 @@ export default function Watchlist() {
       >
         <TabList variant="soft">
           <Tab disableIndicator value="my-watchlist">My Watchlist</Tab>
-          <Tab disableIndicator value="market-breakouts">Market Breakouts</Tab>
+          <Tab disableIndicator value="market-breakouts">Watchlist Breakouts</Tab>
         </TabList>
       </Tabs>
 

@@ -1,76 +1,182 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Box, Typography, Sheet, Table, Button, Input, Grid, Stack, IconButton, CircularProgress, Tooltip, Snackbar, Alert } from '@mui/joy';
-import { Check, Play, Calendar, ArrowUp, ArrowDown, ArrowUpDown, Search, FileText } from 'lucide-react';
+import {
+	Box,
+	Typography,
+	Sheet,
+	Table,
+	Button,
+	Grid,
+	Stack,
+	IconButton,
+	CircularProgress,
+	Tooltip,
+	Snackbar,
+	Alert,
+	Chip,
+	Card,
+	RadioGroup,
+	Radio
+} from '@mui/joy';
+import {
+	RefreshCw,
+	TrendingUp,
+	TrendingDown,
+	Flame,
+	AlertTriangle,
+	ArrowUp,
+	ArrowDown,
+	ArrowUpDown,
+	FileText,
+	Zap,
+	ShieldAlert,
+	CheckCircle2
+} from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
 import DebouncedInput from '../../common/DebouncedInput';
 import { glassStyle } from '../../../styles/glass';
 import { API_BASE_URL } from '../../../config';
 
-interface BreakoutItem {
+export interface BreakoutItem {
 	symbol: string;
 	name: string;
 	price: number;
-	percent_change: number;
-	year_high: number;
-	year_low: number;
-	breakout_type: '52w_high' | '52w_low';
-	scan_date: string;
+	percentChange: number;
+	yearHigh: number;
+	yearLow: number;
+	allTimeHigh?: number | null;
+	allTimeLow?: number | null;
+	breakoutType: 'ath' | '52w_high' | '52w_low' | 'atl';
 }
+
+export type BreakoutStatus =
+	| 'ath'
+	| '52w_high'
+	| '52w_low'
+	| 'atl'
+	| 'near_ath'
+	| 'near_52w_high'
+	| 'near_52w_low'
+	| 'near_atl'
+	| 'normal';
+
+export interface WatchlistProximityItem {
+	symbol: string;
+	name: string;
+	sectorLabel?: string | null;
+	sectorLabelColor?: string | null;
+	price: number;
+	percentChange: number;
+	yearHigh: number | null;
+	yearLow: number | null;
+	allTimeHigh: number | null;
+	allTimeLow: number | null;
+	distance52wHigh: number | null;
+	distanceAth: number | null;
+	distance52wLow: number | null;
+	distanceAtl: number | null;
+	status: BreakoutStatus;
+	updatedAt?: string | null;
+}
+
+export interface WatchlistBreakoutSummary {
+	totalWatchlist: number;
+	athCount: number;
+	high52wCount: number;
+	low52wCount: number;
+	atlCount: number;
+	nearAthCount: number;
+	nearHigh52wCount: number;
+	nearLow52wCount: number;
+	nearAtlCount: number;
+	totalBreakouts: number;
+	highsRatio: number;
+	lowsRatio: number;
+}
+
+type SortField = 'symbol' | 'price' | 'percentChange' | 'distance52wHigh' | 'distanceAth' | 'distance52wLow';
 
 export default function MarketBreakouts() {
 	const navigate = useNavigate();
-	const [breakouts, setBreakouts] = useState<BreakoutItem[]>([]);
-	const [selectedDate, setSelectedDate] = useState<string>(() => {
-		return new Date().toISOString().split('T')[0];
+	const [summary, setSummary] = useState<WatchlistBreakoutSummary>({
+		totalWatchlist: 0,
+		athCount: 0,
+		high52wCount: 0,
+		low52wCount: 0,
+		atlCount: 0,
+		nearAthCount: 0,
+		nearHigh52wCount: 0,
+		nearLow52wCount: 0,
+		nearAtlCount: 0,
+		totalBreakouts: 0,
+		highsRatio: 50,
+		lowsRatio: 50
 	});
+	const [todayBreakouts, setTodayBreakouts] = useState<BreakoutItem[]>([]);
+	const [matrix, setMatrix] = useState<WatchlistProximityItem[]>([]);
 	const [loading, setLoading] = useState(false);
 	const [scanning, setScanning] = useState(false);
 	const [searchQuery, setSearchQuery] = useState('');
 
-	// Toast notification state
+	// Matrix filter: 'all' | 'breaking' | 'near'
+	const [statusFilter, setStatusFilter] = useState<'all' | 'breaking' | 'near'>('all');
+
+	// Active breakouts filter tab
+	const [breakoutTab, setBreakoutTab] = useState<'all' | 'ath' | '52w_high' | '52w_low' | 'atl'>('all');
+
+	// Toast state
 	const [toastOpen, setToastOpen] = useState(false);
 	const [toastMessage, setToastMessage] = useState('');
 
-	// Sort states
-	const [highsSort, setHighsSort] = useState<{ field: 'symbol' | 'price' | 'percent_change'; order: 'asc' | 'desc' }>({
-		field: 'percent_change',
-		order: 'desc'
-	});
-	const [lowsSort, setLowsSort] = useState<{ field: 'symbol' | 'price' | 'percent_change'; order: 'asc' | 'desc' }>({
-		field: 'percent_change',
+	// Table Sorting
+	const [sortState, setSortState] = useState<{ field: SortField; order: 'asc' | 'desc' }>({
+		field: 'percentChange',
 		order: 'desc'
 	});
 
-	const fetchBreakouts = async (dateStr: string) => {
+	const fetchBreakoutsData = async () => {
 		setLoading(true);
 		try {
-			const res = await fetch(`${API_BASE_URL}/api/market-breakouts?date=${dateStr}`);
+			const res = await fetch(`${API_BASE_URL}/api/watchlist-breakouts`);
 			if (res.ok) {
-				const data = await res.json() as BreakoutItem[];
-				setBreakouts(data);
+				const data = await res.json() as {
+					summary: WatchlistBreakoutSummary;
+					todayBreakouts: BreakoutItem[];
+					matrix: WatchlistProximityItem[];
+				};
+				if (data.summary) setSummary(data.summary);
+				if (Array.isArray(data.todayBreakouts)) setTodayBreakouts(data.todayBreakouts);
+				if (Array.isArray(data.matrix)) setMatrix(data.matrix);
 			}
 		} catch (error) {
-			console.error('Failed to fetch market breakouts:', error);
+			console.error('Failed to fetch watchlist breakouts data:', error);
 		} finally {
 			setLoading(false);
 		}
 	};
 
 	useEffect(() => {
-		fetchBreakouts(selectedDate);
-	}, [selectedDate]);
+		fetchBreakoutsData();
+	}, []);
 
 	const handleRunScan = async () => {
 		setScanning(true);
 		try {
-			const res = await fetch(`${API_BASE_URL}/api/scan-market`, { method: 'POST' });
+			const res = await fetch(`${API_BASE_URL}/api/scan-watchlist`, { method: 'POST' });
 			if (res.ok) {
-				const todayStr = new Date().toISOString().split('T')[0];
-				setSelectedDate(todayStr);
-				await fetchBreakouts(todayStr);
+				const data = await res.json() as any;
+				if (data.summary) setSummary(data.summary);
+				if (Array.isArray(data.todayBreakouts)) setTodayBreakouts(data.todayBreakouts);
+				if (Array.isArray(data.matrix)) setMatrix(data.matrix);
+
+				setToastMessage(`Scan complete! Found ${data.count ?? data.todayBreakouts?.length ?? 0} active breakouts today.`);
+				setToastOpen(true);
+			} else {
+				throw new Error(res.statusText);
 			}
 		} catch (error) {
-			console.error('Failed to trigger market scan:', error);
+			console.error('Failed to trigger watchlist scan:', error);
+			setToastMessage('Failed to scan watchlist. Please try again.');
+			setToastOpen(true);
 		} finally {
 			setScanning(false);
 		}
@@ -83,508 +189,763 @@ export default function MarketBreakouts() {
 		});
 	};
 
-	const handleSortHighs = (field: 'symbol' | 'price' | 'percent_change') => {
-		setHighsSort(prev => ({
+	const handleSort = (field: SortField) => {
+		setSortState(prev => ({
 			field,
 			order: prev.field === field && prev.order === 'desc' ? 'asc' : 'desc'
 		}));
 	};
 
-	const handleSortLows = (field: 'symbol' | 'price' | 'percent_change') => {
-		setLowsSort(prev => ({
-			field,
-			order: prev.field === field && prev.order === 'desc' ? 'asc' : 'desc'
-		}));
+	// Filtered Active Breakouts List
+	const filteredBreakouts = useMemo(() => {
+		if (breakoutTab === 'all') return todayBreakouts;
+		return todayBreakouts.filter(b => b.breakoutType === breakoutTab);
+	}, [todayBreakouts, breakoutTab]);
+
+	// Filtered & Sorted Proximity Matrix
+	const filteredMatrix = useMemo(() => {
+		let list = [...matrix];
+
+		// Status category filter
+		if (statusFilter === 'breaking') {
+			list = list.filter(m => ['ath', '52w_high', '52w_low', 'atl'].includes(m.status));
+		} else if (statusFilter === 'near') {
+			list = list.filter(m => ['near_ath', 'near_52w_high', 'near_52w_low', 'near_atl'].includes(m.status));
+		}
+
+		// Search Query filter
+		if (searchQuery.trim()) {
+			const q = searchQuery.toLowerCase();
+			list = list.filter(m =>
+				m.symbol.toLowerCase().includes(q) ||
+				(m.name && m.name.toLowerCase().includes(q)) ||
+				(m.sectorLabel && m.sectorLabel.toLowerCase().includes(q))
+			);
+		}
+
+		// Sorting
+		list.sort((a, b) => {
+			const orderMult = sortState.order === 'asc' ? 1 : -1;
+			if (sortState.field === 'symbol') {
+				return orderMult * a.symbol.localeCompare(b.symbol);
+			}
+			const aVal = a[sortState.field];
+			const bVal = b[sortState.field];
+			if (aVal === null || aVal === undefined) return 1;
+			if (bVal === null || bVal === undefined) return -1;
+			return orderMult * ((aVal as number) - (bVal as number));
+		});
+
+		return list;
+	}, [matrix, statusFilter, searchQuery, sortState]);
+
+	// Render Status Badge
+	const renderStatusBadge = (status: BreakoutStatus) => {
+		switch (status) {
+			case 'ath':
+				return (
+					<Chip color="success" variant="solid" size="sm" startDecorator={<Flame size={14} />}>
+						ATH
+					</Chip>
+				);
+			case '52w_high':
+				return (
+					<Chip color="primary" variant="solid" size="sm" startDecorator={<TrendingUp size={14} />}>
+						52W High
+					</Chip>
+				);
+			case 'near_ath':
+				return (
+					<Chip color="warning" variant="soft" size="sm" startDecorator={<Zap size={14} />}>
+						Near ATH
+					</Chip>
+				);
+			case 'near_52w_high':
+				return (
+					<Chip color="primary" variant="soft" size="sm">
+						Near 52W High
+					</Chip>
+				);
+			case '52w_low':
+				return (
+					<Chip color="warning" variant="solid" size="sm" startDecorator={<TrendingDown size={14} />}>
+						52W Low
+					</Chip>
+				);
+			case 'atl':
+				return (
+					<Chip color="danger" variant="solid" size="sm" startDecorator={<AlertTriangle size={14} />}>
+						ATL
+					</Chip>
+				);
+			case 'near_52w_low':
+				return (
+					<Chip color="neutral" variant="soft" size="sm">
+						Near 52W Low
+					</Chip>
+				);
+			case 'near_atl':
+				return (
+					<Chip color="danger" variant="soft" size="sm" startDecorator={<ShieldAlert size={14} />}>
+						Near ATL
+					</Chip>
+				);
+			default:
+				return (
+					<Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
+						—
+					</Typography>
+				);
+		}
 	};
 
-	// Market Breadth Gauge variables
-	const rawHighsList = useMemo(() => breakouts.filter(b => b.breakout_type === '52w_high'), [breakouts]);
-	const rawLowsList = useMemo(() => breakouts.filter(b => b.breakout_type === '52w_low'), [breakouts]);
-	const totalBreakouts = rawHighsList.length + rawLowsList.length;
-	const highsPercentage = totalBreakouts > 0 ? (rawHighsList.length / totalBreakouts) * 100 : 50;
-	const lowsPercentage = totalBreakouts > 0 ? (rawLowsList.length / totalBreakouts) * 100 : 50;
-
-	// Highs sorting and filtering
-	const highsList = useMemo(() => {
-		let list = [...rawHighsList];
-		if (searchQuery.trim()) {
-			const q = searchQuery.toLowerCase();
-			list = list.filter(item => item.symbol.toLowerCase().includes(q) || (item.name && item.name.toLowerCase().includes(q)));
-		}
-		list.sort((a, b) => {
-			if (highsSort.field === 'symbol') {
-				const aVal = a.symbol;
-				const bVal = b.symbol;
-				return highsSort.order === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
-			} else {
-				const aVal = a[highsSort.field] as number;
-				const bVal = b[highsSort.field] as number;
-				return highsSort.order === 'asc' ? aVal - bVal : bVal - aVal;
-			}
-		});
-		return list;
-	}, [rawHighsList, searchQuery, highsSort]);
-
-	// Lows sorting and filtering
-	const lowsList = useMemo(() => {
-		let list = [...rawLowsList];
-		if (searchQuery.trim()) {
-			const q = searchQuery.toLowerCase();
-			list = list.filter(item => item.symbol.toLowerCase().includes(q) || (item.name && item.name.toLowerCase().includes(q)));
-		}
-		list.sort((a, b) => {
-			if (lowsSort.field === 'symbol') {
-				const aVal = a.symbol;
-				const bVal = b.symbol;
-				return lowsSort.order === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
-			} else {
-				const aVal = a[lowsSort.field] as number;
-				const bVal = b[lowsSort.field] as number;
-				return lowsSort.order === 'asc' ? aVal - bVal : bVal - aVal;
-			}
-		});
-		return list;
-	}, [rawLowsList, searchQuery, lowsSort]);
-
-	const renderHeaderSortLabel = (
-		label: string, 
-		field: 'symbol' | 'price' | 'percent_change', 
-		currentSort: { field: string; order: 'asc' | 'desc' }, 
-		onSort: (field: 'symbol' | 'price' | 'percent_change') => void,
-		align: 'left' | 'right' | 'center' = 'left'
-	) => {
-		const isSorted = currentSort.field === field;
+	const renderSortHeader = (label: string, field: SortField, align: 'left' | 'right' = 'left') => {
+		const isSorted = sortState.field === field;
 		return (
-			<th 
-				onClick={() => onSort(field)}
-				style={{ 
-					cursor: 'pointer', 
-					userSelect: 'none', 
-					textAlign: align,
-					padding: '8px 12px'
+			<Box
+				onClick={() => handleSort(field)}
+				sx={{
+					display: 'flex',
+					alignItems: 'center',
+					justifyContent: align === 'right' ? 'flex-end' : 'flex-start',
+					gap: 0.5,
+					cursor: 'pointer',
+					userSelect: 'none',
+					'&:hover': { color: 'primary.plainColor' }
 				}}
 			>
-				<Stack 
-					direction="row" 
-					spacing={0.5} 
-					alignItems="center" 
-					justifyContent={align === 'right' ? 'flex-end' : align === 'center' ? 'center' : 'flex-start'}
-					sx={{ 
-						'&:hover': { color: 'var(--joy-palette-text-primary)' },
-						color: isSorted ? 'var(--joy-palette-text-primary)' : 'var(--joy-palette-text-tertiary)',
-						transition: 'color 0.2s ease-in-out'
-					}}
-				>
-					<span>{label}</span>
-					{isSorted ? (
-						currentSort.order === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />
-					) : (
-						<ArrowUpDown size={12} style={{ opacity: 0.4 }} />
-					)}
-				</Stack>
-			</th>
+				<Typography level="title-sm" sx={{ color: isSorted ? 'primary.plainColor' : 'inherit' }}>
+					{label}
+				</Typography>
+				{isSorted ? (
+					sortState.order === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />
+				) : (
+					<ArrowUpDown size={14} style={{ opacity: 0.3 }} />
+				)}
+			</Box>
 		);
 	};
 
+	const totalImminent = summary.nearAthCount + summary.nearHigh52wCount + summary.nearLow52wCount + summary.nearAtlCount;
+
 	return (
-		<Box>
-			{/* Controls Toolbar */}
-			<Sheet
-				sx={{
-					...glassStyle,
-					p: 2,
-					mb: 3,
-					display: 'flex',
-					flexDirection: { xs: 'column', md: 'row' },
-					gap: 2,
-					alignItems: 'center',
-					justifyContent: 'space-between',
-					backgroundColor: 'rgba(255, 255, 255, 0.02)'
-				}}
-			>
-				<Stack 
-					direction={{ xs: 'column', sm: 'row' }} 
-					spacing={2.5} 
-					alignItems="center" 
-					sx={{ width: { xs: '100%', md: 'auto' } }}
-				>
-					<Stack direction="row" spacing={1.5} alignItems="center" sx={{ width: { xs: '100%', sm: 'auto' } }}>
-						<Calendar size={18} opacity={0.6} />
-						<Typography level="title-sm" sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>Scan Date:</Typography>
-						<Input
-							type="date"
-							value={selectedDate}
-							onChange={e => setSelectedDate(e.target.value)}
-							size="sm"
+		<Box sx={{ width: '100%', pb: 6 }}>
+			{/* Top Bar / Header */}
+			<Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3, flexWrap: 'wrap', gap: 2 }}>
+				<Box>
+					<Typography level="h2" sx={{ fontWeight: 'bold' }}>
+						Watchlist Breakouts
+					</Typography>
+					<Typography level="body-sm" sx={{ color: 'text.secondary', mt: 0.5 }}>
+						Live boundary milestone monitoring (ATH, ATL, 52W High/Low) and proximity matrix for your {summary.totalWatchlist} active watchlist stocks.
+					</Typography>
+				</Box>
+
+				<Stack direction="row" spacing={1.5} alignItems="center">
+					<Button
+						variant="solid"
+						color="primary"
+						startDecorator={<RefreshCw size={16} className={scanning ? 'animate-spin' : ''} />}
+						loading={scanning}
+						onClick={handleRunScan}
+						sx={{ px: 2.5 }}
+					>
+						Scan Watchlist
+					</Button>
+				</Stack>
+			</Box>
+
+			{/* Metric Overview Cards */}
+			<Grid container spacing={2} sx={{ mb: 3 }}>
+				{/* 1. All-Time High */}
+				<Grid xs={12} sm={6} md={3}>
+					<Sheet sx={{ ...glassStyle, p: 2.5, borderRadius: 'md', display: 'flex', alignItems: 'center', gap: 2 }}>
+						<Box
 							sx={{
-								minWidth: 150,
-								...glassStyle,
-								backgroundColor: 'rgba(255, 255, 255, 0.05)',
-								borderColor: 'rgba(255, 255, 255, 0.1)'
+								width: 48,
+								height: 48,
+								borderRadius: '50%',
+								display: 'flex',
+								alignItems: 'center',
+								justifyContent: 'center',
+								bgcolor: 'success.softBg',
+								color: 'success.solidBg'
+							}}
+						>
+							<Flame size={24} />
+						</Box>
+						<Box>
+							<Typography level="body-xs" sx={{ textTransform: 'uppercase', fontWeight: 600, color: 'text.tertiary' }}>
+								All-Time High
+							</Typography>
+							<Typography level="h3" sx={{ fontWeight: 'bold', color: 'success.plainColor' }}>
+								{summary.athCount}
+							</Typography>
+							<Typography level="body-xs" sx={{ color: 'text.secondary' }}>
+								{summary.nearAthCount > 0 ? `${summary.nearAthCount} nearing ATH (3%)` : '0 nearing ATH'}
+							</Typography>
+						</Box>
+					</Sheet>
+				</Grid>
+
+				{/* 2. 52-Week High */}
+				<Grid xs={12} sm={6} md={3}>
+					<Sheet sx={{ ...glassStyle, p: 2.5, borderRadius: 'md', display: 'flex', alignItems: 'center', gap: 2 }}>
+						<Box
+							sx={{
+								width: 48,
+								height: 48,
+								borderRadius: '50%',
+								display: 'flex',
+								alignItems: 'center',
+								justifyContent: 'center',
+								bgcolor: 'primary.softBg',
+								color: 'primary.solidBg'
+							}}
+						>
+							<TrendingUp size={24} />
+						</Box>
+						<Box>
+							<Typography level="body-xs" sx={{ textTransform: 'uppercase', fontWeight: 600, color: 'text.tertiary' }}>
+								52-Week High
+							</Typography>
+							<Typography level="h3" sx={{ fontWeight: 'bold', color: 'primary.plainColor' }}>
+								{summary.high52wCount}
+							</Typography>
+							<Typography level="body-xs" sx={{ color: 'text.secondary' }}>
+								{summary.nearHigh52wCount > 0 ? `${summary.nearHigh52wCount} nearing high (3%)` : '0 nearing high'}
+							</Typography>
+						</Box>
+					</Sheet>
+				</Grid>
+
+				{/* 3. 52-Week Low */}
+				<Grid xs={12} sm={6} md={3}>
+					<Sheet sx={{ ...glassStyle, p: 2.5, borderRadius: 'md', display: 'flex', alignItems: 'center', gap: 2 }}>
+						<Box
+							sx={{
+								width: 48,
+								height: 48,
+								borderRadius: '50%',
+								display: 'flex',
+								alignItems: 'center',
+								justifyContent: 'center',
+								bgcolor: 'warning.softBg',
+								color: 'warning.solidBg'
+							}}
+						>
+							<TrendingDown size={24} />
+						</Box>
+						<Box>
+							<Typography level="body-xs" sx={{ textTransform: 'uppercase', fontWeight: 600, color: 'text.tertiary' }}>
+								52-Week Low
+							</Typography>
+							<Typography level="h3" sx={{ fontWeight: 'bold', color: 'warning.plainColor' }}>
+								{summary.low52wCount}
+							</Typography>
+							<Typography level="body-xs" sx={{ color: 'text.secondary' }}>
+								{summary.nearLow52wCount > 0 ? `${summary.nearLow52wCount} nearing low (3%)` : '0 nearing low'}
+							</Typography>
+						</Box>
+					</Sheet>
+				</Grid>
+
+				{/* 4. All-Time Low */}
+				<Grid xs={12} sm={6} md={3}>
+					<Sheet sx={{ ...glassStyle, p: 2.5, borderRadius: 'md', display: 'flex', alignItems: 'center', gap: 2 }}>
+						<Box
+							sx={{
+								width: 48,
+								height: 48,
+								borderRadius: '50%',
+								display: 'flex',
+								alignItems: 'center',
+								justifyContent: 'center',
+								bgcolor: 'danger.softBg',
+								color: 'danger.solidBg'
+							}}
+						>
+							<AlertTriangle size={24} />
+						</Box>
+						<Box>
+							<Typography level="body-xs" sx={{ textTransform: 'uppercase', fontWeight: 600, color: 'text.tertiary' }}>
+								All-Time Low
+							</Typography>
+							<Typography level="h3" sx={{ fontWeight: 'bold', color: 'danger.plainColor' }}>
+								{summary.atlCount}
+							</Typography>
+							<Typography level="body-xs" sx={{ color: 'text.secondary' }}>
+								{summary.nearAtlCount > 0 ? `${summary.nearAtlCount} nearing ATL (3%)` : '0 nearing ATL'}
+							</Typography>
+						</Box>
+					</Sheet>
+				</Grid>
+			</Grid>
+
+			{/* Market Breadth Ratio Gauge */}
+			{summary.totalBreakouts > 0 && (
+				<Sheet sx={{ ...glassStyle, p: 2.5, mb: 3, borderRadius: 'md' }}>
+					<Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+						<Typography level="title-md" sx={{ fontWeight: 'bold' }}>
+							Watchlist Breakout Breadth
+						</Typography>
+						<Chip
+							variant="soft"
+							color={summary.highsRatio >= 65 ? 'success' : summary.highsRatio <= 35 ? 'danger' : 'neutral'}
+							size="sm"
+						>
+							{summary.highsRatio >= 65
+								? '🔥 Strongly Bullish'
+								: summary.highsRatio <= 35
+								? '❄️ Strongly Bearish'
+								: '⚖️ Balanced Sentiment'}
+						</Chip>
+					</Box>
+
+					{/* Custom Progress Ratio Bar */}
+					<Box
+						sx={{
+							height: 12,
+							width: '100%',
+							borderRadius: 'sm',
+							display: 'flex',
+							overflow: 'hidden',
+							bgcolor: 'background.level2'
+						}}
+					>
+						<Box
+							sx={{
+								width: `${summary.highsRatio}%`,
+								bgcolor: 'success.solidBg',
+								transition: 'width 0.4s ease-out'
 							}}
 						/>
-					</Stack>
-
-					<DebouncedInput
-						placeholder="Search symbols or names..."
-						value={searchQuery}
-						onChange={setSearchQuery}
-						size="sm"
-						startDecorator={<Search size={16} opacity={0.6} />}
-						sx={{
-							minWidth: { xs: '100%', sm: 240 },
-							...glassStyle,
-							backgroundColor: 'rgba(255, 255, 255, 0.05)',
-							borderColor: 'rgba(255, 255, 255, 0.1)',
-							'&:hover': {
-								borderColor: 'rgba(255, 255, 255, 0.2)'
-							}
-						}}
-					/>
-				</Stack>
-
-				<Button
-					variant="solid"
-					color="primary"
-					onClick={handleRunScan}
-					loading={scanning}
-					startDecorator={<Play size={16} />}
-					size="sm"
-					sx={{
-						borderRadius: '12px',
-						fontWeight: 600,
-						width: { xs: '100%', md: 'auto' },
-						transition: 'all 0.3s ease-out',
-						boxShadow: '0 4px 12px rgba(16, 185, 129, 0.1)',
-						'&:hover': {
-							transform: 'translateY(-1px)',
-							boxShadow: '0 6px 16px rgba(16, 185, 129, 0.2)'
-						}
-					}}
-				>
-					Scan Watchlist
-				</Button>
-			</Sheet>
-
-			{/* Market Breadth Gauge */}
-			{!loading && breakouts.length > 0 && (
-				<Sheet
-					sx={{
-						...glassStyle,
-						p: 2.5,
-						mb: 3,
-						backgroundColor: 'rgba(255, 255, 255, 0.01)',
-						display: 'flex',
-						flexDirection: 'column',
-						gap: 1.5
-					}}
-				>
-					<Stack direction="row" justifyContent="space-between" alignItems="center">
-						<Typography level="title-sm" sx={{ fontWeight: 700 }}>
-							Watchlist Breakout Ratio (52-Week)
-						</Typography>
-						<Typography level="body-xs" sx={{ fontWeight: 700, color: highsPercentage >= 65 ? 'success.solidBg' : highsPercentage <= 35 ? 'danger.solidBg' : 'neutral.solidBg' }}>
-							{highsPercentage >= 65 ? '?? Strongly Bullish' : highsPercentage <= 35 ? '?? Strongly Bearish' : '?? Balanced Market'} ({highsPercentage.toFixed(1)}% Highs)
-						</Typography>
-					</Stack>
-					<Box sx={{ position: 'relative', height: '10px', width: '100%', borderRadius: '5px', overflow: 'hidden', display: 'flex', backgroundColor: 'rgba(255,255,255,0.05)' }}>
-						<Box sx={{ width: `${highsPercentage}%`, backgroundColor: '#10b981', transition: 'width 0.5s ease-out' }} />
-						<Box sx={{ width: `${lowsPercentage}%`, backgroundColor: '#f43f5e', transition: 'width 0.5s ease-out' }} />
+						<Box
+							sx={{
+								width: `${summary.lowsRatio}%`,
+								bgcolor: 'danger.solidBg',
+								transition: 'width 0.4s ease-out'
+							}}
+						/>
 					</Box>
-					<Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ opacity: 0.8 }}>
-						<Typography level="body-xs" sx={{ color: '#10b981', fontWeight: 600 }}>
-							New 52-Week Highs: {rawHighsList.length} ({highsPercentage.toFixed(0)}%)
+
+					<Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+						<Typography level="body-xs" sx={{ color: 'success.plainColor', fontWeight: 600 }}>
+							Highs / ATH: {summary.athCount + summary.high52wCount} ({summary.highsRatio.toFixed(1)}%)
 						</Typography>
-						<Typography level="body-xs" sx={{ color: '#f43f5e', fontWeight: 600 }}>
-							New 52-Week Lows: {rawLowsList.length} ({lowsPercentage.toFixed(0)}%)
+						<Typography level="body-xs" sx={{ color: 'danger.plainColor', fontWeight: 600 }}>
+							Lows / ATL: {summary.atlCount + summary.low52wCount} ({summary.lowsRatio.toFixed(1)}%)
 						</Typography>
-					</Stack>
+					</Box>
 				</Sheet>
 			)}
 
-			{loading ? (
-				<Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 8 }}>
-					<CircularProgress variant="soft" />
+			{/* SECTION 1: Today's Active Breakouts */}
+			<Sheet sx={{ ...glassStyle, p: 3, mb: 4, borderRadius: 'md' }}>
+				<Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1.5 }}>
+					<Box>
+						<Typography level="title-lg" sx={{ fontWeight: 'bold' }}>
+							Today's Active Breakouts ({todayBreakouts.length})
+						</Typography>
+						<Typography level="body-xs" sx={{ color: 'text.secondary' }}>
+							Watchlisted stocks with confirmed price breaches registered today.
+						</Typography>
+					</Box>
+
+					{/* Filter Chips */}
+					{todayBreakouts.length > 0 && (
+						<Stack direction="row" spacing={1}>
+							<Chip
+								variant={breakoutTab === 'all' ? 'solid' : 'outlined'}
+								color="neutral"
+								size="sm"
+								onClick={() => setBreakoutTab('all')}
+								sx={{ cursor: 'pointer' }}
+							>
+								All ({todayBreakouts.length})
+							</Chip>
+							{summary.athCount > 0 && (
+								<Chip
+									variant={breakoutTab === 'ath' ? 'solid' : 'outlined'}
+									color="success"
+									size="sm"
+									onClick={() => setBreakoutTab('ath')}
+									sx={{ cursor: 'pointer' }}
+								>
+									ATH ({summary.athCount})
+								</Chip>
+							)}
+							{summary.high52wCount > 0 && (
+								<Chip
+									variant={breakoutTab === '52w_high' ? 'solid' : 'outlined'}
+									color="primary"
+									size="sm"
+									onClick={() => setBreakoutTab('52w_high')}
+									sx={{ cursor: 'pointer' }}
+								>
+									52W High ({summary.high52wCount})
+								</Chip>
+							)}
+							{summary.low52wCount > 0 && (
+								<Chip
+									variant={breakoutTab === '52w_low' ? 'solid' : 'outlined'}
+									color="warning"
+									size="sm"
+									onClick={() => setBreakoutTab('52w_low')}
+									sx={{ cursor: 'pointer' }}
+								>
+									52W Low ({summary.low52wCount})
+								</Chip>
+							)}
+							{summary.atlCount > 0 && (
+								<Chip
+									variant={breakoutTab === 'atl' ? 'solid' : 'outlined'}
+									color="danger"
+									size="sm"
+									onClick={() => setBreakoutTab('atl')}
+									sx={{ cursor: 'pointer' }}
+								>
+									ATL ({summary.atlCount})
+								</Chip>
+							)}
+						</Stack>
+					)}
 				</Box>
-			) : (
-				<Grid container spacing={3}>
-					{/* New 52-Week Highs */}
-					<Grid xs={12} md={6}>
-						<Sheet
+
+				{loading && todayBreakouts.length === 0 ? (
+					<Box sx={{ display: 'flex', justifyContent: 'center', py: 5 }}>
+						<CircularProgress />
+					</Box>
+				) : filteredBreakouts.length === 0 ? (
+					<Box
+						sx={{
+							p: 4,
+							textAlign: 'center',
+							borderRadius: 'sm',
+							border: '1px dashed',
+							borderColor: 'divider'
+						}}
+					>
+						<CheckCircle2 size={36} style={{ opacity: 0.5, margin: '0 auto 12px' }} />
+						<Typography level="title-md">No Active Breakouts Triggered Today</Typography>
+						<Typography level="body-sm" sx={{ color: 'text.secondary', mt: 0.5, maxWidth: 500, mx: 'auto' }}>
+							All watchlist stocks are trading within their established historical boundaries today. See the Proximity Matrix below to monitor stocks nearing breakout thresholds.
+						</Typography>
+					</Box>
+				) : (
+					<Sheet variant="outlined" sx={{ borderRadius: 'sm', overflowX: 'auto' }}>
+						<Table
+							hoverRow
+							stripe="odd"
+							borderAxis="xBetween"
 							sx={{
-								...glassStyle,
-								p: 3,
-								height: '100%',
-								backgroundColor: 'rgba(255, 255, 255, 0.01)'
+								'& th': { fontWeight: 'bold', fontSize: '0.85rem' },
+								'& td': { fontSize: '0.875rem' }
 							}}
 						>
-							<Typography
-								level="h4"
-								sx={{
-									mb: 2,
-									fontWeight: 800,
-									color: 'success.solidBg',
-									display: 'flex',
-									justifyContent: 'space-between',
-									alignItems: 'center'
-								}}
+							<thead>
+								<tr>
+									<th>Symbol & Name</th>
+									<th style={{ textAlign: 'right' }}>Price</th>
+									<th style={{ textAlign: 'right' }}>Change %</th>
+									<th style={{ textAlign: 'center' }}>Event Type</th>
+									<th style={{ textAlign: 'right' }}>Breached Record</th>
+									<th style={{ textAlign: 'center' }}>Action</th>
+								</tr>
+							</thead>
+							<tbody>
+								{filteredBreakouts.map(b => (
+									<tr key={`${b.symbol}-${b.breakoutType}`}>
+										<td>
+											<Box>
+												<Typography level="title-sm" sx={{ fontWeight: 'bold' }}>
+													{b.symbol}
+												</Typography>
+												<Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
+													{b.name}
+												</Typography>
+											</Box>
+										</td>
+										<td style={{ textAlign: 'right' }}>
+											<Typography level="body-sm" sx={{ fontWeight: 600 }}>
+												${b.price.toFixed(2)}
+											</Typography>
+										</td>
+										<td style={{ textAlign: 'right' }}>
+											<Typography
+												level="body-sm"
+												sx={{
+													fontWeight: 600,
+													color: b.percentChange >= 0 ? 'success.plainColor' : 'danger.plainColor'
+												}}
+											>
+												{b.percentChange >= 0 ? '+' : ''}
+												{b.percentChange.toFixed(2)}%
+											</Typography>
+										</td>
+										<td style={{ textAlign: 'center' }}>
+											{renderStatusBadge(b.breakoutType)}
+										</td>
+										<td style={{ textAlign: 'right' }}>
+											<Typography level="body-xs" sx={{ color: 'text.secondary' }}>
+												{b.breakoutType === 'ath'
+													? `Prev ATH: $${(b.allTimeHigh ?? b.price).toFixed(2)}`
+													: b.breakoutType === '52w_high'
+													? `52W High: $${b.yearHigh.toFixed(2)}`
+													: b.breakoutType === 'atl'
+													? `Prev ATL: $${(b.allTimeLow ?? b.price).toFixed(2)}`
+													: `52W Low: $${b.yearLow.toFixed(2)}`}
+											</Typography>
+										</td>
+										<td style={{ textAlign: 'center' }}>
+											<Tooltip title="View Detailed Analysis" size="sm">
+												<IconButton
+													size="sm"
+													variant="plain"
+													color="neutral"
+													onClick={() => handleViewAnalysis(b.symbol)}
+												>
+													<FileText size={16} />
+												</IconButton>
+											</Tooltip>
+										</td>
+									</tr>
+								))}
+							</tbody>
+						</Table>
+					</Sheet>
+				)}
+			</Sheet>
+
+			{/* SECTION 2: Watchlist Proximity Matrix */}
+			<Sheet sx={{ ...glassStyle, p: 3, borderRadius: 'md' }}>
+				<Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2.5, flexWrap: 'wrap', gap: 2 }}>
+					<Box>
+						<Typography level="title-lg" sx={{ fontWeight: 'bold' }}>
+							Watchlist Proximity Matrix
+						</Typography>
+						<Typography level="body-xs" sx={{ color: 'text.secondary' }}>
+							Tracking all {matrix.length} active watchlist items with real-time distance to 52-week and All-Time records.
+						</Typography>
+					</Box>
+
+					{/* Controls: Search & Category Filters */}
+					<Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" sx={{ gap: 1 }}>
+						<DebouncedInput
+							placeholder="Search symbol or sector..."
+							value={searchQuery}
+							onChange={setSearchQuery}
+							size="sm"
+							sx={{ width: 220 }}
+						/>
+
+						<Stack direction="row" spacing={0.5}>
+							<Chip
+								variant={statusFilter === 'all' ? 'solid' : 'outlined'}
+								color="neutral"
+								size="sm"
+								onClick={() => setStatusFilter('all')}
+								sx={{ cursor: 'pointer' }}
 							>
-								<span>New 52-Week Highs</span>
-								<Typography level="body-xs" sx={{ opacity: 0.6 }}>
-									{highsList.length} Symbols
-								</Typography>
-							</Typography>
-							<Box 
-								sx={{ 
-									overflowX: 'auto', 
-									maxHeight: '600px',
-									'&::-webkit-scrollbar': {
-										width: '6px',
-										height: '6px',
-									},
-									'&::-webkit-scrollbar-track': {
-										background: 'rgba(255, 255, 255, 0.02)',
-										borderRadius: '8px',
-									},
-									'&::-webkit-scrollbar-thumb': {
-										background: 'rgba(255, 255, 255, 0.12)',
-										borderRadius: '8px',
-										'&:hover': {
-											background: 'rgba(255, 255, 255, 0.25)',
-										},
-									},
-								}}
+								All ({matrix.length})
+							</Chip>
+							<Chip
+								variant={statusFilter === 'breaking' ? 'solid' : 'outlined'}
+								color="primary"
+								size="sm"
+								onClick={() => setStatusFilter('breaking')}
+								sx={{ cursor: 'pointer' }}
 							>
-								<Table
-									hoverRow
-									sx={{
-										'--TableCell-paddingY': '12px',
-										backgroundColor: 'transparent',
-										'& tbody tr': {
-											transition: 'background-color 0.2s ease-out'
-										},
-										'& tbody tr:hover': {
-											backgroundColor: 'rgba(255,255,255,0.03)',
-											cursor: 'pointer'
-										}
-									}}
-								>
-									<thead>
-										<tr>
-											{renderHeaderSortLabel('Symbol', 'symbol', highsSort, handleSortHighs)}
-											<th style={{ width: '40%', padding: '8px 12px' }}>Name</th>
-											{renderHeaderSortLabel('Price', 'price', highsSort, handleSortHighs, 'right')}
-											{renderHeaderSortLabel('Change', 'percent_change', highsSort, handleSortHighs, 'right')}
-										</tr>
-									</thead>
-									<tbody>
-										{highsList.length === 0 ? (
-											<tr>
-												<td colSpan={4} style={{ textAlign: 'center', fontStyle: 'italic', opacity: 0.5 }}>
-													No new 52-week highs scanned.
-												</td>
-											</tr>
-										) : (
-											highsList.map(item => {
-												return (
-													<tr key={item.symbol} onClick={() => handleViewAnalysis(item.symbol)}>
-														<td style={{ fontWeight: 700 }}>
-															<Stack direction="row" spacing={1} alignItems="center">
-																<span>{item.symbol}</span>
-																<Tooltip title="View Analysis" variant="soft" size="sm">
-																	<IconButton 
-																		size="sm" 
-																		variant="plain" 
-																		color="neutral"
-																		onClick={(e) => {
-																			e.stopPropagation();
-																			handleViewAnalysis(item.symbol);
-																		}}
-																		sx={{ opacity: 0.5, '&:hover': { opacity: 1 } }}
-																	>
-																		<FileText size={12} />
-																	</IconButton>
-																</Tooltip>
-															</Stack>
-														</td>
-														<td style={{ opacity: 0.8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '150px' }}>
-															{item.name || '-'}
-														</td>
-														<td style={{ textAlign: 'right', fontWeight: 600 }}>
-															${item.price.toFixed(2)}
-														</td>
-														<td
-															style={{
-																textAlign: 'right',
-																fontWeight: 600,
-																color: item.percent_change >= 0 ? '#10b981' : '#f43f5e'
+								Breaking ({summary.totalBreakouts})
+							</Chip>
+							<Chip
+								variant={statusFilter === 'near' ? 'solid' : 'outlined'}
+								color="warning"
+								size="sm"
+								onClick={() => setStatusFilter('near')}
+								sx={{ cursor: 'pointer' }}
+							>
+								Near Breakout ({totalImminent})
+							</Chip>
+						</Stack>
+					</Stack>
+				</Box>
+
+				{/* Proximity Matrix Table */}
+				<Sheet variant="outlined" sx={{ borderRadius: 'sm', overflowX: 'auto' }}>
+					<Table
+						hoverRow
+						stripe="odd"
+						borderAxis="xBetween"
+						sx={{
+							'& th': { fontWeight: 'bold', fontSize: '0.85rem' },
+							'& td': { fontSize: '0.875rem' }
+						}}
+					>
+						<thead>
+							<tr>
+								<th>{renderSortHeader('Symbol & Sector', 'symbol')}</th>
+								<th style={{ textAlign: 'right' }}>{renderSortHeader('Price', 'price', 'right')}</th>
+								<th style={{ textAlign: 'right' }}>{renderSortHeader('Change %', 'percentChange', 'right')}</th>
+								<th style={{ textAlign: 'center' }}>Breakout Status</th>
+								<th style={{ textAlign: 'right' }}>{renderSortHeader('% From 52W High', 'distance52wHigh', 'right')}</th>
+								<th style={{ textAlign: 'right' }}>{renderSortHeader('% From ATH', 'distanceAth', 'right')}</th>
+								<th style={{ textAlign: 'right' }}>{renderSortHeader('% From 52W Low', 'distance52wLow', 'right')}</th>
+								<th style={{ textAlign: 'center' }}>Action</th>
+							</tr>
+						</thead>
+						<tbody>
+							{filteredMatrix.length === 0 ? (
+								<tr>
+									<td colSpan={8} style={{ textAlign: 'center', padding: '24px' }}>
+										<Typography level="body-sm" sx={{ color: 'text.secondary' }}>
+											No stocks found matching the criteria.
+										</Typography>
+									</td>
+								</tr>
+							) : (
+								filteredMatrix.map(m => {
+									const isNearHigh = m.status === 'near_ath' || m.status === 'near_52w_high';
+									const isNearLow = m.status === 'near_atl' || m.status === 'near_52w_low';
+
+									return (
+										<tr key={m.symbol}>
+											<td>
+												<Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+													<Box>
+														<Typography level="title-sm" sx={{ fontWeight: 'bold' }}>
+															{m.symbol}
+														</Typography>
+														<Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
+															{m.name}
+														</Typography>
+													</Box>
+													{m.sectorLabel && (
+														<Chip
+															size="sm"
+															variant="soft"
+															sx={{
+																fontSize: '0.7rem',
+																height: 20,
+																color: m.sectorLabelColor || 'inherit'
 															}}
 														>
-															{item.percent_change >= 0 ? '+' : ''}
-															{item.percent_change.toFixed(2)}%
-														</td>
-													</tr>
-												);
-											})
-										)}
-									</tbody>
-								</Table>
-							</Box>
-						</Sheet>
-					</Grid>
-
-					{/* New 52-Week Lows */}
-					<Grid xs={12} md={6}>
-						<Sheet
-							sx={{
-								...glassStyle,
-								p: 3,
-								height: '100%',
-								backgroundColor: 'rgba(255, 255, 255, 0.01)'
-							}}
-						>
-							<Typography
-								level="h4"
-								sx={{
-									mb: 2,
-									fontWeight: 800,
-									color: 'danger.solidBg',
-									display: 'flex',
-									justifyContent: 'space-between',
-									alignItems: 'center'
-								}}
-							>
-								<span>New 52-Week Lows</span>
-								<Typography level="body-xs" sx={{ opacity: 0.6 }}>
-									{lowsList.length} Symbols
-								</Typography>
-							</Typography>
-							<Box 
-								sx={{ 
-									overflowX: 'auto', 
-									maxHeight: '600px',
-									'&::-webkit-scrollbar': {
-										width: '6px',
-										height: '6px',
-									},
-									'&::-webkit-scrollbar-track': {
-										background: 'rgba(255, 255, 255, 0.02)',
-										borderRadius: '8px',
-									},
-									'&::-webkit-scrollbar-thumb': {
-										background: 'rgba(255, 255, 255, 0.12)',
-										borderRadius: '8px',
-										'&:hover': {
-											background: 'rgba(255, 255, 255, 0.25)',
-										},
-									},
-								}}
-							>
-								<Table
-									hoverRow
-									sx={{
-										'--TableCell-paddingY': '12px',
-										backgroundColor: 'transparent',
-										'& tbody tr': {
-											transition: 'background-color 0.2s ease-out'
-										},
-										'& tbody tr:hover': {
-											backgroundColor: 'rgba(255,255,255,0.03)',
-											cursor: 'pointer'
-										}
-									}}
-								>
-									<thead>
-										<tr>
-											{renderHeaderSortLabel('Symbol', 'symbol', lowsSort, handleSortLows)}
-											<th style={{ width: '40%', padding: '8px 12px' }}>Name</th>
-											{renderHeaderSortLabel('Price', 'price', lowsSort, handleSortLows, 'right')}
-											{renderHeaderSortLabel('Change', 'percent_change', lowsSort, handleSortLows, 'right')}
+															{m.sectorLabel}
+														</Chip>
+													)}
+												</Box>
+											</td>
+											<td style={{ textAlign: 'right' }}>
+												<Typography level="body-sm" sx={{ fontWeight: 600 }}>
+													${m.price > 0 ? m.price.toFixed(2) : '—'}
+												</Typography>
+											</td>
+											<td style={{ textAlign: 'right' }}>
+												<Typography
+													level="body-sm"
+													sx={{
+														fontWeight: 600,
+														color: m.percentChange >= 0 ? 'success.plainColor' : 'danger.plainColor'
+													}}
+												>
+													{m.percentChange >= 0 ? '+' : ''}
+													{m.percentChange.toFixed(2)}%
+												</Typography>
+											</td>
+											<td style={{ textAlign: 'center' }}>
+												{renderStatusBadge(m.status)}
+											</td>
+											<td style={{ textAlign: 'right' }}>
+												{m.distance52wHigh !== null ? (
+													<Typography
+														level="body-sm"
+														sx={{
+															fontWeight: isNearHigh ? 700 : 500,
+															color: isNearHigh
+																? 'warning.plainColor'
+																: m.distance52wHigh >= 0
+																? 'success.plainColor'
+																: 'text.primary'
+														}}
+													>
+														{m.distance52wHigh >= 0 ? '+' : ''}
+														{m.distance52wHigh.toFixed(2)}%
+													</Typography>
+												) : (
+													<Typography level="body-xs" sx={{ color: 'text.tertiary' }}>—</Typography>
+												)}
+											</td>
+											<td style={{ textAlign: 'right' }}>
+												{m.distanceAth !== null ? (
+													<Typography
+														level="body-sm"
+														sx={{
+															fontWeight: m.status === 'near_ath' ? 700 : 500,
+															color: m.status === 'near_ath'
+																? 'warning.plainColor'
+																: m.distanceAth >= 0
+																? 'success.plainColor'
+																: 'text.primary'
+														}}
+													>
+														{m.distanceAth >= 0 ? '+' : ''}
+														{m.distanceAth.toFixed(2)}%
+													</Typography>
+												) : (
+													<Typography level="body-xs" sx={{ color: 'text.tertiary' }}>—</Typography>
+												)}
+											</td>
+											<td style={{ textAlign: 'right' }}>
+												{m.distance52wLow !== null ? (
+													<Typography
+														level="body-sm"
+														sx={{
+															fontWeight: isNearLow ? 700 : 500,
+															color: isNearLow
+																? 'warning.plainColor'
+																: m.distance52wLow <= 0
+																? 'danger.plainColor'
+																: 'text.primary'
+														}}
+													>
+														{m.distance52wLow >= 0 ? '+' : ''}
+														{m.distance52wLow.toFixed(2)}%
+													</Typography>
+												) : (
+													<Typography level="body-xs" sx={{ color: 'text.tertiary' }}>—</Typography>
+												)}
+											</td>
+											<td style={{ textAlign: 'center' }}>
+												<Tooltip title="View Detailed Analysis" size="sm">
+													<IconButton
+														size="sm"
+														variant="plain"
+														color="neutral"
+														onClick={() => handleViewAnalysis(m.symbol)}
+													>
+														<FileText size={16} />
+													</IconButton>
+												</Tooltip>
+											</td>
 										</tr>
-									</thead>
-									<tbody>
-										{lowsList.length === 0 ? (
-											<tr>
-												<td colSpan={4} style={{ textAlign: 'center', fontStyle: 'italic', opacity: 0.5 }}>
-													No new 52-week lows scanned.
-												</td>
-											</tr>
-										) : (
-											lowsList.map(item => {
-												return (
-													<tr key={item.symbol} onClick={() => handleViewAnalysis(item.symbol)}>
-														<td style={{ fontWeight: 700 }}>
-															<Stack direction="row" spacing={1} alignItems="center">
-																<span>{item.symbol}</span>
-																<Tooltip title="View Analysis" variant="soft" size="sm">
-																	<IconButton 
-																		size="sm" 
-																		variant="plain" 
-																		color="neutral"
-																		onClick={(e) => {
-																			e.stopPropagation();
-																			handleViewAnalysis(item.symbol);
-																		}}
-																		sx={{ opacity: 0.5, '&:hover': { opacity: 1 } }}
-																	>
-																		<FileText size={12} />
-																	</IconButton>
-																</Tooltip>
-															</Stack>
-														</td>
-														<td style={{ opacity: 0.8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '150px' }}>
-															{item.name || '-'}
-														</td>
-														<td style={{ textAlign: 'right', fontWeight: 600 }}>
-															${item.price.toFixed(2)}
-														</td>
-														<td
-															style={{
-																textAlign: 'right',
-																fontWeight: 600,
-																color: item.percent_change >= 0 ? '#10b981' : '#f43f5e'
-															}}
-														>
-															{item.percent_change >= 0 ? '+' : ''}
-															{item.percent_change.toFixed(2)}%
-														</td>
-													</tr>
-												);
-											})
-										)}
-									</tbody>
-								</Table>
-							</Box>
-						</Sheet>
-					</Grid>
-				</Grid>
-			)}
+									);
+								})
+							)}
+						</tbody>
+					</Table>
+				</Sheet>
+			</Sheet>
 
-			{/* Snackbar Toast Alert */}
+			{/* Snackbar feedback */}
 			<Snackbar
+				autoHideDuration={4000}
 				open={toastOpen}
-				autoHideDuration={3000}
 				onClose={() => setToastOpen(false)}
-				anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-				variant="soft"
-				color="success"
-				sx={{ 
-					...glassStyle, 
-					borderRadius: '12px', 
-					backgroundColor: 'rgba(20, 20, 20, 0.85)',
-					backdropFilter: 'blur(12px)',
-					border: '1px solid rgba(16, 185, 129, 0.3)',
-					boxShadow: '0 8px 32px rgba(16, 185, 129, 0.15)'
-				}}
+				color="primary"
+				variant="solid"
+				anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
 			>
-				<Alert
-					variant="soft"
-					color="success"
-					startDecorator={<Check size={18} />}
-					sx={{ width: '100%', bg: 'transparent', p: 0, color: '#10b981' }}
-				>
-					{toastMessage}
-				</Alert>
+				{toastMessage}
 			</Snackbar>
 		</Box>
 	);

@@ -824,16 +824,22 @@ app.delete('/api/triggered-alerts', async (c) => {
   }
 });
 
-// API: Market Breakouts & Seeding
-app.get('/api/market-breakouts', cache({ cacheName: 'oaktree-market-breakouts', cacheControl: 'max-age=300' }), async (c) => {
-  const dateStr = c.req.query('date') || new Date().toISOString().split('T')[0];
+// API: Watchlist Breakouts & Seeding
+app.get('/api/market-breakouts', async (c) => {
+  const { getWatchlistBreakoutsData } = await import('./marketScanner');
   try {
-    const { results } = await c.env.DB.prepare(`
-      SELECT * FROM market_breakouts 
-      WHERE scan_date = ?1
-      ORDER BY percent_change DESC
-    `).bind(dateStr).all();
-    return c.json(results || []);
+    const data = await getWatchlistBreakoutsData(c.env.DB);
+    return c.json(data);
+  } catch (error: any) {
+    return c.json({ error: error.message }, 500);
+  }
+});
+
+app.get('/api/watchlist-breakouts', async (c) => {
+  const { getWatchlistBreakoutsData } = await import('./marketScanner');
+  try {
+    const data = await getWatchlistBreakoutsData(c.env.DB);
+    return c.json(data);
   } catch (error: any) {
     return c.json({ error: error.message }, 500);
   }
@@ -844,11 +850,26 @@ app.post('/api/scan-market', async (c) => {
   if (!fmpKey) {
     return c.json({ error: 'FMP_API_KEY not configured' }, 400);
   }
-  const { scanMarketBreakouts } = await import('./marketScanner');
-  const scope = (c.req.query('scope') === 'market' ? 'market' : 'watchlist') as 'watchlist' | 'market';
+  const { scanMarketBreakouts, getWatchlistBreakoutsData } = await import('./marketScanner');
   try {
-    const results = await scanMarketBreakouts(c.env.DB, fmpKey, scope);
-    return c.json({ success: true, count: results.length, breakouts: results.slice(0, 10) });
+    await scanMarketBreakouts(c.env.DB, fmpKey, 'watchlist');
+    const freshData = await getWatchlistBreakoutsData(c.env.DB);
+    return c.json({ success: true, ...freshData });
+  } catch (error: any) {
+    return c.json({ success: false, error: error.message }, 500);
+  }
+});
+
+app.post('/api/scan-watchlist', async (c) => {
+  const fmpKey = c.env.FMP_API_KEY;
+  if (!fmpKey) {
+    return c.json({ error: 'FMP_API_KEY not configured' }, 400);
+  }
+  const { scanMarketBreakouts, getWatchlistBreakoutsData } = await import('./marketScanner');
+  try {
+    await scanMarketBreakouts(c.env.DB, fmpKey, 'watchlist');
+    const freshData = await getWatchlistBreakoutsData(c.env.DB);
+    return c.json({ success: true, ...freshData });
   } catch (error: any) {
     return c.json({ success: false, error: error.message }, 500);
   }
