@@ -38,16 +38,11 @@ import {
   Mail,
   Link,
   Unlink,
-  CheckCircle2,
-  AlertCircle,
   RefreshCw,
   Sliders,
   Play,
   Sparkles,
-  RotateCcw,
-  BellOff,
-  TrendingUp,
-  X
+  RotateCcw
 } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
@@ -111,14 +106,8 @@ export default function SourceManager() {
     pauseDailyReportFacebook: false,
     pauseEmailDigestFacebook: false,
     pauseCustomFacebook: false,
-    pauseMarketBreakoutNotifications: false,
-    pauseMarketBreakoutScan: false,
   });
   const [updatingSettings, setUpdatingSettings] = useState(false);
-  const [isClearBreakoutModalOpen, setIsClearBreakoutModalOpen] = useState(false);
-  const [isClearingBreakoutNotis, setIsClearingBreakoutNotis] = useState(false);
-  const [isRunningScan, setIsRunningScan] = useState(false);
-  const [scanResult, setScanResult] = useState<{ type: 'success' | 'danger'; text: string } | null>(null);
 
   const fetchSettings = async () => {
     try {
@@ -129,8 +118,6 @@ export default function SourceManager() {
           pauseDailyReportFacebook: settings.pause_daily_report_facebook === '1',
           pauseEmailDigestFacebook: settings.pause_email_digest_facebook === '1',
           pauseCustomFacebook: settings.pause_custom_facebook === '1',
-          pauseMarketBreakoutNotifications: settings.pause_market_breakout_notifications === '1',
-          pauseMarketBreakoutScan: settings.pause_market_breakout_scan === '1',
         });
       }
     } catch (e) {
@@ -139,7 +126,7 @@ export default function SourceManager() {
   };
 
   const handleSettingToggle = async (
-    key: 'pause_daily_report_facebook' | 'pause_email_digest_facebook' | 'pause_custom_facebook' | 'pause_market_breakout_notifications' | 'pause_market_breakout_scan',
+    key: 'pause_daily_report_facebook' | 'pause_email_digest_facebook' | 'pause_custom_facebook',
     currentValue: boolean
   ) => {
     const newValue = !currentValue;
@@ -147,11 +134,7 @@ export default function SourceManager() {
       ? 'pauseDailyReportFacebook' 
       : key === 'pause_email_digest_facebook' 
       ? 'pauseEmailDigestFacebook' 
-      : key === 'pause_custom_facebook'
-      ? 'pauseCustomFacebook'
-      : key === 'pause_market_breakout_notifications'
-      ? 'pauseMarketBreakoutNotifications'
-      : 'pauseMarketBreakoutScan';
+      : 'pauseCustomFacebook';
 
     setFacebookSettings(prev => ({ ...prev, [stateKey]: newValue }));
 
@@ -172,52 +155,6 @@ export default function SourceManager() {
       console.error(e);
     } finally {
       setUpdatingSettings(false);
-    }
-  };
-
-  const handleRunManualScan = async () => {
-    try {
-      setIsRunningScan(true);
-      setScanResult(null);
-      const res = await fetch(`${API_BASE_URL}/api/scan-market`, { method: 'POST' });
-      const data = (await res.json()) as any;
-      if (res.ok && data.success) {
-        setScanResult({
-          type: 'success',
-          text: `Scan completed successfully! Detected ${data.count ?? 0} breakouts.`,
-        });
-      } else {
-        setScanResult({
-          type: 'danger',
-          text: data.error || 'Failed to execute market scan.',
-        });
-      }
-    } catch (e) {
-      console.error('Failed to trigger manual market scan', e);
-      setScanResult({
-        type: 'danger',
-        text: 'Network error occurred while triggering market scan.',
-      });
-    } finally {
-      setIsRunningScan(false);
-    }
-  };
-
-  const handleClearBreakoutNotifications = async () => {
-    try {
-      setIsClearingBreakoutNotis(true);
-      const res = await fetch(`${API_BASE_URL}/api/settings/clear-breakout-notifications`, {
-        method: 'POST',
-      });
-      if (res.ok) {
-        setIsClearBreakoutModalOpen(false);
-      } else {
-        console.error('Failed to clear breakout notifications');
-      }
-    } catch (e) {
-      console.error('Error clearing breakout notifications:', e);
-    } finally {
-      setIsClearingBreakoutNotis(false);
     }
   };
 
@@ -551,10 +488,6 @@ export default function SourceManager() {
           <Tab disableIndicator sx={{ px: 3, borderRadius: '8px' }}>
             <Facebook size={16} style={{ marginRight: 8 }} />
             Facebook Page
-          </Tab>
-          <Tab disableIndicator sx={{ px: 3, borderRadius: '8px' }}>
-            <TrendingUp size={16} style={{ marginRight: 8 }} />
-            Market Breakout
           </Tab>
         </TabList>
 
@@ -1092,199 +1025,6 @@ export default function SourceManager() {
             </Stack>
           </Stack>
         </TabPanel>
-
-        <TabPanel value={3} sx={{ p: 0 }}>
-          {/* Tab 4: Market Breakout Settings */}
-          <Sheet
-            variant="outlined"
-            sx={{
-              p: 3,
-              borderRadius: '16px',
-              bgcolor: 'background.surface',
-              border: '1px solid rgba(255, 255, 255, 0.08)',
-              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
-              mb: 4
-            }}
-          >
-            <Stack spacing={3}>
-              <Stack direction="row" spacing={2} alignItems="center">
-                <Box
-                  sx={{
-                    p: 1.5,
-                    borderRadius: '12px',
-                    bgcolor: 'rgba(46, 204, 113, 0.15)',
-                    color: '#2ecc71',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  <TrendingUp size={24} />
-                </Box>
-                <Box>
-                  <Typography level="title-lg" sx={{ fontWeight: 700 }}>
-                    Market Breakout Settings
-                  </Typography>
-                  <Typography level="body-sm" sx={{ opacity: 0.6 }}>
-                    Market breakouts are scanned via the <strong>TradingView Scanner API</strong> for <strong>active Watchlist stocks (including user holdings)</strong> and broader <strong>US Market Equities</strong>.
-                  </Typography>
-                </Box>
-              </Stack>
-
-              {scanResult && (
-                <Alert
-                  color={scanResult.type}
-                  variant="soft"
-                  endDecorator={
-                    <IconButton size="sm" variant="plain" color="neutral" onClick={() => setScanResult(null)}>
-                      <X size={16} />
-                    </IconButton>
-                  }
-                  startDecorator={scanResult.type === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
-                  sx={{ borderRadius: '12px' }}
-                >
-                  {scanResult.text}
-                </Alert>
-              )}
-
-              <Grid container spacing={2}>
-                {/* 1. Stock Scanning Control Card */}
-                <Grid xs={12} sm={6} md={6}>
-                  <Sheet
-                    variant="soft"
-                    sx={{
-                      p: 2.5,
-                      borderRadius: '12px',
-                      height: '100%',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      border: '1px solid rgba(255, 255, 255, 0.04)',
-                      bgcolor: 'rgba(255, 255, 255, 0.02)',
-                      gap: 2
-                    }}
-                  >
-                    <Box>
-                      <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
-                        <Box sx={{ pr: 1 }}>
-                          <FormLabel sx={{ fontWeight: 700, mb: 0.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <TrendingUp size={16} />
-                            Stock Scanning Status
-                          </FormLabel>
-                          <Typography level="body-xs" sx={{ opacity: 0.75, mb: 1.5 }}>
-                            Scans price highs and lows daily to detect 52-week High/Low and All-Time High/Low breakouts.
-                          </Typography>
-                          <Stack direction="row" spacing={1} flexWrap="wrap" sx={{ gap: 0.5, mb: 1 }}>
-                            <Chip size="sm" variant="outlined" color="primary">Source: TradingView Scanner API</Chip>
-                            <Chip size="sm" variant="outlined" color="neutral">Scope: Watchlist, Holdings & US Stocks</Chip>
-                          </Stack>
-                        </Box>
-                        <Chip
-                          size="sm"
-                          variant="soft"
-                          color={facebookSettings.pauseMarketBreakoutScan ? 'danger' : 'success'}
-                        >
-                          {facebookSettings.pauseMarketBreakoutScan ? 'Paused' : 'Active'}
-                        </Chip>
-                      </Stack>
-                    </Box>
-
-                    <Stack spacing={1.5} sx={{ mt: 'auto' }}>
-                      <Divider sx={{ opacity: 0.1 }} />
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Typography level="body-xs" sx={{ fontWeight: 600 }}>
-                          {facebookSettings.pauseMarketBreakoutScan ? 'Stock Scanning is Paused' : 'Stock Scanning is Enabled'}
-                        </Typography>
-                        <Switch
-                          checked={!facebookSettings.pauseMarketBreakoutScan}
-                          onChange={() => handleSettingToggle('pause_market_breakout_scan', facebookSettings.pauseMarketBreakoutScan)}
-                          disabled={updatingSettings}
-                          color={!facebookSettings.pauseMarketBreakoutScan ? 'success' : 'neutral'}
-                        />
-                      </Box>
-                      <Button
-                        variant="soft"
-                        color="primary"
-                        size="sm"
-                        startDecorator={<Play size={14} />}
-                        loading={isRunningScan}
-                        onClick={handleRunManualScan}
-                        disabled={facebookSettings.pauseMarketBreakoutScan}
-                        sx={{ borderRadius: '8px', mt: 1 }}
-                      >
-                        Trigger Manual Scan Now
-                      </Button>
-                    </Stack>
-                  </Sheet>
-                </Grid>
-
-                {/* 2. Breakout Notifications Control Card */}
-                <Grid xs={12} sm={6} md={6}>
-                  <Sheet
-                    variant="soft"
-                    sx={{
-                      p: 2.5,
-                      borderRadius: '12px',
-                      height: '100%',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      justifyContent: 'space-between',
-                      border: '1px solid rgba(255, 255, 255, 0.04)',
-                      bgcolor: 'rgba(255, 255, 255, 0.02)',
-                      gap: 2
-                    }}
-                  >
-                    <Box>
-                      <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
-                        <Box>
-                          <FormLabel sx={{ fontWeight: 700, mb: 0.5, display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <BellOff size={16} />
-                            In-App Notifications
-                          </FormLabel>
-                          <Typography level="body-xs" sx={{ opacity: 0.6 }}>
-                            Generate in-app notification alerts and record breaker events when watchlisted stocks hit new high/low records.
-                          </Typography>
-                        </Box>
-                        <Chip
-                          size="sm"
-                          variant="soft"
-                          color={facebookSettings.pauseMarketBreakoutNotifications ? 'danger' : 'success'}
-                        >
-                          {facebookSettings.pauseMarketBreakoutNotifications ? 'Paused' : 'Active'}
-                        </Chip>
-                      </Stack>
-                    </Box>
-
-                    <Stack spacing={1.5} sx={{ mt: 'auto' }}>
-                      <Divider sx={{ opacity: 0.1 }} />
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Typography level="body-xs" sx={{ fontWeight: 600 }}>
-                          {facebookSettings.pauseMarketBreakoutNotifications ? 'Notifications Paused' : 'Notifications Enabled'}
-                        </Typography>
-                        <Switch
-                          checked={!facebookSettings.pauseMarketBreakoutNotifications}
-                          onChange={() => handleSettingToggle('pause_market_breakout_notifications', facebookSettings.pauseMarketBreakoutNotifications)}
-                          disabled={updatingSettings}
-                          color={!facebookSettings.pauseMarketBreakoutNotifications ? 'success' : 'neutral'}
-                        />
-                      </Box>
-                      <Button
-                        variant="soft"
-                        color="danger"
-                        size="sm"
-                        startDecorator={<Trash2 size={14} />}
-                        onClick={() => setIsClearBreakoutModalOpen(true)}
-                        sx={{ borderRadius: '8px', mt: 1 }}
-                      >
-                        Clear Historic Breakout Notifications
-                      </Button>
-                    </Stack>
-                  </Sheet>
-                </Grid>
-              </Grid>
-            </Stack>
-          </Sheet>
-        </TabPanel>
       </Tabs>
 
       {/* Web Source Modal */}
@@ -1604,33 +1344,6 @@ export default function SourceManager() {
               )}
             </Stack>
           </DialogContent>
-        </ModalDialog>
-      </Modal>
-
-      {/* Clear Market Breakout Notifications Confirmation Modal */}
-      <Modal open={isClearBreakoutModalOpen} onClose={() => setIsClearBreakoutModalOpen(false)}>
-        <ModalDialog role="alertdialog" variant="outlined" sx={{ borderRadius: '16px', maxWidth: 450 }}>
-          <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Trash2 color="#e74c3c" size={20} />
-            Clear Breakout Notifications
-          </DialogTitle>
-          <DialogContent>
-            Are you sure you want to clear all existing 52-week High/Low and All-Time High/Low breakout notifications from the system?
-          </DialogContent>
-          <Stack direction="row" spacing={1.5} justifyContent="flex-end" sx={{ mt: 2 }}>
-            <Button variant="plain" color="neutral" onClick={() => setIsClearBreakoutModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              variant="solid"
-              color="danger"
-              loading={isClearingBreakoutNotis}
-              onClick={handleClearBreakoutNotifications}
-              startDecorator={<Trash2 size={16} />}
-            >
-              Clear Notifications
-            </Button>
-          </Stack>
         </ModalDialog>
       </Modal>
     </Box>
