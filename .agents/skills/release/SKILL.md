@@ -15,36 +15,38 @@ This skill defines the standardized workflow for safely promoting code between b
 2. **No Force Push**: Strictly **forbidden** to use `git push --force` or `--force-with-lease` on public branches (`develop`, `main`).
 3. **No Destructive Operations**: Never delete, hard-reset (`git reset --hard`), or rebase public branches.
 4. **Immediate Stop on Conflicts**: If merge conflicts occur at any point, **stop immediately**. Do NOT attempt automatic resolution. Notify the user to resolve conflicts manually.
-5. **Mandatory Type Check Gate (`ci:typecheck`)**: Before executing any `git push`, all TypeScript checks across the workspace (`backend`, `frontend`, `mcp-worker`) must pass without errors.
-6. **Explicit User Confirmation**: Always prompt and require explicit confirmation from the user before running `git push` to remote.
+5. **Mandatory Quality Gates**: Before executing any `git push`, all 3 verification gates must pass: (1) TypeScript type checks (`npm run ci:typecheck`), (2) Unit tests (`npm test` in backend and frontend), and (3) relevant E2E tests (if touched features affect UI or workflows with existing specs).
+6. **Automated Push on Quality Gates**: Do NOT wait for a separate push command or manual confirmation from the user. When all quality gates pass cleanly, proceed to `git push` automatically. If ANY gate fails, **STOP immediately**, do NOT push, and report the errors.
 
 ---
 
-## 🔍 Pre-Push Gate: `ci:typecheck`
+## 🔍 Pre-Push Quality Gates
 
-Before pushing to remote in either `tostaging` or `tomain`, run type checks across all modules:
+Before pushing to remote in either `tostaging` or `tomain`, run all quality verification gates:
 
-### 1. Root Command
-If running from workspace root:
+### 1. Workspace-wide Type Check Gate (`ci:typecheck`)
 ```bash
 npm run ci:typecheck
 ```
+*Checks TypeScript across `backend`, `frontend`, and `mcp-worker`.*
 
-### 2. Individual Module Verification (Fallback)
-If running per module:
+### 2. Unit Test Gates (`npm test`)
 ```bash
-# Backend Type Check
-cd backend && npm run cf-typegen && npx tsc --noEmit
+# Backend Unit Tests
+cd backend && npm test
 
-# Frontend Type Check
-cd frontend && npm run type-check
+# Frontend Unit Tests
+cd frontend && npm test
+```
 
-# MCP Worker Type Check
-cd mcp-worker && npx tsc --noEmit
+### 3. E2E Test Gate (When Applicable)
+If modified files touch UI pages, components, or user workflows with existing Playwright specs:
+```bash
+cd frontend && npx playwright test
 ```
 
 > [!CAUTION]
-> If any type check fails with errors, **DO NOT PUSH CODE**. Output the error trace, halt the release process, and fix the type errors first.
+> If any test or type check fails with errors, **DO NOT PUSH CODE**. Output the error trace, halt the release process immediately, and report the failure to the user.
 
 ---
 
@@ -75,13 +77,14 @@ cd mcp-worker && npx tsc --noEmit
    ```
    - If conflict occurs: **STOP immediately** and ask the user to resolve.
 
-4. **Execute `ci:typecheck` Gate**:
-   - Run `npm run ci:typecheck` (or per-module type checks).
-   - If errors exist, abort push and report errors.
+4. **Execute Quality Gates**:
+   - Run `npm run ci:typecheck` (workspace-wide type checking).
+   - Run `npm test` in `backend` and `frontend`.
+   - Run relevant E2E tests if modified features affect UI/workflows.
+   - If ANY test fails, **STOP immediately**, do NOT push, and report the failure trace.
 
-5. **Prompt for Confirmation & Push**:
-   - Request explicit user approval: *"Typecheck passed cleanly. Confirm push to origin/develop? (y/n)"*
-   - Upon confirmation, execute:
+5. **Automated Push**:
+   - When all quality gates pass cleanly, push automatically without waiting:
      ```bash
      git push origin develop
      ```
@@ -119,13 +122,14 @@ cd mcp-worker && npx tsc --noEmit
    ```
    - If conflict occurs: **STOP immediately** and ask the user to resolve.
 
-4. **Execute `ci:typecheck` Gate**:
-   - Run `npm run ci:typecheck` (or per-module type checks).
-   - If errors exist, abort push and report errors.
+4. **Execute Quality Gates**:
+   - Run `npm run ci:typecheck` (workspace-wide type checking).
+   - Run `npm test` in `backend` and `frontend`.
+   - Run relevant E2E tests if modified features affect UI/workflows.
+   - If ANY test fails, **STOP immediately**, do NOT push, and report the failure trace.
 
-5. **Prompt for Confirmation & Push**:
-   - Request explicit user approval: *"Typecheck passed cleanly. Confirm push to origin/main? (y/n)"*
-   - Upon confirmation, execute:
+5. **Automated Push**:
+   - When all quality gates pass cleanly, push automatically without waiting:
      ```bash
      git push origin main
      ```
