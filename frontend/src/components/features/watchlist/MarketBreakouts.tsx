@@ -64,6 +64,7 @@ export interface WatchlistProximityItem {
 	name: string;
 	sectorLabel?: string | null;
 	sectorLabelColor?: string | null;
+	isActive?: boolean;
 	price: number;
 	percentChange: number;
 	yearHigh: number | null;
@@ -337,7 +338,7 @@ export default function MarketBreakouts() {
 						Watchlist Breakouts
 					</Typography>
 					<Typography level="body-sm" sx={{ color: 'text.secondary', mt: 0.5 }}>
-						Live boundary milestone monitoring (ATH, ATL, 52W High/Low) and proximity matrix for your {summary.totalWatchlist} active watchlist stocks.
+						Live boundary milestone monitoring (ATH, ATL, 52W High/Low) and proximity matrix for your {summary.totalWatchlist} watchlist stocks.
 					</Typography>
 				</Box>
 
@@ -725,7 +726,7 @@ export default function MarketBreakouts() {
 							Watchlist Proximity Matrix
 						</Typography>
 						<Typography level="body-xs" sx={{ color: 'text.secondary' }}>
-							Tracking all {matrix.length} active watchlist items with real-time distance to 52-week and All-Time records.
+							Tracking all {matrix.length} watchlist items with real-time distance to 52-week and All-Time records.
 						</Typography>
 					</Box>
 
@@ -820,6 +821,19 @@ export default function MarketBreakouts() {
 															{m.name}
 														</Typography>
 													</Box>
+													{m.isActive === false && (
+														<Chip
+															size="sm"
+															variant="outlined"
+															color="neutral"
+															sx={{
+																fontSize: '0.65rem',
+																height: 20
+															}}
+														>
+															Inactive
+														</Chip>
+													)}
 													{m.sectorLabel && (
 														<Chip
 															size="sm"

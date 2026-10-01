@@ -64,6 +64,7 @@ describe('MarketBreakouts Component', () => {
 						symbol: 'MSFT',
 						name: 'Microsoft Corp',
 						sectorLabel: 'Cloud',
+						isActive: false,
 						price: 395,
 						percentChange: 0.5,
 						yearHigh: 400,

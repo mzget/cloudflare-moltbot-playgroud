@@ -161,6 +161,7 @@ describe('scanMarketBreakouts', () => {
 		expect(body.columns).toContain('High.All');
 		expect(body.columns).toContain('Low.All');
 		expect(body.filter[0].right).toEqual(['NVDA', 'AAPL', 'TSLA']);
+		expect(mockDb.prepare).toHaveBeenCalledWith('SELECT symbol FROM watchlist');
 	});
 
 	it('should return empty list immediately when watchlist is empty', async () => {
@@ -194,7 +195,7 @@ describe('scanMarketBreakouts', () => {
 });
 
 describe('getWatchlistBreakoutsData', () => {
-	it('should build Proximity Matrix and Summary for all active watchlist symbols', async () => {
+	it('should build Proximity Matrix and Summary for all watchlist symbols (including inactive)', async () => {
 		const mockDb = {
 			prepare: vi.fn().mockImplementation((query: string) => {
 				let stmt: any;
@@ -202,12 +203,15 @@ describe('getWatchlistBreakoutsData', () => {
 					bind: vi.fn().mockImplementation(() => stmt),
 					all: vi.fn().mockImplementation(() => {
 						if (query.includes('FROM watchlist')) {
+							// Verify query does not restrict by is_active
+							expect(query).not.toContain('WHERE w.is_active = 1');
 							return Promise.resolve({
 								results: [
 									{
 										symbol: 'NVDA',
 										name: 'NVIDIA Corp',
 										sector_label: 'AI & Chips',
+										is_active: 1,
 										price: 140,
 										percent_change: 3.5,
 										fifty_two_week_high: 135,
@@ -220,6 +224,7 @@ describe('getWatchlistBreakoutsData', () => {
 										symbol: 'MSFT',
 										name: 'Microsoft Corp',
 										sector_label: 'Cloud',
+										is_active: 1,
 										price: 395,
 										percent_change: 0.5,
 										fifty_two_week_high: 400, // Distance: -1.25% -> near_52w_high
@@ -232,6 +237,7 @@ describe('getWatchlistBreakoutsData', () => {
 										symbol: 'INTC',
 										name: 'Intel Corp',
 										sector_label: 'Semis',
+										is_active: 0, // Inactive stock
 										price: 19,
 										percent_change: -4.0,
 										fifty_two_week_high: 45,
@@ -278,6 +284,7 @@ describe('getWatchlistBreakoutsData', () => {
 		const nvda = data.matrix.find(m => m.symbol === 'NVDA');
 		expect(nvda?.status).toBe('ath');
 		expect(nvda?.sectorLabel).toBe('AI & Chips');
+		expect(nvda?.isActive).toBe(true);
 
 		// MSFT: price 395 vs 52W High 400 -> near_52w_high
 		const msft = data.matrix.find(m => m.symbol === 'MSFT');
@@ -287,6 +294,7 @@ describe('getWatchlistBreakoutsData', () => {
 		// INTC: price 19 vs 52W Low 20 -> 52w_low
 		const intc = data.matrix.find(m => m.symbol === 'INTC');
 		expect(intc?.status).toBe('52w_low');
+		expect(intc?.isActive).toBe(false);
 
 		// Summary checks
 		expect(data.summary.totalWatchlist).toBe(3);

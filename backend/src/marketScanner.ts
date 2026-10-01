@@ -26,6 +26,7 @@ export interface WatchlistProximityItem {
 	name: string;
 	sectorLabel?: string | null;
 	sectorLabelColor?: string | null;
+	isActive?: boolean;
 	price: number;
 	percentChange: number;
 	yearHigh: number | null;
@@ -156,10 +157,10 @@ export async function scanMarketBreakouts(
 	let watchlistSymbols: Set<string> | null = null;
 	if (scope === 'watchlist') {
 		try {
-			const watchlistRes = await db.prepare('SELECT symbol FROM watchlist WHERE is_active = 1').all();
+			const watchlistRes = await db.prepare('SELECT symbol FROM watchlist').all();
 			const symbols = (watchlistRes.results || []).map((r: any) => r.symbol.toUpperCase());
 			if (symbols.length === 0) {
-				console.log('[MarketScanner] No active watchlist symbols. Skipping scan.');
+				console.log('[MarketScanner] No watchlist symbols found. Skipping scan.');
 				return [];
 			}
 			watchlistSymbols = new Set(symbols);
@@ -370,7 +371,7 @@ export async function scanMarketBreakouts(
 		if (scope === 'watchlist') {
 			breakoutsToNotify.push(...allBreakouts);
 		} else {
-			const watchlistRes = await db.prepare('SELECT symbol FROM watchlist WHERE is_active = 1').all();
+			const watchlistRes = await db.prepare('SELECT symbol FROM watchlist').all();
 			const watchlist = new Set((watchlistRes.results || []).map((r: any) => r.symbol.toUpperCase()));
 			for (const breakout of allBreakouts) {
 				if (watchlist.has(breakout.symbol)) {
@@ -456,19 +457,18 @@ export async function getWatchlistBreakoutsData(db: any): Promise<{
 }> {
 	const todayDate = new Date().toISOString().split('T')[0];
 
-	// 1. Fetch all active watchlist stocks joined with latest market stats
+	// 1. Fetch all watchlist stocks joined with latest market stats
 	let watchlistRows: any[] = [];
 	try {
 		const res = await db.prepare(`
 			SELECT 
-				w.symbol, w.name, w.sector_label, w.sector_label_color,
+				w.symbol, w.name, w.sector_label, w.sector_label_color, w.is_active,
 				s.price, s.change as percent_change,
 				s.fifty_two_week_high, s.fifty_two_week_low,
 				s.all_time_high, s.all_time_low,
 				s.updated_at
 			FROM watchlist w
 			LEFT JOIN market_stats s ON w.symbol = s.symbol
-			WHERE w.is_active = 1
 			ORDER BY w.symbol ASC
 		`).all();
 		watchlistRows = res.results || [];
@@ -540,11 +540,14 @@ export async function getWatchlistBreakoutsData(db: any): Promise<{
 		else if (status === 'near_52w_low') nearLow52wCount++;
 		else if (status === 'near_atl') nearAtlCount++;
 
+		const isActive = row.is_active !== undefined && row.is_active !== null ? Boolean(row.is_active) : true;
+
 		matrix.push({
 			symbol,
 			name: row.name || symbol,
 			sectorLabel: row.sector_label || null,
 			sectorLabelColor: row.sector_label_color || null,
+			isActive,
 			price,
 			percentChange,
 			yearHigh,

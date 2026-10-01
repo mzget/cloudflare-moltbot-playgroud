@@ -37,24 +37,29 @@ Do NOT load domain-specific guidelines or all skills at the start of every turn.
 2. **Backend & Cloudflare Database Guidelines**:
    - *Condition*: Working on backend Workers, API routes, database schemas (D1, KV, R2), Worker AI models, or batch queries.
    - *Path*: [oaktree-backend/SKILL.md](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/.agents/skills/oaktree-backend/SKILL.md)
-3. **Karpathy Guidelines**:
-   - *Condition*: Load when writing, modifying, reviewing, or debugging code.
-   - *Path*: [karpathy-guidelines/SKILL.md](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/.agents/skills/karpathy-guidelines/SKILL.md)
-4. **Cloudflare Platform & Wrangler**:
+3. **Core Coding Principles & Karpathy Guidelines (Mandatory Pair)**:
+   - *Condition*: Writing, modifying, reviewing, refactoring, or debugging any code. Must ALWAYS load both skills together.
+   - *Paths*:
+     - [karpathy-guidelines/SKILL.md](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/.agents/skills/karpathy-guidelines/SKILL.md)
+     - [coding-principles-skill/SKILL.md](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/.agents/skills/coding-principles-skill/SKILL.md)
+4. **SQL Sentinel (Database & SQL Queries)**:
+   - *Condition*: Writing, modifying, reviewing, or optimizing any SQL queries, database logic, or schema operations (D1, SQLite). Always load to audit query performance and prevent anti-patterns.
+   - *Path*: [sql-sentinel/SKILL.md](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/.agents/skills/sql-sentinel/SKILL.md)
+5. **Cloudflare Platform & Wrangler**:
    - *Condition*: Working on Worker backend, `wrangler.jsonc` / `wrangler.toml`, Cloudflare infrastructure, or CLI operations.
    - *Paths*: 
      - [cloudflare/SKILL.md](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/.agents/skills/cloudflare/SKILL.md)
      - [wrangler/SKILL.md](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/.agents/skills/wrangler/SKILL.md)
-5. **Hono Web Framework**:
+6. **Hono Web Framework**:
    - *Condition*: Creating/modifying API endpoints, backend routing, or RPC-client services.
    - *Path*: [@hono/SKILL.md](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/.agents/skills/@hono/SKILL.md)
-6. **Agents SDK**:
+7. **Agents SDK**:
    - *Condition*: Working on stateful agent logic, agent-chat components, or durable workflows.
    - *Path*: [agents-sdk/SKILL.md](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/.agents/skills/agents-sdk/SKILL.md)
-7. **DCF Valuation Model Guidelines**:
+8. **DCF Valuation Model Guidelines**:
    - *Condition*: Working on stock valuation, DCF calculations, DCF parameters entry, or DCF UI components.
    - *Path*: [dcf-valuation-model/SKILL.md](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/.agents/skills/dcf-valuation-model/SKILL.md)
-8. **Release Management Guidelines (tostaging / tomain)**:
+9. **Release Management Guidelines (tostaging / tomain)**:
    - *Condition*: Merging branches, preparing staging/production releases, or executing release commands.
    - *Path*: [release/SKILL.md](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/.agents/skills/release/SKILL.md)
 
