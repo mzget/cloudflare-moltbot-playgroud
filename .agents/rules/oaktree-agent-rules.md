@@ -19,34 +19,44 @@ These rules govern the core behavior of the Oaktree Agent in this repository.
 
 ---
 
+## ☁️ Cloudflare Skill & CLI Usage Authorization
+
+The agent is explicitly authorized and encouraged to:
+- **Activate Cloudflare Skills**: Load and reference `cloudflare` and `wrangler` skills whenever investigating Cloudflare services, architecture, or CLI syntax.
+- **Execute Cloudflare CLI (`wrangler` / `cf`)**: Run CLI commands (e.g. `npx wrangler d1 execute`, `wrangler tail`, `wrangler kv`, inspecting deployments or bindings) via `run_command` whenever needed to inspect live state, query data, or gather relevant information without seeking redundant permission.
+
+---
+
 ## ⚡ Conditional Skills Activation (Load only when relevant)
 
 Do NOT load domain-specific guidelines or all skills at the start of every turn. Only call `view_file` to load the instructions of a specific skill when the task matches the following conditions:
 
 1. **Frontend UI Guidelines**:
    - *Condition*: Working on React components, Astro pages, MUI Joy UI components, tables, modals, buttons, or styling.
-   - *Path*: [oaktree-frontend/SKILL.md](file:///c:/Users/natta/Documents/oaktree-agent/.agents/skills/oaktree-frontend/SKILL.md)
+   - *Path*: [oaktree-frontend/SKILL.md](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/.agents/skills/oaktree-frontend/SKILL.md)
 2. **Backend & Cloudflare Database Guidelines**:
    - *Condition*: Working on backend Workers, API routes, database schemas (D1, KV, R2), Worker AI models, or batch queries.
-   - *Path*: [oaktree-backend/SKILL.md](file:///c:/Users/natta/Documents/oaktree-agent/.agents/skills/oaktree-backend/SKILL.md)
+   - *Path*: [oaktree-backend/SKILL.md](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/.agents/skills/oaktree-backend/SKILL.md)
 3. **Karpathy Guidelines**:
    - *Condition*: Load when writing, modifying, reviewing, or debugging code.
-   - *Path*: [karpathy-guidelines/SKILL.md](file:///c:/Users/natta/Documents/oaktree-agent/.agents/skills/karpathy-guidelines/SKILL.md)
+   - *Path*: [karpathy-guidelines/SKILL.md](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/.agents/skills/karpathy-guidelines/SKILL.md)
 4. **Cloudflare Platform & Wrangler**:
-   - *Condition*: Working on Worker backend, `wrangler.jsonc` configuration, or Cloudflare infrastructure.
-   - *Path*: [cloudflare/SKILL.md](file:///c:/Users/natta/Documents/oaktree-agent/.agents/skills/cloudflare/SKILL.md)
+   - *Condition*: Working on Worker backend, `wrangler.jsonc` / `wrangler.toml`, Cloudflare infrastructure, or CLI operations.
+   - *Paths*: 
+     - [cloudflare/SKILL.md](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/.agents/skills/cloudflare/SKILL.md)
+     - [wrangler/SKILL.md](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/.agents/skills/wrangler/SKILL.md)
 5. **Hono Web Framework**:
    - *Condition*: Creating/modifying API endpoints, backend routing, or RPC-client services.
-   - *Path*: [@hono/SKILL.md](file:///c:/Users/natta/Documents/oaktree-agent/.agents/skills/@hono/SKILL.md)
+   - *Path*: [@hono/SKILL.md](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/.agents/skills/@hono/SKILL.md)
 6. **Agents SDK**:
    - *Condition*: Working on stateful agent logic, agent-chat components, or durable workflows.
-   - *Path*: [agents-sdk/SKILL.md](file:///c:/Users/natta/Documents/oaktree-agent/.agents/skills/agents-sdk/SKILL.md)
+   - *Path*: [agents-sdk/SKILL.md](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/.agents/skills/agents-sdk/SKILL.md)
 7. **DCF Valuation Model Guidelines**:
    - *Condition*: Working on stock valuation, DCF calculations, DCF parameters entry, or DCF UI components.
-   - *Path*: [dcf-valuation-model/SKILL.md](file:///c:/Users/natta/Documents/oaktree-agent/.agents/skills/dcf-valuation-model/SKILL.md)
+   - *Path*: [dcf-valuation-model/SKILL.md](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/.agents/skills/dcf-valuation-model/SKILL.md)
 8. **Release Management Guidelines (tostaging / tomain)**:
    - *Condition*: Merging branches, preparing staging/production releases, or executing release commands.
-   - *Path*: [release/SKILL.md](file:///c:/Users/natta/Documents/oaktree-agent/.agents/skills/release/SKILL.md)
+   - *Path*: [release/SKILL.md](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/.agents/skills/release/SKILL.md)
 
 ---
 
@@ -79,4 +89,4 @@ After writing or modifying any backend logic (Workers, API routes, utility funct
 
 ### Frontend
 - Frontend React component tests are **not required** unless the user explicitly asks.
-- However, **pure utility/display logic** (e.g., fallback label resolution) should be tested in the backend test file or a shared utility test file when feasible.
+- However, **pure utility/display logic** (e.g., fallback label resolution) should be tested in the backend test file or a shared utility test file when feasible.

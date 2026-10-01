@@ -19,6 +19,28 @@ export function getNearest15Minute(targetDate: Date): number {
 }
 
 /**
+ * Returns true if the target date falls within the daytime window (08:00 - 18:00 Asia/Bangkok time).
+ * 08:00 (480 mins) to 18:00 (1080 mins) inclusive.
+ */
+export function isDaytimeWindow(targetDate: Date = new Date()): boolean {
+	const formatter = new Intl.DateTimeFormat('en-US', {
+		timeZone: 'Asia/Bangkok',
+		hour12: false,
+		hour: 'numeric',
+		minute: 'numeric',
+	});
+	const parts = formatter.formatToParts(targetDate);
+	let hour = 0;
+	let minute = 0;
+	for (const p of parts) {
+		if (p.type === 'hour') hour = parseInt(p.value, 10) % 24;
+		if (p.type === 'minute') minute = parseInt(p.value, 10);
+	}
+	const bkkMinutes = hour * 60 + minute;
+	return bkkMinutes >= 8 * 60 && bkkMinutes <= 18 * 60;
+}
+
+/**
  * Decides the workflow parameters to execute based on the scheduled event time.
  */
 export function getScheduledWorkflowParams(
@@ -32,6 +54,7 @@ export function getScheduledWorkflowParams(
 	const targetMinute = getNearest15Minute(scheduledDate);
 	const hour = scheduledDate.getUTCHours();
 	const isSixHourly = hour % 6 === 0;
+	const isDaytime = isDaytimeWindow(scheduledDate);
 	const timestamp = Date.now();
 
 	if (targetMinute === 0) {
@@ -43,11 +66,11 @@ export function getScheduledWorkflowParams(
 				fetchMarketStats: true, // Fetch prices (when open) or metrics (when closed)
 				priceOnly: false,       // Allows rolling metrics sync during off-hours
 				checkAlertRules: true,
-				syncEmails: true,
-				generateEmailDigests: true,
+				syncEmails: true,       // 24/7 hourly email ingestion
+				generateEmailDigests: isDaytime, // Daytime only (08:00 - 18:00 Asia/Bangkok)
 				emailDigestsManual: false,
-				runCrawler: isSixHourly,
-				generateDailySummaries: isSixHourly,
+				runCrawler: false,
+				generateDailySummaries: false,
 				scanMarketBreakouts: true,
 				fetchMarketEvents: isSixHourly,
 				sendDailyEmailReport: false,
@@ -74,10 +97,12 @@ export function getScheduledWorkflowParams(
 	return {
 		workflowId: `cron-price-${timestamp}`,
 		targetMinute: 30,
-		description: '30-min price sync',
+		description: isDaytime ? '30-min price sync & daytime email digest' : '30-min price sync',
 		params: {
 			fetchMarketStats: true,
 			priceOnly: true,
+			generateEmailDigests: isDaytime,
+			emailDigestsManual: false,
 		}
 	};
 }

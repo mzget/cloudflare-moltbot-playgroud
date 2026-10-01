@@ -63,9 +63,6 @@ trace-tool/trace.js
 .clinerules
 .cursorrules
 prototype/**
-frontend/e2e/**
-.gitignore
-frontend/playwright.config.ts
-frontend/test-results/.last-run.json
+frontend/test-results/
 tmp.md
 .gemini
