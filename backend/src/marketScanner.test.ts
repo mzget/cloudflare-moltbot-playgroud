@@ -302,4 +302,101 @@ describe('getWatchlistBreakoutsData', () => {
 		expect(data.summary.nearHigh52wCount).toBe(1);
 		expect(data.summary.low52wCount).toBe(1);
 	});
+
+	it('should verify market_stats batch update statement and schema compatibility with change column', async () => {
+		const { DatabaseSync } = await import('node:sqlite');
+		const db = new DatabaseSync(':memory:');
+
+		// Create schema mimicking production D1 up to migration 0037
+		db.exec(`
+			CREATE TABLE market_stats (
+				symbol TEXT PRIMARY KEY,
+				price REAL,
+				change REAL,
+				fifty_two_week_high REAL,
+				fifty_two_week_low REAL,
+				all_time_high REAL,
+				all_time_low REAL,
+				updated_at INTEGER
+			);
+			CREATE TABLE watchlist (
+				symbol TEXT PRIMARY KEY,
+				name TEXT,
+				sector_label TEXT,
+				sector_label_color TEXT,
+				is_active INTEGER DEFAULT 1
+			);
+		`);
+
+		// Prepare statement identical to marketScanner.ts statsUpdates
+		const upsertSql = `
+			INSERT INTO market_stats (
+				symbol, price, change, fifty_two_week_high, fifty_two_week_low, all_time_high, all_time_low, updated_at
+			) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, strftime('%s', 'now'))
+			ON CONFLICT(symbol) DO UPDATE SET
+				price = excluded.price,
+				change = excluded.change,
+				fifty_two_week_high = COALESCE(excluded.fifty_two_week_high, market_stats.fifty_two_week_high),
+				fifty_two_week_low = COALESCE(excluded.fifty_two_week_low, market_stats.fifty_two_week_low),
+				all_time_high = CASE 
+					WHEN excluded.all_time_high IS NOT NULL THEN MAX(COALESCE(market_stats.all_time_high, 0), excluded.all_time_high, excluded.price)
+					ELSE market_stats.all_time_high 
+				END,
+				all_time_low = CASE 
+					WHEN excluded.all_time_low IS NOT NULL THEN MIN(COALESCE(market_stats.all_time_low, 999999), excluded.all_time_low, excluded.price)
+					ELSE market_stats.all_time_low 
+				END,
+				updated_at = strftime('%s', 'now')
+		`;
+
+		const stmt = db.prepare(upsertSql);
+
+		// Happy path: Initial insert
+		stmt.run('NVDA', 140, 3.5, 135, 70, 138, 30);
+		let rows = db.prepare('SELECT * FROM market_stats WHERE symbol = ?').all('NVDA') as any[];
+		expect(rows).toHaveLength(1);
+		expect(rows[0].symbol).toBe('NVDA');
+		expect(rows[0].price).toBe(140);
+		expect(rows[0].change).toBe(3.5);
+		expect(rows[0].fifty_two_week_high).toBe(135);
+		expect(rows[0].all_time_high).toBe(138); // Bound effectiveAth on first insert
+
+		// Conflict update path: Price and change update, ATH updates to higher price
+		stmt.run('NVDA', 145, 3.57, 145, 70, 145, 30);
+		rows = db.prepare('SELECT * FROM market_stats WHERE symbol = ?').all('NVDA') as any[];
+		expect(rows[0].price).toBe(145);
+		expect(rows[0].change).toBe(3.57);
+		expect(rows[0].fifty_two_week_high).toBe(145);
+		expect(rows[0].all_time_high).toBe(145);
+
+		// Edge case: Null/missing ATH and ATL values
+		stmt.run('NEWSTOCK', 50, 0, 52, 20, null, null);
+		rows = db.prepare('SELECT * FROM market_stats WHERE symbol = ?').all('NEWSTOCK') as any[];
+		expect(rows).toHaveLength(1);
+		expect(rows[0].symbol).toBe('NEWSTOCK');
+		expect(rows[0].price).toBe(50);
+		expect(rows[0].change).toBe(0);
+		expect(rows[0].all_time_high).toBeNull();
+		expect(rows[0].all_time_low).toBeNull();
+
+		// Verify matrix select query works seamlessly
+		db.exec(`INSERT INTO watchlist (symbol, name, is_active) VALUES ('NVDA', 'NVIDIA Corp', 1);`);
+		const matrixRes = db.prepare(`
+			SELECT 
+				w.symbol, w.name, w.sector_label, w.sector_label_color, w.is_active,
+				s.price, s.change as percent_change,
+				s.fifty_two_week_high, s.fifty_two_week_low,
+				s.all_time_high, s.all_time_low,
+				s.updated_at
+			FROM watchlist w
+			LEFT JOIN market_stats s ON w.symbol = s.symbol
+			ORDER BY w.symbol ASC
+		`).all() as any[];
+
+		expect(matrixRes).toHaveLength(1);
+		expect(matrixRes[0].symbol).toBe('NVDA');
+		expect(matrixRes[0].percent_change).toBe(3.57);
+		expect(matrixRes[0].price).toBe(145);
+	});
 });
+
