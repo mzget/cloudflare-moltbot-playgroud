@@ -112,6 +112,44 @@ export async function syncAndIngestEmails(env: Env): Promise<number> {
   }
 }
 
+async function runAiDigestWithRetry(env: Env, prompt: string, maxRetries = 2): Promise<any> {
+  const modelsToTry = [
+    env.default_ai_model,
+    env.facebook_summarize_model
+  ].filter(Boolean);
+
+  let lastError: any;
+
+  for (const model of modelsToTry) {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          const delay = Math.pow(2, attempt - 1) * 1000;
+          await new Promise(resolve => setTimeout(resolve, delay));
+        }
+
+        const response = await env.AI.run(model, {
+          messages: [
+            { role: 'user', content: prompt }
+          ],
+          max_tokens: 4096,
+          max_completion_tokens: 4096,
+          response_format: {
+            type: 'json_object'
+          }
+        } as any);
+
+        return response;
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`[Workers AI] Attempt ${attempt + 1} failed for ${model}:`, err?.message || err);
+      }
+    }
+  }
+
+  throw lastError;
+}
+
 export async function generateEmailDigests(env: Env, isManual = false): Promise<void> {
   // Check active subscriptions
   const { results: activeSubs } = await env.DB.prepare(
@@ -188,15 +226,7 @@ Email content:
 ${emailContext}
 `;
 
-      const response = await env.AI.run(env.default_ai_model, {
-        messages: [
-          { role: 'user', content: prompt }
-        ],
-        max_tokens: 8192,
-        response_format: {
-          type: 'json_object'
-        }
-      } as any);
+      const response = await runAiDigestWithRetry(env, prompt);
 
       let responseText = (response as any).choices?.[0]?.message?.content || response.response || "";
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
@@ -271,9 +301,25 @@ ${emailContext}
         console.error(`No JSON structure found in AI response for email ID: ${email.id}`);
         console.error('Raw responseText:', responseText);
         console.error('Raw response object:', JSON.stringify(response));
+
+        // Mark as failed (processed = -1) so unparseable AI responses do not block the FIFO queue forever
+        await env.DB.prepare(
+          'UPDATE ingested_emails SET processed = -1 WHERE id = ?'
+        ).bind(email.id).run();
+        console.warn(`[EmailDigest] Marked email ID: ${email.id} as failed (processed = -1) due to invalid AI response format.`);
       }
     } catch (emailError) {
       console.error(`Error processing email ID: ${email.id}:`, emailError);
+
+      // Mark as failed (processed = -1) so persistent AI errors do not block subsequent emails in the FIFO queue forever
+      try {
+        await env.DB.prepare(
+          'UPDATE ingested_emails SET processed = -1 WHERE id = ?'
+        ).bind(email.id).run();
+        console.warn(`[EmailDigest] Marked poison-pill email ID: ${email.id} as failed (processed = -1) after all AI retries to unblock queue.`);
+      } catch (dbErr) {
+        console.error(`Failed to mark email ID: ${email.id} as failed in DB:`, dbErr);
+      }
     }
   }
 }

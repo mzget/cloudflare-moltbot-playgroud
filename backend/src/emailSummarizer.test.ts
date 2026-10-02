@@ -301,5 +301,221 @@ describe('emailSummarizer', () => {
 
       expect(mockAi.run).not.toHaveBeenCalled();
     });
+
+    it('retries on AI failure and succeeds on subsequent attempt', async () => {
+      const subsStmt = {
+        bind: vi.fn().mockReturnThis(),
+        all: vi.fn().mockResolvedValue({ results: [{ id: 1 }] }),
+      };
+
+      const emailsStmt = {
+        bind: vi.fn().mockReturnThis(),
+        all: vi.fn().mockResolvedValue({
+          results: [
+            {
+              id: 'email-retry-test',
+              subscription_id: 1,
+              sender: 'analyst@bloomberg.com',
+              subject: 'Market Update',
+              body_text: 'Body...',
+              received_at: '2026-10-01T01:00:00Z',
+              processed: 0,
+            },
+          ],
+        }),
+      };
+
+      const markProcessedStmt = {
+        bind: vi.fn().mockReturnThis(),
+        run: vi.fn().mockResolvedValue({ success: true }),
+      };
+
+      mockDb.prepare.mockImplementation((sql: string) => {
+        if (sql.includes('FROM email_subscriptions')) return subsStmt;
+        if (sql.includes('FROM ingested_emails WHERE processed = 0')) return emailsStmt;
+        if (sql.includes('INSERT INTO email_digests')) return { bind: vi.fn().mockReturnThis(), run: vi.fn().mockResolvedValue({ success: true }) };
+        if (sql.includes('UPDATE ingested_emails SET processed = 1')) return markProcessedStmt;
+        return { bind: vi.fn().mockReturnThis(), all: vi.fn(), run: vi.fn() };
+      });
+
+      // Fail once with Ai._parseError, then succeed
+      mockAi.run
+        .mockRejectedValueOnce(new Error('Ai._parseError: 3040 Capacity Exceeded'))
+        .mockResolvedValueOnce({
+          response: JSON.stringify({
+            digests: [
+              {
+                category: 'Macroeconomy',
+                summary: 'สรุปภาพรวมเศรษฐกิจ',
+                key_takeaways: ['ข้อคิดที่ 1'],
+                source_emails: ['email-retry-test'],
+              },
+            ],
+          }),
+        });
+
+      await generateEmailDigests(mockEnv);
+
+      expect(mockAi.run).toHaveBeenCalledTimes(2);
+      expect(markProcessedStmt.run).toHaveBeenCalledTimes(1);
+    });
+
+    it('falls back to facebook_summarize_model when default_ai_model fails all attempts', async () => {
+      const subsStmt = {
+        bind: vi.fn().mockReturnThis(),
+        all: vi.fn().mockResolvedValue({ results: [{ id: 1 }] }),
+      };
+
+      const emailsStmt = {
+        bind: vi.fn().mockReturnThis(),
+        all: vi.fn().mockResolvedValue({
+          results: [
+            {
+              id: 'email-fallback-test',
+              subscription_id: 1,
+              sender: 'newsletter@invest.com',
+              subject: 'Deep Dive',
+              body_text: 'Content...',
+              received_at: '2026-10-01T01:00:00Z',
+              processed: 0,
+            },
+          ],
+        }),
+      };
+
+      const markProcessedStmt = {
+        bind: vi.fn().mockReturnThis(),
+        run: vi.fn().mockResolvedValue({ success: true }),
+      };
+
+      mockDb.prepare.mockImplementation((sql: string) => {
+        if (sql.includes('FROM email_subscriptions')) return subsStmt;
+        if (sql.includes('FROM ingested_emails WHERE processed = 0')) return emailsStmt;
+        if (sql.includes('INSERT INTO email_digests')) return { bind: vi.fn().mockReturnThis(), run: vi.fn().mockResolvedValue({ success: true }) };
+        if (sql.includes('UPDATE ingested_emails SET processed = 1')) return markProcessedStmt;
+        return { bind: vi.fn().mockReturnThis(), all: vi.fn(), run: vi.fn() };
+      });
+
+      const envWithFallback = {
+        ...mockEnv,
+        default_ai_model: '@cf/google/gemma-4-26b-a4b-it',
+        facebook_summarize_model: '@cf/meta/llama-3.2-3b-instruct',
+      };
+
+      // Fail default_ai_model (attempts 1, 2, 3), then succeed on fallback model
+      mockAi.run
+        .mockRejectedValueOnce(new Error('Ai._parseError on gemma attempt 1'))
+        .mockRejectedValueOnce(new Error('Ai._parseError on gemma attempt 2'))
+        .mockRejectedValueOnce(new Error('Ai._parseError on gemma attempt 3'))
+        .mockResolvedValueOnce({
+          response: JSON.stringify({
+            digests: [
+              {
+                category: 'Technology & AI',
+                summary: 'สรุปจากโมเดลสำรอง',
+                key_takeaways: ['ข้อคิดที่ 1'],
+                source_emails: ['email-fallback-test'],
+              },
+            ],
+          }),
+        });
+
+      await generateEmailDigests(envWithFallback);
+
+      expect(mockAi.run).toHaveBeenCalledTimes(4);
+      expect(mockAi.run).toHaveBeenLastCalledWith(
+        '@cf/meta/llama-3.2-3b-instruct',
+        expect.objectContaining({ max_tokens: 4096 })
+      );
+      expect(markProcessedStmt.run).toHaveBeenCalledTimes(1);
+    });
+
+    it('marks email as failed (processed = -1) when all AI attempts fail, preventing queue deadlock', async () => {
+      const subsStmt = {
+        bind: vi.fn().mockReturnThis(),
+        all: vi.fn().mockResolvedValue({ results: [{ id: 1 }] }),
+      };
+
+      const emailsStmt = {
+        bind: vi.fn().mockReturnThis(),
+        all: vi.fn().mockResolvedValue({
+          results: [
+            {
+              id: '1a0ddeaacc54ff5e',
+              subscription_id: 1,
+              sender: 'bad@format.com',
+              subject: 'Corrupted',
+              body_text: 'Corrupted body...',
+              received_at: '2026-10-01T01:00:00Z',
+              processed: 0,
+            },
+          ],
+        }),
+      };
+
+      const markFailedStmt = {
+        bind: vi.fn().mockReturnThis(),
+        run: vi.fn().mockResolvedValue({ success: true }),
+      };
+
+      mockDb.prepare.mockImplementation((sql: string) => {
+        if (sql.includes('FROM email_subscriptions')) return subsStmt;
+        if (sql.includes('FROM ingested_emails WHERE processed = 0')) return emailsStmt;
+        if (sql.includes('UPDATE ingested_emails SET processed = -1')) return markFailedStmt;
+        return { bind: vi.fn().mockReturnThis(), all: vi.fn(), run: vi.fn() };
+      });
+
+      mockAi.run.mockRejectedValue(new Error('Ai._parseError: Cloudflare internal error'));
+
+      await generateEmailDigests(mockEnv);
+
+      // Verify that the failed email is quarantined with processed = -1
+      expect(markFailedStmt.bind).toHaveBeenCalledWith('1a0ddeaacc54ff5e');
+      expect(markFailedStmt.run).toHaveBeenCalledTimes(1);
+    });
+
+    it('marks email as failed (processed = -1) when AI response contains no JSON structure', async () => {
+      const subsStmt = {
+        bind: vi.fn().mockReturnThis(),
+        all: vi.fn().mockResolvedValue({ results: [{ id: 1 }] }),
+      };
+
+      const emailsStmt = {
+        bind: vi.fn().mockReturnThis(),
+        all: vi.fn().mockResolvedValue({
+          results: [
+            {
+              id: 'email-no-json',
+              subscription_id: 1,
+              sender: 'test@example.com',
+              subject: 'No JSON',
+              body_text: 'Body...',
+              received_at: '2026-10-01T01:00:00Z',
+              processed: 0,
+            },
+          ],
+        }),
+      };
+
+      const markFailedStmt = {
+        bind: vi.fn().mockReturnThis(),
+        run: vi.fn().mockResolvedValue({ success: true }),
+      };
+
+      mockDb.prepare.mockImplementation((sql: string) => {
+        if (sql.includes('FROM email_subscriptions')) return subsStmt;
+        if (sql.includes('FROM ingested_emails WHERE processed = 0')) return emailsStmt;
+        if (sql.includes('UPDATE ingested_emails SET processed = -1')) return markFailedStmt;
+        return { bind: vi.fn().mockReturnThis(), all: vi.fn(), run: vi.fn() };
+      });
+
+      mockAi.run.mockResolvedValue({ response: 'I am sorry, I cannot output JSON for this prompt.' });
+
+      await generateEmailDigests(mockEnv);
+
+      expect(markFailedStmt.bind).toHaveBeenCalledWith('email-no-json');
+      expect(markFailedStmt.run).toHaveBeenCalledTimes(1);
+    });
   });
 });
+
