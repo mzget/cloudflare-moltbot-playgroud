@@ -384,12 +384,12 @@ function ChatWindow({ sessionId }: { sessionId: string }) {
     const groups: { id: string; role: string; text: string; tools: any[] }[] = [];
     for (const m of messages) {
       const textParts = m.parts
-        ?.filter(p => p.type === 'text')
-        ?.map(p => (p as any).text) || [];
+        ?.filter((p: any) => p.type === 'text')
+        ?.map((p: any) => (p as any).text) || [];
       const text = textParts.join('');
 
       const toolParts = m.parts
-        ?.filter(p => p.type === 'tool-invocation' || p.type.startsWith('tool-')) || [];
+        ?.filter((p: any) => p.type === 'tool-invocation' || p.type.startsWith('tool-')) || [];
 
       const lastGroup = groups[groups.length - 1];
       if (lastGroup && lastGroup.role === m.role) {
