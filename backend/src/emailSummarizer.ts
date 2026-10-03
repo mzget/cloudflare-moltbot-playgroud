@@ -22,6 +22,28 @@ function cleanEmailBody(body: string): string {
   return cleaned.trim();
 }
 
+export function isGibberishThai(text: string): boolean {
+  if (!text || typeof text !== 'string') return false;
+
+  // 1. Invalid Thai orthography: Mai Han-Akat (\u0E31) directly followed by Sara Aa (\u0E32)
+  if (/[\u0E31][\u0E32]/.test(text)) {
+    return true;
+  }
+
+  // 2. Impossible vowel stacking: three or more upper/lower vowels or tone marks consecutively
+  if (/[\u0E31\u0E34-\u0E37\u0E47-\u0E4E]{3,}/.test(text)) {
+    return true;
+  }
+
+  // 3. Repeated 3+ character patterns (autoregressive looping tokens repeating 4+ times)
+  const repeatedPattern = /(.{3,8})\1{3,}/;
+  if (repeatedPattern.test(text)) {
+    return true;
+  }
+
+  return false;
+}
+
 export async function syncAndIngestEmails(env: Env): Promise<number> {
   const clientId = env.GOOGLE_CLIENT_ID;
   const clientSecret = env.GOOGLE_CLIENT_SECRET;
@@ -271,6 +293,15 @@ ${emailContext}
 
         const digests = data.digests || [];
         console.log(`AI generated ${digests.length} digest(s) for email ID: ${email.id}`);
+
+        const hasGibberish = digests.some((d: any) =>
+          isGibberishThai(d.summary) ||
+          (Array.isArray(d.key_takeaways) && d.key_takeaways.some(isGibberishThai))
+        );
+
+        if (hasGibberish) {
+          throw new Error(`AI generated corrupted/gibberish Thai text for email ID: ${email.id}`);
+        }
 
         for (const digest of digests) {
           // Source is always the current email being processed

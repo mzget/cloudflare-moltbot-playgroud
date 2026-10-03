@@ -37,7 +37,7 @@ binding = "OAKTREE_SYNC_WORKFLOW"
 class_name = "OaktreeSyncWorkflow"
 
 [vars]
-facebook_summarize_model = "@cf/meta/llama-3.2-3b-instruct"
+facebook_summarize_model = "@cf/meta/llama-4-scout-17b-16e-instruct"
 default_ai_model = "@cf/google/gemma-4-26b-a4b-it"
 ALERT_EMAIL = "rattajak.n@gmail.com"
 

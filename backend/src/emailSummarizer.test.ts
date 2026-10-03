@@ -1,5 +1,5 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { syncAndIngestEmails, generateEmailDigests } from './emailSummarizer';
+import { syncAndIngestEmails, generateEmailDigests, isGibberishThai } from './emailSummarizer';
 import * as gmailModule from './gmail';
 
 vi.mock('./gmail', () => ({
@@ -399,7 +399,7 @@ describe('emailSummarizer', () => {
       const envWithFallback = {
         ...mockEnv,
         default_ai_model: '@cf/google/gemma-4-26b-a4b-it',
-        facebook_summarize_model: '@cf/meta/llama-3.2-3b-instruct',
+        facebook_summarize_model: '@cf/meta/llama-4-scout-17b-16e-instruct',
       };
 
       // Fail default_ai_model (attempts 1, 2, 3), then succeed on fallback model
@@ -424,7 +424,7 @@ describe('emailSummarizer', () => {
 
       expect(mockAi.run).toHaveBeenCalledTimes(4);
       expect(mockAi.run).toHaveBeenLastCalledWith(
-        '@cf/meta/llama-3.2-3b-instruct',
+        '@cf/meta/llama-4-scout-17b-16e-instruct',
         expect.objectContaining({ max_tokens: 4096 })
       );
       expect(markProcessedStmt.run).toHaveBeenCalledTimes(1);
@@ -515,6 +515,107 @@ describe('emailSummarizer', () => {
 
       expect(markFailedStmt.bind).toHaveBeenCalledWith('email-no-json');
       expect(markFailedStmt.run).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects AI response with gibberish/corrupted Thai text and marks email as failed', async () => {
+      const subsStmt = {
+        bind: vi.fn().mockReturnThis(),
+        all: vi.fn().mockResolvedValue({ results: [{ id: 1 }] }),
+      };
+
+      const emailsStmt = {
+        bind: vi.fn().mockReturnThis(),
+        all: vi.fn().mockResolvedValue({
+          results: [
+            {
+              id: 'email-gibberish',
+              subscription_id: 1,
+              sender: 'test@example.com',
+              subject: 'Agentic AI: Winners and Losers',
+              body_text: 'Body...',
+              received_at: '2026-10-01T01:00:00Z',
+              processed: 0,
+            },
+          ],
+        }),
+      };
+
+      const insertDigestStmt = {
+        bind: vi.fn().mockReturnThis(),
+        run: vi.fn().mockResolvedValue({ success: true }),
+      };
+
+      const markFailedStmt = {
+        bind: vi.fn().mockReturnThis(),
+        run: vi.fn().mockResolvedValue({ success: true }),
+      };
+
+      mockDb.prepare.mockImplementation((sql: string) => {
+        if (sql.includes('FROM email_subscriptions')) return subsStmt;
+        if (sql.includes('FROM ingested_emails WHERE processed = 0')) return emailsStmt;
+        if (sql.includes('INSERT INTO email_digests')) return insertDigestStmt;
+        if (sql.includes('UPDATE ingested_emails SET processed = -1')) return markFailedStmt;
+        return { bind: vi.fn().mockReturnThis(), all: vi.fn(), run: vi.fn() };
+      });
+
+      // Mock AI returning corrupted/hallucinated Thai text with Mai Han-Akat + Sara Aa
+      mockAi.run.mockResolvedValue({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                digests: [
+                  {
+                    category: 'Technology & AI',
+                    summary: 'ส็ายนราผ สหาปนาสรัาหปมา สอาบาสหฬามรัา บหาสาหฬาสาอาสารัา.',
+                    key_takeaways: ['สาสหาสาสาฬารัา สอารัามา สาหาสาฬารัามา.'],
+                    source_emails: ['email-gibberish'],
+                  },
+                ],
+              }),
+            },
+          },
+        ],
+      });
+
+      await generateEmailDigests(mockEnv);
+
+      // Verify that corrupted digest was NOT inserted into database
+      expect(insertDigestStmt.run).not.toHaveBeenCalled();
+      // Verify that the email was quarantined with processed = -1
+      expect(markFailedStmt.bind).toHaveBeenCalledWith('email-gibberish');
+      expect(markFailedStmt.run).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('isGibberishThai', () => {
+    it('returns false for null, undefined, empty, or non-string inputs', () => {
+      expect(isGibberishThai('')).toBe(false);
+      expect(isGibberishThai(null as any)).toBe(false);
+      expect(isGibberishThai(undefined as any)).toBe(false);
+      expect(isGibberishThai(123 as any)).toBe(false);
+    });
+
+    it('returns false for coherent, well-formed Thai sentences', () => {
+      const normalThai1 = 'จดหมายข่าวฉบับนี้เน้นย้ำถึงเทรนด์ใหม่ในโลกของ AI ที่เรียกว่า Decision Models';
+      const normalThai2 = 'การลงทุนในหุ้นกลุ่มเติบโตมีความเสี่ยงสูงต่อการถูกลดมูลค่าหากดอกเบี้ยเป็นขาขึ้น';
+      expect(isGibberishThai(normalThai1)).toBe(false);
+      expect(isGibberishThai(normalThai2)).toBe(false);
+    });
+
+    it('returns true when text contains invalid vowel combination Mai Han-Akat + Sara Aa (ัา)', () => {
+      const invalidOrthography = 'สรัาหปมา สอาบาสหฬามรัา';
+      expect(isGibberishThai(invalidOrthography)).toBe(true);
+    });
+
+    it('returns true when text contains looping token repetitions', () => {
+      const loopingRepetition = 'สาหาสาฬารัามาสาหาอารัามาสาหาอารัามาสาหาอารัามา';
+      expect(isGibberishThai(loopingRepetition)).toBe(true);
+    });
+
+    it('returns true for stacked impossible vowel marks', () => {
+      const stackedVowels = 'คำที่มีสระซ้อนกันเกินไป \u0E31\u0E34\u0E35';
+      expect(isGibberishThai(stackedVowels)).toBe(true);
     });
   });
 });
