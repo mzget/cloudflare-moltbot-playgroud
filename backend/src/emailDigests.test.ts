@@ -160,4 +160,66 @@ describe('Email Digests API', () => {
       expect(data.error).toBe('D1 query failure');
     });
   });
+
+  describe('POST /api/email-digests/reprocess', () => {
+    it('should delete digest and reset ingested email when reprocess is called', async () => {
+      const deleteDigestStmt = {
+        bind: vi.fn().mockReturnThis(),
+        run: vi.fn().mockResolvedValue({ success: true }),
+      };
+      const deleteFbPostStmt = {
+        bind: vi.fn().mockReturnThis(),
+        run: vi.fn().mockResolvedValue({ success: true }),
+      };
+      const updateIngestedStmt = {
+        bind: vi.fn().mockReturnThis(),
+        run: vi.fn().mockResolvedValue({ success: true }),
+      };
+      const subsStmt = {
+        all: vi.fn().mockResolvedValue({ results: [] }),
+      };
+
+      mockDb.prepare.mockImplementation((sql: string) => {
+        if (sql.includes('DELETE FROM email_digests WHERE id')) return deleteDigestStmt;
+        if (sql.includes('DELETE FROM facebook_posts WHERE source_type')) return deleteFbPostStmt;
+        if (sql.includes('UPDATE ingested_emails SET processed = 0 WHERE id')) return updateIngestedStmt;
+        if (sql.includes('FROM email_subscriptions')) return subsStmt;
+        return { bind: vi.fn().mockReturnThis(), all: vi.fn().mockResolvedValue({ results: [] }), run: vi.fn().mockResolvedValue({ success: true }) };
+      });
+
+      const req = new Request('http://localhost/api/email-digests/reprocess', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email_id: 'email-123', digest_id: 355 }),
+      });
+
+      const res = await worker.fetch(req, mockEnv, {} as any);
+      expect(res.status).toBe(200);
+      const data = (await res.json()) as any;
+      expect(data.success).toBe(true);
+
+      expect(deleteDigestStmt.bind).toHaveBeenCalledWith(355);
+      expect(deleteDigestStmt.run).toHaveBeenCalledTimes(1);
+      expect(updateIngestedStmt.bind).toHaveBeenCalledWith('email-123');
+      expect(updateIngestedStmt.run).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return 500 when database error occurs during reprocess', async () => {
+      mockDb.prepare.mockImplementationOnce(() => ({
+        bind: vi.fn().mockReturnThis(),
+        run: vi.fn().mockRejectedValue(new Error('D1 write failure')),
+      }));
+
+      const req = new Request('http://localhost/api/email-digests/reprocess', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email_id: 'email-123', digest_id: 355 }),
+      });
+
+      const res = await worker.fetch(req, mockEnv, {} as any);
+      expect(res.status).toBe(500);
+      const data = (await res.json()) as any;
+      expect(data.error).toBe('D1 write failure');
+    });
+  });
 });
