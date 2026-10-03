@@ -45,13 +45,14 @@ This workspace uses a multi-tier AI model architecture configured in `wrangler.t
   - Enforce `response_format: { type: 'json_object' }`.
   - Escaped quotes: Require prompts to instruct the LLM not to use unescaped double quotes inside JSON string values.
 
-### 2. `facebook_summarize_model` (`@cf/meta/llama-3.2-3b-instruct`)
-- **Category**: Fast & Lightweight Social Media Stylist & Daily News Summarizer (3B parameters).
+### 2. `facebook_summarize_model` (`@cf/meta/llama-4-scout-17b-16e-instruct`)
+- **Category**: Multimodal & Multilingual MoE Model (17B parameters / 16 experts) & Email Digest Fallback.
 - **Target Use Cases**:
   - Stock daily news summarization (`backend/src/summarizer.ts`).
   - Generating short 2-3 sentence "Oaktree Memo" commentaries for Facebook Page posts (`backend/src/facebook.ts`).
   - Re-formatting custom user drafts into engaging Facebook posts with emojis, clear spacing, and hashtags (`backend/src/facebook.ts`).
-- **Input/Output Constraints**: Plain text / formatted social media copy (no raw JSON requirement).
+  - Robust fallback for email digest summarization (`backend/src/emailSummarizer.ts`) with strong Thai language capabilities.
+- **Input/Output Constraints**: Plain text / formatted social media copy / structured JSON output.
 
 ### 💡 Developer Rules for AI Models:
 - **No Hardcoded Model Strings**: Always reference models via `env.default_ai_model` or `env.facebook_summarize_model` instead of hardcoding model string literals in TypeScript files.
