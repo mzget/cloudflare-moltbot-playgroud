@@ -1217,6 +1217,24 @@ app.post('/api/email-digests/mark-read', async (c) => {
   }
 });
 
+// API: Reprocess Email Digest
+app.post('/api/email-digests/reprocess', async (c) => {
+  try {
+    const { email_id, digest_id } = await c.req.json() as any;
+    if (digest_id) {
+      await c.env.DB.prepare('DELETE FROM email_digests WHERE id = ?').bind(Number(digest_id)).run();
+      await c.env.DB.prepare("DELETE FROM facebook_posts WHERE source_type = 'email_digest' AND source_id = ?").bind(Number(digest_id)).run();
+    }
+    if (email_id) {
+      await c.env.DB.prepare('UPDATE ingested_emails SET processed = 0 WHERE id = ?').bind(email_id).run();
+    }
+    await generateEmailDigests(c.env, true);
+    return c.json({ success: true, message: 'Reprocessed email successfully' });
+  } catch (e) {
+    return c.json({ error: (e as any).message }, 500);
+  }
+});
+
 // API: Queue Facebook Post
 app.post('/api/facebook/queue', async (c) => {
   try {
