@@ -23,7 +23,6 @@ import {
 
 export class OaktreeMCP extends McpAgent {
   server = new McpServer({ name: "oaktree-mcp", version: "1.0.0" });
-  private isAuthenticated = false;
 
   async init() {
     // Register MCP Tools
@@ -86,59 +85,6 @@ export class OaktreeMCP extends McpAgent {
         };
       }
     );
-  }
-
-  // Override fetch to add Bearer token / query token security with hybrid session binding
-  async fetch(request: Request) {
-    const env = this.env as any;
-    const secret = env.MCP_SECRET;
-
-    if (secret) {
-      const authResult = await validateMcpToken(request, secret);
-      if (authResult.isValid) {
-        this.isAuthenticated = true;
-      } else if (!this.isAuthenticated) {
-        const url = new URL(request.url);
-        const baseUrl = `${url.protocol}//${url.host}`;
-        return new Response(
-          JSON.stringify({
-            jsonrpc: "2.0",
-            error: {
-              code: -32000,
-              message: "Unauthorized: Invalid or missing MCP access token",
-            },
-            id: null,
-          }),
-          {
-            status: 401,
-            headers: {
-              "Content-Type": "application/json",
-              "Access-Control-Allow-Origin": request.headers.get("Origin") || "*",
-              "WWW-Authenticate": `Bearer resource_metadata="${baseUrl}/.well-known/oauth-protected-resource"`,
-            },
-          }
-        );
-      }
-    } else {
-      return new Response(
-        JSON.stringify({
-          jsonrpc: "2.0",
-          error: {
-            code: -32000,
-            message: "Unauthorized: MCP_SECRET is not configured on server",
-          },
-          id: null,
-        }),
-        {
-          status: 401,
-          headers: {
-            "Content-Type": "application/json",
-            "Access-Control-Allow-Origin": request.headers.get("Origin") || "*",
-          },
-        }
-      );
-    }
-    return super.fetch(request);
   }
 }
 
@@ -598,17 +544,59 @@ export default {
         });
       }
 
-      const response = await mcpFetch(request, env, ctx);
-      const newResponse = new Response(response.body, response);
-      newResponse.headers.set("Access-Control-Allow-Origin", mcpOrigin);
-      newResponse.headers.set("Access-Control-Expose-Headers", "mcp-session-id, WWW-Authenticate");
-      if (response.status === 401) {
-        newResponse.headers.set(
-          "WWW-Authenticate",
-          `Bearer resource_metadata="${baseUrl}/.well-known/oauth-protected-resource"`
+      // Validate MCP Access Token BEFORE calling mcpFetch to avoid WebSocket DO hang
+      const secret = env.MCP_SECRET;
+      if (secret) {
+        const authResult = await validateMcpToken(request, secret);
+        if (!authResult.isValid) {
+          return new Response(
+            JSON.stringify({
+              jsonrpc: "2.0",
+              error: {
+                code: -32000,
+                message: "Unauthorized: Invalid or missing MCP access token",
+              },
+              id: null,
+            }),
+            {
+              status: 401,
+              headers: {
+                "Content-Type": "application/json",
+                "Access-Control-Allow-Origin": mcpOrigin,
+                "Access-Control-Expose-Headers": "mcp-session-id, WWW-Authenticate",
+                "WWW-Authenticate": `Bearer resource_metadata="${baseUrl}/.well-known/oauth-protected-resource"`,
+              },
+            }
+          );
+        }
+      }
+
+      try {
+        const response = await mcpFetch(request, env, ctx);
+        const newResponse = new Response(response.body, response);
+        newResponse.headers.set("Access-Control-Allow-Origin", mcpOrigin);
+        newResponse.headers.set("Access-Control-Expose-Headers", "mcp-session-id, WWW-Authenticate");
+        return newResponse;
+      } catch (err: any) {
+        console.error("mcpFetch error:", err);
+        return new Response(
+          JSON.stringify({
+            jsonrpc: "2.0",
+            error: {
+              code: -32603,
+              message: "Internal error",
+            },
+            id: null,
+          }),
+          {
+            status: 500,
+            headers: {
+              "Content-Type": "application/json",
+              "Access-Control-Allow-Origin": mcpOrigin,
+            },
+          }
         );
       }
-      return newResponse;
     }
 
     // Resolve the allowed origin dynamically for non-MCP routes
