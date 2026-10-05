@@ -7,10 +7,12 @@ import { createWorkersAI } from "workers-ai-provider";
 import { streamText, tool, convertToModelMessages, UIMessage } from "ai";
 import { AIChatAgent } from "@cloudflare/ai-chat";
 import { getAgentByName, routeAgentRequest, callable } from "agents";
+import { validateMcpToken } from "./auth";
 
 
 export class OaktreeMCP extends McpAgent {
   server = new McpServer({ name: "oaktree-mcp", version: "1.0.0" });
+  private isAuthenticated = false;
 
   async init() {
     // Register MCP Tools
@@ -75,14 +77,52 @@ export class OaktreeMCP extends McpAgent {
     );
   }
 
-  // Override fetch to add Bearer token security
+  // Override fetch to add Bearer token / query token security with hybrid session binding
   async fetch(request: Request) {
     const env = this.env as any;
-    if (env.MCP_SECRET) {
-      const authHeader = request.headers.get("Authorization");
-      if (!authHeader || authHeader !== `Bearer ${env.MCP_SECRET}`) {
-        return new Response("Unauthorized", { status: 401 });
+    const secret = env.MCP_SECRET;
+
+    if (secret) {
+      const authResult = validateMcpToken(request, secret);
+      if (authResult.isValid) {
+        this.isAuthenticated = true;
+      } else if (!this.isAuthenticated) {
+        return new Response(
+          JSON.stringify({
+            jsonrpc: "2.0",
+            error: {
+              code: -32000,
+              message: "Unauthorized: Invalid or missing MCP access token",
+            },
+            id: null,
+          }),
+          {
+            status: 401,
+            headers: {
+              "Content-Type": "application/json",
+              "Access-Control-Allow-Origin": request.headers.get("Origin") || "*",
+            },
+          }
+        );
       }
+    } else {
+      return new Response(
+        JSON.stringify({
+          jsonrpc: "2.0",
+          error: {
+            code: -32000,
+            message: "Unauthorized: MCP_SECRET is not configured on server",
+          },
+          id: null,
+        }),
+        {
+          status: 401,
+          headers: {
+            "Content-Type": "application/json",
+            "Access-Control-Allow-Origin": request.headers.get("Origin") || "*",
+          },
+        }
+      );
     }
     return super.fetch(request);
   }
@@ -229,19 +269,44 @@ async function authenticateRequest(request: Request, env: any): Promise<{ email:
   return { email: payload.email };
 }
 
-const mcpFetch = OaktreeMCP.serve("/mcp", { binding: "OAKTREE_MCP" }).fetch;
+const mcpFetch = OaktreeMCP.serve("/mcp", { 
+  binding: "OAKTREE_MCP",
+  transport: "auto"
+}).fetch;
 
 export default {
   async fetch(request: Request, env: any, ctx: ExecutionContext) {
     const url = new URL(request.url);
 
-    // Resolve the allowed origin dynamically
+    // MCP Routes: Open CORS with MCP token protection
+    if (url.pathname.startsWith("/mcp")) {
+      const mcpOrigin = request.headers.get("Origin") || "*";
+      if (request.method === "OPTIONS") {
+        return new Response(null, {
+          headers: {
+            "Access-Control-Allow-Origin": mcpOrigin,
+            "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type, Accept, Authorization, mcp-session-id, mcp-protocol-version, X-Session-ID, x-session-id",
+            "Access-Control-Expose-Headers": "mcp-session-id",
+            "Access-Control-Max-Age": "86400",
+          },
+        });
+      }
+
+      const response = await mcpFetch(request, env, ctx);
+      const newResponse = new Response(response.body, response);
+      newResponse.headers.set("Access-Control-Allow-Origin", mcpOrigin);
+      newResponse.headers.set("Access-Control-Expose-Headers", "mcp-session-id");
+      return newResponse;
+    }
+
+    // Resolve the allowed origin dynamically for non-MCP routes
     const origin = request.headers.get("Origin");
     const allowedOrigin = (origin === "https://oaktree-agent-frontend.pages.dev" || (origin && origin.startsWith("http://localhost:")))
       ? origin
       : "https://oaktree-agent-frontend.pages.dev";
 
-    // Handle CORS for all requests
+    // Handle CORS for non-MCP requests
     if (request.method === "OPTIONS") {
       return new Response(null, {
         headers: {
