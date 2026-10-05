@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { extractMcpToken, validateMcpToken } from './auth';
+import { createAccessToken } from './oauth';
 
 describe('MCP Authentication (auth.ts)', () => {
   const EXPECTED_SECRET = 'ot_mcp_test_secret_key_12345';
@@ -59,38 +60,62 @@ describe('MCP Authentication (auth.ts)', () => {
   });
 
   describe('validateMcpToken', () => {
-    it('should validate successfully when token matches expected secret', () => {
+    it('should validate successfully when token matches expected static secret', async () => {
       const request = new Request(`https://example.com/mcp?token=${EXPECTED_SECRET}`);
-      const result = validateMcpToken(request, EXPECTED_SECRET);
+      const result = await validateMcpToken(request, EXPECTED_SECRET);
       expect(result.isValid).toBe(true);
       expect(result.token).toBe(EXPECTED_SECRET);
       expect(result.reason).toBeUndefined();
     });
 
-    it('should reject when expectedSecret is empty or undefined', () => {
+    it('should validate successfully with an HMAC-signed OAuth access token', async () => {
+      const oauthToken = await createAccessToken('oaktree-gemini', EXPECTED_SECRET);
+      const request = new Request('https://example.com/mcp', {
+        headers: {
+          Authorization: `Bearer ${oauthToken}`,
+        },
+      });
+      const result = await validateMcpToken(request, EXPECTED_SECRET);
+      expect(result.isValid).toBe(true);
+      expect(result.token).toBe(oauthToken);
+    });
+
+    it('should reject when expectedSecret is empty or undefined', async () => {
       const request = new Request(`https://example.com/mcp?token=${EXPECTED_SECRET}`);
-      const resultEmpty = validateMcpToken(request, '');
+      const resultEmpty = await validateMcpToken(request, '');
       expect(resultEmpty.isValid).toBe(false);
       expect(resultEmpty.reason).toBe('missing_secret');
 
-      const resultUndefined = validateMcpToken(request, undefined);
+      const resultUndefined = await validateMcpToken(request, undefined);
       expect(resultUndefined.isValid).toBe(false);
       expect(resultUndefined.reason).toBe('missing_secret');
     });
 
-    it('should reject when request has no token', () => {
+    it('should reject when request has no token', async () => {
       const request = new Request('https://example.com/mcp');
-      const result = validateMcpToken(request, EXPECTED_SECRET);
+      const result = await validateMcpToken(request, EXPECTED_SECRET);
       expect(result.isValid).toBe(false);
       expect(result.token).toBeNull();
       expect(result.reason).toBe('missing_token');
     });
 
-    it('should reject when token is incorrect', () => {
+    it('should reject when token is incorrect', async () => {
       const request = new Request('https://example.com/mcp?token=wrong_secret');
-      const result = validateMcpToken(request, EXPECTED_SECRET);
+      const result = await validateMcpToken(request, EXPECTED_SECRET);
       expect(result.isValid).toBe(false);
       expect(result.token).toBe('wrong_secret');
+      expect(result.reason).toBe('invalid_token');
+    });
+
+    it('should reject an OAuth token signed with a different secret', async () => {
+      const tamperedToken = await createAccessToken('oaktree-gemini', 'different_secret_key');
+      const request = new Request('https://example.com/mcp', {
+        headers: {
+          Authorization: `Bearer ${tamperedToken}`,
+        },
+      });
+      const result = await validateMcpToken(request, EXPECTED_SECRET);
+      expect(result.isValid).toBe(false);
       expect(result.reason).toBe('invalid_token');
     });
   });
