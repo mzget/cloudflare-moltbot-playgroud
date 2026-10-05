@@ -70,6 +70,11 @@ Stocks trading within a 3.0% margin of boundary records are flagged as imminent 
 - Deduplication limit: At most one In-App Notification per `(symbol, event_type, today_date)` per day.
 - Imminent candidates (`near_*`) are displayed exclusively as visual highlights in the Watchlist Proximity Matrix and never trigger In-App Notifications.
 
+### MCP Access Token
+A shared secret string required to authenticate requests to the Model Context Protocol (MCP) endpoints and agent tools. Transported either via the HTTP `Authorization: Bearer <token>` header or as a URL query parameter (`?token=<token>` or `?key=<token>`) to support external agent connectors that do not permit custom header configuration.
+_Avoid_: Session ID, API Key, User Password
+
+
 
 
 
