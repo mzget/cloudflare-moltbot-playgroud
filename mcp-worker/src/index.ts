@@ -8,6 +8,17 @@ import { streamText, tool, convertToModelMessages, UIMessage } from "ai";
 import { AIChatAgent } from "@cloudflare/ai-chat";
 import { getAgentByName, routeAgentRequest, callable } from "agents";
 import { validateMcpToken } from "./auth";
+import {
+  getProtectedResourceMetadata,
+  getAuthorizationServerMetadata,
+  createAuthCode,
+  verifyAuthCode,
+  createAccessToken,
+  extractClientCredentials,
+  isAllowedRedirectUri,
+  renderAuthorizeHtml,
+  computeSha256Base64Url,
+} from "./oauth";
 
 
 export class OaktreeMCP extends McpAgent {
@@ -83,10 +94,12 @@ export class OaktreeMCP extends McpAgent {
     const secret = env.MCP_SECRET;
 
     if (secret) {
-      const authResult = validateMcpToken(request, secret);
+      const authResult = await validateMcpToken(request, secret);
       if (authResult.isValid) {
         this.isAuthenticated = true;
       } else if (!this.isAuthenticated) {
+        const url = new URL(request.url);
+        const baseUrl = `${url.protocol}//${url.host}`;
         return new Response(
           JSON.stringify({
             jsonrpc: "2.0",
@@ -101,6 +114,7 @@ export class OaktreeMCP extends McpAgent {
             headers: {
               "Content-Type": "application/json",
               "Access-Control-Allow-Origin": request.headers.get("Origin") || "*",
+              "WWW-Authenticate": `Bearer resource_metadata="${baseUrl}/.well-known/oauth-protected-resource"`,
             },
           }
         );
@@ -277,6 +291,297 @@ const mcpFetch = OaktreeMCP.serve("/mcp", {
 export default {
   async fetch(request: Request, env: any, ctx: ExecutionContext) {
     const url = new URL(request.url);
+    const baseUrl = `${url.protocol}//${url.host}`;
+    const oauthCorsHeaders = {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Accept, Authorization, X-Requested-With",
+    };
+
+    // 1. RFC 9728: Protected Resource Metadata
+    if (url.pathname === "/.well-known/oauth-protected-resource") {
+      if (request.method === "OPTIONS") {
+        return new Response(null, { headers: oauthCorsHeaders });
+      }
+      return new Response(JSON.stringify(getProtectedResourceMetadata(baseUrl)), {
+        headers: {
+          "Content-Type": "application/json",
+          ...oauthCorsHeaders,
+        },
+      });
+    }
+
+    // 2. RFC 8414: Authorization Server Metadata
+    if (url.pathname === "/.well-known/oauth-authorization-server") {
+      if (request.method === "OPTIONS") {
+        return new Response(null, { headers: oauthCorsHeaders });
+      }
+      return new Response(JSON.stringify(getAuthorizationServerMetadata(baseUrl)), {
+        headers: {
+          "Content-Type": "application/json",
+          ...oauthCorsHeaders,
+        },
+      });
+    }
+
+    // 3. OAuth 2.0 Authorize Endpoint
+    if (url.pathname === "/oauth/authorize") {
+      if (request.method === "OPTIONS") {
+        return new Response(null, { headers: oauthCorsHeaders });
+      }
+
+      const expectedClientId = env.OAUTH_CLIENT_ID || "oaktree-gemini";
+      const secret = env.OAUTH_CLIENT_SECRET || env.MCP_SECRET;
+
+      if (request.method === "GET") {
+        const clientId = url.searchParams.get("client_id") || "";
+        const redirectUri = url.searchParams.get("redirect_uri") || "";
+        const state = url.searchParams.get("state") || "";
+        const codeChallenge = url.searchParams.get("code_challenge") || "";
+        const codeChallengeMethod = url.searchParams.get("code_challenge_method") || "";
+
+        if (clientId !== expectedClientId) {
+          return new Response(`Invalid client_id: ${clientId}. Expected: ${expectedClientId}`, {
+            status: 400,
+            headers: oauthCorsHeaders,
+          });
+        }
+
+        if (!isAllowedRedirectUri(redirectUri)) {
+          return new Response(`Invalid redirect_uri: ${redirectUri}`, {
+            status: 400,
+            headers: oauthCorsHeaders,
+          });
+        }
+
+        const html = renderAuthorizeHtml({
+          clientId,
+          redirectUri,
+          state,
+          codeChallenge,
+          codeChallengeMethod,
+        });
+
+        return new Response(html, {
+          headers: {
+            "Content-Type": "text/html; charset=utf-8",
+            ...oauthCorsHeaders,
+          },
+        });
+      }
+
+      if (request.method === "POST") {
+        let params: Record<string, string> = {};
+        const contentType = request.headers.get("Content-Type") || "";
+        if (contentType.includes("application/x-www-form-urlencoded")) {
+          const text = await request.text();
+          const searchParams = new URLSearchParams(text);
+          searchParams.forEach((v, k) => {
+            params[k] = v;
+          });
+        } else if (contentType.includes("application/json")) {
+          params = (await request.json()) as any;
+        }
+
+        const clientId = params.client_id || url.searchParams.get("client_id") || "";
+        const redirectUri = params.redirect_uri || url.searchParams.get("redirect_uri") || "";
+        const state = params.state || url.searchParams.get("state") || "";
+        const codeChallenge = params.code_challenge || url.searchParams.get("code_challenge") || undefined;
+        const codeChallengeMethod = params.code_challenge_method || url.searchParams.get("code_challenge_method") || undefined;
+
+        if (clientId !== expectedClientId) {
+          return new Response(`Invalid client_id: ${clientId}`, { status: 400, headers: oauthCorsHeaders });
+        }
+        if (!isAllowedRedirectUri(redirectUri)) {
+          return new Response(`Invalid redirect_uri: ${redirectUri}`, { status: 400, headers: oauthCorsHeaders });
+        }
+
+        const code = await createAuthCode(
+          {
+            clientId,
+            redirectUri,
+            codeChallenge,
+            codeChallengeMethod,
+          },
+          secret
+        );
+
+        const targetUrl = new URL(redirectUri);
+        targetUrl.searchParams.set("code", code);
+        if (state) {
+          targetUrl.searchParams.set("state", state);
+        }
+
+        return Response.redirect(targetUrl.toString(), 302);
+      }
+    }
+
+    // 4. OAuth 2.0 Token Endpoint
+    if (url.pathname === "/oauth/token") {
+      if (request.method === "OPTIONS") {
+        return new Response(null, { headers: oauthCorsHeaders });
+      }
+
+      if (request.method !== "POST") {
+        return new Response("Method Not Allowed", { status: 405, headers: oauthCorsHeaders });
+      }
+
+      let bodyParams: Record<string, string> = {};
+      const contentType = request.headers.get("Content-Type") || "";
+      if (contentType.includes("application/x-www-form-urlencoded")) {
+        const text = await request.text();
+        const searchParams = new URLSearchParams(text);
+        searchParams.forEach((v, k) => {
+          bodyParams[k] = v;
+        });
+      } else if (contentType.includes("application/json")) {
+        bodyParams = (await request.json()) as any;
+      }
+
+      const creds = extractClientCredentials(request, bodyParams);
+      const expectedClientId = env.OAUTH_CLIENT_ID || "oaktree-gemini";
+      const expectedSecret = env.OAUTH_CLIENT_SECRET || env.MCP_SECRET;
+
+      if (!creds || creds.clientId !== expectedClientId || creds.clientSecret !== expectedSecret) {
+        return new Response(
+          JSON.stringify({
+            error: "invalid_client",
+            error_description: "Invalid client_id or client_secret",
+          }),
+          {
+            status: 401,
+            headers: {
+              "Content-Type": "application/json",
+              ...oauthCorsHeaders,
+            },
+          }
+        );
+      }
+
+      const grantType = bodyParams.grant_type;
+      if (grantType !== "authorization_code") {
+        return new Response(
+          JSON.stringify({
+            error: "unsupported_grant_type",
+            error_description: "Only authorization_code is supported",
+          }),
+          {
+            status: 400,
+            headers: {
+              "Content-Type": "application/json",
+              ...oauthCorsHeaders,
+            },
+          }
+        );
+      }
+
+      const code = bodyParams.code;
+      const redirectUri = bodyParams.redirect_uri;
+      const codeVerifier = bodyParams.code_verifier;
+
+      if (!code) {
+        return new Response(
+          JSON.stringify({
+            error: "invalid_request",
+            error_description: "Missing authorization code",
+          }),
+          {
+            status: 400,
+            headers: {
+              "Content-Type": "application/json",
+              ...oauthCorsHeaders,
+            },
+          }
+        );
+      }
+
+      const authPayload = await verifyAuthCode(code, expectedSecret);
+      if (!authPayload || authPayload.clientId !== creds.clientId) {
+        return new Response(
+          JSON.stringify({
+            error: "invalid_grant",
+            error_description: "Authorization code is invalid or expired",
+          }),
+          {
+            status: 400,
+            headers: {
+              "Content-Type": "application/json",
+              ...oauthCorsHeaders,
+            },
+          }
+        );
+      }
+
+      if (redirectUri && authPayload.redirectUri !== redirectUri) {
+        return new Response(
+          JSON.stringify({
+            error: "invalid_grant",
+            error_description: "redirect_uri mismatch",
+          }),
+          {
+            status: 400,
+            headers: {
+              "Content-Type": "application/json",
+              ...oauthCorsHeaders,
+            },
+          }
+        );
+      }
+
+      // PKCE verification
+      if (authPayload.codeChallenge) {
+        if (!codeVerifier) {
+          return new Response(
+            JSON.stringify({
+              error: "invalid_request",
+              error_description: "code_verifier required for PKCE",
+            }),
+            {
+              status: 400,
+              headers: {
+                "Content-Type": "application/json",
+                ...oauthCorsHeaders,
+              },
+            }
+          );
+        }
+
+        const computed = await computeSha256Base64Url(codeVerifier);
+        if (computed !== authPayload.codeChallenge) {
+          return new Response(
+            JSON.stringify({
+              error: "invalid_grant",
+              error_description: "code_verifier mismatch",
+            }),
+            {
+              status: 400,
+              headers: {
+                "Content-Type": "application/json",
+                ...oauthCorsHeaders,
+              },
+            }
+          );
+        }
+      }
+
+      // Generate Access Token
+      const accessToken = await createAccessToken(creds.clientId, expectedSecret);
+
+      return new Response(
+        JSON.stringify({
+          access_token: accessToken,
+          token_type: "Bearer",
+          expires_in: 2592000,
+          scope: "mcp",
+        }),
+        {
+          headers: {
+            "Content-Type": "application/json",
+            ...oauthCorsHeaders,
+          },
+        }
+      );
+    }
 
     // MCP Routes: Open CORS with MCP token protection
     if (url.pathname.startsWith("/mcp")) {
@@ -287,7 +592,7 @@ export default {
             "Access-Control-Allow-Origin": mcpOrigin,
             "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
             "Access-Control-Allow-Headers": "Content-Type, Accept, Authorization, mcp-session-id, mcp-protocol-version, X-Session-ID, x-session-id",
-            "Access-Control-Expose-Headers": "mcp-session-id",
+            "Access-Control-Expose-Headers": "mcp-session-id, WWW-Authenticate",
             "Access-Control-Max-Age": "86400",
           },
         });
@@ -296,7 +601,13 @@ export default {
       const response = await mcpFetch(request, env, ctx);
       const newResponse = new Response(response.body, response);
       newResponse.headers.set("Access-Control-Allow-Origin", mcpOrigin);
-      newResponse.headers.set("Access-Control-Expose-Headers", "mcp-session-id");
+      newResponse.headers.set("Access-Control-Expose-Headers", "mcp-session-id, WWW-Authenticate");
+      if (response.status === 401) {
+        newResponse.headers.set(
+          "WWW-Authenticate",
+          `Bearer resource_metadata="${baseUrl}/.well-known/oauth-protected-resource"`
+        );
+      }
       return newResponse;
     }
 

@@ -1,3 +1,5 @@
+import { verifyAccessToken } from './oauth';
+
 /**
  * MCP Authentication Utility
  * Extracts and verifies access tokens from HTTP requests for Gemini Spark and external MCP clients.
@@ -37,12 +39,13 @@ export function extractMcpToken(request: Request): string | null {
 }
 
 /**
- * Validates the extracted token against the expected secret string.
+ * Validates the extracted token against the expected secret string
+ * or as an HMAC-signed OAuth access token.
  */
-export function validateMcpToken(
+export async function validateMcpToken(
   request: Request,
   expectedSecret?: string
-): TokenValidationResult {
+): Promise<TokenValidationResult> {
   if (!expectedSecret || expectedSecret.trim().length === 0) {
     return {
       isValid: false,
@@ -60,16 +63,30 @@ export function validateMcpToken(
     };
   }
 
-  if (token !== expectedSecret.trim()) {
+  const trimmedSecret = expectedSecret.trim();
+
+  // 1. Direct static secret match (Bearer or query token)
+  if (token === trimmedSecret) {
     return {
-      isValid: false,
+      isValid: true,
       token,
-      reason: 'invalid_token',
     };
   }
 
+  // 2. OAuth access token verification (signed with expectedSecret)
+  if (token.startsWith('ota_')) {
+    const verified = await verifyAccessToken(token, trimmedSecret);
+    if (verified) {
+      return {
+        isValid: true,
+        token,
+      };
+    }
+  }
+
   return {
-    isValid: true,
+    isValid: false,
     token,
+    reason: 'invalid_token',
   };
 }

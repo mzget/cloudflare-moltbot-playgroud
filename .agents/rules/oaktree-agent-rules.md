@@ -24,6 +24,7 @@ These rules govern the core behavior of the Oaktree Agent in this repository.
 The agent is explicitly authorized and encouraged to:
 - **Activate Cloudflare Skills**: Load and reference `cloudflare` and `wrangler` skills whenever investigating Cloudflare services, architecture, or CLI syntax.
 - **Execute Cloudflare CLI (`wrangler` / `cf`)**: Run CLI commands (e.g. `npx wrangler d1 execute`, `wrangler tail`, `wrangler kv`, inspecting deployments or bindings) via `run_command` whenever needed to inspect live state, query data, or gather relevant information without seeking redundant permission.
+- **CLI Preference**: When interacting with Cloudflare, use the `cf` CLI unless the project has a Wrangler configuration file.
 
 ---
 
