@@ -106,6 +106,7 @@ export default function SourceManager() {
     pauseDailyReportFacebook: false,
     pauseEmailDigestFacebook: false,
     pauseCustomFacebook: false,
+    pauseNotebookFacebook: false,
   });
   const [updatingSettings, setUpdatingSettings] = useState(false);
 
@@ -118,6 +119,7 @@ export default function SourceManager() {
           pauseDailyReportFacebook: settings.pause_daily_report_facebook === '1',
           pauseEmailDigestFacebook: settings.pause_email_digest_facebook === '1',
           pauseCustomFacebook: settings.pause_custom_facebook === '1',
+          pauseNotebookFacebook: settings.pause_notebook_facebook === '1',
         });
       }
     } catch (e) {
@@ -126,7 +128,7 @@ export default function SourceManager() {
   };
 
   const handleSettingToggle = async (
-    key: 'pause_daily_report_facebook' | 'pause_email_digest_facebook' | 'pause_custom_facebook',
+    key: 'pause_daily_report_facebook' | 'pause_email_digest_facebook' | 'pause_custom_facebook' | 'pause_notebook_facebook',
     currentValue: boolean
   ) => {
     const newValue = !currentValue;
@@ -134,6 +136,8 @@ export default function SourceManager() {
       ? 'pauseDailyReportFacebook' 
       : key === 'pause_email_digest_facebook' 
       ? 'pauseEmailDigestFacebook' 
+      : key === 'pause_notebook_facebook'
+      ? 'pauseNotebookFacebook'
       : 'pauseCustomFacebook';
 
     setFacebookSettings(prev => ({ ...prev, [stateKey]: newValue }));
@@ -827,7 +831,7 @@ export default function SourceManager() {
                 <Divider sx={{ opacity: 0.1 }} />
 
                 <Grid container spacing={3}>
-                  <Grid xs={12} sm={6} md={4}>
+                  <Grid xs={12} sm={6} md={3}>
                     <Sheet
                       variant="soft"
                       sx={{
@@ -859,7 +863,7 @@ export default function SourceManager() {
                     </Sheet>
                   </Grid>
 
-                  <Grid xs={12} sm={6} md={4}>
+                  <Grid xs={12} sm={6} md={3}>
                     <Sheet
                       variant="soft"
                       sx={{
@@ -891,7 +895,39 @@ export default function SourceManager() {
                     </Sheet>
                   </Grid>
 
-                  <Grid xs={12} sm={6} md={4}>
+                  <Grid xs={12} sm={6} md={3}>
+                    <Sheet
+                      variant="soft"
+                      sx={{
+                        p: 2.5,
+                        borderRadius: '12px',
+                        height: '100%',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        border: '1px solid rgba(255, 255, 255, 0.04)',
+                        bgcolor: 'rgba(255, 255, 255, 0.02)',
+                        gap: 2
+                      }}
+                    >
+                      <Box>
+                        <FormLabel sx={{ fontWeight: 700, mb: 0.5 }}>Pause Articles & Analyses</FormLabel>
+                        <Typography level="body-xs" sx={{ opacity: 0.5 }}>
+                          When enabled, market news and Gemini Spark analyses will not be auto-published to Facebook.
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 'auto' }}>
+                        <Switch
+                          checked={facebookSettings.pauseNotebookFacebook}
+                          onChange={() => handleSettingToggle('pause_notebook_facebook', facebookSettings.pauseNotebookFacebook)}
+                          disabled={updatingSettings}
+                          color={facebookSettings.pauseNotebookFacebook ? "danger" : "neutral"}
+                        />
+                      </Box>
+                    </Sheet>
+                  </Grid>
+
+                  <Grid xs={12} sm={6} md={3}>
                     <Sheet
                       variant="soft"
                       sx={{

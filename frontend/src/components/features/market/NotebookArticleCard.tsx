@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { Box, Typography, Card, CardContent, Chip, Stack, Tooltip, IconButton, Link } from '@mui/joy';
-import { Clock, AlertCircle, CheckCircle, ExternalLink, Quote, RefreshCw } from 'lucide-react';
+import { Box, Typography, Card, CardContent, Chip, Stack, Tooltip, Link, Button } from '@mui/joy';
+import { Clock, AlertCircle, CheckCircle, ExternalLink, RefreshCw, Sparkles, BookOpen, Send } from 'lucide-react';
 import { glassStyle } from '../../../styles/glass';
 
 const FacebookIcon = ({ size = 24, ...props }: React.SVGProps<SVGSVGElement> & { size?: number }) => (
@@ -20,21 +20,34 @@ const FacebookIcon = ({ size = 24, ...props }: React.SVGProps<SVGSVGElement> & {
   </svg>
 );
 
-interface NotebookArticleCardProps {
+export interface NotebookArticleCardProps {
   article: {
     id: number;
     title: string;
     symbol: string | null;
     summary: string | null;
     key_takeaways: string;
+    source?: string | null;
+    category?: string | null;
+    url?: string | null;
+    auto_publish?: number | null;
     created_at: number; // timestamp in seconds
     facebook_status: 'pending' | 'processing' | 'posted' | 'failed' | null;
     facebook_post_id: string | null;
     facebook_error: string | null;
   };
+  onQueueFacebook?: (id: number) => Promise<void>;
+  onPublishNow?: (id: number) => Promise<{ success: boolean; error?: string }>;
 }
 
-export default function NotebookArticleCard({ article }: NotebookArticleCardProps) {
+export default function NotebookArticleCard({
+  article,
+  onQueueFacebook,
+  onPublishNow
+}: NotebookArticleCardProps) {
+  const [isPublishing, setIsPublishing] = React.useState(false);
+  const [isQueueing, setIsQueueing] = React.useState(false);
+
   const takeaways = React.useMemo(() => {
     try {
       return JSON.parse(article.key_takeaways || '[]');
@@ -42,6 +55,8 @@ export default function NotebookArticleCard({ article }: NotebookArticleCardProp
       return [];
     }
   }, [article.key_takeaways]);
+
+  const isGeminiSpark = article.source === 'gemini_spark';
 
   const renderStatus = () => {
     const status = article.facebook_status;
@@ -124,12 +139,65 @@ export default function NotebookArticleCard({ article }: NotebookArticleCardProp
     }
   };
 
+  const handlePublishNow = async () => {
+    if (!onPublishNow) return;
+    try {
+      setIsPublishing(true);
+      await onPublishNow(article.id);
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+  const handleQueueFacebook = async () => {
+    if (!onQueueFacebook) return;
+    try {
+      setIsQueueing(true);
+      await onQueueFacebook(article.id);
+    } finally {
+      setIsQueueing(false);
+    }
+  };
+
   return (
     <Card sx={{ ...glassStyle, p: 1 }}>
       <CardContent sx={{ p: 3 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
           <Box sx={{ minWidth: 0, flex: 1 }}>
-            <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" sx={{ gap: 1, mb: 1 }}>
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ gap: 1, mb: 1.5 }}>
+              {isGeminiSpark ? (
+                <Chip
+                  variant="soft"
+                  color="primary"
+                  size="sm"
+                  startDecorator={<Sparkles size={13} />}
+                  sx={{
+                    bgcolor: 'rgba(147, 51, 234, 0.14)',
+                    color: '#c084fc',
+                    border: '1px solid rgba(147, 51, 234, 0.3)',
+                    fontWeight: 700
+                  }}
+                >
+                  Gemini Spark
+                </Chip>
+              ) : (
+                <Chip
+                  variant="soft"
+                  color="neutral"
+                  size="sm"
+                  startDecorator={<BookOpen size={13} />}
+                  sx={{ fontWeight: 600 }}
+                >
+                  NotebookLM
+                </Chip>
+              )}
+
+              {article.category && (
+                <Chip variant="outlined" color="neutral" size="sm" sx={{ fontSize: 'xs' }}>
+                  {article.category}
+                </Chip>
+              )}
+
               {article.symbol && (
                 <Typography level="h3" sx={{ fontWeight: 800 }}>
                   {article.symbol}
@@ -139,10 +207,25 @@ export default function NotebookArticleCard({ article }: NotebookArticleCardProp
                 {article.title}
               </Typography>
             </Stack>
-            <Typography level="body-xs" sx={{ color: 'text.tertiary', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-              Synced on {new Date(article.created_at * 1000).toLocaleDateString()} {new Date(article.created_at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-            </Typography>
+
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Typography level="body-xs" sx={{ color: 'text.tertiary', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                Synced on {new Date(article.created_at * 1000).toLocaleDateString()} {new Date(article.created_at * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+              </Typography>
+              {article.url && (
+                <Link
+                  href={article.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  level="body-xs"
+                  sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5, color: 'primary.400' }}
+                >
+                  Source Link <ExternalLink size={11} />
+                </Link>
+              )}
+            </Stack>
           </Box>
+
           <Stack direction="row" spacing={1} alignItems="center">
             {renderStatus()}
             <Box sx={{ color: 'rgba(24, 119, 242, 0.2)' }}>
@@ -181,6 +264,61 @@ export default function NotebookArticleCard({ article }: NotebookArticleCardProp
               ))}
             </Stack>
           </Box>
+        )}
+
+        {/* Facebook Action Buttons */}
+        {article.facebook_status !== 'posted' && (
+          <Stack direction="row" spacing={1.5} sx={{ mt: 3 }} alignItems="center">
+            {article.facebook_status === 'failed' ? (
+              <>
+                <Button
+                  size="sm"
+                  variant="solid"
+                  color="danger"
+                  startDecorator={<RefreshCw size={14} />}
+                  loading={isPublishing}
+                  onClick={handlePublishNow}
+                  sx={{ fontWeight: 600 }}
+                >
+                  Retry Publish Now
+                </Button>
+                <Button
+                  size="sm"
+                  variant="soft"
+                  color="neutral"
+                  loading={isQueueing}
+                  onClick={handleQueueFacebook}
+                  sx={{ fontWeight: 600 }}
+                >
+                  Re-queue to FB
+                </Button>
+              </>
+            ) : article.facebook_status === 'pending' || article.facebook_status === 'processing' ? null : (
+              <>
+                <Button
+                  size="sm"
+                  variant="solid"
+                  color="primary"
+                  startDecorator={<Send size={14} />}
+                  loading={isPublishing}
+                  onClick={handlePublishNow}
+                  sx={{ fontWeight: 600 }}
+                >
+                  Publish Now
+                </Button>
+                <Button
+                  size="sm"
+                  variant="soft"
+                  color="neutral"
+                  loading={isQueueing}
+                  onClick={handleQueueFacebook}
+                  sx={{ fontWeight: 600 }}
+                >
+                  Post to FB (Queue)
+                </Button>
+              </>
+            )}
+          </Stack>
         )}
       </CardContent>
     </Card>
