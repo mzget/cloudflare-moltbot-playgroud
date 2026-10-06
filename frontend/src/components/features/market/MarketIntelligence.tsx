@@ -10,6 +10,8 @@ export default function MarketIntelligence() {
     loading,
     onDigestRead,
     onDigestQueueFacebook,
+    onArticleQueueFacebook,
+    onArticlePublishNow,
     onReportRead,
   } = useIntelligenceStore();
 
@@ -21,6 +23,8 @@ export default function MarketIntelligence() {
       loading={loading}
       onDigestRead={onDigestRead}
       onDigestQueueFacebook={onDigestQueueFacebook}
+      onArticleQueueFacebook={onArticleQueueFacebook}
+      onArticlePublishNow={onArticlePublishNow}
       onReportRead={onReportRead}
     />
   );

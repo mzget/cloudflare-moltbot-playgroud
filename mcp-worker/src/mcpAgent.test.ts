@@ -6,6 +6,9 @@ const m = vi.hoisted(() => ({
   getKnowledgeByCategory: vi.fn(),
   searchKnowledge: vi.fn(),
   getLatestAnalysisReport: vi.fn(),
+  saveMarketArticle: vi.fn(),
+  createFacebookDraft: vi.fn(),
+  getRecentArticles: vi.fn(),
 }));
 
 vi.mock("agents/mcp", () => ({ McpAgent: class { env: any = { id: "env" }; } }));
@@ -25,7 +28,7 @@ async function setup() {
 const textOf = (res: any) => JSON.parse(res.content[0].text);
 
 describe("OaktreeMCP", () => {
-  it("registers all five tools with descriptions", async () => {
+  it("registers all eight tools with descriptions", async () => {
     const { tools } = await setup();
     expect([...tools.keys()]).toEqual([
       "get_portfolio",
@@ -33,6 +36,9 @@ describe("OaktreeMCP", () => {
       "get_knowledge",
       "search_knowledge",
       "get_analysis_report",
+      "save_market_intelligence",
+      "create_facebook_post_draft",
+      "get_recent_intelligence",
     ]);
     for (const call of tools.values()) expect(typeof call[1]).toBe("string");
   });
@@ -53,12 +59,25 @@ describe("OaktreeMCP", () => {
     m.getKnowledgeByCategory.mockResolvedValue({ c: 1 });
     m.searchKnowledge.mockResolvedValue([]);
     m.getLatestAnalysisReport.mockResolvedValue(null);
+    m.saveMarketArticle.mockResolvedValue({ success: true, id: 1 });
+    m.createFacebookDraft.mockResolvedValue({ success: true });
+    m.getRecentArticles.mockResolvedValue([{ id: 1 }]);
+
     expect(textOf(await tools.get("get_knowledge")![3]({ category: "five_forces" }))).toEqual({ c: 1 });
     expect(m.getKnowledgeByCategory).toHaveBeenCalledWith(agent.env, "five_forces");
     expect(textOf(await tools.get("search_knowledge")![3]({ query: "moat" }))).toEqual([]);
     expect(m.searchKnowledge).toHaveBeenCalledWith(agent.env, "moat");
     expect(textOf(await tools.get("get_analysis_report")![3]({ symbol: "AAPL" }))).toBeNull();
     expect(m.getLatestAnalysisReport).toHaveBeenCalledWith(agent.env, "AAPL");
+
+    expect(textOf(await tools.get("save_market_intelligence")![3]({ title: "T", summary: "S" }))).toEqual({ success: true, id: 1 });
+    expect(m.saveMarketArticle).toHaveBeenCalledWith(agent.env, { title: "T", summary: "S" });
+
+    expect(textOf(await tools.get("create_facebook_post_draft")![3]({ title: "T", content: "C" }))).toEqual({ success: true });
+    expect(m.createFacebookDraft).toHaveBeenCalledWith(agent.env, { title: "T", content: "C" });
+
+    expect(textOf(await tools.get("get_recent_intelligence")![3]({ limit: 5, source: "gemini_spark" }))).toEqual([{ id: 1 }]);
+    expect(m.getRecentArticles).toHaveBeenCalledWith(agent.env, 5, "gemini_spark");
   });
 
   it("propagates knowledge errors to the MCP layer", async () => {

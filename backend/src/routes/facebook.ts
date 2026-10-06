@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { cache } from 'hono/cache';
 import type { AppEnv } from '../env';
-import { syncAndProcessFacebookPosts, styleCustomPost, queueFacebookPost } from '../facebook';
+import { syncAndProcessFacebookPosts, styleCustomPost, queueFacebookPost, publishArticleNow } from '../facebook';
 
 const facebook = new Hono<AppEnv>();
 
@@ -184,11 +184,25 @@ facebook.post('/api/facebook/queue', async (c) => {
     if (!source_type || !source_id) {
       return c.json({ error: 'source_type and source_id are required' }, 400);
     }
-    if (source_type !== 'email_digest' && source_type !== 'daily_report') {
+    if (source_type !== 'email_digest' && source_type !== 'daily_report' && source_type !== 'notebook_article') {
       return c.json({ error: 'Invalid source_type' }, 400);
     }
     await queueFacebookPost(c.env, source_type, parseInt(source_id));
     return c.json({ success: true, message: `${source_type} queued for Facebook posting` });
+  } catch (e) {
+    return c.json({ error: (e as any).message }, 500);
+  }
+});
+
+// API: Publish Notebook Article Immediately
+facebook.post('/api/facebook/publish-article-now', async (c) => {
+  try {
+    const { article_id } = await c.req.json() as any;
+    if (!article_id) {
+      return c.json({ error: 'article_id is required' }, 400);
+    }
+    const result = await publishArticleNow(c.env, parseInt(article_id));
+    return c.json(result);
   } catch (e) {
     return c.json({ error: (e as any).message }, 500);
   }

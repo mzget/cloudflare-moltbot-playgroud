@@ -13,7 +13,9 @@ export default function IntelligenceFeed({
   loading,
   onDigestRead,
   onReportRead,
-  onDigestQueueFacebook
+  onDigestQueueFacebook,
+  onArticleQueueFacebook,
+  onArticlePublishNow
 }: {
   reports: any[];
   digests?: any[];
@@ -22,6 +24,8 @@ export default function IntelligenceFeed({
   onDigestRead?: (id: number) => void;
   onReportRead?: (id: number) => void;
   onDigestQueueFacebook?: (id: number) => void;
+  onArticleQueueFacebook?: (id: number) => Promise<void>;
+  onArticlePublishNow?: (id: number) => Promise<{ success: boolean; error?: string }>;
 }) {
   const [filter, setFilter] = React.useState<'all' | 'reports' | 'digests' | 'articles'>('all');
 
@@ -191,7 +195,7 @@ export default function IntelligenceFeed({
                 '&:hover': { bgcolor: filter === 'articles' ? 'background.surface' : 'background.level2' }
               }}
             >
-              Notebook Articles
+              Articles & Analyses
             </Button>
           </ButtonGroup>
         </Box>
@@ -210,7 +214,7 @@ export default function IntelligenceFeed({
               : filter === 'digests'
                 ? 'No email digests generated yet. Make sure your Gmail is connected.'
                 : filter === 'articles'
-                  ? 'No NotebookLM articles synced yet.'
+                  ? 'No market articles or analyses ingested yet.'
                   : 'No intelligence reports, email digests, or articles generated yet.'}
           </Typography>
         </Sheet>
@@ -218,7 +222,14 @@ export default function IntelligenceFeed({
         <Stack spacing={4}>
           {filteredFeed.map((item) => {
             if (item.title !== undefined) {
-              return <NotebookArticleCard key={`article-${item.id}`} article={item} />;
+              return (
+                <NotebookArticleCard
+                  key={`article-${item.id}`}
+                  article={item}
+                  onQueueFacebook={onArticleQueueFacebook}
+                  onPublishNow={onArticlePublishNow}
+                />
+              );
             } else if (item.symbol) {
               return <DailyReportCard key={`report-${item.id}`} report={item} onMarkAsRead={onReportRead} />;
             } else {

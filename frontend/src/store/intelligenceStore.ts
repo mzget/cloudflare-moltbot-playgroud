@@ -31,6 +31,8 @@ interface IntelligenceStore {
   fetchReports: () => Promise<void>;
   onDigestRead: (id: number) => Promise<void>;
   onDigestQueueFacebook: (id: number) => Promise<void>;
+  onArticleQueueFacebook: (id: number) => Promise<void>;
+  onArticlePublishNow: (id: number) => Promise<{ success: boolean; error?: string }>;
   onReportRead: (id: number) => Promise<void>;
 }
 
@@ -100,6 +102,55 @@ export const useIntelligenceStore = create<IntelligenceStore>((set, get) => ({
     } catch (e) {
       console.error("Failed to queue Facebook post:", e);
       await get().fetchReports();
+    }
+  },
+
+  onArticleQueueFacebook: async (id: number) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/facebook/queue`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source_type: 'notebook_article', source_id: id })
+      });
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+      set(state => ({
+        notebookArticles: state.notebookArticles.map(a => a.id === id ? { ...a, facebook_status: 'pending' } : a)
+      }));
+      await get().fetchReports();
+    } catch (e) {
+      console.error("Failed to queue Facebook post for article:", e);
+      await get().fetchReports();
+    }
+  },
+
+  onArticlePublishNow: async (id: number) => {
+    try {
+      set(state => ({
+        notebookArticles: state.notebookArticles.map(a => a.id === id ? { ...a, facebook_status: 'processing' } : a)
+      }));
+      const res = await fetch(`${API_BASE_URL}/api/facebook/publish-article-now`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ article_id: id })
+      });
+      const data = (await res.json()) as any;
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to publish to Facebook');
+      }
+      set(state => ({
+        notebookArticles: state.notebookArticles.map(a => a.id === id ? { ...a, facebook_status: 'posted', facebook_post_id: data.facebookPostId } : a)
+      }));
+      await get().fetchReports();
+      return { success: true };
+    } catch (e: any) {
+      console.error("Failed to publish article now:", e);
+      set(state => ({
+        notebookArticles: state.notebookArticles.map(a => a.id === id ? { ...a, facebook_status: 'failed', facebook_error: e.message } : a)
+      }));
+      await get().fetchReports();
+      return { success: false, error: e.message };
     }
   },
 

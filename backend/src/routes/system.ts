@@ -34,6 +34,7 @@ async function ensureSystemSettingsTable(db: D1Database) {
 		('pause_daily_report_facebook', '0'),
 		('pause_email_digest_facebook', '0'),
 		('pause_custom_facebook', '0'),
+		('pause_notebook_facebook', '0'),
 		('pause_market_breakout_notifications', '0'),
 		('pause_market_breakout_scan', '0')
 	`).run();

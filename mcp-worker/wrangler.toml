@@ -15,6 +15,10 @@ database_id = "97634677-4bac-44d1-bd02-6c733328a137"
 binding = "BUCKET"
 bucket_name = "oaktree-assets"
 
+[[r2_buckets]]
+binding = "KNOWLEDGE_BUCKET"
+bucket_name = "oaktree-knowledge"
+
 [durable_objects]
 bindings = [
   { name = "OAKTREE_MCP", class_name = "OaktreeMCP" },

@@ -11,7 +11,7 @@ interface FacebookPostRow {
 	error_message: string | null;
 }
 
-export async function queueFacebookPost(env: Env, sourceType: 'daily_report' | 'email_digest', sourceId: number) {
+export async function queueFacebookPost(env: Env, sourceType: 'daily_report' | 'email_digest' | 'notebook_article', sourceId: number) {
 	try {
 		await env.DB.prepare(
 			'INSERT OR IGNORE INTO facebook_posts (source_type, source_id, status) VALUES (?, ?, ?)'
@@ -215,6 +215,7 @@ export async function syncAndProcessFacebookPosts(env: Env): Promise<number> {
 	// Check pause settings
 	let dailyReportPaused = false;
 	let emailDigestPaused = false;
+	let notebookPaused = false;
 	try {
 		// Ensure system_settings table exists
 		await env.DB.prepare(`
@@ -226,8 +227,10 @@ export async function syncAndProcessFacebookPosts(env: Env): Promise<number> {
 
 		const dailyRow = await env.DB.prepare("SELECT value FROM system_settings WHERE key = 'pause_daily_report_facebook'").first() as { value: string } | null;
 		const emailRow = await env.DB.prepare("SELECT value FROM system_settings WHERE key = 'pause_email_digest_facebook'").first() as { value: string } | null;
+		const notebookRow = await env.DB.prepare("SELECT value FROM system_settings WHERE key = 'pause_notebook_facebook'").first() as { value: string } | null;
 		dailyReportPaused = dailyRow?.value === '1';
 		emailDigestPaused = emailRow?.value === '1';
+		notebookPaused = notebookRow?.value === '1';
 	} catch (e) {
 		console.warn('Failed to fetch Facebook pause settings in syncAndProcessFacebookPosts, defaulting to unpaused:', e);
 	}
@@ -259,28 +262,37 @@ export async function syncAndProcessFacebookPosts(env: Env): Promise<number> {
 			console.log('Facebook posting for email digests is paused. Skipping discovery.');
 		}
 
-		// 3. Discover and queue new notebook articles from the last 24h
-		try {
-			await env.DB.prepare(`
-				CREATE TABLE IF NOT EXISTS notebook_articles (
-					id INTEGER PRIMARY KEY AUTOINCREMENT,
-					title TEXT NOT NULL,
-					symbol TEXT,
-					summary TEXT,
-					key_takeaways TEXT,
-					synced_at TEXT DEFAULT (datetime('now')),
-					created_at TEXT DEFAULT (datetime('now'))
-				)
-			`).run();
-			await env.DB.prepare(`
-				INSERT OR IGNORE INTO facebook_posts (source_type, source_id, status)
-				SELECT 'notebook_article', id, 'pending'
-				FROM notebook_articles
-				WHERE created_at > datetime('now', '-1 day')
-				  AND id NOT IN (SELECT source_id FROM facebook_posts WHERE source_type = 'notebook_article')
-			`).run();
-		} catch (e) {
-			console.warn('Notebook article Facebook discovery skipped:', e);
+		// 3. Discover and queue new notebook articles from the last 24h where auto_publish = 1
+		if (!notebookPaused) {
+			try {
+				await env.DB.prepare(`
+					CREATE TABLE IF NOT EXISTS notebook_articles (
+						id INTEGER PRIMARY KEY AUTOINCREMENT,
+						title TEXT NOT NULL,
+						symbol TEXT,
+						summary TEXT,
+						key_takeaways TEXT,
+						synced_at TEXT DEFAULT (datetime('now')),
+						created_at TEXT DEFAULT (datetime('now')),
+						source TEXT DEFAULT 'notebooklm',
+						category TEXT,
+						url TEXT,
+						auto_publish INTEGER DEFAULT 0
+					)
+				`).run();
+				await env.DB.prepare(`
+					INSERT OR IGNORE INTO facebook_posts (source_type, source_id, status)
+					SELECT 'notebook_article', id, 'pending'
+					FROM notebook_articles
+					WHERE auto_publish = 1
+					  AND created_at > datetime('now', '-1 day')
+					  AND id NOT IN (SELECT source_id FROM facebook_posts WHERE source_type = 'notebook_article')
+				`).run();
+			} catch (e) {
+				console.warn('Notebook article Facebook discovery skipped:', e);
+			}
+		} else {
+			console.log('Facebook posting for notebook articles is paused. Skipping discovery.');
 		}
 
 	} catch (e) {
@@ -456,5 +468,103 @@ ${instructions ? `7. Special Instructions: Follow these additional directions st
 	}
 
 	return styledContent;
+}
+
+export async function publishArticleNow(
+	env: Env,
+	articleId: number
+): Promise<{ success: boolean; facebookPostId?: string; url?: string; alreadyPosted?: boolean }> {
+	try {
+		const article = await env.DB.prepare(
+			'SELECT id, title, symbol, summary, key_takeaways FROM notebook_articles WHERE id = ?'
+		).bind(articleId).first() as { id: number; title: string; symbol: string | null; summary: string | null; key_takeaways: string | null } | null;
+
+		if (!article) {
+			throw new Error(`Notebook article ID ${articleId} not found`);
+		}
+
+		// Check if already posted
+		const existingPost = await env.DB.prepare(
+			"SELECT id, status, facebook_post_id FROM facebook_posts WHERE source_type = 'notebook_article' AND source_id = ?"
+		).bind(articleId).first() as { id: number; status: string; facebook_post_id: string | null } | null;
+
+		if (existingPost?.status === 'posted' && existingPost?.facebook_post_id) {
+			return {
+				success: true,
+				facebookPostId: existingPost.facebook_post_id,
+				url: `https://facebook.com/${existingPost.facebook_post_id}`,
+				alreadyPosted: true
+			};
+		}
+
+		let takeaways: string[] = [];
+		try {
+			takeaways = JSON.parse(article.key_takeaways || '[]');
+		} catch (_) {
+			takeaways = [];
+		}
+
+		const symbolOrCategory = article.symbol || article.title;
+		const summary = article.summary || article.title;
+
+		const thaiPost = await formatAndStyleFacebookPost(env, {
+			type: 'notebook_article',
+			symbolOrCategory,
+			summary,
+			takeaways,
+		});
+
+		if (!thaiPost) {
+			throw new Error('AI failed to format Thai memo for notebook article');
+		}
+
+		if (!env.FACEBOOK_PAGE_ID || !env.FACEBOOK_PAGE_ACCESS_TOKEN) {
+			throw new Error('Facebook credentials (FACEBOOK_PAGE_ID or FACEBOOK_PAGE_ACCESS_TOKEN) are missing');
+		}
+
+		console.log(`Publishing notebook article ${articleId} to Facebook Page: ${env.FACEBOOK_PAGE_ID}`);
+		const fbResponse = await fetch(`https://graph.facebook.com/v20.0/${env.FACEBOOK_PAGE_ID}/feed`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				message: thaiPost,
+				access_token: env.FACEBOOK_PAGE_ACCESS_TOKEN,
+			}),
+		});
+
+		const fbResult = await fbResponse.json() as any;
+		if (!fbResponse.ok || fbResult.error) {
+			const errorMsg = fbResult.error?.message || JSON.stringify(fbResult);
+			throw new Error(`Facebook API error: ${errorMsg}`);
+		}
+
+		const facebookPostId = fbResult.id;
+		console.log(`Successfully posted notebook article ${articleId} to Facebook. Post ID: ${facebookPostId}`);
+
+		// Upsert into facebook_posts
+		if (existingPost) {
+			await env.DB.prepare(
+				"UPDATE facebook_posts SET thai_content = ?, status = 'posted', facebook_post_id = ?, error_message = NULL, updated_at = (strftime('%Y-%m-%d %H:%M:%S', 'now')) WHERE id = ?"
+			).bind(thaiPost, facebookPostId, existingPost.id).run();
+		} else {
+			await env.DB.prepare(
+				"INSERT INTO facebook_posts (source_type, source_id, thai_content, status, facebook_post_id) VALUES ('notebook_article', ?, ?, 'posted', ?)"
+			).bind(articleId, thaiPost, facebookPostId).run();
+		}
+
+		return {
+			success: true,
+			facebookPostId,
+			url: `https://facebook.com/${facebookPostId}`
+		};
+	} catch (e: any) {
+		console.error(`Failed to publish notebook article ${articleId} immediately:`, e);
+		try {
+			await env.DB.prepare(
+				"UPDATE facebook_posts SET status = 'failed', error_message = ?, updated_at = (strftime('%Y-%m-%d %H:%M:%S', 'now')) WHERE source_type = 'notebook_article' AND source_id = ?"
+			).bind(e.message || 'Unknown error', articleId).run();
+		} catch (_) {}
+		throw e;
+	}
 }
 
