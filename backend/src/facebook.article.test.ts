@@ -210,6 +210,9 @@ describe('Facebook Notebook Article & Publishing Pipeline', () => {
       expect(items[0].category).toBe('Tech & Semiconductors');
       expect(items[0].auto_publish).toBe(0);
       expect(items[0].is_readed).toBe(0);
+
+      const queryCall = executedSql.find(e => e.sql.includes('FROM notebook_articles n'));
+      expect(queryCall?.sql).toContain('WHERE COALESCE(n.is_readed, 0) = 0');
     });
   });
 

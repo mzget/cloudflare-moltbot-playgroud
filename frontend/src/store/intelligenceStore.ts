@@ -213,9 +213,9 @@ export const useIntelligenceStore = create<IntelligenceStore>((set, get) => ({
   },
 
   onArticleRead: async (id: number) => {
-    // Optimistic UI update: mark article as read immediately
+    // Optimistic UI update: remove article immediately
     set(state => ({
-      notebookArticles: state.notebookArticles.map(a => a.id === id ? { ...a, is_readed: 1 } : a)
+      notebookArticles: state.notebookArticles.filter(a => a.id !== id)
     }));
     try {
       const res = await fetch(`${API_BASE_URL}/api/notebook-articles/mark-read`, {

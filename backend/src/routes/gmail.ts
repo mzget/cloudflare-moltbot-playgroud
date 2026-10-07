@@ -222,6 +222,7 @@ gmail.get('/api/notebook-articles', async (c) => {
         f.error_message as facebook_error
       FROM notebook_articles n
       LEFT JOIN facebook_posts f ON f.source_type = 'notebook_article' AND f.source_id = n.id
+      WHERE COALESCE(n.is_readed, 0) = 0
       ORDER BY n.created_at DESC
       LIMIT 50
     `).all();
