@@ -158,7 +158,7 @@ test.describe('Market Intelligence - All Tabs E2E Suite', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(mockArticles),
+        body: JSON.stringify(mockArticles.filter(a => (a.is_readed || 0) === 0)),
       });
     });
 
@@ -276,8 +276,8 @@ test.describe('Market Intelligence - All Tabs E2E Suite', () => {
     await expect(markReadBtn).toBeVisible();
     await markReadBtn.click();
 
-    // Verify "Read" chip appears on the card
-    await expect(targetArticleCard.getByText('Read', { exact: true })).toBeVisible();
+    // Verify article is removed from view once marked as read
+    await expect(page.getByText('Tech Valuation Memo')).not.toBeVisible();
   });
 
   test('5. "Articles & Analyses" tab - delete article with confirmation modal dialog', async ({ page }) => {
