@@ -1,6 +1,6 @@
 import * as React from 'react';
-import { Box, Typography, Card, CardContent, Chip, Stack, Tooltip, Link, Button } from '@mui/joy';
-import { Clock, AlertCircle, CheckCircle, ExternalLink, RefreshCw, Sparkles, BookOpen, Send } from 'lucide-react';
+import { Box, Typography, Card, CardContent, Chip, Stack, Tooltip, Link, Button, IconButton, Modal, ModalDialog, DialogTitle, DialogContent } from '@mui/joy';
+import { Clock, AlertCircle, CheckCircle, ExternalLink, RefreshCw, Sparkles, BookOpen, Send, Trash2, Check } from 'lucide-react';
 import { glassStyle } from '../../../styles/glass';
 
 const FacebookIcon = ({ size = 24, ...props }: React.SVGProps<SVGSVGElement> & { size?: number }) => (
@@ -32,21 +32,31 @@ export interface NotebookArticleCardProps {
     url?: string | null;
     auto_publish?: number | null;
     created_at: number; // timestamp in seconds
+    is_readed?: number;
     facebook_status: 'pending' | 'processing' | 'posted' | 'failed' | null;
     facebook_post_id: string | null;
     facebook_error: string | null;
   };
   onQueueFacebook?: (id: number) => Promise<void>;
   onPublishNow?: (id: number) => Promise<{ success: boolean; error?: string }>;
+  onDelete?: (id: number) => Promise<void> | void;
+  onMarkAsRead?: (id: number) => Promise<void> | void;
 }
 
 export default function NotebookArticleCard({
   article,
   onQueueFacebook,
-  onPublishNow
+  onPublishNow,
+  onDelete,
+  onMarkAsRead
 }: NotebookArticleCardProps) {
   const [isPublishing, setIsPublishing] = React.useState(false);
   const [isQueueing, setIsQueueing] = React.useState(false);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = React.useState(false);
+  const [isDeleting, setIsDeleting] = React.useState(false);
+  const [isMarkingRead, setIsMarkingRead] = React.useState(false);
+
+  const isRead = article.is_readed === 1;
 
   const takeaways = React.useMemo(() => {
     try {
@@ -159,8 +169,33 @@ export default function NotebookArticleCard({
     }
   };
 
+  const handleConfirmDelete = async () => {
+    if (!onDelete) return;
+    try {
+      setIsDeleting(true);
+      await onDelete(article.id);
+      setIsDeleteConfirmOpen(false);
+    } catch (e) {
+      console.error('Failed to delete notebook article:', e);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const handleMarkAsRead = async () => {
+    if (!onMarkAsRead) return;
+    try {
+      setIsMarkingRead(true);
+      await onMarkAsRead(article.id);
+    } catch (e) {
+      console.error('Failed to mark article as read:', e);
+    } finally {
+      setIsMarkingRead(false);
+    }
+  };
+
   return (
-    <Card sx={{ ...glassStyle, p: 1 }}>
+    <Card sx={{ ...glassStyle, p: 1, opacity: isRead ? 0.6 : 1, transition: 'opacity 0.3s ease' }}>
       <CardContent sx={{ p: 3 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
           <Box sx={{ minWidth: 0, flex: 1 }}>
@@ -198,6 +233,12 @@ export default function NotebookArticleCard({
                 </Chip>
               )}
 
+              {isRead && (
+                <Chip variant="soft" color="neutral" size="sm" startDecorator={<Check size={12} />}>
+                  Read
+                </Chip>
+              )}
+
               {article.symbol && (
                 <Typography level="h3" sx={{ fontWeight: 800 }}>
                   {article.symbol}
@@ -227,10 +268,58 @@ export default function NotebookArticleCard({
           </Box>
 
           <Stack direction="row" spacing={1} alignItems="center">
+            {onMarkAsRead && !isRead && (
+              <Button
+                variant="outlined"
+                color="neutral"
+                size="sm"
+                startDecorator={<Check size={14} />}
+                onClick={handleMarkAsRead}
+                loading={isMarkingRead}
+                sx={{
+                  borderRadius: '10px',
+                  fontWeight: 600,
+                  fontSize: '0.8rem',
+                  borderColor: 'rgba(255, 255, 255, 0.1)',
+                  bgcolor: 'rgba(255, 255, 255, 0.02)',
+                  transition: 'all 0.2s',
+                  '&:hover': {
+                    bgcolor: 'primary.softBg',
+                    color: 'primary.softColor',
+                    borderColor: 'primary.softBorder',
+                    transform: 'translateY(-1px)',
+                    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.1)',
+                  },
+                  '&:active': {
+                    transform: 'translateY(0)',
+                  }
+                }}
+              >
+                Mark as Read
+              </Button>
+            )}
             {renderStatus()}
             <Box sx={{ color: 'rgba(24, 119, 242, 0.2)' }}>
               <FacebookIcon size={24} />
             </Box>
+            {onDelete && (
+              <Tooltip title="Delete article" variant="soft">
+                <IconButton
+                  size="sm"
+                  variant="plain"
+                  color="danger"
+                  onClick={() => setIsDeleteConfirmOpen(true)}
+                  sx={{
+                    borderRadius: '8px',
+                    opacity: 0.7,
+                    transition: 'all 0.2s',
+                    '&:hover': { opacity: 1, bgcolor: 'danger.softBg' }
+                  }}
+                >
+                  <Trash2 size={16} />
+                </IconButton>
+              </Tooltip>
+            )}
           </Stack>
         </Stack>
 
@@ -246,7 +335,7 @@ export default function NotebookArticleCard({
               pl: 3
             }}
           >
-            {article.summary}
+            "{article.summary}"
           </Typography>
         )}
 
@@ -266,9 +355,15 @@ export default function NotebookArticleCard({
           </Box>
         )}
 
-        {/* Facebook Action Buttons */}
+        {/* Action Buttons */}
         {article.facebook_status !== 'posted' && (
-          <Stack direction="row" spacing={1.5} sx={{ mt: 3 }} alignItems="center">
+          <Stack
+            direction="row"
+            spacing={1.5}
+            sx={{ mt: 3 }}
+            alignItems="center"
+            flexWrap="wrap"
+          >
             {article.facebook_status === 'failed' ? (
               <>
                 <Button
@@ -319,6 +414,52 @@ export default function NotebookArticleCard({
               </>
             )}
           </Stack>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {onDelete && (
+          <Modal
+            open={isDeleteConfirmOpen}
+            onClose={() => !isDeleting && setIsDeleteConfirmOpen(false)}
+          >
+            <ModalDialog
+              role="alertdialog"
+              variant="outlined"
+              sx={{
+                ...glassStyle,
+                maxWidth: 460,
+                borderRadius: '16px',
+                p: 3,
+              }}
+            >
+              <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Trash2 size={20} color="var(--joy-palette-danger-500, #f43f5e)" />
+                Delete Article
+              </DialogTitle>
+              <DialogContent sx={{ color: 'text.secondary', mt: 1 }}>
+                Are you sure you want to delete <strong>"{article.title}"</strong>? This will permanently remove the article and any associated Facebook queue record.
+              </DialogContent>
+              <Stack direction="row" spacing={1.5} justifyContent="flex-end" sx={{ mt: 3 }}>
+                <Button
+                  variant="plain"
+                  color="neutral"
+                  disabled={isDeleting}
+                  onClick={() => setIsDeleteConfirmOpen(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="solid"
+                  color="danger"
+                  startDecorator={<Trash2 size={14} />}
+                  loading={isDeleting}
+                  onClick={handleConfirmDelete}
+                >
+                  Delete Article
+                </Button>
+              </Stack>
+            </ModalDialog>
+          </Modal>
         )}
       </CardContent>
     </Card>
