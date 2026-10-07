@@ -6,6 +6,7 @@ const m = vi.hoisted(() => ({
   getKnowledgeByCategory: vi.fn(),
   searchKnowledge: vi.fn(),
   getLatestAnalysisReport: vi.fn(),
+  getWatchlist: vi.fn(),
   saveMarketArticle: vi.fn(),
   createFacebookDraft: vi.fn(),
   getRecentArticles: vi.fn(),
@@ -28,7 +29,7 @@ async function setup() {
 const textOf = (res: any) => JSON.parse(res.content[0].text);
 
 describe("OaktreeMCP", () => {
-  it("registers all eight tools with descriptions", async () => {
+  it("registers all nine tools with descriptions", async () => {
     const { tools } = await setup();
     expect([...tools.keys()]).toEqual([
       "get_portfolio",
@@ -36,6 +37,7 @@ describe("OaktreeMCP", () => {
       "get_knowledge",
       "search_knowledge",
       "get_analysis_report",
+      "get_watchlist",
       "save_market_intelligence",
       "create_facebook_post_draft",
       "get_recent_intelligence",
@@ -59,6 +61,7 @@ describe("OaktreeMCP", () => {
     m.getKnowledgeByCategory.mockResolvedValue({ c: 1 });
     m.searchKnowledge.mockResolvedValue([]);
     m.getLatestAnalysisReport.mockResolvedValue(null);
+    m.getWatchlist.mockResolvedValue([{ symbol: "AAPL" }, { symbol: "MSFT" }]);
     m.saveMarketArticle.mockResolvedValue({ success: true, id: 1 });
     m.createFacebookDraft.mockResolvedValue({ success: true });
     m.getRecentArticles.mockResolvedValue([{ id: 1 }]);
@@ -69,6 +72,12 @@ describe("OaktreeMCP", () => {
     expect(m.searchKnowledge).toHaveBeenCalledWith(agent.env, "moat");
     expect(textOf(await tools.get("get_analysis_report")![3]({ symbol: "AAPL" }))).toBeNull();
     expect(m.getLatestAnalysisReport).toHaveBeenCalledWith(agent.env, "AAPL");
+
+    expect(textOf(await tools.get("get_watchlist")![3]({ active_only: true }))).toEqual([
+      { symbol: "AAPL" },
+      { symbol: "MSFT" },
+    ]);
+    expect(m.getWatchlist).toHaveBeenCalledWith(agent.env, { activeOnly: true });
 
     expect(textOf(await tools.get("save_market_intelligence")![3]({ title: "T", summary: "S" }))).toEqual({ success: true, id: 1 });
     expect(m.saveMarketArticle).toHaveBeenCalledWith(agent.env, { title: "T", summary: "S" });

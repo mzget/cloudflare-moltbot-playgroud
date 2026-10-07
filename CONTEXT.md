@@ -74,8 +74,9 @@ Stocks trading within a 3.0% margin of boundary records are flagged as imminent 
 A shared secret string required to authenticate requests to the Model Context Protocol (MCP) endpoints and agent tools. Transported either via the HTTP `Authorization: Bearer <token>` header or as a URL query parameter (`?token=<token>` or `?key=<token>`) to support external agent connectors that do not permit custom header configuration.
 _Avoid_: Session ID, API Key, User Password
 
+### Market Intelligence Article
+A comprehensive financial analysis or market memo record (`notebook_articles`) produced by NotebookLM or external AI agents (e.g. Gemini Spark). Articles include tags for source, category, canonical URL, and an `auto_publish` safety flag determining whether automated Facebook posting is eligible.
 
-
-
-
+### Knowledge Vault
+Durable Cloudflare R2 bucket (`oaktree-knowledge`) used to preserve full-text Markdown articles, external research reports, and agent documents for future context retrieval.
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { saveMarketArticle, createFacebookDraft, getRecentArticles } from "./knowledge";
+import { saveMarketArticle, createFacebookDraft, getRecentArticles, getWatchlist, searchKnowledge } from "./knowledge";
 
 describe("Market Intelligence Knowledge Helpers", () => {
   let mockDb: any;
@@ -34,6 +34,30 @@ describe("Market Intelligence Knowledge Helpers", () => {
               return {
                 results: [
                   { id: 77, title: "NVIDIA Chip Surge", symbol: "NVDA", source: "gemini_spark" },
+                ],
+              };
+            }
+            if (sql.includes("FROM watchlist")) {
+              if (sql.includes("WHERE (w.is_active = 1")) {
+                return {
+                  results: [
+                    { symbol: "AAPL", name: "Apple", is_active: 1 },
+                    { symbol: "MSFT", name: "Microsoft", is_active: 1 },
+                  ],
+                };
+              }
+              return {
+                results: [
+                  { symbol: "AAPL", name: "Apple", is_active: 1 },
+                  { symbol: "MSFT", name: "Microsoft", is_active: 1 },
+                  { symbol: "NFLX", name: "Netflix", is_active: 0 },
+                ],
+              };
+            }
+            if (sql.includes("FROM knowledge_base")) {
+              return {
+                results: [
+                  { id: 1, title: "Warren Buffett Principles", category: "warren_buffett", content: "Margin of safety" }
                 ],
               };
             }
@@ -136,6 +160,59 @@ describe("Market Intelligence Knowledge Helpers", () => {
       expect(articles.length).toBe(1);
       const select = executedSql.find((e) => e.sql.includes("WHERE source = ?"));
       expect(select?.binds).toEqual(["gemini_spark", 5]);
+    });
+  });
+
+  describe("getWatchlist", () => {
+    it("returns all watchlist symbols by default (including inactive)", async () => {
+      const items = await getWatchlist(mockEnv);
+      expect(items.length).toBe(3);
+      expect(items.map((i: any) => i.symbol)).toEqual(["AAPL", "MSFT", "NFLX"]);
+      const query = executedSql.find((e) => e.sql.includes("FROM watchlist w"));
+      expect(query?.sql).not.toContain("WHERE (w.is_active = 1");
+    });
+
+    it("filters only active watchlist symbols when activeOnly is true", async () => {
+      const items = await getWatchlist(mockEnv, { activeOnly: true });
+      expect(items.length).toBe(2);
+      expect(items.map((i: any) => i.symbol)).toEqual(["AAPL", "MSFT"]);
+      const query = executedSql.find((e) => e.sql.includes("WHERE (w.is_active = 1"));
+      expect(query).toBeDefined();
+    });
+
+    it("falls back to SELECT * FROM watchlist when joined query errors", async () => {
+      mockDb.prepare = vi.fn().mockImplementation((sql: string) => {
+        if (sql.includes("LEFT JOIN market_stats")) {
+          throw new Error("column not found");
+        }
+        return {
+          all: vi.fn().mockResolvedValue({
+            results: [{ symbol: "AAPL" }, { symbol: "MSFT" }, { symbol: "NFLX" }],
+          }),
+        };
+      });
+
+      const items = await getWatchlist(mockEnv);
+      expect(items.length).toBe(3);
+      expect(mockDb.prepare).toHaveBeenCalledWith("SELECT * FROM watchlist ORDER BY symbol ASC");
+    });
+  });
+
+  describe("searchKnowledge", () => {
+    it("returns knowledge base items when query does not include watchlist", async () => {
+      const results = await searchKnowledge(mockEnv, "margin");
+      expect(results.length).toBe(1);
+      expect(results[0].title).toBe("Warren Buffett Principles");
+    });
+
+    it("injects user watchlist when query includes watchlist", async () => {
+      const results = await searchKnowledge(mockEnv, "watchlist");
+      expect(results.length).toBe(2); // 1 from knowledge_base + 1 injected watchlist
+      const watchlistResult = results.find((r: any) => r.category === "watchlist") as any;
+      expect(watchlistResult).toBeDefined();
+      expect(watchlistResult.title).toBe("User Watchlist");
+      expect(watchlistResult.symbols).toEqual(["AAPL", "MSFT", "NFLX"]);
+      expect(watchlistResult.content).toContain("Watchlist contains 3 symbols");
     });
   });
 });
