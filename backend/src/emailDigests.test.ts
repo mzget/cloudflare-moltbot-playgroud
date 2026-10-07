@@ -24,6 +24,7 @@ describe('Email Digests API', () => {
                 results: [
                   {
                     id: 1,
+                    source_type: 'email_digest',
                     category: 'Technology & AI',
                     summary: 'AI developments summary',
                     key_takeaways: '["takeaway 1"]',
@@ -140,6 +141,10 @@ describe('Email Digests API', () => {
       const data = (await res.json()) as any[];
       expect(data).toHaveLength(1);
       expect(data[0].id).toBe(1);
+      expect(data[0].source_type).toBe('email_digest');
+      expect(mockDb.prepare).toHaveBeenCalledWith(
+        expect.stringContaining("'email_digest' as source_type")
+      );
       expect(mockDb.prepare).toHaveBeenCalledWith(
         expect.stringContaining('WHERE COALESCE(e.is_readed, 0) = 0')
       );

@@ -59,6 +59,7 @@ describe('Facebook Notebook Article & Publishing Pipeline', () => {
                 results: [
                   {
                     id: 1,
+                    source_type: 'notebook_article',
                     title: 'NVIDIA AI Revenue Surge',
                     symbol: 'NVDA',
                     summary: 'Summary text',
@@ -197,12 +198,13 @@ describe('Facebook Notebook Article & Publishing Pipeline', () => {
   });
 
   describe('GET /api/notebook-articles', () => {
-    it('returns source, category, url, and auto_publish fields', async () => {
+    it('returns source, category, url, auto_publish, and source_type fields', async () => {
       const req = new Request('http://localhost/api/notebook-articles');
       const res = await worker.fetch(req, mockEnv);
       expect(res.status).toBe(200);
       const items = (await res.json()) as any[];
       expect(items.length).toBe(1);
+      expect(items[0].source_type).toBe('notebook_article');
       expect(items[0].source).toBe('gemini_spark');
       expect(items[0].category).toBe('Tech & Semiconductors');
       expect(items[0].auto_publish).toBe(0);

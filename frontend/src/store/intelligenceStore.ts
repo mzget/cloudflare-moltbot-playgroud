@@ -10,6 +10,7 @@ export interface EmailSource {
 
 export interface EmailDigest {
   id: number;
+  source_type?: 'email_digest';
   category: string;
   summary: string;
   key_takeaways: string; // JSON string of array
@@ -22,10 +23,40 @@ export interface EmailDigest {
   facebook_error?: string | null;
 }
 
+export interface NotebookArticle {
+  id: number;
+  source_type?: 'notebook_article';
+  title: string;
+  symbol: string | null;
+  summary: string | null;
+  key_takeaways: string;
+  source?: string | null;
+  category?: string | null;
+  url?: string | null;
+  auto_publish?: number | null;
+  created_at: number;
+  facebook_status?: 'pending' | 'processing' | 'posted' | 'failed' | null;
+  facebook_post_id?: string | null;
+  facebook_error?: string | null;
+}
+
+export interface DailyReport {
+  id: number;
+  source_type?: 'daily_report';
+  symbol: string;
+  summary?: string;
+  key_takeaways?: string;
+  sentiment_score?: number;
+  report_date?: string;
+  is_readed?: number;
+  created_at?: string;
+  [key: string]: any;
+}
+
 interface IntelligenceStore {
-  reports: any[];
+  reports: DailyReport[];
   digests: EmailDigest[];
-  notebookArticles: any[];
+  notebookArticles: NotebookArticle[];
   loading: boolean;
   initialized: boolean;
   fetchReports: () => Promise<void>;
@@ -54,9 +85,15 @@ export const useIntelligenceStore = create<IntelligenceStore>((set, get) => ({
         fetch(`${API_BASE_URL}/api/notebook-articles`),
       ]);
 
-      const reports = reportsRes.ok ? (await reportsRes.json()) as any[] : [];
-      const digests = digestsRes.ok ? (await digestsRes.json()) as EmailDigest[] : [];
-      const notebookArticles = articlesRes.ok ? (await articlesRes.json()) as any[] : [];
+      const reports = reportsRes.ok
+        ? ((await reportsRes.json()) as any[]).map(r => ({ ...r, source_type: r.source_type || 'daily_report' }))
+        : [];
+      const digests = digestsRes.ok
+        ? ((await digestsRes.json()) as EmailDigest[]).map(d => ({ ...d, source_type: d.source_type || 'email_digest' }))
+        : [];
+      const notebookArticles = articlesRes.ok
+        ? ((await articlesRes.json()) as any[]).map(a => ({ ...a, source_type: a.source_type || 'notebook_article' }))
+        : [];
 
       set({ reports, digests, notebookArticles, loading: false, initialized: true });
     } catch (e) {

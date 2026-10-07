@@ -7,7 +7,7 @@ const content = new Hono<AppEnv>();
 // API: Get Latest Reports (One per symbol) / Purge Old Reports
 content.get('/api/reports', async (c) => {
   const { results } = await c.env.DB.prepare(`
-		SELECT m.*
+		SELECT m.*, 'daily_report' as source_type
 		FROM (SELECT DISTINCT symbol FROM daily_reports) s
 		JOIN daily_reports m ON m.id IN (
 			SELECT id FROM daily_reports

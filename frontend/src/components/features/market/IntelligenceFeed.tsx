@@ -6,6 +6,16 @@ import NotebookArticleCard from './NotebookArticleCard';
 import { glassStyle } from '../../../styles/glass';
 import MarketEventsTimeline from './MarketEventsTimeline';
 
+export type IntelligenceSourceType = 'daily_report' | 'email_digest' | 'notebook_article';
+
+export interface FeedItem {
+  id: number;
+  source_type: IntelligenceSourceType;
+  created_at?: number | string;
+  is_readed?: number;
+  [key: string]: any;
+}
+
 export default function IntelligenceFeed({
   reports,
   digests = [],
@@ -33,23 +43,32 @@ export default function IntelligenceFeed({
     return digests.filter(d => d.is_readed !== 1).length;
   }, [digests]);
 
-  const getReportTime = (item: any) => {
-    if (item.title || item.facebook_status !== undefined) {
-      // Notebook article (created_at is a timestamp in seconds)
-      return item.created_at ? item.created_at * 1000 : 0;
-    } else if (item.symbol) {
+  const getReportTime = (item: FeedItem) => {
+    if (item.source_type === 'daily_report') {
       // Symbol report (created_at is a string "YYYY-MM-DD HH:MM:SS" in UTC)
-      const utcStr = item.created_at ? item.created_at.replace(' ', 'T') + 'Z' : '';
+      const utcStr = item.created_at ? String(item.created_at).replace(' ', 'T') + 'Z' : '';
       return utcStr ? new Date(utcStr).getTime() : 0;
-    } else {
-      // Email digest (created_at is a timestamp in seconds)
-      return item.created_at ? item.created_at * 1000 : 0;
     }
+    // Notebook article and Email digest (created_at is a timestamp in seconds)
+    return item.created_at ? Number(item.created_at) * 1000 : 0;
   };
 
   // Combine and sort: unread first (newest), then read items last
   const combinedFeed = React.useMemo(() => {
-    const items = [...reports, ...digests, ...notebookArticles];
+    const taggedReports = (reports || []).map((r): FeedItem => ({
+      ...r,
+      source_type: r.source_type || 'daily_report',
+    }));
+    const taggedDigests = (digests || []).map((d): FeedItem => ({
+      ...d,
+      source_type: d.source_type || 'email_digest',
+    }));
+    const taggedArticles = (notebookArticles || []).map((a): FeedItem => ({
+      ...a,
+      source_type: a.source_type || 'notebook_article',
+    }));
+
+    const items = [...taggedReports, ...taggedDigests, ...taggedArticles];
     return items.sort((a, b) => {
       const aRead = (a.is_readed === 1) ? 1 : 0;
       const bRead = (b.is_readed === 1) ? 1 : 0;
@@ -58,12 +77,12 @@ export default function IntelligenceFeed({
     });
   }, [reports, digests, notebookArticles]);
 
-  // Filter items
+  // Filter items strictly by source_type
   const filteredFeed = React.useMemo(() => {
     return combinedFeed.filter(item => {
-      if (filter === 'reports') return !!item.symbol && !item.title && item.facebook_status === undefined;
-      if (filter === 'digests') return !!item.category;
-      if (filter === 'articles') return !!item.title || item.facebook_status !== undefined;
+      if (filter === 'reports') return item.source_type === 'daily_report';
+      if (filter === 'digests') return item.source_type === 'email_digest';
+      if (filter === 'articles') return item.source_type === 'notebook_article';
       return true;
     });
   }, [combinedFeed, filter]);
@@ -221,20 +240,34 @@ export default function IntelligenceFeed({
       ) : (
         <Stack spacing={4}>
           {filteredFeed.map((item) => {
-            if (item.title !== undefined) {
+            if (item.source_type === 'notebook_article') {
               return (
                 <NotebookArticleCard
                   key={`article-${item.id}`}
-                  article={item}
+                  article={item as any}
                   onQueueFacebook={onArticleQueueFacebook}
                   onPublishNow={onArticlePublishNow}
                 />
               );
-            } else if (item.symbol) {
-              return <DailyReportCard key={`report-${item.id}`} report={item} onMarkAsRead={onReportRead} />;
-            } else {
-              return <EmailDigestCard key={`digest-${item.id}`} digest={item} onMarkAsRead={onDigestRead} onQueueFacebook={onDigestQueueFacebook} />;
+            } else if (item.source_type === 'daily_report') {
+              return (
+                <DailyReportCard
+                  key={`report-${item.id}`}
+                  report={item}
+                  onMarkAsRead={onReportRead}
+                />
+              );
+            } else if (item.source_type === 'email_digest') {
+              return (
+                <EmailDigestCard
+                  key={`digest-${item.id}`}
+                  digest={item as any}
+                  onMarkAsRead={onDigestRead}
+                  onQueueFacebook={onDigestQueueFacebook}
+                />
+              );
             }
+            return null;
           })}
         </Stack>
       )}

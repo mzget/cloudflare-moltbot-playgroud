@@ -177,6 +177,7 @@ gmail.get('/api/email-digests', async (c) => {
     const { results } = await c.env.DB.prepare(`
       SELECT 
         e.id, 
+        'email_digest' as source_type,
         e.category, 
         e.summary, 
         e.key_takeaways, 
@@ -205,6 +206,7 @@ gmail.get('/api/notebook-articles', async (c) => {
     const { results } = await c.env.DB.prepare(`
       SELECT 
         n.id, 
+        'notebook_article' as source_type,
         n.title, 
         n.symbol, 
         n.summary, 
