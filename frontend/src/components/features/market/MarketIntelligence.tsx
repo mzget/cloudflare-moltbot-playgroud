@@ -12,6 +12,8 @@ export default function MarketIntelligence() {
     onDigestQueueFacebook,
     onArticleQueueFacebook,
     onArticlePublishNow,
+    onArticleDelete,
+    onArticleRead,
     onReportRead,
   } = useIntelligenceStore();
 
@@ -25,6 +27,8 @@ export default function MarketIntelligence() {
       onDigestQueueFacebook={onDigestQueueFacebook}
       onArticleQueueFacebook={onArticleQueueFacebook}
       onArticlePublishNow={onArticlePublishNow}
+      onArticleDelete={onArticleDelete}
+      onArticleRead={onArticleRead}
       onReportRead={onReportRead}
     />
   );

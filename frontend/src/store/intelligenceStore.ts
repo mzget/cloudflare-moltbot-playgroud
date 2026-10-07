@@ -35,6 +35,7 @@ export interface NotebookArticle {
   url?: string | null;
   auto_publish?: number | null;
   created_at: number;
+  is_readed?: number;
   facebook_status?: 'pending' | 'processing' | 'posted' | 'failed' | null;
   facebook_post_id?: string | null;
   facebook_error?: string | null;
@@ -64,6 +65,8 @@ interface IntelligenceStore {
   onDigestQueueFacebook: (id: number) => Promise<void>;
   onArticleQueueFacebook: (id: number) => Promise<void>;
   onArticlePublishNow: (id: number) => Promise<{ success: boolean; error?: string }>;
+  onArticleDelete: (id: number) => Promise<void>;
+  onArticleRead: (id: number) => Promise<void>;
   onReportRead: (id: number) => Promise<void>;
 }
 
@@ -188,6 +191,44 @@ export const useIntelligenceStore = create<IntelligenceStore>((set, get) => ({
       }));
       await get().fetchReports();
       return { success: false, error: e.message };
+    }
+  },
+
+  onArticleDelete: async (id: number) => {
+    // Optimistic UI update: remove article immediately
+    set(state => ({
+      notebookArticles: state.notebookArticles.filter(a => a.id !== id)
+    }));
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/notebook-articles/${id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+    } catch (e) {
+      console.error("Failed to delete notebook article:", e);
+      await get().fetchReports();
+    }
+  },
+
+  onArticleRead: async (id: number) => {
+    // Optimistic UI update: mark article as read immediately
+    set(state => ({
+      notebookArticles: state.notebookArticles.map(a => a.id === id ? { ...a, is_readed: 1 } : a)
+    }));
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/notebook-articles/mark-read`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+      if (!res.ok) {
+        throw new Error(await res.text());
+      }
+    } catch (e) {
+      console.error("Failed to mark notebook article as read:", e);
+      await get().fetchReports();
     }
   },
 

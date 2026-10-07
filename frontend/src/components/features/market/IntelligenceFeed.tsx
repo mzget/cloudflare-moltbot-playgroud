@@ -25,7 +25,9 @@ export default function IntelligenceFeed({
   onReportRead,
   onDigestQueueFacebook,
   onArticleQueueFacebook,
-  onArticlePublishNow
+  onArticlePublishNow,
+  onArticleDelete,
+  onArticleRead
 }: {
   reports: any[];
   digests?: any[];
@@ -36,12 +38,18 @@ export default function IntelligenceFeed({
   onDigestQueueFacebook?: (id: number) => void;
   onArticleQueueFacebook?: (id: number) => Promise<void>;
   onArticlePublishNow?: (id: number) => Promise<{ success: boolean; error?: string }>;
+  onArticleDelete?: (id: number) => Promise<void>;
+  onArticleRead?: (id: number) => void;
 }) {
   const [filter, setFilter] = React.useState<'all' | 'reports' | 'digests' | 'articles'>('all');
 
   const unreadCount = React.useMemo(() => {
     return digests.filter(d => d.is_readed !== 1).length;
   }, [digests]);
+
+  const unreadArticlesCount = React.useMemo(() => {
+    return (notebookArticles || []).filter(a => a.is_readed !== 1).length;
+  }, [notebookArticles]);
 
   const getReportTime = (item: FeedItem) => {
     if (item.source_type === 'daily_report') {
@@ -214,7 +222,22 @@ export default function IntelligenceFeed({
                 '&:hover': { bgcolor: filter === 'articles' ? 'background.surface' : 'background.level2' }
               }}
             >
-              Articles & Analyses
+              <Badge
+                badgeContent={unreadArticlesCount}
+                color="danger"
+                variant="solid"
+                size="sm"
+                invisible={unreadArticlesCount === 0}
+                sx={{
+                  '& .MuiBadge-badge': {
+                    right: -15,
+                    top: -2,
+                    boxShadow: '0 0 8px rgba(225, 29, 72, 0.5)',
+                  }
+                }}
+              >
+                Articles & Analyses
+              </Badge>
             </Button>
           </ButtonGroup>
         </Box>
@@ -247,6 +270,8 @@ export default function IntelligenceFeed({
                   article={item as any}
                   onQueueFacebook={onArticleQueueFacebook}
                   onPublishNow={onArticlePublishNow}
+                  onDelete={onArticleDelete}
+                  onMarkAsRead={onArticleRead}
                 />
               );
             } else if (item.source_type === 'daily_report') {

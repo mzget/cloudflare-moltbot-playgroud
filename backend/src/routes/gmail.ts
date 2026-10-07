@@ -215,6 +215,7 @@ gmail.get('/api/notebook-articles', async (c) => {
         n.category,
         n.url,
         COALESCE(n.auto_publish, 0) as auto_publish,
+        COALESCE(n.is_readed, 0) as is_readed,
         CAST(strftime('%s', n.created_at) as INTEGER) as created_at,
         f.status as facebook_status,
         f.facebook_post_id,
@@ -225,6 +226,37 @@ gmail.get('/api/notebook-articles', async (c) => {
       LIMIT 50
     `).all();
     return c.json(results || []);
+  } catch (e) {
+    return c.json({ error: (e as any).message }, 500);
+  }
+});
+
+// API: Mark Notebook Article as Read
+gmail.post('/api/notebook-articles/mark-read', async (c) => {
+  try {
+    const { id } = await c.req.json() as any;
+    if (!id || isNaN(Number(id))) {
+      return c.json({ error: 'Missing or invalid article ID' }, 400);
+    }
+    const result = await c.env.DB.prepare(
+      'UPDATE notebook_articles SET is_readed = 1 WHERE id = ?'
+    ).bind(Number(id)).run();
+    return c.json({ success: true, message: 'Article marked as read', changes: result.meta?.changes ?? 0 });
+  } catch (e) {
+    return c.json({ error: (e as any).message }, 500);
+  }
+});
+
+// API: Delete Notebook Article
+gmail.delete('/api/notebook-articles/:id', async (c) => {
+  try {
+    const id = Number(c.req.param('id'));
+    if (!id || isNaN(id) || id <= 0) {
+      return c.json({ error: 'Missing or invalid article ID' }, 400);
+    }
+    await c.env.DB.prepare('DELETE FROM notebook_articles WHERE id = ?').bind(id).run();
+    await c.env.DB.prepare("DELETE FROM facebook_posts WHERE source_type = 'notebook_article' AND source_id = ?").bind(id).run();
+    return c.json({ success: true, message: 'Article deleted successfully' });
   } catch (e) {
     return c.json({ error: (e as any).message }, 500);
   }
