@@ -8,6 +8,7 @@ import {
   getKnowledgeByCategory, 
   searchKnowledge, 
   getLatestAnalysisReport,
+  getWatchlist,
   saveMarketArticle,
   createFacebookDraft,
   getRecentArticles
@@ -24,7 +25,7 @@ export class OaktreeMCP extends McpAgent {
     // Register MCP Tools
     this.server.tool(
       "get_portfolio",
-      "Get all portfolio holdings, their weights, and investment thesis.",
+      "Get all current portfolio holdings (19 symbols), their shares, weights, and investment thesis. NOTE: This is the user's actual portfolio holdings, NOT the watchlist. For watchlist stocks (24 symbols), call 'get_watchlist' instead.",
       {},
       async () => asText(await getPortfolio(this.env as any))
     );
@@ -45,8 +46,8 @@ export class OaktreeMCP extends McpAgent {
 
     this.server.tool(
       "search_knowledge",
-      "Search the knowledge base for a specific term.",
-      { query: z.string() },
+      "Search the knowledge base and watchlist for a specific term.",
+      { query: z.string().describe("Search term, e.g. 'margin of safety', 'moat', 'watchlist', or a framework name") },
       async ({ query }: any) => asText(await searchKnowledge(this.env as any, query))
     );
 
@@ -55,6 +56,15 @@ export class OaktreeMCP extends McpAgent {
       "Get the latest value investor deep analysis report for a stock symbol.",
       { symbol: z.string().describe("The stock symbol to fetch the analysis report for (e.g. AAPL)") },
       async ({ symbol }: any) => asText(await getLatestAnalysisReport(this.env as any, symbol))
+    );
+
+    this.server.tool(
+      "get_watchlist",
+      "Get all stock symbols in the user's watchlist (24 symbols total), with company names, sectors, target prices, current prices, PE ratios, and active status.",
+      {
+        active_only: z.boolean().optional().describe("If true, returns only active watchlist symbols (21 symbols). If false or omitted, returns all 24 symbols in the watchlist.")
+      },
+      async ({ active_only }: any) => asText(await getWatchlist(this.env as any, { activeOnly: active_only }))
     );
 
     this.server.tool(

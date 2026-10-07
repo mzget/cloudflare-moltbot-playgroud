@@ -65,8 +65,25 @@ export async function getKnowledgeByCategory(env: Env, category: string) {
 }
 
 export async function searchKnowledge(env: Env, query: string) {
+  const normalizedQuery = (query || "").trim().toLowerCase();
   const likeQuery = `%${query}%`;
   const { results } = await env.DB.prepare('SELECT * FROM knowledge_base WHERE title LIKE ? OR content LIKE ?').bind(likeQuery, likeQuery).all();
+
+  // If query searches for watchlist, include user's watchlist symbols and details
+  if (normalizedQuery.includes("watchlist") || normalizedQuery === "watch list") {
+    const watchlist = await getWatchlist(env);
+    return [
+      ...results,
+      {
+        category: "watchlist",
+        title: "User Watchlist",
+        content: `User Watchlist contains ${watchlist.length} symbols: ${watchlist.map((w: any) => w.symbol).join(", ")}`,
+        symbols: watchlist.map((w: any) => w.symbol),
+        items: watchlist,
+      }
+    ];
+  }
+
   return results;
 }
 
@@ -78,8 +95,9 @@ export async function getLatestAnalysisReport(env: any, symbol: string) {
   return result;
 }
 
-export async function getWatchlist(env: Env) {
+export async function getWatchlist(env: Env, options?: { activeOnly?: boolean }) {
   try {
+    const activeCondition = options?.activeOnly ? 'WHERE (w.is_active = 1 OR w.is_active IS NULL)' : '';
     const { results } = await env.DB.prepare(`
       SELECT 
         w.symbol,
@@ -87,18 +105,20 @@ export async function getWatchlist(env: Env) {
         w.sector,
         w.target_price,
         w.thesis,
+        COALESCE(w.is_active, 1) as is_active,
         m.price as current_price,
         m.pe_ratio,
         m.fifty_two_week_high,
         m.fifty_two_week_low
       FROM watchlist w
       LEFT JOIN market_stats m ON w.symbol = m.symbol
-      WHERE w.is_active = 1 OR w.is_active IS NULL
+      ${activeCondition}
+      ORDER BY w.symbol ASC
     `).all();
     return results;
   } catch (error) {
     try {
-      const { results } = await env.DB.prepare('SELECT * FROM watchlist').all();
+      const { results } = await env.DB.prepare('SELECT * FROM watchlist ORDER BY symbol ASC').all();
       return results;
     } catch (e) {
       console.error('Failed to query watchlist:', e);
