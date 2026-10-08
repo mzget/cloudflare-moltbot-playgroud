@@ -90,3 +90,87 @@ When executing CLI/SQL database operations or seeding DCF scenario data:
 - **Saved Scenario Loading**: When switching to a scenario that has a saved calculation in D1, auto-populate the sliders and recalculate intrinsic price immediately.
 - **Status Badges**: Render visual status indicators (e.g. `🟢 ($245.50)` for saved vs `⚪ (ยังไม่ได้ประเมิน)` for unsaved) on preset buttons and inside dropdown options.
 - **Input Field Dimensions**: Projection table input fields must maintain a minimum width of `85px` to prevent text truncation/ellipsis.
+
+---
+
+## 🤖 External Agent MCP Integration (Gemini Spark / Gemini App)
+
+External AI agents (such as Google Gemini Spark or Gemini App) that compute DCF models from SEC 10-K/10-Q filings can directly persist and retrieve models via the `oaktree-mcp` server.
+
+### 1. Ingest Scenarios: `save_dcf_scenarios`
+Saves 1 to 3 scenarios in an atomic batch.
+
+```json
+{
+  "symbol": "NVDA",
+  "sync_target_price": false,
+  "scenarios": [
+    {
+      "scenario_name": "Base Case",
+      "mode": "detailed",
+      "base_revenue": 130.5,
+      "shares_outstanding": 24500,
+      "net_cash": 28.5,
+      "wacc": 10.5,
+      "terminal_growth": 3.0,
+      "tax_rate": 21.0,
+      "exit_multiple": 25.0,
+      "target_shares": 24500,
+      "implied_share_price": 142.50,
+      "yearly_growth": [35, 25, 20, 15, 12],
+      "yearly_op_margin": [58, 59, 60, 60, 59],
+      "yearly_fcf_conv": [80, 80, 82, 85, 85],
+      "rationale": "Base case assumes sustained data center capex growth moderating over 5 years with steady gross margins.",
+      "source": "gemini_spark"
+    },
+    {
+      "scenario_name": "Bull Case",
+      "mode": "detailed",
+      "base_revenue": 130.5,
+      "shares_outstanding": 24500,
+      "net_cash": 28.5,
+      "wacc": 9.5,
+      "terminal_growth": 3.5,
+      "tax_rate": 21.0,
+      "exit_multiple": 28.0,
+      "target_shares": 24500,
+      "implied_share_price": 195.00,
+      "yearly_growth": [45, 35, 25, 20, 15],
+      "yearly_op_margin": [60, 62, 63, 63, 62],
+      "yearly_fcf_conv": [85, 85, 87, 88, 88],
+      "rationale": "Accelerated AI sovereign cloud adoption and networking attach rates push revenue and margins higher.",
+      "source": "gemini_spark"
+    },
+    {
+      "scenario_name": "Bear Case",
+      "mode": "detailed",
+      "base_revenue": 130.5,
+      "shares_outstanding": 24500,
+      "net_cash": 28.5,
+      "wacc": 11.5,
+      "terminal_growth": 2.5,
+      "tax_rate": 21.0,
+      "exit_multiple": 20.0,
+      "target_shares": 24500,
+      "implied_share_price": 95.20,
+      "yearly_growth": [20, 15, 10, 8, 5],
+      "yearly_op_margin": [52, 50, 48, 47, 46],
+      "yearly_fcf_conv": [75, 75, 75, 75, 75],
+      "rationale": "Hyperscaler capex digestion cycle and competitive pressure compress margins and growth.",
+      "source": "gemini_spark"
+    }
+  ]
+}
+```
+
+### 2. Inspect Existing DCF Model: `get_dcf_model`
+Retrieves saved scenarios, joins current market price, and returns margin of safety / upside-downside metrics.
+```json
+{
+  "symbol": "NVDA"
+}
+```
+
+### 3. List All Saved DCF Symbols: `list_dcf_symbols`
+Retrieves list of all evaluated stock symbols with latest valuations.
+

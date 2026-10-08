@@ -24,6 +24,9 @@
    - [`save_market_intelligence`](#7-save_market_intelligence)
    - [`create_facebook_post_draft`](#8-create_facebook_post_draft)
    - [`get_recent_intelligence`](#9-get_recent_intelligence)
+   - [`save_dcf_scenarios`](#10-save_dcf_scenarios)
+   - [`get_dcf_model`](#11-get_dcf_model)
+   - [`list_dcf_symbols`](#12-list_dcf_symbols)
 5. [Internal & Admin Endpoints เพิ่มเติม](#-internal--admin-endpoints-เพิ่มเติม)
 6. [รหัสข้อผิดพลาด (Error Codes & Troubleshooting)](#-รหัสข้อผิดพลาด-error-codes--troubleshooting)
 
@@ -526,6 +529,78 @@ curl -X POST "https://<YOUR_WORKER_DOMAIN>/mcp" \
   }
 ]
 ```
+
+---
+
+### 10. `save_dcf_scenarios`
+บันทึกผลลัพธ์ DCF Model ทั้ง 3 Scenarios (`Base Case`, `Bull Case`, `Bear Case`) ของหุ้นตัวใดตัวหนึ่งกลับเข้าสู่ฐานข้อมูล D1 (`dcf_calculations`) ในคราวเดียวแบบ Atomic Batch
+
+#### Parameters
+| Field | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `symbol` | `string` | **Yes** | รหัสย่อหุ้น (เช่น `NVDA`, `AAPL`) |
+| `sync_target_price` | `boolean` | No | หากเป็น `true` จะนำ `implied_share_price` ของ `Base Case` ไปอัปเดตเป็น `target_price` ใน Watchlist ให้อัตโนมัติ (Default: `false`) |
+| `scenarios` | `array` | **Yes** | รายการ Scenarios (1 ถึง 3 รายการ: Base Case, Bull Case, Bear Case) |
+
+**โครงสร้างภายในแต่ละ Scenario:**
+- `scenario_name` (*Required*): `'Base Case'` \| `'Bull Case'` \| `'Bear Case'`
+- `mode` (*Optional*): `'detailed'` (Default) หรือ `'uniform'`
+- `base_revenue` (*Required*): รายได้ตั้งต้น ($B)
+- `shares_outstanding` (*Required*): จำนวนหุ้นทั้งหมดในหน่วย **ล้านหุ้น ($M$)** (ห้ามใส่หน่วยพันล้าน เช่น หุ้น 15B ให้ใส่ 15000)
+- `net_cash` (*Optional*): เงินสดสุทธิ ($B) (Total Cash - Total Debt) (Default: `0`)
+- `wacc` (*Required*): อัตราคิดลด / WACC (%)
+- `terminal_growth` (*Required*): Perpetual growth rate (%) ต้องน้อยกว่า WACC
+- `tax_rate` (*Optional*): อัตราภาษีนิติบุคคล (%) (Default: `21`)
+- `exit_multiple` (*Optional*): 5-Year terminal exit multiple (Default: `20.0`)
+- `target_shares` (*Optional*): จำนวนหุ้นคาดการณ์ปีที่ 5 ($M)
+- `implied_share_price` (*Required*): มูลค่าหุ้นที่แท้จริงจากการคำนวณ ($)
+- `yearly_growth` (*Optional*): อัตราเติบโตของรายได้ 5 ปี `[yr1, yr2, yr3, yr4, yr5]` (%)
+- `yearly_op_margin` (*Optional*): อัตรากำไรจากการดำเนินงาน 5 ปี `[yr1, yr2, yr3, yr4, yr5]` (%)
+- `yearly_fcf_conv` (*Optional*): อัตราการแปลง FCF 5 ปี `[yr1, yr2, yr3, yr4, yr5]` (%)
+- `rationale` (*Optional*): คำอธิบายสมมติฐานและเหตุผลเบื้องหลังของ Scenario นี้
+- `source` (*Optional*): แหล่งที่มา (Default: `'gemini_spark'`)
+
+---
+
+### 11. `get_dcf_model`
+ดึงข้อมูลและสมมติฐาน DCF Model ทั้งหมดของหุ้นที่ระบุ พร้อมเปรียบเทียบกับราคาตลาดปัจจุบัน (`market_stats`) และคำนวณ Upside/Downside และ Margin of Safety ให้อัตโนมัติ
+
+#### Parameters
+| Field | Type | Required | Description |
+| :--- | :--- | :--- | :--- |
+| `symbol` | `string` | **Yes** | รหัสย่อหุ้น เช่น `NVDA` |
+
+#### Response Example
+```json
+{
+  "symbol": "NVDA",
+  "current_price": 125.40,
+  "scenarios": [
+    {
+      "scenario_name": "Base Case",
+      "implied_share_price": 142.50,
+      "upside_downside_pct": 13.64,
+      "margin_of_safety_pct": 12.00,
+      "mode": "detailed",
+      "wacc": 10.5,
+      "terminal_growth": 3.0,
+      "exit_multiple": 25.0,
+      "yearly_growth": [35, 25, 20, 15, 12],
+      "rationale": "Base case assumes sustained data center capex...",
+      "source": "gemini_spark",
+      "created_at": "2026-10-08 23:30:00"
+    }
+  ]
+}
+```
+
+---
+
+### 12. `list_dcf_symbols`
+ดึงรายชื่อหุ้นทั้งหมดที่มีการประเมินและบันทึกโมเดล DCF ไว้ในระบบ พร้อมสรุปราคาประเมิน Base Case และวันที่ประเมินล่าสุด
+
+#### Parameters
+*ไม่มีพารามิเตอร์*
 
 ---
 

@@ -12,11 +12,18 @@ const m = vi.hoisted(() => ({
   getRecentArticles: vi.fn(),
 }));
 
+const dcfMock = vi.hoisted(() => ({
+  saveDcfScenarios: vi.fn(),
+  getDcfModel: vi.fn(),
+  listDcfSymbols: vi.fn(),
+}));
+
 vi.mock("agents/mcp", () => ({ McpAgent: class { env: any = { id: "env" }; } }));
 vi.mock("@modelcontextprotocol/sdk/server/mcp.js", () => ({
   McpServer: class { tool = vi.fn(); },
 }));
 vi.mock("./knowledge", () => m);
+vi.mock("./dcfTools", () => dcfMock);
 
 import { OaktreeMCP } from "./mcpAgent";
 
@@ -29,7 +36,7 @@ async function setup() {
 const textOf = (res: any) => JSON.parse(res.content[0].text);
 
 describe("OaktreeMCP", () => {
-  it("registers all nine tools with descriptions", async () => {
+  it("registers all twelve tools with descriptions", async () => {
     const { tools } = await setup();
     expect([...tools.keys()]).toEqual([
       "get_portfolio",
@@ -41,6 +48,9 @@ describe("OaktreeMCP", () => {
       "save_market_intelligence",
       "create_facebook_post_draft",
       "get_recent_intelligence",
+      "save_dcf_scenarios",
+      "get_dcf_model",
+      "list_dcf_symbols",
     ]);
     for (const call of tools.values()) expect(typeof call[1]).toBe("string");
   });
@@ -87,6 +97,19 @@ describe("OaktreeMCP", () => {
 
     expect(textOf(await tools.get("get_recent_intelligence")![3]({ limit: 5, source: "gemini_spark" }))).toEqual([{ id: 1 }]);
     expect(m.getRecentArticles).toHaveBeenCalledWith(agent.env, 5, "gemini_spark");
+
+    dcfMock.saveDcfScenarios.mockResolvedValue({ success: true, symbol: "NVDA" });
+    dcfMock.getDcfModel.mockResolvedValue({ symbol: "NVDA", scenarios: [] });
+    dcfMock.listDcfSymbols.mockResolvedValue({ total_symbols: 1, symbols: [] });
+
+    expect(textOf(await tools.get("save_dcf_scenarios")![3]({ symbol: "NVDA", scenarios: [] }))).toEqual({ success: true, symbol: "NVDA" });
+    expect(dcfMock.saveDcfScenarios).toHaveBeenCalledWith(agent.env, { symbol: "NVDA", scenarios: [] });
+
+    expect(textOf(await tools.get("get_dcf_model")![3]({ symbol: "NVDA" }))).toEqual({ symbol: "NVDA", scenarios: [] });
+    expect(dcfMock.getDcfModel).toHaveBeenCalledWith(agent.env, "NVDA");
+
+    expect(textOf(await tools.get("list_dcf_symbols")![3]())).toEqual({ total_symbols: 1, symbols: [] });
+    expect(dcfMock.listDcfSymbols).toHaveBeenCalledWith(agent.env);
   });
 
   it("propagates knowledge errors to the MCP layer", async () => {

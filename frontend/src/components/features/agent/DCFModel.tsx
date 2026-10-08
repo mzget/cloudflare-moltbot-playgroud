@@ -2,7 +2,7 @@ import * as React from 'react';
 import {
   Box, Sheet, Typography, Stack, Slider, Input, Divider, Table,
   FormLabel, FormControl, Tooltip, Button, Chip, Tabs, TabList, Tab, Grid,
-  Select, Option
+  Select, Option, Textarea
 } from '@mui/joy';
 import { Calculator, Info } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
@@ -404,6 +404,8 @@ export default function DCFModel({ symbol }: DCFModelProps) {
   const [activePreset, setActivePreset] = React.useState<'base' | 'bear' | 'bull' | 'custom' | null>('base');
   const [hasSavedValuation, setHasSavedValuation] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
+  const [rationale, setRationale] = React.useState<string>('');
+  const [source, setSource] = React.useState<string>('manual');
 
   const fetchHistory = React.useCallback(async () => {
     try {
@@ -439,6 +441,9 @@ export default function DCFModel({ symbol }: DCFModelProps) {
       if (match.mode === 'uniform' || match.mode === 'detailed') {
         setMode(match.mode);
       }
+
+      setRationale(match.rationale || '');
+      setSource(match.source || 'manual');
 
       const gm = match.base_gross_margin || 0;
       const opex = match.opex_margin || 0;
@@ -521,6 +526,8 @@ export default function DCFModel({ symbol }: DCFModelProps) {
       setYearlyFcfConv([0, 0, 0, 0, 0]);
       setExitMultiple(0);
       setTargetShares(0);
+      setRationale('');
+      setSource('manual');
     }
   }, []);
 
@@ -695,6 +702,8 @@ export default function DCFModel({ symbol }: DCFModelProps) {
           yearlyGrowth,
           yearlyOpMargin,
           yearlyFcfConv,
+          rationale,
+          source: 'manual',
         }),
       });
 
@@ -955,6 +964,18 @@ export default function DCFModel({ symbol }: DCFModelProps) {
                 })}
               </Select>
             </FormControl>
+            <FormControl>
+              <FormLabel sx={{ fontSize: '0.75rem', fontWeight: 600 }}>Scenario Rationale / สมมติฐาน</FormLabel>
+              <Textarea
+                minRows={2}
+                maxRows={5}
+                size="sm"
+                placeholder="ระบุเหตุผลหรือสมมติฐานเบื้องหลังของ Scenario นี้..."
+                value={rationale}
+                onChange={(e) => setRationale(e.target.value)}
+                sx={{ background: 'rgba(255,255,255,0.03)', fontSize: '0.8rem' }}
+              />
+            </FormControl>
             <Button
               size="sm"
               color="primary"
@@ -1005,6 +1026,45 @@ export default function DCFModel({ symbol }: DCFModelProps) {
               </Stack>
             </Sheet>
           )}
+
+          {/* Scenario Rationale & AI Source Badge */}
+          {hasSavedValuation && (rationale || source !== 'manual') && (
+            <Sheet
+              sx={{
+                p: 2.5,
+                mb: 3,
+                borderRadius: '16px',
+                background: source === 'gemini_spark' || source === 'gemini_app'
+                  ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(168, 85, 247, 0.06) 100%)'
+                  : 'rgba(255,255,255,0.03)',
+                border: source === 'gemini_spark' || source === 'gemini_app'
+                  ? '1px solid rgba(168, 85, 247, 0.3)'
+                  : '1px solid rgba(255,255,255,0.08)',
+              }}
+            >
+              <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: rationale ? 1.5 : 0 }}>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  <Chip
+                    size="sm"
+                    variant="soft"
+                    color={source === 'gemini_spark' || source === 'gemini_app' ? 'primary' : 'neutral'}
+                    sx={{ fontWeight: 700, fontSize: '0.72rem' }}
+                  >
+                    {source === 'gemini_spark' ? '🤖 Gemini Spark' : source === 'gemini_app' ? '🤖 Gemini App' : '👤 Manual'}
+                  </Chip>
+                  <Typography level="title-sm" sx={{ fontWeight: 700, fontSize: '0.85rem' }}>
+                    {scenarioName} — Qualitative Rationale & Thesis
+                  </Typography>
+                </Stack>
+              </Stack>
+              {rationale ? (
+                <Typography level="body-sm" sx={{ lineHeight: 1.6, opacity: 0.9 }}>
+                  {rationale}
+                </Typography>
+              ) : null}
+            </Sheet>
+          )}
+
           {/* Key Output Cards */}
           <Box
             sx={{

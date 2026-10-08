@@ -39,3 +39,26 @@
 - **Pause Articles & Analyses (`pause_notebook_facebook`)**:
   A system-level kill switch in the Command Center (Facebook Page tab) that temporarily halts automated discovery and publishing of `notebook_articles` without interrupting general market news or custom post drafting.
 
+## DCF Valuation Subsystem (MCP Integration)
+
+### Terms & Concepts
+
+- **3 Preset Scenarios**:
+  The canonical three valuation scenarios managed per stock symbol: `Base Case` (primary baseline), `Bull Case` (optimistic forecast), and `Bear Case` (conservative downside margin). Each stock maintains at most 1 saved record per scenario name in `dcf_calculations`.
+
+- **Batch Scenario Ingestion (`save_dcf_scenarios`)**:
+  Atomic submission of 1 to 3 DCF preset scenarios from external agents (such as Google Gemini Spark) via Model Context Protocol. Replaces existing records using an atomic batch `DELETE` and `INSERT` protocol in Cloudflare D1.
+
+- **Detailed Forecast Mode**:
+  Granular year-by-year 5-year forecast arrays: `yearly_growth`, `yearly_op_margin`, and `yearly_fcf_conv` (representing FY+1 through FY+5), mapped to the Gordon Growth intrinsic valuation model.
+
+- **Scenario Rationale (`rationale`)**:
+  Qualitative thesis and narrative justifications explaining the strategic assumptions behind the growth projections, margins, and terminal exit multiples.
+
+- **Share Count Unit Standard**:
+  Strict requirement where `shares_outstanding` and `target_shares` must always be stated in **Millions ($M$)** (e.g., 15,000 for 15 Billion shares). Input values $< 50$ trigger automated validation rejection to eliminate 1,000x calculation errors.
+
+- **Valuation Inspection (`get_dcf_model` & `list_dcf_symbols`)**:
+  MCP query tools allowing AI agents to read back stored valuation metrics, compare intrinsic share prices against real-time market prices, and compute margin of safety metrics.
+
+
