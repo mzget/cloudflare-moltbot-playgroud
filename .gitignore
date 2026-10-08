@@ -47,6 +47,8 @@ coverage/
 .cache/
 
 .agents/skills/**
+!.agents/skills/grill-with-docs/
+!.agents/skills/grill-with-docs/**
 !.agents/skills/oaktree-frontend/
 !.agents/skills/oaktree-frontend/**
 !.agents/skills/oaktree-backend/
