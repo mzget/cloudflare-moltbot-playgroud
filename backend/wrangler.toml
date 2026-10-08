@@ -43,6 +43,6 @@ ALERT_EMAIL = "rattajak.n@gmail.com"
 
 [dev]
 port = 8787
-# reload trigger
+# migration 0040 recorded and applied
 
 
