@@ -134,42 +134,164 @@ export async function syncAndIngestEmails(env: Env): Promise<number> {
   }
 }
 
-async function runAiDigestWithRetry(env: Env, prompt: string, maxRetries = 2): Promise<any> {
-  const modelsToTry = [
-    env.default_ai_model,
-    env.facebook_summarize_model
-  ].filter(Boolean);
+function escapeHtml(str: string): string {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
-  let lastError: any;
+export function parseAndValidateDigests(responseText: string, emailId: string): any[] {
+  const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) {
+    throw new Error(`No JSON structure found in AI response for email ID: ${emailId}`);
+  }
 
-  for (const model of modelsToTry) {
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        if (attempt > 0) {
-          const delay = Math.pow(2, attempt - 1) * 1000;
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-
-        const response = await env.AI.run(model, {
-          messages: [
-            { role: 'user', content: prompt }
-          ],
-          max_tokens: 4096,
-          max_completion_tokens: 4096,
-          response_format: {
-            type: 'json_object'
+  let data: any;
+  try {
+    data = JSON.parse(jsonMatch[0]);
+  } catch (parseError) {
+    // Attempt parsing again by escaping raw newlines in string literals
+    let inString = false;
+    let escape = false;
+    let cleaned = '';
+    const rawJson = jsonMatch[0];
+    for (let k = 0; k < rawJson.length; k++) {
+      const char = rawJson[k];
+      if (char === '"' && !escape) {
+        inString = !inString;
+        cleaned += char;
+      } else if (char === '\\' && inString) {
+        escape = !escape;
+        cleaned += char;
+      } else {
+        if (inString && (char === '\n' || char === '\r')) {
+          if (char === '\n') {
+            cleaned += '\\n';
+          } else if (char === '\r') {
+            if (rawJson[k + 1] === '\n') {
+              // handled by next character
+            } else {
+              cleaned += '\\n';
+            }
           }
-        } as any);
+        } else {
+          cleaned += char;
+        }
+        escape = false;
+      }
+    }
+    data = JSON.parse(cleaned);
+  }
 
-        return response;
-      } catch (err: any) {
-        lastError = err;
-        console.warn(`[Workers AI] Attempt ${attempt + 1} failed for ${model}:`, err?.message || err);
+  const digests = data?.digests || [];
+  if (!Array.isArray(digests) || digests.length === 0) {
+    throw new Error(`AI response does not contain valid digests array for email ID: ${emailId}`);
+  }
+
+  const hasGibberish = digests.some((d: any) =>
+    isGibberishThai(d.summary) ||
+    (Array.isArray(d.key_takeaways) && d.key_takeaways.some(isGibberishThai))
+  );
+
+  if (hasGibberish) {
+    throw new Error(`AI generated corrupted/gibberish Thai text for email ID: ${emailId}`);
+  }
+
+  return digests;
+}
+
+export async function sendDigestFailureAlert(
+  env: Env,
+  email: { id: string; subject?: string; sender?: string },
+  errors: string[]
+): Promise<void> {
+  const recipient = env.ALERT_EMAIL || env.DESTINATION_EMAIL || env.EMAIL?.destination_address || 'rattajak.n@gmail.com';
+  if (!env.EMAIL || !recipient) {
+    console.warn('[EmailDigest] Cannot send failure alert email: env.EMAIL or recipient not configured.');
+    return;
+  }
+
+  try {
+    const { createMimeMessage } = await import('mimetext');
+    const msg = createMimeMessage();
+    msg.setSender({ name: 'Oaktree Agent', addr: 'agent@oaktree.internal' });
+    msg.setRecipient(recipient);
+    msg.setSubject(`[Oaktree Alert] Email Digest Failed: ${email.subject || email.id}`);
+
+    const errorDetails = (errors && errors.length > 0)
+      ? errors.map((err, idx) => `<li><strong>${idx === 0 ? 'Primary' : 'Fallback'}:</strong> ${escapeHtml(err)}</li>`).join('')
+      : '<li>Unknown error</li>';
+
+    const emailHtml = `
+      <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; line-height: 1.6; border: 1px solid #e1e8ed; border-radius: 8px; padding: 24px;">
+        <h2 style="color: #e74c3c; margin-top: 0;">⚠️ Email Digest Generation Failed</h2>
+        <p>Both primary and fallback AI models failed to summarize the following email newsletter:</p>
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+          <tr><td style="padding: 6px 0; font-weight: bold; width: 100px;">Subject:</td><td>${escapeHtml(email.subject || 'N/A')}</td></tr>
+          <tr><td style="padding: 6px 0; font-weight: bold;">Sender:</td><td>${escapeHtml(email.sender || 'N/A')}</td></tr>
+          <tr><td style="padding: 6px 0; font-weight: bold;">Email ID:</td><td><code>${escapeHtml(email.id)}</code></td></tr>
+          <tr><td style="padding: 6px 0; font-weight: bold;">Timestamp:</td><td>${new Date().toISOString()}</td></tr>
+        </table>
+        <h3 style="color: #4b5563; font-size: 16px;">Failure Details:</h3>
+        <ul style="background: #f8f9fa; padding: 16px 24px; border-radius: 6px; font-family: monospace; font-size: 13px; color: #c0392b;">
+          ${errorDetails}
+        </ul>
+        <p style="font-size: 13px; color: #6b7280; margin-top: 20px;">The email has been marked with status <code>processed = -1</code> to avoid blocking the queue. You can review or reprocess it via the Oaktree Agent dashboard.</p>
+      </div>
+    `;
+
+    msg.addMessage({
+      contentType: 'text/html',
+      data: emailHtml
+    });
+
+    await env.EMAIL.send(msg.asRaw());
+    console.log(`[EmailDigest] Alert email sent to ${recipient} for email ID: ${email.id}`);
+  } catch (err) {
+    console.error(`[EmailDigest] Failed to send failure alert email for ID: ${email.id}:`, err);
+  }
+}
+
+export async function generateDigestWithFallback(
+  env: Env,
+  prompt: string,
+  emailId: string
+): Promise<{ digests: any[]; errors: string[] }> {
+  const models = [env.default_ai_model, env.facebook_summarize_model].filter(Boolean);
+  const errors: string[] = [];
+
+  for (let i = 0; i < models.length; i++) {
+    const model = models[i];
+    const isPrimary = i === 0;
+    try {
+      console.log(`[EmailDigest] Attempting ${isPrimary ? 'primary' : 'fallback'} model: ${model}`);
+      const response = await env.AI.run(model, {
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 4096,
+        max_completion_tokens: 4096,
+        response_format: { type: 'json_object' }
+      } as any);
+
+      const responseText = (response as any).choices?.[0]?.message?.content || (response as any).response || '';
+      const digests = parseAndValidateDigests(responseText, emailId);
+      console.log(`[EmailDigest] Successfully generated ${digests.length} digest(s) with model: ${model}`);
+      return { digests, errors };
+    } catch (err: any) {
+      const errMsg = err?.message || String(err);
+      errors.push(`${model}: ${errMsg}`);
+      if (isPrimary && models.length > 1) {
+        console.warn(`[EmailDigest] Primary model ${model} failed: ${errMsg}. Switching immediately to fallback model without retry.`);
+      } else {
+        console.error(`[EmailDigest] Model ${model} failed: ${errMsg}`);
       }
     }
   }
 
-  throw lastError;
+  return { digests: [], errors };
 }
 
 export async function generateEmailDigests(env: Env, isManual = false): Promise<void> {
@@ -248,61 +370,9 @@ Email content:
 ${emailContext}
 `;
 
-      const response = await runAiDigestWithRetry(env, prompt);
+      const { digests, errors } = await generateDigestWithFallback(env, prompt, email.id);
 
-      let responseText = (response as any).choices?.[0]?.message?.content || response.response || "";
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-
-      if (jsonMatch) {
-        let data: any;
-        try {
-          data = JSON.parse(jsonMatch[0]);
-        } catch (parseError) {
-          // Attempt parsing again by escaping raw newlines in string literals
-          let inString = false;
-          let escape = false;
-          let cleaned = '';
-          const rawJson = jsonMatch[0];
-          for (let k = 0; k < rawJson.length; k++) {
-            const char = rawJson[k];
-            if (char === '"' && !escape) {
-              inString = !inString;
-              cleaned += char;
-            } else if (char === '\\' && inString) {
-              escape = !escape;
-              cleaned += char;
-            } else {
-              if (inString && (char === '\n' || char === '\r')) {
-                if (char === '\n') {
-                  cleaned += '\\n';
-                } else if (char === '\r') {
-                  if (rawJson[k + 1] === '\n') {
-                    // handled by next character
-                  } else {
-                    cleaned += '\\n';
-                  }
-                }
-              } else {
-                cleaned += char;
-              }
-              escape = false;
-            }
-          }
-          data = JSON.parse(cleaned);
-        }
-
-        const digests = data.digests || [];
-        console.log(`AI generated ${digests.length} digest(s) for email ID: ${email.id}`);
-
-        const hasGibberish = digests.some((d: any) =>
-          isGibberishThai(d.summary) ||
-          (Array.isArray(d.key_takeaways) && d.key_takeaways.some(isGibberishThai))
-        );
-
-        if (hasGibberish) {
-          throw new Error(`AI generated corrupted/gibberish Thai text for email ID: ${email.id}`);
-        }
-
+      if (digests.length > 0) {
         for (const digest of digests) {
           // Source is always the current email being processed
           const mappedSources = [{
@@ -329,28 +399,30 @@ ${emailContext}
 
         console.log(`Successfully processed email ID: ${email.id}`);
       } else {
-        console.error(`No JSON structure found in AI response for email ID: ${email.id}`);
-        console.error('Raw responseText:', responseText);
-        console.error('Raw response object:', JSON.stringify(response));
+        console.error(`Both primary and fallback models failed for email ID: ${email.id}. Errors: ${errors.join(' | ')}`);
 
-        // Mark as failed (processed = -1) so unparseable AI responses do not block the FIFO queue forever
+        // Mark as failed (processed = -1) so persistent AI errors do not block subsequent emails in the FIFO queue forever
         await env.DB.prepare(
           'UPDATE ingested_emails SET processed = -1 WHERE id = ?'
         ).bind(email.id).run();
-        console.warn(`[EmailDigest] Marked email ID: ${email.id} as failed (processed = -1) due to invalid AI response format.`);
+        console.warn(`[EmailDigest] Marked poison-pill email ID: ${email.id} as failed (processed = -1) after all models failed.`);
+
+        // Send alert email to ALERT_EMAIL
+        await sendDigestFailureAlert(env, email, errors);
       }
-    } catch (emailError) {
+    } catch (emailError: any) {
       console.error(`Error processing email ID: ${email.id}:`, emailError);
 
-      // Mark as failed (processed = -1) so persistent AI errors do not block subsequent emails in the FIFO queue forever
       try {
         await env.DB.prepare(
           'UPDATE ingested_emails SET processed = -1 WHERE id = ?'
         ).bind(email.id).run();
-        console.warn(`[EmailDigest] Marked poison-pill email ID: ${email.id} as failed (processed = -1) after all AI retries to unblock queue.`);
+        console.warn(`[EmailDigest] Marked poison-pill email ID: ${email.id} as failed (processed = -1) due to unexpected error.`);
       } catch (dbErr) {
         console.error(`Failed to mark email ID: ${email.id} as failed in DB:`, dbErr);
       }
+
+      await sendDigestFailureAlert(env, email, [emailError?.message || String(emailError)]);
     }
   }
 }
