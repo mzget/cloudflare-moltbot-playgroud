@@ -1,5 +1,5 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest';
-import { syncAndIngestEmails, generateEmailDigests, isGibberishThai } from './emailSummarizer';
+import { syncAndIngestEmails, generateEmailDigests, isGibberishThai, sendDigestFailureAlert, parseAndValidateDigests } from './emailSummarizer';
 import * as gmailModule from './gmail';
 
 vi.mock('./gmail', () => ({
@@ -60,7 +60,12 @@ describe('emailSummarizer', () => {
       GOOGLE_CLIENT_ID: 'test-client-id',
       GOOGLE_CLIENT_SECRET: 'test-client-secret',
       JWT_SECRET: 'test-jwt-secret',
-      default_ai_model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+      default_ai_model: '@cf/google/gemma-4-26b-a4b-it',
+      facebook_summarize_model: '@cf/meta/llama-4-scout-17b-16e-instruct',
+      ALERT_EMAIL: 'alert@example.com',
+      EMAIL: {
+        send: vi.fn().mockResolvedValue(undefined),
+      },
     };
   });
 
@@ -302,65 +307,7 @@ describe('emailSummarizer', () => {
       expect(mockAi.run).not.toHaveBeenCalled();
     });
 
-    it('retries on AI failure and succeeds on subsequent attempt', async () => {
-      const subsStmt = {
-        bind: vi.fn().mockReturnThis(),
-        all: vi.fn().mockResolvedValue({ results: [{ id: 1 }] }),
-      };
-
-      const emailsStmt = {
-        bind: vi.fn().mockReturnThis(),
-        all: vi.fn().mockResolvedValue({
-          results: [
-            {
-              id: 'email-retry-test',
-              subscription_id: 1,
-              sender: 'analyst@bloomberg.com',
-              subject: 'Market Update',
-              body_text: 'Body...',
-              received_at: '2026-10-01T01:00:00Z',
-              processed: 0,
-            },
-          ],
-        }),
-      };
-
-      const markProcessedStmt = {
-        bind: vi.fn().mockReturnThis(),
-        run: vi.fn().mockResolvedValue({ success: true }),
-      };
-
-      mockDb.prepare.mockImplementation((sql: string) => {
-        if (sql.includes('FROM email_subscriptions')) return subsStmt;
-        if (sql.includes('FROM ingested_emails WHERE processed = 0')) return emailsStmt;
-        if (sql.includes('INSERT INTO email_digests')) return { bind: vi.fn().mockReturnThis(), run: vi.fn().mockResolvedValue({ success: true }) };
-        if (sql.includes('UPDATE ingested_emails SET processed = 1')) return markProcessedStmt;
-        return { bind: vi.fn().mockReturnThis(), all: vi.fn(), run: vi.fn() };
-      });
-
-      // Fail once with Ai._parseError, then succeed
-      mockAi.run
-        .mockRejectedValueOnce(new Error('Ai._parseError: 3040 Capacity Exceeded'))
-        .mockResolvedValueOnce({
-          response: JSON.stringify({
-            digests: [
-              {
-                category: 'Macroeconomy',
-                summary: 'สรุปภาพรวมเศรษฐกิจ',
-                key_takeaways: ['ข้อคิดที่ 1'],
-                source_emails: ['email-retry-test'],
-              },
-            ],
-          }),
-        });
-
-      await generateEmailDigests(mockEnv);
-
-      expect(mockAi.run).toHaveBeenCalledTimes(2);
-      expect(markProcessedStmt.run).toHaveBeenCalledTimes(1);
-    });
-
-    it('falls back to facebook_summarize_model when default_ai_model fails all attempts', async () => {
+    it('falls back to facebook_summarize_model immediately without retry when default_ai_model fails', async () => {
       const subsStmt = {
         bind: vi.fn().mockReturnThis(),
         all: vi.fn().mockResolvedValue({ results: [{ id: 1 }] }),
@@ -396,17 +343,9 @@ describe('emailSummarizer', () => {
         return { bind: vi.fn().mockReturnThis(), all: vi.fn(), run: vi.fn() };
       });
 
-      const envWithFallback = {
-        ...mockEnv,
-        default_ai_model: '@cf/google/gemma-4-26b-a4b-it',
-        facebook_summarize_model: '@cf/meta/llama-4-scout-17b-16e-instruct',
-      };
-
-      // Fail default_ai_model (attempts 1, 2, 3), then succeed on fallback model
+      // Fail default_ai_model once, then succeed on fallback model immediately
       mockAi.run
-        .mockRejectedValueOnce(new Error('Ai._parseError on gemma attempt 1'))
-        .mockRejectedValueOnce(new Error('Ai._parseError on gemma attempt 2'))
-        .mockRejectedValueOnce(new Error('Ai._parseError on gemma attempt 3'))
+        .mockRejectedValueOnce(new Error('AiError: Service temporarily at capacity'))
         .mockResolvedValueOnce({
           response: JSON.stringify({
             digests: [
@@ -420,17 +359,26 @@ describe('emailSummarizer', () => {
           }),
         });
 
-      await generateEmailDigests(envWithFallback);
+      await generateEmailDigests(mockEnv);
 
-      expect(mockAi.run).toHaveBeenCalledTimes(4);
-      expect(mockAi.run).toHaveBeenLastCalledWith(
+      // Verify it called primary once, then fallback once (total 2 calls without retry)
+      expect(mockAi.run).toHaveBeenCalledTimes(2);
+      expect(mockAi.run).toHaveBeenNthCalledWith(
+        1,
+        '@cf/google/gemma-4-26b-a4b-it',
+        expect.objectContaining({ max_tokens: 4096 })
+      );
+      expect(mockAi.run).toHaveBeenNthCalledWith(
+        2,
         '@cf/meta/llama-4-scout-17b-16e-instruct',
         expect.objectContaining({ max_tokens: 4096 })
       );
       expect(markProcessedStmt.run).toHaveBeenCalledTimes(1);
+      // No alert email should be sent when fallback succeeds
+      expect(mockEnv.EMAIL.send).not.toHaveBeenCalled();
     });
 
-    it('marks email as failed (processed = -1) when all AI attempts fail, preventing queue deadlock', async () => {
+    it('marks email as failed (processed = -1) and sends alert email to ALERT_EMAIL when both models fail', async () => {
       const subsStmt = {
         bind: vi.fn().mockReturnThis(),
         all: vi.fn().mockResolvedValue({ results: [{ id: 1 }] }),
@@ -465,16 +413,20 @@ describe('emailSummarizer', () => {
         return { bind: vi.fn().mockReturnThis(), all: vi.fn(), run: vi.fn() };
       });
 
-      mockAi.run.mockRejectedValue(new Error('Ai._parseError: Cloudflare internal error'));
+      mockAi.run.mockRejectedValue(new Error('Cloudflare internal error'));
 
       await generateEmailDigests(mockEnv);
 
-      // Verify that the failed email is quarantined with processed = -1
+      // Verify each model was called exactly once without retry
+      expect(mockAi.run).toHaveBeenCalledTimes(2);
       expect(markFailedStmt.bind).toHaveBeenCalledWith('1a0ddeaacc54ff5e');
       expect(markFailedStmt.run).toHaveBeenCalledTimes(1);
+
+      // Verify alert email was sent
+      expect(mockEnv.EMAIL.send).toHaveBeenCalledTimes(1);
     });
 
-    it('marks email as failed (processed = -1) when AI response contains no JSON structure', async () => {
+    it('marks email as failed (processed = -1) and sends alert email when AI response contains no JSON structure across models', async () => {
       const subsStmt = {
         bind: vi.fn().mockReturnThis(),
         all: vi.fn().mockResolvedValue({ results: [{ id: 1 }] }),
@@ -513,11 +465,13 @@ describe('emailSummarizer', () => {
 
       await generateEmailDigests(mockEnv);
 
+      expect(mockAi.run).toHaveBeenCalledTimes(2);
       expect(markFailedStmt.bind).toHaveBeenCalledWith('email-no-json');
       expect(markFailedStmt.run).toHaveBeenCalledTimes(1);
+      expect(mockEnv.EMAIL.send).toHaveBeenCalledTimes(1);
     });
 
-    it('rejects AI response with gibberish/corrupted Thai text and marks email as failed', async () => {
+    it('rejects AI response with gibberish/corrupted Thai text across models and sends alert email', async () => {
       const subsStmt = {
         bind: vi.fn().mockReturnThis(),
         all: vi.fn().mockResolvedValue({ results: [{ id: 1 }] }),
@@ -558,7 +512,6 @@ describe('emailSummarizer', () => {
         return { bind: vi.fn().mockReturnThis(), all: vi.fn(), run: vi.fn() };
       });
 
-      // Mock AI returning corrupted/hallucinated Thai text with Mai Han-Akat + Sara Aa
       mockAi.run.mockResolvedValue({
         choices: [
           {
@@ -580,10 +533,102 @@ describe('emailSummarizer', () => {
 
       await generateEmailDigests(mockEnv);
 
-      // Verify that corrupted digest was NOT inserted into database
+      expect(mockAi.run).toHaveBeenCalledTimes(2);
       expect(insertDigestStmt.run).not.toHaveBeenCalled();
-      // Verify that the email was quarantined with processed = -1
       expect(markFailedStmt.bind).toHaveBeenCalledWith('email-gibberish');
+      expect(markFailedStmt.run).toHaveBeenCalledTimes(1);
+      expect(mockEnv.EMAIL.send).toHaveBeenCalledTimes(1);
+    });
+
+    it('handles failure alert email gracefully when EMAIL binding is missing', async () => {
+      const subsStmt = {
+        bind: vi.fn().mockReturnThis(),
+        all: vi.fn().mockResolvedValue({ results: [{ id: 1 }] }),
+      };
+
+      const emailsStmt = {
+        bind: vi.fn().mockReturnThis(),
+        all: vi.fn().mockResolvedValue({
+          results: [
+            {
+              id: 'email-no-email-binding',
+              subscription_id: 1,
+              sender: 'test@example.com',
+              subject: 'No Binding',
+              body_text: 'Body...',
+              received_at: '2026-10-01T01:00:00Z',
+              processed: 0,
+            },
+          ],
+        }),
+      };
+
+      const markFailedStmt = {
+        bind: vi.fn().mockReturnThis(),
+        run: vi.fn().mockResolvedValue({ success: true }),
+      };
+
+      mockDb.prepare.mockImplementation((sql: string) => {
+        if (sql.includes('FROM email_subscriptions')) return subsStmt;
+        if (sql.includes('FROM ingested_emails WHERE processed = 0')) return emailsStmt;
+        if (sql.includes('UPDATE ingested_emails SET processed = -1')) return markFailedStmt;
+        return { bind: vi.fn().mockReturnThis(), all: vi.fn(), run: vi.fn() };
+      });
+
+      mockAi.run.mockRejectedValue(new Error('AI failure'));
+
+      const envWithoutEmail = { ...mockEnv, EMAIL: undefined };
+      await generateEmailDigests(envWithoutEmail);
+
+      expect(markFailedStmt.run).toHaveBeenCalledTimes(1);
+    });
+
+    it('handles failure alert email gracefully when EMAIL.send throws', async () => {
+      const subsStmt = {
+        bind: vi.fn().mockReturnThis(),
+        all: vi.fn().mockResolvedValue({ results: [{ id: 1 }] }),
+      };
+
+      const emailsStmt = {
+        bind: vi.fn().mockReturnThis(),
+        all: vi.fn().mockResolvedValue({
+          results: [
+            {
+              id: 'email-send-fail',
+              subscription_id: 1,
+              sender: 'test@example.com',
+              subject: 'Send Fail',
+              body_text: 'Body...',
+              received_at: '2026-10-01T01:00:00Z',
+              processed: 0,
+            },
+          ],
+        }),
+      };
+
+      const markFailedStmt = {
+        bind: vi.fn().mockReturnThis(),
+        run: vi.fn().mockResolvedValue({ success: true }),
+      };
+
+      mockDb.prepare.mockImplementation((sql: string) => {
+        if (sql.includes('FROM email_subscriptions')) return subsStmt;
+        if (sql.includes('FROM ingested_emails WHERE processed = 0')) return emailsStmt;
+        if (sql.includes('UPDATE ingested_emails SET processed = -1')) return markFailedStmt;
+        return { bind: vi.fn().mockReturnThis(), all: vi.fn(), run: vi.fn() };
+      });
+
+      mockAi.run.mockRejectedValue(new Error('AI failure'));
+
+      const envWithThrowingEmail = {
+        ...mockEnv,
+        EMAIL: {
+          send: vi.fn().mockRejectedValue(new Error('SMTP connection failed')),
+        },
+      };
+
+      await generateEmailDigests(envWithThrowingEmail);
+
       expect(markFailedStmt.run).toHaveBeenCalledTimes(1);
     });
   });
