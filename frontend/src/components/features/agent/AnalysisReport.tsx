@@ -7,6 +7,8 @@ import { API_BASE_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
 import MarkdownRenderer from '../../common/MarkdownRenderer';
 import DCFModel from './DCFModel';
+import DebateCard from './DebateCard';
+
 
 interface AnalysisReportProps {
   symbol: string;
@@ -136,46 +138,82 @@ export default function AnalysisReport({ symbol, onBack, subTab }: AnalysisRepor
 
     if (!report) {
       return (
-        <Sheet sx={{ ...glassStyle, p: 4, minHeight: '300px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, textAlign: 'center' }}>
-          <Typography level="h3">{'\u0e22\u0e31\u0e07\u0e44\u0e21\u0e48\u0e21\u0e35\u0e1c\u0e25\u0e01\u0e32\u0e23\u0e27\u0e34\u0e40\u0e04\u0e23\u0e32\u0e30\u0e2b\u0e4c\u0e40\u0e0a\u0e34\u0e07\u0e25\u0e36\u0e01\u0e02\u0e2d\u0e07'} {symbol}</Typography>
-          <Typography level="body-md" sx={{ color: 'text.secondary', mb: 3, maxWidth: '600px' }}>
-            {'\u0e04\u0e25\u0e34\u0e01\u0e1b\u0e38\u0e48\u0e21\u0e14\u0e49\u0e32\u0e19\u0e25\u0e48\u0e32\u0e07\u0e40\u0e1e\u0e37\u0e48\u0e2d\u0e40\u0e23\u0e34\u0e48\u0e21\u0e01\u0e32\u0e23\u0e27\u0e34\u0e40\u0e04\u0e23\u0e32\u0e30\u0e2b\u0e4c\u0e40\u0e0a\u0e34\u0e07\u0e25\u0e36\u0e01\u0e14\u0e49\u0e27\u0e22'} Value Investing {'\u0e41\u0e1a\u0e1a\u0e2d\u0e31\u0e15\u0e42\u0e19\u0e21\u0e31\u0e15\u0e34'}
-          </Typography>
-          <Button size="lg" color="success" startDecorator={<Play size={18} />} onClick={handleRunAnalysis}>
-            {'\u0e40\u0e23\u0e34\u0e48\u0e21\u0e01\u0e32\u0e23\u0e27\u0e34\u0e40\u0e04\u0e23\u0e32\u0e30\u0e2b\u0e4c\u0e40\u0e0a\u0e34\u0e07\u0e25\u0e36\u0e01'}
-          </Button>
-        </Sheet>
+        <Box>
+          <DebateCard symbol={symbol} />
+          <Sheet sx={{ ...glassStyle, p: 4, minHeight: '300px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, textAlign: 'center' }}>
+            <Typography level="h3">{'ยังไม่มีผลการวิเคราะห์เชิงลึกของ'} {symbol}</Typography>
+            <Typography level="body-md" sx={{ color: 'text.secondary', mb: 3, maxWidth: '600px' }}>
+              {'คลิกปุ่มด้านล่างเพื่อเริ่มการวิเคราะห์เชิงลึกด้วย'} Value Investing {'แบบอัตโนมัติ'}
+            </Typography>
+            <Button size="lg" color="success" startDecorator={<Play size={18} />} loading={analyzing} onClick={handleRunAnalysis}>
+              {'เริ่มการวิเคราะห์เชิงลึก'}
+            </Button>
+          </Sheet>
+        </Box>
       );
     }
 
     const convictionColor = report.conviction_level === 'High' ? '#10b981' : report.conviction_level === 'Medium' ? '#eab308' : '#ef4444';
 
+    let initialDebate = null;
+    if (report.debate) {
+      initialDebate = report.debate;
+    } else if (report.framework_results) {
+      try {
+        const parsed = typeof report.framework_results === 'string' ? JSON.parse(report.framework_results) : report.framework_results;
+        initialDebate = parsed.debate || null;
+      } catch {
+        initialDebate = null;
+      }
+    }
+
     return (
-      <Sheet sx={{ ...glassStyle, p: 4 }}>
-        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
-          <Box>
-            <Typography level="h1" sx={{ fontSize: '2rem', fontWeight: 900 }}>
-              🌳 {symbol} Deep Value Analysis
-            </Typography>
-            <Typography level="body-xs" sx={{ opacity: 0.5, mt: 0.5 }}>
-              {'\u0e27\u0e34\u0e40\u0e04\u0e23\u0e32\u0e30\u0e2b\u0e4c\u0e25\u0e48\u0e32\u0e2a\u0e38\u0e14\u0e40\u0e21\u0e37\u0e48\u0e2d'}: {report.created_at}
-            </Typography>
-          </Box>
-          <Stack direction="row" spacing={1.5} alignItems="center">
-            <Box sx={{ px: 2, py: 1, borderRadius: '8px', border: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography level="body-sm" sx={{ opacity: 0.7 }}>{'\u0e23\u0e30\u0e14\u0e31\u0e1a\u0e04\u0e27\u0e32\u0e21\u0e40\u0e0a\u0e37\u0e48\u0e2d\u0e21\u0e31\u0e48\u0e19'}:</Typography>
-              <Typography level="title-sm" sx={{ color: convictionColor, fontWeight: 800 }}>{report.conviction_level}</Typography>
+      <Box>
+        <DebateCard
+          symbol={symbol}
+          initialDebate={initialDebate}
+          onDebateUpdated={(updatedDebate) => {
+            setReport((prev: any) => {
+              if (!prev) return prev;
+              let fw = {};
+              try {
+                fw = typeof prev.framework_results === 'string' ? JSON.parse(prev.framework_results) : (prev.framework_results || {});
+              } catch {}
+              return {
+                ...prev,
+                debate: updatedDebate,
+                framework_results: JSON.stringify({ ...fw, debate: updatedDebate })
+              };
+            });
+          }}
+        />
+
+        <Sheet sx={{ ...glassStyle, p: 4 }}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={2} sx={{ mb: 3 }}>
+            <Box>
+              <Typography level="h1" sx={{ fontSize: '2rem', fontWeight: 900 }}>
+                🌳 {symbol} Deep Value Analysis
+              </Typography>
+              <Typography level="body-xs" sx={{ opacity: 0.5, mt: 0.5 }}>
+                {'วิเคราะห์ล่าสุดเมื่อ'}: {report.created_at}
+              </Typography>
             </Box>
-            <Button size="sm" variant="soft" color="neutral" startDecorator={<RotateCw size={14} />} onClick={handleRunAnalysis}>
-              {'\u0e23\u0e31\u0e19\u0e27\u0e34\u0e40\u0e04\u0e23\u0e32\u0e30\u0e2b\u0e4c\u0e43\u0e2b\u0e21\u0e48'}
-            </Button>
+            <Stack direction="row" spacing={1.5} alignItems="center">
+              <Box sx={{ px: 2, py: 1, borderRadius: '8px', border: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography level="body-sm" sx={{ opacity: 0.7 }}>{'ระดับความเชื่อมั่น'}:</Typography>
+                <Typography level="title-sm" sx={{ color: convictionColor, fontWeight: 800 }}>{report.conviction_level}</Typography>
+              </Box>
+              <Button size="sm" variant="soft" color="neutral" startDecorator={<RotateCw size={14} />} loading={analyzing} onClick={handleRunAnalysis}>
+                {'รันวิเคราะห์ใหม่'}
+              </Button>
+            </Stack>
           </Stack>
-        </Stack>
-        <Divider sx={{ mb: 4, opacity: 0.1 }} />
-        <Box className="markdown-body">
-          <MarkdownRenderer text={report.summary} />
-        </Box>
-      </Sheet>
+          <Divider sx={{ mb: 4, opacity: 0.1 }} />
+          <Box className="markdown-body">
+            <MarkdownRenderer text={report.summary} />
+          </Box>
+        </Sheet>
+      </Box>
     );
   };
 

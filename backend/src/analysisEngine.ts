@@ -13,6 +13,8 @@ import {
   getSynthesisPrompt,
   getFinalReportPrompt
 } from './analysisPrompts';
+import { runDialecticalDebate, type DialecticalDebateResult } from './debateEngine';
+
 
 function parseAIJson(text: string): any {
   const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -226,6 +228,7 @@ export async function runFullAnalysis(env: Env, symbol: string): Promise<{
   summary: string;
   conviction_level: string;
   framework_results: string;
+  debate?: DialecticalDebateResult | null;
 }> {
   const symbolUpper = symbol.toUpperCase();
   const stats = await getOrUpdateMarketStats(env, symbolUpper);
@@ -338,6 +341,16 @@ export async function runFullAnalysis(env: Env, symbol: string): Promise<{
   let greenblattText = (greenblattAIResponse as any).choices?.[0]?.message?.content || greenblattAIResponse.response || '';
   stepResults.joel_greenblatt = parseAIJson(greenblattText);
   
+  // Step 6.5: Bull vs. Bear Dialectical Debate (TauricResearch TradingAgents Engine)
+  console.log('Starting Step 6.5 (Bull vs. Bear Dialectical Debate) for ' + symbolUpper + '...');
+  let debateResult: DialecticalDebateResult | null = null;
+  try {
+    debateResult = await runDialecticalDebate(env, symbolUpper, metricsStr);
+    stepResults.debate = debateResult;
+  } catch (debateErr) {
+    console.warn(`[AnalysisEngine] Dialectical debate failed for ${symbolUpper}:`, debateErr);
+  }
+
   console.log('Starting Step 7 (Synthesis) for ' + symbolUpper + '...');
   const synthesisPrompt = getSynthesisPrompt(symbolUpper, metricsStr, JSON.stringify(stepResults));
   const synthesisAIResponse = await env.AI.run(env.default_ai_model, {
@@ -385,6 +398,7 @@ export async function runFullAnalysis(env: Env, symbol: string): Promise<{
     symbol: symbolUpper,
     summary: reportMarkdown,
     conviction_level: convictionLevel,
-    framework_results: frameworkResultsStr
+    framework_results: frameworkResultsStr,
+    debate: debateResult
   };
 }
