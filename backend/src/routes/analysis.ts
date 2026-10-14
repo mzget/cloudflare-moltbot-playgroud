@@ -1,8 +1,11 @@
 import { Hono } from 'hono';
 import type { AppEnv } from '../env';
 import { runFullAnalysis, getOrUpdateMarketStats } from '../analysisEngine';
+import { runDialecticalDebate } from '../debateEngine';
+import { formatMetricsForPrompt } from '../analysisPrompts';
 
 const analysis = new Hono<AppEnv>();
+
 
 // API: Value Investor Deep Analysis
 // POST /api/analysis/run
@@ -94,6 +97,68 @@ analysis.get('/api/analysis/history', async (c) => {
   ).bind(symbolUpper).all();
   return c.json(results);
 });
+
+// GET /api/analysis/debate
+// Returns cached debate results from analysis_results if available
+analysis.get('/api/analysis/debate', async (c) => {
+  const symbol = c.req.query('symbol');
+  if (!symbol) return c.json({ error: 'symbol is required' }, 400);
+  const symbolUpper = symbol.toUpperCase();
+
+  const result = await c.env.DB.prepare(
+    'SELECT framework_results FROM analysis_results WHERE symbol = ? ORDER BY created_at DESC LIMIT 1'
+  ).bind(symbolUpper).first<{ framework_results: string }>();
+
+  if (!result || !result.framework_results) {
+    return c.json({ error: 'Debate not found for ' + symbolUpper }, 404);
+  }
+
+  try {
+    const fw = JSON.parse(result.framework_results);
+    if (!fw.debate) {
+      return c.json({ error: 'No debate record found in analysis' }, 404);
+    }
+    return c.json(fw.debate);
+  } catch {
+    return c.json({ error: 'Failed to parse debate record' }, 500);
+  }
+});
+
+// POST /api/analysis/debate
+// Runs or refreshes on-demand Bull vs. Bear Dialectical Debate
+analysis.post('/api/analysis/debate', async (c) => {
+  const { symbol } = await c.req.json() as any;
+  if (!symbol) return c.json({ error: 'symbol is required' }, 400);
+  const symbolUpper = symbol.toUpperCase();
+  try {
+    const stats = await getOrUpdateMarketStats(c.env, symbolUpper);
+    const metricsStr = formatMetricsForPrompt(stats);
+    const debate = await runDialecticalDebate(c.env, symbolUpper, metricsStr);
+
+    // If an analysis_results entry exists, update its framework_results with the refreshed debate
+    const existing = await c.env.DB.prepare(
+      'SELECT id, framework_results FROM analysis_results WHERE symbol = ? ORDER BY created_at DESC LIMIT 1'
+    ).bind(symbolUpper).first<{ id: number; framework_results: string }>();
+
+    if (existing && existing.framework_results) {
+      try {
+        const parsed = JSON.parse(existing.framework_results);
+        parsed.debate = debate;
+        await c.env.DB.prepare(
+          "UPDATE analysis_results SET framework_results = ?, updated_at = (datetime('now')) WHERE id = ?"
+        ).bind(JSON.stringify(parsed), existing.id).run();
+      } catch (dbErr) {
+        console.warn('Failed to patch framework_results:', dbErr);
+      }
+    }
+
+    return c.json(debate);
+  } catch (e) {
+    console.error(`Debate failed for ${symbolUpper}:`, e);
+    return c.json({ error: (e as any).message }, 500);
+  }
+});
+
 
 // GET /api/analysis/dcf-defaults
 // Returns pre-populated DCF model parameters from market_stats

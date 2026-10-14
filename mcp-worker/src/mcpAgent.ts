@@ -20,8 +20,9 @@ import {
 } from "./dcfTools";
 
 const asText = (data: unknown) => ({
-  content: [{ type: "text", text: JSON.stringify(data, null, 2) }]
+  content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }]
 });
+
 
 export class OaktreeMCP extends McpAgent {
   server = new McpServer({ name: "oaktree-mcp", version: "1.0.0" });

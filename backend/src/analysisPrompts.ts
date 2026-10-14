@@ -111,3 +111,72 @@ export function getFinalReportPrompt(symbol: string, metricsStr: string, synthes
     prompt: 'ผลสรุปสังเคราะห์การวิเคราะห์:\n' + synthesisOutput + '\n\nผลวิเคราะห์รวมขั้นตอนก่อนหน้า:\n' + allStepsOutput
   };
 }
+
+export interface MarketEventItem {
+  title: string;
+  description?: string | null;
+  event_date: string;
+  event_type: string;
+}
+
+export interface NotebookArticleItem {
+  title: string;
+  summary?: string | null;
+  key_takeaways?: string | null;
+}
+
+export function formatDebateContext(metricsStr: string, events: MarketEventItem[] = [], articles: NotebookArticleItem[] = []): string {
+  const sections: string[] = ['### 1. ข้อมูลทางการเงินและตัวชี้วัด (Financial Metrics):', metricsStr];
+  
+  if (events.length > 0) {
+    sections.push('\n### 2. ข่าวและเหตุการณ์สำคัญล่าสุด (Recent Market Events):');
+    events.forEach((ev, idx) => {
+      sections.push(`${idx + 1}. [${ev.event_type.toUpperCase()}] ${ev.title} (${ev.event_date})${ev.description ? `: ${ev.description}` : ''}`);
+    });
+  }
+
+  if (articles.length > 0) {
+    sections.push('\n### 3. บทวิเคราะห์และมุมมองสังเคราะห์ (Research & Notes):');
+    articles.forEach((art, idx) => {
+      sections.push(`${idx + 1}. หัวข้อ: ${art.title}${art.summary ? `\nสรุป: ${art.summary}` : ''}`);
+    });
+  }
+
+  return sections.join('\n');
+}
+
+export function getBullOpeningPrompt(symbol: string, contextStr: string) {
+  return {
+    system: `คุณคือ Bullish Researcher Agent (นักวิเคราะห์ฝั่งกระทิง) ตามแนวทาง TradingAgents ทำหน้าที่สร้างข้อถกเถียงเชิงบวกและโอกาสเติบโต (Long Thesis) ที่แข็งแกร่งและสมเหตุสมผลที่สุดสำหรับหุ้น ${symbol} โดยอ้างอิงจากตัวเลขการเงิน ข่าวสาร และบทวิเคราะห์ที่ให้มา\n\nคำสั่ง: ห้ามใช้เครื่องหมาย double quote ซ้อนภายในข้อความ และตอบเป็นรูปแบบ JSON เท่านั้น โดยมีโครงสร้างดังนี้:\n{\n  "bull_thesis": "บทสรุปมุมมองกระทิงและวิทยานิพนธ์การลงทุนเชิงรุก 2-3 ประโยค",\n  "growth_catalysts": ["ปัจจัยเร่งการเติบโตข้อ 1 พร้อมตัวเลขสนับสนุน", "ปัจจัยเร่งข้อ 2"],\n  "competitive_advantages": ["ความได้เปรียบในการแข่งขันหรือการขยาย Moat ข้อ 1", "ข้อ 2"],\n  "valuation_upside": "การประเมินโอกาสที่ราคาจะปรับตัวขึ้นหรือข้อได้เปรียบเชิงมูลค่า"\n}`,
+    prompt: `ข้อมูลหุ้น ${symbol}:\n${contextStr}`
+  };
+}
+
+export function getBearOpeningPrompt(symbol: string, contextStr: string) {
+  return {
+    system: `คุณคือ Bearish Researcher Agent (นักวิเคราะห์ฝั่งหมี) ตามแนวทาง TradingAgents ทำหน้าที่ท้าทายและค้นหาจุดอ่อน ความเสี่ยง และ downside scenario (Short/Skeptical Thesis) ที่อันตรายที่สุดสำหรับหุ้น ${symbol} โดยใช้หลัก Inversion Thinking และอ้างอิงตัวเลขจริง\n\nคำสั่ง: ห้ามใช้เครื่องหมาย double quote ซ้อนภายในข้อความ และตอบเป็นรูปแบบ JSON เท่านั้น โดยมีโครงสร้างดังนี้:\n{\n  "bear_thesis": "บทสรุปมุมมองหมีและวิทยานิพนธ์ความเสี่ยงเชิงลึก 2-3 ประโยค",\n  "downside_risks": ["ความเสี่ยงและจุดเปราะบางข้อ 1 พร้อมตัวเลขสนับสนุน", "ความเสี่ยงข้อ 2"],\n  "structural_headwinds": ["อุปสรรคเชิงโครงสร้างหรือการแข่งขันที่รุนแรงขึ้นข้อ 1", "ข้อ 2"],\n  "valuation_stretch": "การประเมินความตึงตัวของ Valuation หรือโอกาสเกิด Permanent Capital Loss"\n}`,
+    prompt: `ข้อมูลหุ้น ${symbol}:\n${contextStr}`
+  };
+}
+
+export function getBullRebuttalPrompt(symbol: string, contextStr: string, bearOpeningJson: string) {
+  return {
+    system: `คุณคือ Bullish Researcher Agent กำลังเข้าสู่ Round 2: Cross-Examination Rebuttal จงพิจารณาข้อโต้แย้งของฝั่ง Bear แล้วตอบโต้/แก้ต่าง (Rebuttal) จุดอ่อนเหล่านั้นด้วยข้อมูลและหลักการลงทุนที่มีเหตุผล\n\nคำสั่ง: ห้ามใช้เครื่องหมาย double quote ซ้อนภายในข้อความ และตอบเป็นรูปแบบ JSON เท่านั้น โดยมีโครงสร้างดังนี้:\n{\n  "rebuttal_arguments": ["การหักล้างข้ออ้างความเสี่ยงของฝั่ง Bear ข้อ 1", "การหักล้างข้อ 2"],\n  "mitigating_factors": ["ปัจจัยบรรเทาความเสี่ยงที่ทำให้บริษัทเอาชนะอุปสรรคได้ข้อ 1", "ข้อ 2"]\n}`,
+    prompt: `ข้อมูลหุ้น ${symbol}:\n${contextStr}\n\nข้อโต้แย้งจากฝั่ง Bear ใน Round 1:\n${bearOpeningJson}`
+  };
+}
+
+export function getBearRebuttalPrompt(symbol: string, contextStr: string, bullOpeningJson: string) {
+  return {
+    system: `คุณคือ Bearish Researcher Agent กำลังเข้าสู่ Round 2: Cross-Examination Rebuttal จงพิจารณาข้อกล่าวอ้างเชิงบวกของฝั่ง Bull แล้วโจมตีจุดโหว่ (Critique) ชี้ให้เห็นว่าทำไมตลาดอาจมองโลกในแง่ดีเกินจริง\n\nคำสั่ง: ห้ามใช้เครื่องหมาย double quote ซ้อนภายในข้อความ และตอบเป็นรูปแบบ JSON เท่านั้น โดยมีโครงสร้างดังนี้:\n{\n  "rebuttal_arguments": ["การชี้จุดบกพร่องในมุมมองฝั่ง Bull ข้อ 1", "การชี้จุดบกพร่องข้อ 2"],\n  "skeptical_counters": ["ข้อสังเกตเชิงลบที่ฝั่ง Bull มองข้ามไปข้อ 1", "ข้อ 2"]\n}`,
+    prompt: `ข้อมูลหุ้น ${symbol}:\n${contextStr}\n\nข้อโต้แย้งจากฝั่ง Bull ใน Round 1:\n${bullOpeningJson}`
+  };
+}
+
+export function getArbiterSynthesisPrompt(symbol: string, contextStr: string, debateTranscriptJson: string) {
+  return {
+    system: `คุณคือ Dialectical Arbiter Agent (อนุญาโตตุลาการผู้เป็นกลาง) ตามแนวทาง TradingAgents ทำหน้าที่ชั่งน้ำหนักการโต้วาทีระหว่าง Bull vs. Bear ทั้ง 2 รอบ สกัดข้อสรุปที่เป็นกลาง ระบุจุดเห็นพ้อง (Consensus) ชี้จุดวัดใจสำคัญ (Key Tensions) และให้คะแนน Conviction Balance (-10 ถึง +10)\n\nคำสั่ง: ห้ามใช้เครื่องหมาย double quote ซ้อนภายในข้อความ และตอบเป็นรูปแบบ JSON เท่านั้น โดยมีโครงสร้างดังนี้:\n{\n  "key_tensions": [\n    {\n      "topic": "ชื่อประเด็นขัดแย้งหลัก",\n      "bull_argument": "มุมมองฝั่ง Bull",\n      "bear_argument": "มุมมองฝั่ง Bear",\n      "decisive_factor": "ปัจจัยหรือตัวชี้วัดชี้ขาดที่ต้องติดตาม"\n    }\n  ],\n  "consensus_points": ["จุดที่ทั้งสองฝ่ายเห็นพ้องต้องกันข้อ 1", "ข้อ 2"],\n  "conviction_score": 3,\n  "conviction_label": "Strong Bull หรือ Moderate Bull หรือ Neutral หรือ Moderate Bear หรือ Strong Bear",\n  "verdict_summary": "บทสรุปดุลยภาพความเสี่ยงและผลตอบแทน 3-4 ประโยคเป็นภาษาไทย"\n}\n\nเกณฑ์ conviction_score:\n- ระหว่าง +7 ถึง +10: "Strong Bull"\n- ระหว่าง +2 ถึง +6: "Moderate Bull"\n- ระหว่าง -1 ถึง +1: "Neutral"\n- ระหว่าง -6 ถึง -2: "Moderate Bear"\n- ระหว่าง -10 ถึง -7: "Strong Bear"`,
+    prompt: `ข้อมูลหุ้น ${symbol}:\n${contextStr}\n\nบันทึกการโต้วาที Bull vs. Bear (Round 1 & 2):\n${debateTranscriptJson}`
+  };
+}
+
