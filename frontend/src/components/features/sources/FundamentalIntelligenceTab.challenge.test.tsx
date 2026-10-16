@@ -1,11 +1,15 @@
 import * as React from 'react';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { renderToString } from 'react-dom/server';
 import {
   FundamentalIntelligenceTab,
   type FundamentalStatusItem,
 } from './FundamentalIntelligenceTab';
 import SourceManager from './SourceManager';
+
+vi.mock('@tanstack/react-router', () => ({
+  useNavigate: () => vi.fn(),
+}));
 
 /**
  * Filter Oracle mirroring the exact implementation in FundamentalIntelligenceTab.tsx (lines 118-135).
