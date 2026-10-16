@@ -523,5 +523,117 @@ describe('Analysis Debate Routes (Hono Endpoints)', () => {
     expect(data.symbol).toBe('AAPL');
     expect(data.synthesis.conviction_score).toBe(3);
   });
+
+  it('GET /api/analysis/results ignores debate-only rows where summary is empty', async () => {
+    const analysisRoutes = (await import('./routes/analysis')).default;
+    let executedSql = '';
+    const mockEnv = {
+      DB: {
+        prepare: vi.fn((sql: string) => {
+          executedSql = sql;
+          return {
+            bind: vi.fn().mockReturnThis(),
+            first: vi.fn().mockResolvedValue(null)
+          };
+        })
+      }
+    };
+    const res = await analysisRoutes.request('/api/analysis/results?symbol=ARM', { method: 'GET' }, mockEnv);
+    expect(res.status).toBe(404);
+    expect(executedSql).toContain("summary IS NOT NULL AND summary != ''");
+  });
+
+  it('POST /api/analysis/debate inserts initial row into analysis_results when no record exists', async () => {
+    const analysisRoutes = (await import('./routes/analysis')).default;
+    let insertedSql = '';
+    let insertedBinds: any[] = [];
+    const mockEnv = {
+      default_ai_model: '@cf/meta/llama-3-8b-instruct',
+      AI: {
+        run: vi.fn().mockImplementation(async (_model: string, options: any) => {
+          const sys = options.messages?.[0]?.content || '';
+          const user = options.messages?.[1]?.content || options.prompt || '';
+          if (sys.includes('Arbiter') || user.includes('บันทึกการโต้วาที')) {
+            return {
+              response: JSON.stringify({
+                key_tensions: [{ topic: 'Valuation', bull_argument: 'Cheap', bear_argument: 'Expensive', decisive_factor: 'Growth' }],
+                consensus_points: ['Healthy balance sheet'],
+                conviction_score: 5,
+                conviction_label: 'Moderate Bull',
+                verdict_summary: 'Moderate Bull edge'
+              })
+            };
+          }
+          return {
+            response: JSON.stringify({
+              bull_thesis: 'Leading IP provider',
+              bear_thesis: 'Valuation concerns',
+              growth_catalysts: ['AI PCs'],
+              downside_risks: ['Customer in-housing'],
+              structural_headwinds: ['Macro'],
+              competitive_advantages: ['Moat'],
+              valuation_upside: 'High growth',
+              valuation_stretch: 'Multiple compression',
+              rebuttal_arguments: ['Strong FCF'],
+              mitigating_factors: ['Diversification'],
+              skeptical_counters: ['Margin peak']
+            })
+          };
+        })
+      },
+      DB: {
+        prepare: vi.fn((sql: string) => ({
+          bind: vi.fn((...args: any[]) => {
+            if (sql.startsWith('INSERT INTO analysis_results')) {
+              insertedSql = sql;
+              insertedBinds = args;
+            }
+            return {
+              first: vi.fn().mockImplementation(async () => {
+                if (sql.includes('FROM market_stats')) {
+                  return {
+                    symbol: 'ARM',
+                    price: 140,
+                    pe_ratio: 75,
+                    market_cap: 140000000000,
+                    updated_at: new Date().toISOString().replace('T', ' ').slice(0, 19)
+                  };
+                }
+                return null;
+              }),
+              run: vi.fn().mockResolvedValue({ success: true }),
+              all: vi.fn().mockResolvedValue({ results: [] })
+            };
+          }),
+          first: vi.fn().mockImplementation(async () => {
+            if (sql.includes('FROM market_stats')) {
+              return {
+                symbol: 'ARM',
+                price: 140,
+                pe_ratio: 75,
+                market_cap: 140000000000,
+                updated_at: new Date().toISOString().replace('T', ' ').slice(0, 19)
+              };
+            }
+            return null;
+          }),
+          run: vi.fn().mockResolvedValue({ success: true }),
+          all: vi.fn().mockResolvedValue({ results: [] })
+        }))
+      }
+    };
+
+    const res = await analysisRoutes.request('/api/analysis/debate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol: 'ARM' })
+    }, mockEnv);
+
+    expect(res.status).toBe(200);
+    expect(insertedSql).toContain('INSERT INTO analysis_results');
+    expect(insertedBinds[0]).toBe('ARM');
+    expect(insertedBinds[1]).toBe('Moderate Bull');
+    expect(insertedBinds[2]).toContain('"debate"');
+  });
 });
 
