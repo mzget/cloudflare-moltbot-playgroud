@@ -1,7 +1,11 @@
 import * as React from 'react';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { renderToString } from 'react-dom/server';
 import { FundamentalIntelligenceTab, type FundamentalStatusItem } from './FundamentalIntelligenceTab';
+
+vi.mock('@tanstack/react-router', () => ({
+  useNavigate: () => vi.fn(),
+}));
 
 describe('FundamentalIntelligenceTab Component', () => {
   const mockItems: FundamentalStatusItem[] = [
@@ -85,6 +89,12 @@ describe('FundamentalIntelligenceTab Component', () => {
 
     // Action buttons
     expect(html).toContain('Copy Prompt');
+    expect(html).not.toContain('>Analysis<');
+
+    // Symbol analysis links
+    expect(html).toContain('/analysis?symbol=ARM&amp;tab=report');
+    expect(html).toContain('/analysis?symbol=INTC&amp;tab=report');
+    expect(html).toContain('/analysis?symbol=TSM&amp;tab=report');
   });
 
   it('renders clean empty state when no items exist', () => {
@@ -95,5 +105,19 @@ describe('FundamentalIntelligenceTab Component', () => {
     expect(html).toContain('Total Tickers');
     expect(html).toContain('0');
     expect(html).toContain('No stocks found in watchlist.');
+  });
+
+  it('applies density mode padding styles properly', () => {
+    const compactHtml = renderToString(
+      <FundamentalIntelligenceTab initialItems={mockItems} autoFetch={false} density="compact" />
+    );
+    expect(compactHtml).toMatch(/--TableCell-paddingX:\s*8px/);
+    expect(compactHtml).toMatch(/--TableCell-paddingY:\s*5px/);
+
+    const comfortHtml = renderToString(
+      <FundamentalIntelligenceTab initialItems={mockItems} autoFetch={false} density="comfort" />
+    );
+    expect(comfortHtml).toMatch(/--TableCell-paddingX:\s*18px/);
+    expect(comfortHtml).toMatch(/--TableCell-paddingY:\s*14px/);
   });
 });

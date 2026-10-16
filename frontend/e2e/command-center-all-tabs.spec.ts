@@ -1,6 +1,36 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Command Center - All 3 Tabs E2E Suite', () => {
+test.describe('Command Center - All 4 Tabs E2E Suite', () => {
+  const mockFundamentalItems = [
+    {
+      symbol: 'NVDA',
+      company_name: 'NVIDIA Corporation',
+      as_of_date: '2026-07-30',
+      status: 'active',
+      source_count: 5,
+      theme_tags: ['AI Compute & Datacenter', 'Semiconductors'],
+      updated_at: '2026-10-15 10:00:00',
+    },
+    {
+      symbol: 'AAPL',
+      company_name: 'Apple Inc.',
+      as_of_date: '2026-03-31',
+      status: 'stale',
+      source_count: 2,
+      theme_tags: ['Consumer Tech'],
+      updated_at: '2026-04-01 10:00:00',
+    },
+    {
+      symbol: 'TSLA',
+      company_name: 'Tesla, Inc.',
+      as_of_date: null,
+      status: 'missing',
+      source_count: 0,
+      theme_tags: [],
+      updated_at: null,
+    },
+  ];
+
   const mockWebSources = [
     {
       id: 1,
@@ -135,6 +165,13 @@ test.describe('Command Center - All 3 Tabs E2E Suite', () => {
     });
     await page.route('**/api/notebook-articles', async (route) => {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
+    });
+    await page.route('**/api/fundamentals/status', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ items: mockFundamentalItems }),
+      });
     });
   });
 
@@ -425,5 +462,76 @@ test.describe('Command Center - All 3 Tabs E2E Suite', () => {
       await expect.poll(() => postNowCalledWithId).toBe('10');
     });
   });
+
+  // ==========================================
+  // TAB 4: FUNDAMENTAL INTELLIGENCE
+  // ==========================================
+  test.describe('Tab 4: Fundamental Intelligence', () => {
+    test('renders freshness metrics, filter chips, stock table, analysis links, and Copy Prompt modal', async ({ page }) => {
+      await page.goto('/command-center');
+
+      // Click Fundamental Intelligence tab
+      const fundamentalTab = page.getByRole('tab', { name: /Fundamental Intelligence/i });
+      await expect(fundamentalTab).toBeVisible();
+      await fundamentalTab.click();
+
+      // Verify Header
+      await expect(page.getByRole('heading', { name: 'Fundamental Intelligence' })).toBeVisible();
+      await expect(page.getByText('Track qualitative research freshness')).toBeVisible();
+
+      // Verify Summary Cards
+      await expect(page.getByText('Total Tickers')).toBeVisible();
+      await expect(page.getByText('Active (<90d)', { exact: true })).toBeVisible();
+      await expect(page.getByText('Stale (≥90d)', { exact: true })).toBeVisible();
+      await expect(page.getByText('Missing', { exact: true })).toBeVisible();
+
+      // Verify Table Rows
+      await expect(page.getByText('NVDA')).toBeVisible();
+      await expect(page.getByText('NVIDIA Corporation')).toBeVisible();
+      await expect(page.getByText('AAPL')).toBeVisible();
+      await expect(page.getByText('TSLA')).toBeVisible();
+
+      // Check analysis deep link on symbol
+      const nvdaLink = page.getByRole('link', { name: 'NVDA' });
+      await expect(nvdaLink).toBeVisible();
+      await expect(nvdaLink).toHaveAttribute('href', '/analysis?symbol=NVDA&tab=report');
+
+      // Open Copy Prompt Modal
+      const copyPromptBtn = page.getByRole('button', { name: /Copy Prompt/i }).first();
+      await expect(copyPromptBtn).toBeVisible();
+      await copyPromptBtn.click();
+
+      // Verify Modal Dialog opens
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await expect(page.getByText(/Gemini Extraction Prompt/i)).toBeVisible();
+
+      // Close Modal
+      const closeBtn = page.getByRole('button', { name: /Close/i });
+      await closeBtn.click();
+      await expect(page.getByRole('dialog')).not.toBeVisible();
+    });
+
+    test('seamlessly switches between all 4 tabs in Command Center', async ({ page }) => {
+      await page.goto('/command-center');
+
+      // 1. Web & RSS Crawler
+      await expect(page.getByRole('tab', { name: /Web & RSS Crawler/i })).toBeVisible();
+      await expect(page.getByText('Active Web Targets')).toBeVisible();
+
+      // 2. Gmail Newsletters
+      await page.getByRole('tab', { name: /Gmail Newsletters/i }).click();
+      await expect(page.getByText('Newsletter Rules', { exact: true })).toBeVisible();
+
+      // 3. Facebook Page
+      await page.getByRole('tab', { name: /Facebook Page/i }).click();
+      await expect(page.getByText('Facebook Auto-Posting Controls')).toBeVisible();
+
+      // 4. Fundamental Intelligence
+      await page.getByRole('tab', { name: /Fundamental Intelligence/i }).click();
+      await expect(page.getByText('Track qualitative research freshness')).toBeVisible();
+      await expect(page.getByText('NVDA')).toBeVisible();
+    });
+  });
 });
+
 

@@ -13,6 +13,7 @@ import {
   Grid,
   Alert,
   CircularProgress,
+  Link,
 } from '@mui/joy';
 import {
   Search,
@@ -26,6 +27,8 @@ import {
   Layers,
   Sparkles,
 } from 'lucide-react';
+import { useNavigate } from '@tanstack/react-router';
+import { useSettingsStore, type DensityMode } from '../../../store/settingsStore';
 import { API_BASE_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
 import { FundamentalFreshnessBadge, type FreshnessStatus } from './FundamentalFreshnessBadge';
@@ -56,12 +59,67 @@ export interface FundamentalIntelligenceTabProps {
   initialItems?: FundamentalStatusItem[];
   /** Optional flag to suppress auto-fetch on mount (useful in tests) */
   autoFetch?: boolean;
+  /** Optional callback when clicking View Analysis */
+  onViewAnalysis?: (symbol: string) => void;
+  /** Optional table density override */
+  density?: DensityMode;
 }
 
 export const FundamentalIntelligenceTab: React.FC<FundamentalIntelligenceTabProps> = ({
   initialItems,
   autoFetch = true,
+  onViewAnalysis,
+  density: propDensity,
 }) => {
+  let routerNavigate: any = null;
+  try {
+    routerNavigate = useNavigate();
+  } catch {
+    routerNavigate = null;
+  }
+
+  let storeDensity: DensityMode = 'cozy';
+  try {
+    storeDensity = useSettingsStore((state) => state.density);
+  } catch {
+    storeDensity = 'cozy';
+  }
+  const activeDensity = propDensity || storeDensity || 'cozy';
+
+  const densityStyles = useMemo(() => {
+    const config = {
+      compact: {
+        paddingX: '8px',
+        paddingY: '5px',
+        fontSize: '0.75rem',
+      },
+      cozy: {
+        paddingX: '12px',
+        paddingY: '9px',
+        fontSize: '0.8rem',
+      },
+      comfort: {
+        paddingX: '18px',
+        paddingY: '14px',
+        fontSize: '0.88rem',
+      },
+    };
+    return config[activeDensity] || config.cozy;
+  }, [activeDensity]);
+
+  const handleViewAnalysis = useCallback((symbol: string) => {
+    if (onViewAnalysis) {
+      onViewAnalysis(symbol);
+    } else if (routerNavigate) {
+      routerNavigate({
+        to: '/analysis',
+        search: { symbol, tab: 'report' },
+      });
+    } else if (typeof window !== 'undefined') {
+      window.location.href = `/analysis?symbol=${encodeURIComponent(symbol)}&tab=report`;
+    }
+  }, [onViewAnalysis, routerNavigate]);
+
   const [items, setItems] = useState<FundamentalStatusItem[]>(initialItems || []);
   const [loading, setLoading] = useState<boolean>(!initialItems && autoFetch);
   const [error, setError] = useState<string | null>(null);
@@ -375,8 +433,9 @@ export const FundamentalIntelligenceTab: React.FC<FundamentalIntelligenceTabProp
           borderAxis="xBetween"
           sx={{
             '& tr > *': { borderBottom: '1px solid var(--joy-palette-divider)' },
-            '--TableCell-paddingX': '16px',
-            '--TableCell-paddingY': '14px',
+            '--TableCell-paddingX': densityStyles.paddingX,
+            '--TableCell-paddingY': densityStyles.paddingY,
+            fontSize: densityStyles.fontSize,
             minWidth: 780,
           }}
         >
@@ -417,17 +476,39 @@ export const FundamentalIntelligenceTab: React.FC<FundamentalIntelligenceTabProp
               filteredItems.map((item) => (
                 <tr key={item.symbol}>
                   <td>
-                    <Typography level="title-sm" sx={{ fontFamily: 'monospace', fontWeight: 800 }}>
+                    <Link
+                      component="a"
+                      href={`/analysis?symbol=${encodeURIComponent(item.symbol)}&tab=report`}
+                      level={activeDensity === 'compact' ? 'body-sm' : 'title-sm'}
+                      onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                        if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
+                          e.preventDefault();
+                          handleViewAnalysis(item.symbol);
+                        }
+                      }}
+                      sx={{
+                        fontFamily: 'monospace',
+                        fontWeight: 800,
+                        color: 'primary.plainColor',
+                        textDecoration: 'none',
+                        cursor: 'pointer',
+                        '&:hover': {
+                          color: 'primary.hoverColor',
+                          textDecoration: 'underline',
+                        },
+                        transition: 'all 0.15s ease-out',
+                      }}
+                    >
                       {item.symbol}
-                    </Typography>
+                    </Link>
                   </td>
                   <td>
-                    <Typography level="body-sm" sx={{ fontWeight: 500 }} noWrap>
+                    <Typography level="body-sm" sx={{ fontWeight: 500, fontSize: densityStyles.fontSize }} noWrap>
                       {item.company_name}
                     </Typography>
                   </td>
                   <td>
-                    <Typography level="body-xs" sx={{ fontFamily: 'monospace', color: item.as_of_date ? 'text.primary' : 'text.tertiary' }}>
+                    <Typography level="body-xs" sx={{ fontFamily: 'monospace', color: item.as_of_date ? 'text.primary' : 'text.tertiary', fontSize: densityStyles.fontSize }}>
                       {item.as_of_date || '—'}
                     </Typography>
                   </td>
