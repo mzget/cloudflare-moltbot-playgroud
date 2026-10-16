@@ -26,6 +26,7 @@ const SAMPLE_ROUTES: Array<[string, string, string]> = [
   ['portfolio/brokers', 'POST', '/api/portfolio/brokers/override'],
   ['analysis', 'GET', '/api/analysis/results'],
   ['theses', 'GET', '/api/analysis/theses'],
+  ['fundamentals', 'GET', '/api/fundamentals/status'],
 ];
 
 const makeDb = () => {

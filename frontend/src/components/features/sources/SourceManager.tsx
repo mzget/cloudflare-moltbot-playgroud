@@ -42,12 +42,14 @@ import {
   Sliders,
   Play,
   Sparkles,
-  RotateCcw
+  RotateCcw,
+  BookOpen
 } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
 import OaktreeIcon from '../../common/OaktreeIcon';
 import ManualTrigger from './ManualTrigger';
+import FundamentalIntelligenceTab from './FundamentalIntelligenceTab';
 
 // Custom Facebook Icon component using standard Lucide SVG path
 const Facebook = (props: any) => (
@@ -67,8 +69,8 @@ const Facebook = (props: any) => (
   </svg>
 );
 
-export default function SourceManager() {
-  const [index, setIndex] = useState(0);
+export default function SourceManager({ initialTab = 0 }: { initialTab?: number } = {}) {
+  const [index, setIndex] = useState(initialTab);
 
   const {
     sources,
@@ -492,6 +494,10 @@ export default function SourceManager() {
           <Tab disableIndicator sx={{ px: 3, borderRadius: '8px' }}>
             <Facebook size={16} style={{ marginRight: 8 }} />
             Facebook Page
+          </Tab>
+          <Tab disableIndicator sx={{ px: 3, borderRadius: '8px' }}>
+            <BookOpen size={16} style={{ marginRight: 8 }} />
+            Fundamental Intelligence
           </Tab>
         </TabList>
 
@@ -1060,6 +1066,9 @@ export default function SourceManager() {
               </Sheet>
             </Stack>
           </Stack>
+        </TabPanel>
+        <TabPanel value={3} sx={{ p: 0 }}>
+          <FundamentalIntelligenceTab />
         </TabPanel>
       </Tabs>
 

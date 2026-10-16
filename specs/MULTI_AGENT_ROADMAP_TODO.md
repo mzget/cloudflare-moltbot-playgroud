@@ -67,9 +67,9 @@ flowchart TD
     - Terminal Growth Rate
   - [ ] แมปผลลัพธ์เป็น 3 Presets: `Bull Case`, `Base Case`, `Bear Case`
 - [ ] **Integration กับ DCF Engine (`backend/src/dcfAnalysis.ts`, `frontend/src/components/DCF/`)**
-  - [ ] เพิ่มปุ่ม *"Auto-fill with AI Multi-Scenario"* ในหน้า DCF Valuation Model
-  - [ ] มีช่องแสดงเหตุผลสนับสนุน (Rationale) กำกับในแต่ละสมมติฐานตัวเลข
-  - [ ] คำนวณ Margin of Safety เปรียบเทียบกับราคาตลาดปัจจุบันแบบไดนามิก
+  - [ ] เพิ่มปุ่ม *"Auto-fill with AI Multi-Scenario"* ในหน้า DCF Valuation Model (ใช้ Gemini app สร้าง Bull/Bear scenarios)
+  - [ ] ใช้ mcp-worker บันทึกพารามิเตอร์ DCF ที่ได้จาก Gemini ลง D1/KV
+  - [ ] เพิ่มขั้นตอนคำนวณ Margin of Safety: เปรียบเทียบ Intrinsic Value (จากแต่ละ scenario) กับ Market Price, แสดง % Safety และสรุป Recommendation
 
 ---
 

@@ -18,6 +18,14 @@ import {
   getDcfModel,
   listDcfSymbols
 } from "./dcfTools";
+import {
+  saveFundamentalBrief,
+  saveThemeSectorContext,
+  getFundamentalBrief,
+  saveFundamentalBriefShape,
+  saveThemeSectorContextShape,
+  getFundamentalBriefShape
+} from "./fundamentalTools";
 
 const asText = (data: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }]
@@ -156,6 +164,27 @@ export class OaktreeMCP extends McpAgent {
       "List all stock symbols that have saved DCF valuation models in Oaktree, with their latest Base Case intrinsic prices and update dates.",
       {},
       async () => asText(await listDcfSymbols(this.env as any))
+    );
+
+    this.server.tool(
+      "save_fundamental_brief",
+      "Save or update a single-stock qualitative fundamental research brief (business model, moat, guidance targets, risks, thesis KPIs) into Oaktree D1 and R2 storage.",
+      saveFundamentalBriefShape,
+      async (args: any) => asText(await saveFundamentalBrief(this.env as any, args))
+    );
+
+    this.server.tool(
+      "save_theme_sector_context",
+      "Save or update a theme/sector intelligence notebook context (industry dynamics, bottlenecks, competitive landscape, macro trends) and link to stock ticker symbols in Oaktree D1.",
+      saveThemeSectorContextShape,
+      async (args: any) => asText(await saveThemeSectorContext(this.env as any, args))
+    );
+
+    this.server.tool(
+      "get_fundamental_brief",
+      "Retrieve stored qualitative fundamental research and linked theme/sector dynamics for a stock symbol.",
+      getFundamentalBriefShape,
+      async (args: any) => asText(await getFundamentalBrief(this.env as any, args))
     );
   }
 }
