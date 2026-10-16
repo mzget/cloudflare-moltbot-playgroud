@@ -36,7 +36,7 @@ analysis.get('/api/analysis/coverage', async (c) => {
   if (symbolsList.length > 0) {
     const placeholders = symbolsList.map(() => '?').join(',');
     const [reportsRes, dcfRes, thesesRes] = await Promise.all([
-      c.env.DB.prepare(`SELECT DISTINCT symbol FROM analysis_results WHERE symbol IN (${placeholders})`).bind(...symbolsList).all(),
+      c.env.DB.prepare(`SELECT DISTINCT symbol FROM analysis_results WHERE symbol IN (${placeholders}) AND summary IS NOT NULL AND summary != ''`).bind(...symbolsList).all(),
       c.env.DB.prepare(`SELECT DISTINCT symbol FROM dcf_calculations WHERE symbol IN (${placeholders})`).bind(...symbolsList).all(),
       c.env.DB.prepare(`SELECT DISTINCT symbol FROM stock_theses WHERE symbol IN (${placeholders})`).bind(...symbolsList).all(),
     ]);
@@ -45,7 +45,7 @@ analysis.get('/api/analysis/coverage', async (c) => {
     thesisSymbols = (thesesRes.results || []).map((r: any) => r.symbol);
   } else {
     const [reportsRes, dcfRes, thesesRes] = await Promise.all([
-      c.env.DB.prepare('SELECT DISTINCT symbol FROM analysis_results').all(),
+      c.env.DB.prepare("SELECT DISTINCT symbol FROM analysis_results WHERE summary IS NOT NULL AND summary != ''").all(),
       c.env.DB.prepare('SELECT DISTINCT symbol FROM dcf_calculations').all(),
       c.env.DB.prepare('SELECT DISTINCT symbol FROM stock_theses').all(),
     ]);
@@ -81,7 +81,7 @@ analysis.get('/api/analysis/results', async (c) => {
   if (!symbol) return c.json({ error: 'symbol is required' }, 400);
   const symbolUpper = symbol.toUpperCase();
   const result = await c.env.DB.prepare(
-    'SELECT * FROM analysis_results WHERE symbol = ? ORDER BY created_at DESC LIMIT 1'
+    "SELECT * FROM analysis_results WHERE symbol = ? AND summary IS NOT NULL AND summary != '' ORDER BY created_at DESC LIMIT 1"
   ).bind(symbolUpper).first();
   if (!result) return c.json({ error: 'Analysis not found' }, 404);
   return c.json(result);
@@ -93,7 +93,7 @@ analysis.get('/api/analysis/history', async (c) => {
   if (!symbol) return c.json({ error: 'symbol is required' }, 400);
   const symbolUpper = symbol.toUpperCase();
   const { results } = await c.env.DB.prepare(
-    'SELECT id, symbol, conviction_level, created_at FROM analysis_results WHERE symbol = ? ORDER BY created_at DESC'
+    "SELECT id, symbol, conviction_level, created_at FROM analysis_results WHERE symbol = ? AND summary IS NOT NULL AND summary != '' ORDER BY created_at DESC"
   ).bind(symbolUpper).all();
   return c.json(results);
 });
@@ -106,7 +106,7 @@ analysis.get('/api/analysis/debate', async (c) => {
   const symbolUpper = symbol.toUpperCase();
 
   const result = await c.env.DB.prepare(
-    'SELECT framework_results FROM analysis_results WHERE symbol = ? ORDER BY created_at DESC LIMIT 1'
+    "SELECT framework_results FROM analysis_results WHERE symbol = ? AND framework_results LIKE '%\"debate\"%' ORDER BY created_at DESC LIMIT 1"
   ).bind(symbolUpper).first<{ framework_results: string }>();
 
   if (!result || !result.framework_results) {
@@ -149,6 +149,17 @@ analysis.post('/api/analysis/debate', async (c) => {
         ).bind(JSON.stringify(parsed), existing.id).run();
       } catch (dbErr) {
         console.warn('Failed to patch framework_results:', dbErr);
+      }
+    } else {
+      // Create a new record containing the debate so it persists across page reloads
+      try {
+        const initialFw = { debate };
+        const conviction = debate?.synthesis?.conviction_label || 'Medium';
+        await c.env.DB.prepare(
+          "INSERT INTO analysis_results (symbol, summary, conviction_level, framework_results, created_at, updated_at) VALUES (?, '', ?, ?, datetime('now'), datetime('now'))"
+        ).bind(symbolUpper, conviction, JSON.stringify(initialFw)).run();
+      } catch (insertErr) {
+        console.warn('Failed to insert initial debate into analysis_results:', insertErr);
       }
     }
 

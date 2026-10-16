@@ -136,10 +136,49 @@ export default function AnalysisReport({ symbol, onBack, subTab }: AnalysisRepor
       );
     }
 
-    if (!report) {
+    let initialDebate = null;
+    if (report?.debate) {
+      initialDebate = report.debate;
+    } else if (report?.framework_results) {
+      try {
+        const parsed = typeof report.framework_results === 'string' ? JSON.parse(report.framework_results) : report.framework_results;
+        initialDebate = parsed?.debate || null;
+      } catch {
+        initialDebate = null;
+      }
+    }
+
+    const handleDebateUpdated = (updatedDebate: any) => {
+      setReport((prev: any) => {
+        if (!prev) {
+          return {
+            symbol,
+            summary: '',
+            conviction_level: updatedDebate?.synthesis?.conviction_label || 'Medium',
+            debate: updatedDebate,
+            framework_results: JSON.stringify({ debate: updatedDebate })
+          };
+        }
+        let fw = {};
+        try {
+          fw = typeof prev.framework_results === 'string' ? JSON.parse(prev.framework_results) : (prev.framework_results || {});
+        } catch {}
+        return {
+          ...prev,
+          debate: updatedDebate,
+          framework_results: JSON.stringify({ ...fw, debate: updatedDebate })
+        };
+      });
+    };
+
+    if (!report || !report.summary || report.summary.trim() === '') {
       return (
         <Box>
-          <DebateCard symbol={symbol} />
+          <DebateCard
+            symbol={symbol}
+            initialDebate={initialDebate}
+            onDebateUpdated={handleDebateUpdated}
+          />
           <Sheet sx={{ ...glassStyle, p: 4, minHeight: '300px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, textAlign: 'center' }}>
             <Typography level="h3">{'ยังไม่มีผลการวิเคราะห์เชิงลึกของ'} {symbol}</Typography>
             <Typography level="body-md" sx={{ color: 'text.secondary', mb: 3, maxWidth: '600px' }}>
@@ -155,37 +194,12 @@ export default function AnalysisReport({ symbol, onBack, subTab }: AnalysisRepor
 
     const convictionColor = report.conviction_level === 'High' ? '#10b981' : report.conviction_level === 'Medium' ? '#eab308' : '#ef4444';
 
-    let initialDebate = null;
-    if (report.debate) {
-      initialDebate = report.debate;
-    } else if (report.framework_results) {
-      try {
-        const parsed = typeof report.framework_results === 'string' ? JSON.parse(report.framework_results) : report.framework_results;
-        initialDebate = parsed.debate || null;
-      } catch {
-        initialDebate = null;
-      }
-    }
-
     return (
       <Box>
         <DebateCard
           symbol={symbol}
           initialDebate={initialDebate}
-          onDebateUpdated={(updatedDebate) => {
-            setReport((prev: any) => {
-              if (!prev) return prev;
-              let fw = {};
-              try {
-                fw = typeof prev.framework_results === 'string' ? JSON.parse(prev.framework_results) : (prev.framework_results || {});
-              } catch {}
-              return {
-                ...prev,
-                debate: updatedDebate,
-                framework_results: JSON.stringify({ ...fw, debate: updatedDebate })
-              };
-            });
-          }}
+          onDebateUpdated={handleDebateUpdated}
         />
 
         <Sheet sx={{ ...glassStyle, p: 4 }}>
