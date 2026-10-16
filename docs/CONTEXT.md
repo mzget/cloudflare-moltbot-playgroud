@@ -61,4 +61,39 @@
 - **Valuation Inspection (`get_dcf_model` & `list_dcf_symbols`)**:
   MCP query tools allowing AI agents to read back stored valuation metrics, compare intrinsic share prices against real-time market prices, and compute margin of safety metrics.
 
+## Fundamental Intelligence Subsystem (Gemini Notebook → Debate Context)
+
+### Terms & Concepts
+
+- **Gemini Notebook**:
+  The user's research notebooks (formerly NotebookLM; `notebooklm.google.com` now redirects to `notebook.google.com`, and `gemini.google.com/notebook/<id>` uses the same UUID). Sources are typically quarterly earnings `report` / `slide` / `transcript` PDFs plus one user-authored thesis document.
+
+- **Single-Stock Notebook** (`kind = 'single'`):
+  A notebook dedicated to exactly one ticker (e.g. `ARM`). Source of that symbol's **Fundamental Brief**.
+
+- **Theme Notebook** (`kind = 'theme'`):
+  A notebook covering an industry or theme spanning many tickers (e.g. `SemiAnalysis`, `AI Datacenter`, `GRID`, `Cybersecure`). Mapped to multiple symbols and used to supply **Sector Context** — industry dynamics and competitor positioning.
+
+- **Fundamental Brief (`stock_fundamentals`)**:
+  Structured, slow-changing (quarterly) qualitative profile of one symbol extracted from its Single-Stock Notebook: `business_model`, `moat`, `competitors`, `guidance`, `key_risks`, `thesis_kpis`. Complements the fast-changing numbers in `market_stats`.
+
+- **Sector Context (`theme_sector_contexts`)**:
+  Qualitative industry, macro, and competitor synthesis extracted from a Theme Notebook and attached to every symbol mapped to that theme via `theme_symbol_mappings`.
+
+- **Source As-Of Date**:
+  The freshness date of a brief, derived by the system from the newest source's date (e.g. `..._2026-07-29_report.pdf`), never from the LLM's self-reported date (observed to be wrong).
+
+- **Freshness Threshold (Stale Alert)**:
+  A 90-day (1 calendar quarter) aging rule. Stocks whose `as_of_date` or `updated_at` exceeds 90 days are flagged with a warning badge in the Fundamental Intelligence Dashboard.
+
+- **MCP Ingestion Protocol (`save_fundamental_brief` & `save_theme_sector_context`)**:
+  High-reliability push tools in `mcp-worker` that ingest structured profiles directly from Gemini into Cloudflare D1 and persist OKF Markdown copies into Cloudflare R2 (`KNOWLEDGE_BUCKET`).
+
+- **Grounding Context Fusion**:
+  The assembly step in `debateEngine.ts` (`formatDebateContext`) that unifies:
+  1. Real-time Market Stats & Ratios (`market_stats`)
+  2. Company Fundamental Brief (`stock_fundamentals`)
+  3. Industry & Competitor Dynamics (`theme_sector_contexts`)
+  4. Recent Significant Events (`market_events`)
+
 
