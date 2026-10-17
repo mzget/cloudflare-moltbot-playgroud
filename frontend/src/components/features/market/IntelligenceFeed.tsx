@@ -41,7 +41,7 @@ export default function IntelligenceFeed({
   onArticleDelete?: (id: number) => Promise<void>;
   onArticleRead?: (id: number) => void;
 }) {
-  const [filter, setFilter] = React.useState<'all' | 'reports' | 'digests' | 'articles'>('all');
+  const [filter, setFilter] = React.useState<'all' | 'digests' | 'articles'>('all');
 
   const unreadCount = React.useMemo(() => {
     return digests.filter(d => d.is_readed !== 1).length;
@@ -88,7 +88,6 @@ export default function IntelligenceFeed({
   // Filter items strictly by source_type
   const filteredFeed = React.useMemo(() => {
     return combinedFeed.filter(item => {
-      if (filter === 'reports') return item.source_type === 'daily_report';
       if (filter === 'digests') return item.source_type === 'email_digest';
       if (filter === 'articles') return item.source_type === 'notebook_article';
       return true;
@@ -168,20 +167,6 @@ export default function IntelligenceFeed({
               All
             </Button>
             <Button
-              onClick={() => setFilter('reports')}
-              sx={{
-                fontWeight: 600,
-                flex: { xs: 1, sm: 'initial' },
-                whiteSpace: 'nowrap',
-                bgcolor: filter === 'reports' ? 'background.surface' : 'transparent',
-                color: filter === 'reports' ? 'primary.plainColor' : 'text.secondary',
-                boxShadow: filter === 'reports' ? '0 2px 8px rgba(0,0,0,0.15)' : 'none',
-                '&:hover': { bgcolor: filter === 'reports' ? 'background.surface' : 'background.level2' }
-              }}
-            >
-              Symbol Reports
-            </Button>
-            <Button
               onClick={() => setFilter('digests')}
               sx={{
                 fontWeight: 600,
@@ -251,13 +236,11 @@ export default function IntelligenceFeed({
         <Sheet sx={{ ...glassStyle, p: 4, textAlign: 'center' }}>
           <Typography level="h4" sx={{ mb: 1 }}>Quiet on the Horizon</Typography>
           <Typography sx={{ color: 'text.secondary' }}>
-            {filter === 'reports'
-              ? 'No symbol reports generated yet.'
-              : filter === 'digests'
-                ? 'No email digests generated yet. Make sure your Gmail is connected.'
-                : filter === 'articles'
-                  ? 'No market articles or analyses ingested yet.'
-                  : 'No intelligence reports, email digests, or articles generated yet.'}
+            {filter === 'digests'
+              ? 'No email digests generated yet. Make sure your Gmail is connected.'
+              : filter === 'articles'
+                ? 'No market articles or analyses ingested yet.'
+                : 'No intelligence reports, email digests, or articles generated yet.'}
           </Typography>
         </Sheet>
       ) : (
