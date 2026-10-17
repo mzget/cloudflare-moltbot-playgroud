@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Typography,
@@ -8,11 +8,9 @@ import {
   TabPanel,
 } from '@mui/joy';
 import {
-  Globe,
   Mail,
 } from 'lucide-react';
 import { useSettingsStore, type DensityMode } from '../../../store/settingsStore';
-import WebCrawlerTab from './WebCrawlerTab';
 import GmailNewslettersTab from './GmailNewslettersTab';
 import FacebookQueueTab, { FacebookIcon } from './FacebookQueueTab';
 
@@ -33,7 +31,7 @@ export default function SourceManager({ initialTab = 0 }: { initialTab?: number 
     <Box sx={{ p: 2 }}>
       <Typography level="h2" sx={{ fontWeight: 800, mb: 1 }}>Command Center</Typography>
       <Typography sx={{ color: 'text.secondary', mb: 3 }}>
-        Manage crawlers, web search definitions, and email newsletter configurations.
+        Manage email newsletter configurations and Facebook auto-posting.
       </Typography>
 
       <Tabs value={index} onChange={(_e, val) => setIndex(val as number)}>
@@ -50,10 +48,6 @@ export default function SourceManager({ initialTab = 0 }: { initialTab?: number 
           }}
         >
           <Tab disableIndicator sx={{ px: 3, borderRadius: '8px' }}>
-            <Globe size={16} style={{ marginRight: 8 }} />
-            Web & RSS Crawler
-          </Tab>
-          <Tab disableIndicator sx={{ px: 3, borderRadius: '8px' }}>
             <Mail size={16} style={{ marginRight: 8 }} />
             Gmail Newsletters
           </Tab>
@@ -64,15 +58,11 @@ export default function SourceManager({ initialTab = 0 }: { initialTab?: number 
         </TabList>
 
         <TabPanel value={0} sx={{ p: 0 }}>
-          <WebCrawlerTab density={density} />
-        </TabPanel>
-
-        <TabPanel value={1} sx={{ p: 0 }}>
           <GmailNewslettersTab density={density} />
         </TabPanel>
 
-        <TabPanel value={2} sx={{ p: 0 }}>
-          <FacebookQueueTab density={density} active={index === 2} />
+        <TabPanel value={1} sx={{ p: 0 }}>
+          <FacebookQueueTab density={density} active={index === 1} />
         </TabPanel>
       </Tabs>
     </Box>

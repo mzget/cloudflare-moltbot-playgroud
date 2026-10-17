@@ -1,20 +1,10 @@
-﻿import * as React from 'react';
+import * as React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { renderToString } from 'react-dom/server';
 import SourceManager, { FacebookIcon } from './SourceManager';
 
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => vi.fn(),
-}));
-
-vi.mock('./hooks/useCrawlerSources', () => ({
-  useCrawlerSources: () => ({
-    sources: [],
-    loading: false,
-    fetchSources: vi.fn(),
-    saveSource: vi.fn(),
-    deleteSource: vi.fn(),
-  }),
 }));
 
 vi.mock('./hooks/useGmailSubscriptions', () => ({
@@ -36,30 +26,24 @@ vi.mock('./hooks/useGmailSubscriptions', () => ({
 }));
 
 describe('SourceManager Component', () => {
-  it('renders all 3 tabs in tablist', () => {
+  it('renders all 2 tabs in tablist', () => {
     const html = renderToString(<SourceManager initialTab={0} />);
 
     expect(html).toContain('Command Center');
-    expect(html).toContain('Web &amp; RSS Crawler');
+    expect(html).not.toContain('Web &amp; RSS Crawler');
     expect(html).toContain('Gmail Newsletters');
     expect(html).toContain('Facebook Page');
     expect(html).not.toContain('Fundamental Intelligence');
   });
 
-  it('renders WebCrawlerTab at initialTab={0}', () => {
+  it('renders GmailNewslettersTab at initialTab={0}', () => {
     const html = renderToString(<SourceManager initialTab={0} />);
-    expect(html).toContain('Active Web Targets');
-    expect(html).toContain('Crawler &amp; Report Controls');
-  });
-
-  it('renders GmailNewslettersTab at initialTab={1}', () => {
-    const html = renderToString(<SourceManager initialTab={1} />);
     expect(html).toContain('Gmail API Connection');
     expect(html).toContain('Newsletter Rules');
   });
 
-  it('renders FacebookQueueTab at initialTab={2}', () => {
-    const html = renderToString(<SourceManager initialTab={2} />);
+  it('renders FacebookQueueTab at initialTab={1}', () => {
+    const html = renderToString(<SourceManager initialTab={1} />);
     expect(html).toContain('Facebook Auto-Posting Controls');
     expect(html).toContain('Custom Standalone Posts');
   });

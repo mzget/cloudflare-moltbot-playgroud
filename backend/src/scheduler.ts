@@ -114,7 +114,6 @@ export function getScheduledWorkflowParams(
 				syncEmails: true,       // 24/7 hourly email ingestion
 				generateEmailDigests: isDaytime, // Daytime only (08:00 - 18:00 Asia/Bangkok)
 				emailDigestsManual: false,
-				runCrawler: false,
 				generateDailySummaries: false,
 				scanMarketBreakouts: false, // Handled separately at :05, :20, :35, :50
 				fetchMarketEvents: isSixHourly,

@@ -93,7 +93,6 @@ describe('scheduler - getScheduledWorkflowParams', () => {
 		expect(decision.params.checkAlertRules).toBe(true);
 		expect(decision.params.syncEmails).toBe(true);
 		expect(decision.params.generateEmailDigests).toBe(true);
-		expect(decision.params.runCrawler).toBe(false);
 		expect(decision.params.generateDailySummaries).toBe(false);
 		expect(decision.params.scanMarketBreakouts).toBe(false);
 	});
@@ -107,7 +106,6 @@ describe('scheduler - getScheduledWorkflowParams', () => {
 		expect(decision.workflowId).toMatch(/^cron-hourly-\d+$/);
 		expect(decision.params.syncEmails).toBe(true);
 		expect(decision.params.generateEmailDigests).toBe(false);
-		expect(decision.params.runCrawler).toBe(false);
 		expect(decision.params.generateDailySummaries).toBe(false);
 		expect(decision.params.scanMarketBreakouts).toBe(false);
 	});

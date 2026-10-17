@@ -48,7 +48,7 @@ const NewsFeed: React.FC = () => {
         return (
             <div className="text-center text-gray-500 py-20 glass rounded-2xl">
                 <Newspaper className="mx-auto w-12 h-12 mb-4 opacity-20" />
-                <p>No news found yet. Wait for the crawler to run.</p>
+                <p>No news found yet.</p>
             </div>
         );
     }

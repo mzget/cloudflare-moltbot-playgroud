@@ -52,7 +52,6 @@ const rateLimitCache = new Map<string, number>();
 export const rateLimitMiddleware = createMiddleware<AppEnv>(async (c, next) => {
   const path = c.req.path;
   const isTriggerRoute = path === '/api/email-test' ||
-    path === '/api/crawl' ||
     path === '/api/summarize-all' ||
     path === '/api/test-market-stats' ||
     path === '/api/crawl-events' ||

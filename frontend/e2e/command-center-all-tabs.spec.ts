@@ -31,27 +31,6 @@ test.describe('Command Center - All 4 Tabs E2E Suite', () => {
     },
   ];
 
-  const mockWebSources = [
-    {
-      id: 1,
-      name: 'Google News AI & Tech',
-      url_pattern: 'https://news.google.com/rss/search?q={symbol}+AI',
-      selector: '',
-      type: 'RSS',
-      enabled: 1,
-      created_at: 1720000000,
-    },
-    {
-      id: 2,
-      name: 'Yahoo Finance Headlines',
-      url_pattern: 'https://finance.yahoo.com/quote/{symbol}/news',
-      selector: "section[data-test='qsp-news'] a",
-      type: 'WEB',
-      enabled: 0,
-      created_at: 1720001000,
-    },
-  ];
-
   const mockSubscriptions = [
     {
       id: 1,
@@ -176,73 +155,9 @@ test.describe('Command Center - All 4 Tabs E2E Suite', () => {
   });
 
   // ==========================================
-  // TAB 1: WEB & RSS CRAWLER
+  // TAB 1: GMAIL NEWSLETTERS
   // ==========================================
-  test.describe('Tab 1: Web & RSS Crawler', () => {
-    test('displays crawler controls, active web targets table, and handles Add Source modal', async ({ page }) => {
-      let createdSourcePayload: any = null;
-
-      await page.route('**/api/sources', async (route) => {
-        if (route.request().method() === 'POST') {
-          createdSourcePayload = route.request().postDataJSON();
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ success: true, id: 3 }),
-          });
-        } else {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify(mockWebSources),
-          });
-        }
-      });
-
-      await page.goto('/command-center');
-
-      // Verify Tab 1 is active by default
-      const crawlerTab = page.getByRole('tab', { name: /Web & RSS Crawler/i });
-      await expect(crawlerTab).toBeVisible();
-
-      // Verify Controls & Header
-      await expect(page.getByText('Crawler & Report Controls')).toBeVisible();
-      await expect(page.getByText('Active Web Targets')).toBeVisible();
-
-      // Verify Table Rows
-      await expect(page.getByText('Google News AI & Tech')).toBeVisible();
-      await expect(page.getByText('https://news.google.com/rss/search?q={symbol}+AI')).toBeVisible();
-      await expect(page.getByText('Yahoo Finance Headlines')).toBeVisible();
-
-      // Open Add Source Modal
-      const addSourceBtn = page.getByRole('button', { name: /Add Source/i });
-      await expect(addSourceBtn).toBeVisible();
-      await addSourceBtn.click();
-
-      // Verify Add Source dialog
-      await expect(page.getByRole('dialog')).toBeVisible();
-      await expect(page.getByRole('heading', { name: /Add Source/i })).toBeVisible();
-
-      // Fill in source form
-      await page.getByPlaceholder(/e\.g\. Yahoo News Tech/i).fill('Bloomberg Tech RSS');
-      await page.getByPlaceholder(/https:\/\/finance\.yahoo\.com/i).fill('https://bloomberg.com/feed/{symbol}');
-
-      // Save Source
-      const saveSourceBtn = page.getByRole('button', { name: /Save Source/i });
-      await saveSourceBtn.click();
-
-      // Verify API was called with correct payload
-      await expect.poll(() => createdSourcePayload).not.toBeNull();
-      expect(createdSourcePayload.name).toBe('Bloomberg Tech RSS');
-      expect(createdSourcePayload.url_pattern).toBe('https://bloomberg.com/feed/{symbol}');
-      expect(createdSourcePayload.type).toBe('RSS');
-    });
-  });
-
-  // ==========================================
-  // TAB 2: GMAIL NEWSLETTERS
-  // ==========================================
-  test.describe('Tab 2: Gmail Newsletters', () => {
+  test.describe('Tab 1: Gmail Newsletters', () => {
     test('displays connection status, sync buttons, and opens Add Rule modal', async ({ page }) => {
       let emailSyncTriggered = false;
       let createdSubPayload: any = null;

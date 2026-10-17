@@ -9,7 +9,7 @@ const buildApp = () => {
   app.use('/api/*', rateLimitMiddleware);
   app.get('/api/watchlist', (c) => c.text('ok'));
   app.get('/api/auth/user/login-url', (c) => c.text('login'));
-  app.get('/api/crawl', (c) => c.text('crawled'));
+  app.get('/api/summarize-all', (c) => c.text('summarized'));
   return app;
 };
 
@@ -37,7 +37,7 @@ describe('middleware', () => {
   it('does not rate-limit trigger routes in local mode', async () => {
     const app = buildApp();
     const env = { IS_LOCAL: 'true' } as any;
-    expect((await app.request('/api/crawl', {}, env)).status).toBe(200);
-    expect((await app.request('/api/crawl', {}, env)).status).toBe(200);
+    expect((await app.request('/api/summarize-all', {}, env)).status).toBe(200);
+    expect((await app.request('/api/summarize-all', {}, env)).status).toBe(200);
   });
 });
