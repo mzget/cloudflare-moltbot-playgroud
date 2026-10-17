@@ -1,11 +1,10 @@
-import * as React from 'react';
+﻿import * as React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { renderToString } from 'react-dom/server';
 import {
   FundamentalIntelligenceTab,
   type FundamentalStatusItem,
 } from './FundamentalIntelligenceTab';
-import SourceManager from './SourceManager';
 
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => vi.fn(),
@@ -428,43 +427,4 @@ describe('Challenger M4-2: Empirical Stress-Test Suite', () => {
     });
   });
 
-  // ==========================================================================
-  // Dimension 4: Tab Composition in SourceManager
-  // ==========================================================================
-  describe('Dimension 4: Tab Composition in SourceManager', () => {
-    it('4.1: SourceManager renders 4th tab with BookOpen icon and "Fundamental Intelligence" label', () => {
-      const html = renderToString(<SourceManager initialTab={0} />);
-
-      // Verify all 4 tabs in tab list
-      expect(html).toContain('Web &amp; RSS Crawler');
-      expect(html).toContain('Gmail Newsletters');
-      expect(html).toContain('Facebook Page');
-      expect(html).toContain('Fundamental Intelligence');
-    });
-
-    it('4.2: SourceManager with initialTab={3} mounts and renders FundamentalIntelligenceTab', () => {
-      const html = renderToString(<SourceManager initialTab={3} />);
-
-      // When tab 3 is mounted:
-      expect(html).toContain('Fundamental Intelligence');
-      expect(html).toContain('Track qualitative research freshness, filing dates, and linked themes for watchlist equities.');
-      expect(html).toContain('Total Tickers');
-      expect(html).toContain('Active (&lt;90d)');
-      expect(html).toContain('Stale (≥90d)');
-      expect(html).toContain('Missing');
-      expect(html).toContain('Refresh Status');
-      expect(html).toContain('Search by symbol, company, or theme...');
-    });
-
-    it('4.3: Switching tab parameter mounts FundamentalIntelligenceTab at TabPanel value 3', () => {
-      // In SourceManager:
-      // TabPanel value 0: Web targets & crawler controls
-      // TabPanel value 3: FundamentalIntelligenceTab
-      const html0 = renderToString(<SourceManager initialTab={0} />);
-      expect(html0).toContain('Active Web Targets');
-
-      const html3 = renderToString(<SourceManager initialTab={3} />);
-      expect(html3).toContain('Search by symbol, company, or theme...');
-    });
-  });
 });

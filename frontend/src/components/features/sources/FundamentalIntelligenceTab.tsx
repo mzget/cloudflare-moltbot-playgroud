@@ -14,6 +14,8 @@ import {
   Alert,
   CircularProgress,
   Link,
+  Card,
+  CardContent,
 } from '@mui/joy';
 import {
   Search,
@@ -63,6 +65,8 @@ export interface FundamentalIntelligenceTabProps {
   onViewAnalysis?: (symbol: string) => void;
   /** Optional table density override */
   density?: DensityMode;
+  /** Display layout: classic table (default) or one card per symbol */
+  layout?: 'table' | 'cards';
 }
 
 export const FundamentalIntelligenceTab: React.FC<FundamentalIntelligenceTabProps> = ({
@@ -70,6 +74,7 @@ export const FundamentalIntelligenceTab: React.FC<FundamentalIntelligenceTabProp
   autoFetch = true,
   onViewAnalysis,
   density: propDensity,
+  layout = 'table',
 }) => {
   let routerNavigate: any = null;
   try {
@@ -419,6 +424,7 @@ export const FundamentalIntelligenceTab: React.FC<FundamentalIntelligenceTabProp
       </Sheet>
 
       {/* Main Table */}
+      {layout === 'table' ? (
       <Sheet
         sx={{
           ...glassStyle,
@@ -564,6 +570,122 @@ export const FundamentalIntelligenceTab: React.FC<FundamentalIntelligenceTabProp
           </tbody>
         </Table>
       </Sheet>
+      ) : (
+        <Grid container spacing={2}>
+          {loading && items.length === 0 ? (
+            <Grid xs={12}>
+              <Stack direction="row" spacing={1.5} justifyContent="center" alignItems="center" sx={{ p: 4 }}>
+                <CircularProgress size="sm" />
+                <Typography level="body-sm" sx={{ color: 'text.secondary' }}>
+                  Loading fundamental status...
+                </Typography>
+              </Stack>
+            </Grid>
+          ) : filteredItems.length === 0 ? (
+            <Grid xs={12}>
+              <Typography level="body-sm" sx={{ color: 'text.secondary', textAlign: 'center', p: 4 }}>
+                {searchQuery || statusFilter !== 'all'
+                  ? 'No stocks match your filter criteria.'
+                  : 'No stocks found in watchlist.'}
+              </Typography>
+            </Grid>
+          ) : (
+            filteredItems.map((item) => (
+              <Grid key={item.symbol} xs={12} sm={12} md={6} lg={6} xl={4}>
+                <Card
+                  sx={{
+                    ...glassStyle,
+                    border: '1px solid rgba(255, 255, 255, 0.08)',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                    transition: 'all 0.3s ease-in-out',
+                    height: '100%',
+                  }}
+                >
+                  <CardContent sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, justifyContent: 'space-between' }}>
+                    <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1}>
+                      <Box sx={{ minWidth: 0 }}>
+                        <Link
+                          component="a"
+                          href={`/analysis?symbol=${encodeURIComponent(item.symbol)}&tab=report`}
+                          onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                            if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
+                              e.preventDefault();
+                              handleViewAnalysis(item.symbol);
+                            }
+                          }}
+                          level="title-lg"
+                          sx={{
+                            fontFamily: 'monospace',
+                            fontWeight: 800,
+                            color: 'primary.plainColor',
+                            textDecoration: 'none',
+                            '&:hover': { textDecoration: 'underline' },
+                          }}
+                        >
+                          {item.symbol}
+                        </Link>
+                        <Typography level="body-sm" sx={{ opacity: 0.7 }} noWrap>
+                          {item.company_name}
+                        </Typography>
+                      </Box>
+                      <FundamentalFreshnessBadge
+                        status={item.status}
+                        asOfDate={item.as_of_date}
+                        format="verbose"
+                      />
+                    </Stack>
+
+                    <Stack direction="row" spacing={2} alignItems="center">
+                      <Box>
+                        <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>As-Of Date</Typography>
+                        <Typography level="body-sm" sx={{ fontFamily: 'monospace' }}>
+                          {item.as_of_date || '—'}
+                        </Typography>
+                      </Box>
+                      <Box>
+                        <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>Sources</Typography>
+                        <Chip size="sm" variant="soft" color="neutral" sx={{ fontWeight: 600 }}>
+                          {item.source_count ?? 0}
+                        </Chip>
+                      </Box>
+                    </Stack>
+
+                    <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+                      {item.theme_tags && item.theme_tags.length > 0 ? (
+                        item.theme_tags.map((tag) => (
+                          <Chip
+                            key={tag}
+                            size="sm"
+                            variant="outlined"
+                            color="primary"
+                            startDecorator={<Layers size={12} />}
+                            sx={{ fontSize: '0.7rem' }}
+                          >
+                            {tag}
+                          </Chip>
+                        ))
+                      ) : (
+                        <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>—</Typography>
+                      )}
+                    </Stack>
+
+                    <Button
+                      size="sm"
+                      variant="soft"
+                      color="primary"
+                      startDecorator={<Copy size={14} />}
+                      onClick={() => setSelectedStockForPrompt(item)}
+                      sx={{ borderRadius: '8px', fontWeight: 600, alignSelf: 'flex-end' }}
+                    >
+                      Copy Prompt
+                    </Button>
+                  </CardContent>
+                </Card>
+              </Grid>
+            ))
+          )}
+        </Grid>
+      )}
 
       {/* Copy Prompt Modal */}
       <CopyPromptModal

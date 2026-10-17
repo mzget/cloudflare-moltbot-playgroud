@@ -5,6 +5,8 @@ import { WatchlistCard } from './WatchlistCard';
 import AddSecurityBox from './AddSecurityBox';
 import { EditSecurityModal } from './EditSecurityModal';
 import { AlertsManagerModal } from './AlertsManagerModal';
+import type { FundamentalStatusItem, FundamentalStatusResponse } from '../sources/FundamentalIntelligenceTab';
+import { CopyPromptModal } from '../sources/CopyPromptModal';
 import {
   Typography,
   Select,
@@ -49,6 +51,34 @@ export default function MyWatchlist() {
   // Alert Modal State
   const [isAlertsModalOpen, setIsAlertsModalOpen] = useState(false);
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
+
+  // Copy Prompt Modal State
+  const [copyPromptItem, setCopyPromptItem] = useState<{ symbol: string; companyName?: string; asOfDate?: string | null } | null>(null);
+
+  // Fundamental Intelligence Status State
+  const [fundamentalMap, setFundamentalMap] = useState<Record<string, FundamentalStatusItem>>({});
+
+  const fetchFundamentalStatus = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/fundamentals/status`);
+      if (res.ok) {
+        const data: FundamentalStatusResponse = await res.json();
+        const map: Record<string, FundamentalStatusItem> = {};
+        if (Array.isArray(data.items)) {
+          for (const item of data.items) {
+            map[item.symbol.toUpperCase()] = item;
+          }
+        }
+        setFundamentalMap(map);
+      }
+    } catch (e) {
+      console.error('Failed to fetch fundamental status:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchFundamentalStatus();
+  }, [fetchFundamentalStatus]);
 
   const {
     symbolRules,
@@ -188,6 +218,20 @@ export default function MyWatchlist() {
     setSelectedSymbol(null);
   }, []);
 
+  const handleOpenCopyPrompt = useCallback((item: WatchlistItem) => {
+    const symUpper = item.symbol.toUpperCase();
+    const fund = fundamentalMap[symUpper];
+    setCopyPromptItem({
+      symbol: item.symbol,
+      companyName: item.name || fund?.company_name,
+      asOfDate: fund?.as_of_date,
+    });
+  }, [fundamentalMap]);
+
+  const handleCloseCopyPrompt = useCallback(() => {
+    setCopyPromptItem(null);
+  }, []);
+
   const handleCreateRule = useCallback(
     async (metric: string, condition: string, targetVal: number, note?: string) => {
       if (!selectedSymbol) return;
@@ -265,7 +309,8 @@ export default function MyWatchlist() {
     setToastColor('success');
     setToastMessage('Symbol added successfully!');
     setToastOpen(true);
-  }, []);
+    fetchFundamentalStatus();
+  }, [fetchFundamentalStatus]);
 
   const handleAddError = useCallback((errMsg: string) => {
     setToastColor('danger');
@@ -359,15 +404,26 @@ export default function MyWatchlist() {
             <WatchlistCard
               item={item}
               todayEvents={todayEventsMap[item.symbol.toUpperCase()] || EMPTY_EVENTS}
+              fundamental={fundamentalMap[item.symbol.toUpperCase()] || null}
               onEdit={handleOpenEditModal}
               onAlertsClick={handleOpenAlertsModal}
               onViewAnalysis={handleViewAnalysis}
+              onCopyPrompt={handleOpenCopyPrompt}
               onToggleActive={handleToggleActive}
               onTogglePortfolio={handleTogglePortfolio}
             />
           </Grid>
         ))}
       </Grid>
+
+      {/* Copy Prompt Modal */}
+      <CopyPromptModal
+        open={!!copyPromptItem}
+        onClose={handleCloseCopyPrompt}
+        symbol={copyPromptItem?.symbol}
+        companyName={copyPromptItem?.companyName}
+        asOfDate={copyPromptItem?.asOfDate}
+      />
 
       {/* Alert Rules Manager Modal */}
       <AlertsManagerModal
