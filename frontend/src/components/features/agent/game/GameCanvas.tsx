@@ -76,15 +76,6 @@ const INITIAL_NPCS: NPC[] = [
     metadata: { type: 'scheduled-job', endpoint: '/api/test-market-stats', triggerLabel: 'Fetch Stats', schedule: 'Hourly' },
   },
   {
-    id: 'job-crawler', name: 'runCrawler', type: 'pokemon',
-    worldX: 14 * TILE_SIZE, worldY: 8 * TILE_SIZE,
-    width: TILE_SIZE, height: TILE_SIZE,
-    spriteUrl: 'https://img.pokemondb.net/sprites/black-white/anim/normal/scyther.gif',
-    responsibility: 'Crawls Google/Yahoo', dialogue: ['Cron: Every 6 hours', 'Job: Crawl Google News & Yahoo Finance.', 'Falls back to Puppeteer if RSS fails.'],
-    isSolid: true, animationType: 'waddle',
-    metadata: { type: 'scheduled-job', endpoint: '/api/crawl', triggerLabel: 'Start Crawl', schedule: 'Every 6h' },
-  },
-  {
     id: 'job-summarizer', name: 'generateDailySummaries', type: 'pokemon',
     worldX: 13 * TILE_SIZE, worldY: 10 * TILE_SIZE,
     width: TILE_SIZE, height: TILE_SIZE,

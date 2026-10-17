@@ -44,7 +44,7 @@ export const HEROES: HeroConfig[] = [
       { key: 'Q', name: 'View Reports', description: 'Read latest market reports', icon: 'FileText' },
       { key: 'W', name: 'Scan Digests', description: 'Check email digests', icon: 'Mail' },
       { key: 'E', name: 'Timeline', description: 'View market events timeline', icon: 'Clock' },
-      { key: 'R', name: 'Force Crawl', description: 'Trigger news crawler', icon: 'RefreshCw', cooldown: 60 },
+      { key: 'R', name: 'Summarize', description: 'Trigger daily summaries generation', icon: 'RefreshCw', cooldown: 60 },
     ],
   },
   {

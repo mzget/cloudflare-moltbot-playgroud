@@ -74,14 +74,6 @@ test.describe('Command Center - Gmail Newsletters Tab', () => {
       });
     });
 
-    await page.route('**/api/sources', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify([]),
-      });
-    });
-
     await page.route('**/api/reports', async (route) => {
       await route.fulfill({
         status: 200,

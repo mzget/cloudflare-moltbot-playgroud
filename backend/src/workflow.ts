@@ -1,6 +1,5 @@
 import { WorkflowEntrypoint, WorkflowStep, WorkflowEvent } from 'cloudflare:workers';
 import { Env } from './index';
-import { runCrawler } from './crawler';
 import { generateDailySummary } from './summarizer';
 import { sendDailyEmailReport } from './email';
 import { fetchAndStoreMarketStats } from './marketData';
@@ -18,7 +17,6 @@ export interface OaktreeWorkflowParams {
 	syncEmails?: boolean;
 	generateEmailDigests?: boolean;
 	emailDigestsManual?: boolean;
-	runCrawler?: boolean;
 	generateDailySummaries?: boolean;
 	generateDailySummariesForce?: boolean;
 	fetchMarketEvents?: boolean;
@@ -101,20 +99,6 @@ export class OaktreeSyncWorkflow extends WorkflowEntrypoint<Env, OaktreeWorkflow
 				});
 			} catch (e) {
 				const msg = `generate-email-digests failed: ${(e as Error).message || e}`;
-				console.warn(`[Workflow] ${msg}`);
-				errors.push(msg);
-			}
-		}
-
-		if (params.runCrawler) {
-			try {
-				await step.do('run-crawler', STEP_CONFIG, async () => {
-					console.log('[Workflow] Starting step: run-crawler');
-					await runCrawler(this.env);
-					return { status: "completed" };
-				});
-			} catch (e) {
-				const msg = `run-crawler failed: ${(e as Error).message || e}`;
 				console.warn(`[Workflow] ${msg}`);
 				errors.push(msg);
 			}

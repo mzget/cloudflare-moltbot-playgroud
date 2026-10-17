@@ -1,6 +1,5 @@
 import { Hono } from 'hono';
 import type { AppEnv } from '../env';
-import { runCrawler } from '../crawler';
 import { sendDailyEmailReport } from '../email';
 import { fetchAndStoreMarketStats } from '../marketData';
 
@@ -86,19 +85,6 @@ system.post('/api/settings/clear-breakout-notifications', async (c) => {
 });
 
 
-// API: Trigger Crawler (Chains to Summarizer)
-system.get('/api/crawl', async (c) => {
-  try {
-    const instance = await c.env.OAKTREE_SYNC_WORKFLOW.create({
-      id: `manual-crawl-${Date.now()}`,
-      params: { runCrawler: true }
-    });
-    return c.text(`Crawler sequence started via Workflow: ${instance.id}`);
-  } catch (e) {
-    return c.text(`Failed to start crawler workflow: ${(e as any).message}`, 500);
-  }
-});
-
 // API: Summarize All Symbols
 system.get('/api/summarize-all', async (c) => {
   try {
@@ -118,7 +104,7 @@ system.get('/api/summarize-all', async (c) => {
 
 // API: Trigger Full Daily Sequence Manually (Legacy/Combined)
 system.get('/api/run-all', (c) => {
-  return c.redirect(`/api/crawl`, 307);
+  return c.redirect(`/api/summarize-all`, 307);
 });
 
 // API: Trigger Market Stats Update Manually (Test)

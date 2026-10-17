@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Command Center - All 4 Tabs E2E Suite', () => {
+test.describe('Command Center - All Tabs E2E Suite', () => {
   const mockFundamentalItems = [
     {
       symbol: 'NVDA',
@@ -28,27 +28,6 @@ test.describe('Command Center - All 4 Tabs E2E Suite', () => {
       source_count: 0,
       theme_tags: [],
       updated_at: null,
-    },
-  ];
-
-  const mockWebSources = [
-    {
-      id: 1,
-      name: 'Google News AI & Tech',
-      url_pattern: 'https://news.google.com/rss/search?q={symbol}+AI',
-      selector: '',
-      type: 'RSS',
-      enabled: 1,
-      created_at: 1720000000,
-    },
-    {
-      id: 2,
-      name: 'Yahoo Finance Headlines',
-      url_pattern: 'https://finance.yahoo.com/quote/{symbol}/news',
-      selector: "section[data-test='qsp-news'] a",
-      type: 'WEB',
-      enabled: 0,
-      created_at: 1720001000,
     },
   ];
 
@@ -176,73 +155,9 @@ test.describe('Command Center - All 4 Tabs E2E Suite', () => {
   });
 
   // ==========================================
-  // TAB 1: WEB & RSS CRAWLER
+  // TAB 1: GMAIL NEWSLETTERS
   // ==========================================
-  test.describe('Tab 1: Web & RSS Crawler', () => {
-    test('displays crawler controls, active web targets table, and handles Add Source modal', async ({ page }) => {
-      let createdSourcePayload: any = null;
-
-      await page.route('**/api/sources', async (route) => {
-        if (route.request().method() === 'POST') {
-          createdSourcePayload = route.request().postDataJSON();
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({ success: true, id: 3 }),
-          });
-        } else {
-          await route.fulfill({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify(mockWebSources),
-          });
-        }
-      });
-
-      await page.goto('/command-center');
-
-      // Verify Tab 1 is active by default
-      const crawlerTab = page.getByRole('tab', { name: /Web & RSS Crawler/i });
-      await expect(crawlerTab).toBeVisible();
-
-      // Verify Controls & Header
-      await expect(page.getByText('Crawler & Report Controls')).toBeVisible();
-      await expect(page.getByText('Active Web Targets')).toBeVisible();
-
-      // Verify Table Rows
-      await expect(page.getByText('Google News AI & Tech')).toBeVisible();
-      await expect(page.getByText('https://news.google.com/rss/search?q={symbol}+AI')).toBeVisible();
-      await expect(page.getByText('Yahoo Finance Headlines')).toBeVisible();
-
-      // Open Add Source Modal
-      const addSourceBtn = page.getByRole('button', { name: /Add Source/i });
-      await expect(addSourceBtn).toBeVisible();
-      await addSourceBtn.click();
-
-      // Verify Add Source dialog
-      await expect(page.getByRole('dialog')).toBeVisible();
-      await expect(page.getByRole('heading', { name: /Add Source/i })).toBeVisible();
-
-      // Fill in source form
-      await page.getByPlaceholder(/e\.g\. Yahoo News Tech/i).fill('Bloomberg Tech RSS');
-      await page.getByPlaceholder(/https:\/\/finance\.yahoo\.com/i).fill('https://bloomberg.com/feed/{symbol}');
-
-      // Save Source
-      const saveSourceBtn = page.getByRole('button', { name: /Save Source/i });
-      await saveSourceBtn.click();
-
-      // Verify API was called with correct payload
-      await expect.poll(() => createdSourcePayload).not.toBeNull();
-      expect(createdSourcePayload.name).toBe('Bloomberg Tech RSS');
-      expect(createdSourcePayload.url_pattern).toBe('https://bloomberg.com/feed/{symbol}');
-      expect(createdSourcePayload.type).toBe('RSS');
-    });
-  });
-
-  // ==========================================
-  // TAB 2: GMAIL NEWSLETTERS
-  // ==========================================
-  test.describe('Tab 2: Gmail Newsletters', () => {
+  test.describe('Tab 1: Gmail Newsletters', () => {
     test('displays connection status, sync buttons, and opens Add Rule modal', async ({ page }) => {
       let emailSyncTriggered = false;
       let createdSubPayload: any = null;
@@ -464,74 +379,26 @@ test.describe('Command Center - All 4 Tabs E2E Suite', () => {
   });
 
   // ==========================================
-  // TAB 4: FUNDAMENTAL INTELLIGENCE
+  // TAB NAVIGATION & SWITCHER
   // ==========================================
-  test.describe('Tab 4: Fundamental Intelligence', () => {
-    test('renders freshness metrics, filter chips, stock table, analysis links, and Copy Prompt modal', async ({ page }) => {
+  test.describe('Tab Navigation', () => {
+    test('seamlessly switches between active tabs in Command Center', async ({ page }) => {
       await page.goto('/command-center');
 
-      // Click Fundamental Intelligence tab
-      const fundamentalTab = page.getByRole('tab', { name: /Fundamental Intelligence/i });
-      await expect(fundamentalTab).toBeVisible();
-      await fundamentalTab.click();
-
-      // Verify Header
-      await expect(page.getByRole('heading', { name: 'Fundamental Intelligence' })).toBeVisible();
-      await expect(page.getByText('Track qualitative research freshness')).toBeVisible();
-
-      // Verify Summary Cards
-      await expect(page.getByText('Total Tickers')).toBeVisible();
-      await expect(page.getByText('Active (<90d)', { exact: true })).toBeVisible();
-      await expect(page.getByText('Stale (≥90d)', { exact: true })).toBeVisible();
-      await expect(page.getByText('Missing', { exact: true })).toBeVisible();
-
-      // Verify Table Rows
-      await expect(page.getByText('NVDA')).toBeVisible();
-      await expect(page.getByText('NVIDIA Corporation')).toBeVisible();
-      await expect(page.getByText('AAPL')).toBeVisible();
-      await expect(page.getByText('TSLA')).toBeVisible();
-
-      // Check analysis deep link on symbol
-      const nvdaLink = page.getByRole('link', { name: 'NVDA' });
-      await expect(nvdaLink).toBeVisible();
-      await expect(nvdaLink).toHaveAttribute('href', '/analysis?symbol=NVDA&tab=report');
-
-      // Open Copy Prompt Modal
-      const copyPromptBtn = page.getByRole('button', { name: /Copy Prompt/i }).first();
-      await expect(copyPromptBtn).toBeVisible();
-      await copyPromptBtn.click();
-
-      // Verify Modal Dialog opens
-      await expect(page.getByRole('dialog')).toBeVisible();
-      await expect(page.getByText(/Gemini Extraction Prompt/i)).toBeVisible();
-
-      // Close Modal
-      const closeBtn = page.getByRole('button', { name: /Close/i });
-      await closeBtn.click();
-      await expect(page.getByRole('dialog')).not.toBeVisible();
-    });
-
-    test('seamlessly switches between all 4 tabs in Command Center', async ({ page }) => {
-      await page.goto('/command-center');
-
-      // 1. Web & RSS Crawler
-      await expect(page.getByRole('tab', { name: /Web & RSS Crawler/i })).toBeVisible();
-      await expect(page.getByText('Active Web Targets')).toBeVisible();
-
-      // 2. Gmail Newsletters
-      await page.getByRole('tab', { name: /Gmail Newsletters/i }).click();
+      // 1. Gmail Newsletters (Active by default)
+      await expect(page.getByRole('tab', { name: /Gmail Newsletters/i })).toBeVisible();
       await expect(page.getByText('Newsletter Rules', { exact: true })).toBeVisible();
 
-      // 3. Facebook Page
+      // 2. Facebook Page
       await page.getByRole('tab', { name: /Facebook Page/i }).click();
       await expect(page.getByText('Facebook Auto-Posting Controls')).toBeVisible();
 
-      // 4. Fundamental Intelligence
-      await page.getByRole('tab', { name: /Fundamental Intelligence/i }).click();
-      await expect(page.getByText('Track qualitative research freshness')).toBeVisible();
-      await expect(page.getByText('NVDA')).toBeVisible();
+      // Switch back to Gmail Newsletters
+      await page.getByRole('tab', { name: /Gmail Newsletters/i }).click();
+      await expect(page.getByText('Newsletter Rules', { exact: true })).toBeVisible();
     });
   });
 });
+
 
 

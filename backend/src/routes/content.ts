@@ -61,35 +61,4 @@ content.delete('/api/news', async (c) => {
     return c.text(`Failed to purge news: ${(e as any).message}`, 500);
   }
 });
-
-// API: Source Operations
-content.get('/api/sources', async (c) => {
-  const { results } = await c.env.DB.prepare('SELECT * FROM news_sources').all();
-  return c.json(results);
-});
-
-content.post('/api/sources', async (c) => {
-  const source = await c.req.json() as any;
-  await c.env.DB.prepare('INSERT INTO news_sources (name, url_pattern, selector, type, enabled) VALUES (?, ?, ?, ?, ?)')
-    .bind(source.name, source.url_pattern, source.selector, source.type, source.enabled ? 1 : 0).run();
-  return c.text('Source updated');
-});
-
-content.put('/api/sources', async (c) => {
-  const source = await c.req.json() as any;
-  await c.env.DB.prepare('UPDATE news_sources SET name=?, url_pattern=?, selector=?, type=?, enabled=? WHERE id=?')
-    .bind(source.name, source.url_pattern, source.selector, source.type, source.enabled ? 1 : 0, source.id).run();
-  return c.text('Source updated');
-});
-
-content.delete('/api/sources', async (c) => {
-  try {
-    const id = c.req.query('id');
-    await c.env.DB.prepare('DELETE FROM news_sources WHERE id = ?').bind(id).run();
-    return c.text('Source removed');
-  } catch (e) {
-    return c.text(`Failed to remove source: ${(e as any).message}`, 500);
-  }
-});
-
 export default content;
