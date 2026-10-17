@@ -1,15 +1,19 @@
 import React from 'react';
-import { Box, Typography, Card, CardContent, Divider, Switch, CardActions, Avatar, Stack, IconButton, Badge, Button } from '@mui/joy';
-import { Pencil, Bell, FileText } from 'lucide-react';
+import { Box, Typography, Card, CardContent, Divider, Switch, CardActions, Avatar, Stack, IconButton, Badge, Button, Chip } from '@mui/joy';
+import { Pencil, Bell, FileText, Copy, Layers } from 'lucide-react';
 import type { WatchlistItem } from './hooks/useWatchlist';
+import type { FundamentalStatusItem } from '../sources/FundamentalIntelligenceTab';
+import { FundamentalFreshnessBadge } from '../sources/FundamentalFreshnessBadge';
 import { glassStyle } from '../../../styles/glass';
 
 interface WatchlistCardProps {
   item: WatchlistItem;
   todayEvents?: { id: string; symbol: string; event_type: string; title: string; description?: string }[];
+  fundamental?: FundamentalStatusItem | null;
   onEdit: (item: WatchlistItem) => void;
   onAlertsClick: (symbol: string) => void;
   onViewAnalysis: (symbol: string) => void;
+  onCopyPrompt?: (item: WatchlistItem) => void;
   onToggleActive: (symbol: string, currentStatus: number) => Promise<void>;
   onTogglePortfolio: (symbol: string, currentPortfolioStatus: number) => Promise<void>;
 }
@@ -18,7 +22,11 @@ function areWatchlistCardPropsEqual(
   prevProps: WatchlistCardProps,
   nextProps: WatchlistCardProps
 ): boolean {
-  if (prevProps.item === nextProps.item && prevProps.todayEvents === nextProps.todayEvents) {
+  if (
+    prevProps.item === nextProps.item &&
+    prevProps.todayEvents === nextProps.todayEvents &&
+    prevProps.fundamental === nextProps.fundamental
+  ) {
     return true;
   }
 
@@ -34,6 +42,17 @@ function areWatchlistCardPropsEqual(
     prevItem.active_alerts_count !== nextItem.active_alerts_count ||
     prevItem.sector_label !== nextItem.sector_label ||
     prevItem.sector_label_color !== nextItem.sector_label_color
+  ) {
+    return false;
+  }
+
+  const prevFund = prevProps.fundamental;
+  const nextFund = nextProps.fundamental;
+  if (
+    prevFund?.status !== nextFund?.status ||
+    prevFund?.as_of_date !== nextFund?.as_of_date ||
+    prevFund?.source_count !== nextFund?.source_count ||
+    prevFund?.theme_tags?.length !== nextFund?.theme_tags?.length
   ) {
     return false;
   }
@@ -60,9 +79,11 @@ function areWatchlistCardPropsEqual(
 export const WatchlistCard: React.FC<WatchlistCardProps> = React.memo(({
   item,
   todayEvents = [],
+  fundamental,
   onEdit,
   onAlertsClick,
   onViewAnalysis,
+  onCopyPrompt,
   onToggleActive,
   onTogglePortfolio,
 }) => {
@@ -70,9 +91,9 @@ export const WatchlistCard: React.FC<WatchlistCardProps> = React.memo(({
     <Card 
       sx={{ 
         ...glassStyle, 
-        border: item.in_portfolio ? '1.5px solid rgba(46, 204, 113, 0.45)' : '1px solid rgba(255, 255, 255, 0.08)',
+        border: item.in_portfolio ? '1.5px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(255, 255, 255, 0.08)',
         boxShadow: item.in_portfolio 
-          ? '0 0 12px rgba(46, 204, 113, 0.15), 0 4px 20px rgba(0,0,0,0.08)' 
+          ? '0 0 12px rgba(16, 185, 129, 0.12), 0 4px 20px rgba(0,0,0,0.08)' 
           : '0 2px 8px rgba(0,0,0,0.04)',
         transition: 'all 0.3s ease-in-out',
         position: 'relative',
@@ -80,7 +101,8 @@ export const WatchlistCard: React.FC<WatchlistCardProps> = React.memo(({
       }}
     >
       <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
+        {/* Top Header Row */}
+        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1.5 }}>
           <Stack direction="row" spacing={1.5} alignItems="center">
             <Avatar 
               src={`https://images.financialmodelingprep.com/symbol/${item.symbol}.png`}
@@ -100,51 +122,49 @@ export const WatchlistCard: React.FC<WatchlistCardProps> = React.memo(({
             </Avatar>
             <Box>
               <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
-                <Typography level="title-lg" sx={{ fontWeight: '700', letterSpacing: '0.5px', lineHeight: 1.2 }}>{item.symbol}</Typography>
-                <Box
+                <Typography level="title-lg" sx={{ fontWeight: '700', letterSpacing: '0.5px', lineHeight: 1.2 }}>
+                  {item.symbol}
+                </Typography>
+                <Chip
+                  size="sm"
+                  variant="outlined"
+                  color="neutral"
                   sx={{
                     fontSize: '9px',
-                    fontWeight: 'bold',
+                    fontWeight: 700,
                     textTransform: 'uppercase',
-                    px: 1,
-                    py: 0.25,
+                    px: 0.75,
+                    py: 0.1,
                     borderRadius: '4px',
-                    backgroundColor: item.type === 'etf' ? 'rgba(54, 162, 235, 0.15)' : 'rgba(16, 185, 129, 0.1)',
-                    color: item.type === 'etf' ? '#36a2eb' : '#10b981',
-                    border: item.type === 'etf' ? '1px solid rgba(54, 162, 235, 0.3)' : '1px solid rgba(16, 185, 129, 0.2)',
                     lineHeight: 1.2,
                   }}
                 >
                   {item.type || 'stock'}
-                </Box>
+                </Chip>
                 {todayEvents.length > 0 && (
-                  <Box
+                  <Chip
+                    size="sm"
+                    variant="soft"
+                    color="warning"
                     sx={{
                       fontSize: '9px',
-                      fontWeight: '800',
+                      fontWeight: 700,
                       textTransform: 'uppercase',
-                      px: 1,
-                      py: 0.25,
+                      px: 0.75,
+                      py: 0.1,
                       borderRadius: '4px',
-                      backgroundColor: 'rgba(234, 88, 12, 0.15)',
-                      color: '#f97316',
-                      border: '1px solid rgba(234, 88, 12, 0.35)',
                       lineHeight: 1.2,
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 0.5
                     }}
                   >
-                    🔥 {todayEvents.map(e => e.event_type.toUpperCase()).join(' & ')} TODAY
-                  </Box>
+                    {todayEvents.map(e => e.event_type.toUpperCase()).join(' & ')} TODAY
+                  </Chip>
                 )}
               </Stack>
               <Typography
                 level="body-sm"
                 sx={{
-                  opacity: item.sector_label ? 1 : 0.7,
-                  fontWeight: item.sector_label ? 600 : 500,
-                  color: item.sector_label && item.sector_label_color ? item.sector_label_color : undefined,
+                  opacity: 0.75,
+                  fontWeight: 500,
                 }}
               >
                 {item.sector_label || item.name}
@@ -160,7 +180,7 @@ export const WatchlistCard: React.FC<WatchlistCardProps> = React.memo(({
               sx={{ 
                 opacity: 0.6, 
                 transition: 'opacity 0.2s', 
-                '&:hover': { opacity: 1, backgroundColor: 'rgba(255, 255, 255, 0.05)', color: '#10b981' } 
+                '&:hover': { opacity: 1, backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'primary.plainColor' } 
               }}
             >
               <Pencil size={18} />
@@ -175,7 +195,7 @@ export const WatchlistCard: React.FC<WatchlistCardProps> = React.memo(({
                 '& .MuiBadge-badge': {
                   right: 2,
                   top: 2,
-                  boxShadow: '0 0 8px rgba(245, 158, 11, 0.4)',
+                  boxShadow: '0 0 8px rgba(245, 158, 11, 0.3)',
                 }
               }}
             >
@@ -184,9 +204,9 @@ export const WatchlistCard: React.FC<WatchlistCardProps> = React.memo(({
                 variant="plain" 
                 onClick={() => onAlertsClick(item.symbol)}
                 sx={{ 
-                  opacity: item.active_alerts_count ? 1 : 0.8,
+                  opacity: item.active_alerts_count ? 1 : 0.7,
                   transition: 'all 0.2s', 
-                  '&:hover': { opacity: 1, backgroundColor: 'rgba(0,0,0,0.05)', color: '#10b981' } 
+                  '&:hover': { opacity: 1, backgroundColor: 'rgba(255, 255, 255, 0.05)', color: 'primary.plainColor' } 
                 }}
               >
                 <Bell 
@@ -199,26 +219,101 @@ export const WatchlistCard: React.FC<WatchlistCardProps> = React.memo(({
           </Stack>
         </Stack>
 
-        <Divider sx={{ my: 1.5, opacity: 0.15 }} />
+        {/* Fundamental Intelligence Section */}
+        <Box
+          sx={{
+            p: 1.25,
+            my: 1,
+            borderRadius: '10px',
+            backgroundColor: 'rgba(255, 255, 255, 0.03)',
+            border: '1px solid rgba(255, 255, 255, 0.05)',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 1,
+          }}
+        >
+          <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
+            <FundamentalFreshnessBadge
+              status={fundamental?.status || 'missing'}
+              asOfDate={fundamental?.as_of_date}
+              size="sm"
+              format="verbose"
+            />
+            <Stack direction="row" spacing={1} alignItems="center">
+              {fundamental?.as_of_date && (
+                <Typography level="body-xs" sx={{ fontFamily: 'monospace', opacity: 0.7 }}>
+                  {fundamental.as_of_date}
+                </Typography>
+              )}
+              <Chip size="sm" variant="soft" color="neutral" sx={{ fontSize: '0.7rem', fontWeight: 600 }}>
+                {`${fundamental?.source_count ?? 0} ${fundamental?.source_count === 1 ? 'src' : 'srcs'}`}
+              </Chip>
+            </Stack>
+          </Stack>
 
-        <CardActions sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 0, mt: 1.5 }}>
-          <Button
-            size="sm"
-            variant="outlined"
-            color="neutral"
-            startDecorator={<FileText size={14} />}
-            onClick={() => onViewAnalysis(item.symbol)}
-            sx={{ fontSize: '0.8rem', py: 0.5 }}
-          >
-            Analysis
-          </Button>
+          {/* Linked Themes */}
+          {fundamental?.theme_tags && fundamental.theme_tags.length > 0 ? (
+            <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 0.25 }}>
+              {fundamental.theme_tags.map((tag) => (
+                <Chip
+                  key={tag}
+                  size="sm"
+                  variant="outlined"
+                  color="neutral"
+                  startDecorator={<Layers size={11} />}
+                  sx={{
+                    fontSize: '0.68rem',
+                    py: 0.2,
+                    borderColor: 'rgba(255, 255, 255, 0.1)',
+                    backgroundColor: 'rgba(255, 255, 255, 0.02)',
+                    '&:hover': { borderColor: 'rgba(16, 185, 129, 0.3)' },
+                  }}
+                >
+                  {tag}
+                </Chip>
+              ))}
+            </Stack>
+          ) : (
+            <Typography level="body-xs" sx={{ color: 'text.tertiary', fontSize: '0.72rem' }}>
+              No linked research themes
+            </Typography>
+          )}
+        </Box>
+
+        <Divider sx={{ my: 1, opacity: 0.12 }} />
+
+        {/* CardActions Zone */}
+        <CardActions sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 0, mt: 1 }}>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Button
+              size="sm"
+              variant="outlined"
+              color="neutral"
+              startDecorator={<FileText size={14} />}
+              onClick={() => onViewAnalysis(item.symbol)}
+              sx={{ fontSize: '0.8rem', py: 0.5 }}
+            >
+              Analysis
+            </Button>
+            <Button
+              size="sm"
+              variant="soft"
+              color="primary"
+              startDecorator={<Copy size={13} />}
+              onClick={() => onCopyPrompt?.(item)}
+              sx={{ fontSize: '0.8rem', py: 0.5, borderRadius: '8px', fontWeight: 600 }}
+            >
+              Copy Prompt
+            </Button>
+          </Stack>
+
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
               <Typography level="body-xs" sx={{ fontWeight: '600', opacity: 0.7 }}>Active</Typography>
               <Switch 
                 checked={!!item.is_active} 
                 onChange={() => onToggleActive(item.symbol, item.is_active)} 
-                color={item.is_active ? 'success' : 'neutral'}
+                color={item.is_active ? 'primary' : 'neutral'}
                 size="sm"
               />
             </Box>
@@ -227,7 +322,7 @@ export const WatchlistCard: React.FC<WatchlistCardProps> = React.memo(({
               <Switch 
                 checked={!!item.in_portfolio} 
                 onChange={() => onTogglePortfolio(item.symbol, item.in_portfolio)} 
-                color={item.in_portfolio ? 'success' : 'neutral'}
+                color={item.in_portfolio ? 'primary' : 'neutral'}
                 size="sm"
               />
             </Box>

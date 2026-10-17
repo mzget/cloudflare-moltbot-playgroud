@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
   Box,
   Typography,
@@ -10,13 +10,11 @@ import {
 import {
   Globe,
   Mail,
-  BookOpen,
 } from 'lucide-react';
 import { useSettingsStore, type DensityMode } from '../../../store/settingsStore';
 import WebCrawlerTab from './WebCrawlerTab';
 import GmailNewslettersTab from './GmailNewslettersTab';
 import FacebookQueueTab, { FacebookIcon } from './FacebookQueueTab';
-import FundamentalIntelligenceTab from './FundamentalIntelligenceTab';
 
 export { FacebookIcon };
 
@@ -63,10 +61,6 @@ export default function SourceManager({ initialTab = 0 }: { initialTab?: number 
             <FacebookIcon size={16} style={{ marginRight: 8 }} />
             Facebook Page
           </Tab>
-          <Tab disableIndicator sx={{ px: 3, borderRadius: '8px' }}>
-            <BookOpen size={16} style={{ marginRight: 8 }} />
-            Fundamental Intelligence
-          </Tab>
         </TabList>
 
         <TabPanel value={0} sx={{ p: 0 }}>
@@ -79,10 +73,6 @@ export default function SourceManager({ initialTab = 0 }: { initialTab?: number 
 
         <TabPanel value={2} sx={{ p: 0 }}>
           <FacebookQueueTab density={density} active={index === 2} />
-        </TabPanel>
-
-        <TabPanel value={3} sx={{ p: 0 }}>
-          <FundamentalIntelligenceTab density={density} />
         </TabPanel>
       </Tabs>
     </Box>

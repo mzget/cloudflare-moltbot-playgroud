@@ -1,4 +1,4 @@
-import * as React from 'react';
+﻿import * as React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { renderToString } from 'react-dom/server';
 import SourceManager, { FacebookIcon } from './SourceManager';
@@ -36,14 +36,14 @@ vi.mock('./hooks/useGmailSubscriptions', () => ({
 }));
 
 describe('SourceManager Component', () => {
-  it('renders all 4 tabs in tablist', () => {
+  it('renders all 3 tabs in tablist', () => {
     const html = renderToString(<SourceManager initialTab={0} />);
 
     expect(html).toContain('Command Center');
     expect(html).toContain('Web &amp; RSS Crawler');
     expect(html).toContain('Gmail Newsletters');
     expect(html).toContain('Facebook Page');
-    expect(html).toContain('Fundamental Intelligence');
+    expect(html).not.toContain('Fundamental Intelligence');
   });
 
   it('renders WebCrawlerTab at initialTab={0}', () => {
@@ -62,13 +62,6 @@ describe('SourceManager Component', () => {
     const html = renderToString(<SourceManager initialTab={2} />);
     expect(html).toContain('Facebook Auto-Posting Controls');
     expect(html).toContain('Custom Standalone Posts');
-  });
-
-  it('renders FundamentalIntelligenceTab at initialTab={3}', () => {
-    const html = renderToString(<SourceManager initialTab={3} />);
-    expect(html).toContain('Fundamental Intelligence');
-    expect(html).toContain('Track qualitative research freshness');
-    expect(html).toContain('Total Tickers');
   });
 
   it('exports FacebookIcon correctly', () => {
