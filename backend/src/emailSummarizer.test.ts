@@ -10,6 +10,16 @@ vi.mock('./gmail', () => ({
   getHeader: vi.fn(),
 }));
 
+vi.mock('mimetext', () => ({
+  createMimeMessage: vi.fn(() => ({
+    setSender: vi.fn(),
+    setRecipient: vi.fn(),
+    setSubject: vi.fn(),
+    addMessage: vi.fn(),
+    asRaw: vi.fn().mockReturnValue('mock-raw-mime'),
+  })),
+}));
+
 describe('emailSummarizer', () => {
   let mockDb: any;
   let mockAi: any;

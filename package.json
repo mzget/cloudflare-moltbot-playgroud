@@ -2,9 +2,33 @@
   "name": "oaktree-agent-workspace",
   "version": "1.0.0",
   "private": true,
+  "packageManager": "npm@11.6.2",
+  "workspaces": [
+    "backend",
+    "frontend",
+    "mcp-worker",
+    "packages/*"
+  ],
   "scripts": {
-    "ci:typecheck": "npm --prefix backend run cf-typegen && npm --prefix backend run type-check && npm --prefix frontend run type-check && npm --prefix mcp-worker run type-check",
-    "type-check": "npm run ci:typecheck",
-    "test:e2e": "node backend/node_modules/vitest/vitest.mjs run --config tests/e2e/vitest.config.ts"
+    "prepare": "npm run build --workspace=@oaktree/shared",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "test:backend": "turbo run test --filter=oaktree-backend",
+    "test:frontend": "turbo run test --filter=frontend",
+    "test:mcp": "turbo run test --filter=oaktree-mcp",
+    "test:shared": "turbo run test --filter=@oaktree/shared",
+    "type-check": "turbo run type-check",
+    "ci:typecheck": "turbo run type-check",
+    "cf-typegen": "turbo run cf-typegen",
+    "dev": "turbo run dev",
+    "dev:frontend": "turbo run dev --filter=frontend",
+    "dev:backend": "turbo run dev --filter=oaktree-backend",
+    "dev:mcp": "turbo run dev --filter=oaktree-mcp",
+    "dev:app": "turbo run dev --filter=oaktree-backend --filter=frontend",
+    "test:e2e": "vitest run --config tests/e2e/vitest.config.ts"
+  },
+  "devDependencies": {
+    "turbo": "^2.4.0",
+    "vitest": "^4.1.11"
   }
 }

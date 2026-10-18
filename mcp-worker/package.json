@@ -7,22 +7,23 @@
     "deploy": "wrangler deploy",
     "cf-typegen": "wrangler types",
     "type-check": "tsc --noEmit",
-    "test": "node ../backend/node_modules/vitest/vitest.mjs run"
+    "test": "vitest run"
   },
   "dependencies": {
     "@cloudflare/ai-chat": "^0.9.0",
     "@emnapi/core": "^1.10.0",
     "@emnapi/runtime": "^1.10.0",
     "@modelcontextprotocol/sdk": "1.29.0",
+    "@oaktree/shared": "*",
     "agents": "^0.17.0",
     "ai": "^6.0.182",
     "workers-ai-provider": "^3.1.14",
     "zod": "4.4.1"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "4.20260430.1",
+    "@cloudflare/workers-types": "^5.20261003.1",
     "typescript": "5.9.3",
     "vitest": "^4.1.11",
-    "wrangler": "4.87.0"
+    "wrangler": "^4.147.0"
   }
 }

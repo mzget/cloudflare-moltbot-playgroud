@@ -7,7 +7,7 @@ This document establishes the End-to-End (E2E) Test Infrastructure and Opaque-Bo
 The Fundamental Intelligence subsystem connects qualitative fundamental equity research from Google Gemini Notebooks into the Oaktree Dialectical Debate Engine via Cloudflare Workers (`mcp-worker`, `backend`), Cloudflare D1 SQL database, Cloudflare R2 object storage (`KNOWLEDGE_BUCKET`), and an observability dashboard in Astro + MUI Joy UI.
 
 ### Test Architecture Principles
-1. **Opaque-Box Contract Verification**: Tests evaluate system behavior exclusively against documented public interfaces, schema contracts, API endpoints, serialization formats, and UI helper logic defined in `PROJECT.md`, `ADR 0010`, `docs/CONTEXT.md`, and `specs/BULL_BEAR_DEBATE_SPEC.md`.
+1. **Opaque-Box Contract Verification**: Tests evaluate system behavior exclusively against documented public interfaces, schema contracts, API endpoints, serialization formats, and UI helper logic defined in `PROJECT.md`, `ADR 0010`, `docs/CONTEXT.md`, and `docs/specs/BULL_BEAR_DEBATE_SPEC.md`.
 2. **Deterministic Isolation**: Tests run in an isolated environment without external cloud dependencies. Cloudflare D1 and R2 storage interfaces are exercised through deterministic contract harnesses matching Cloudflare Workers runtime behavior.
 3. **Progressive Testability**: The test infrastructure verifies contracts independently of deployment sequencing, allowing milestone implementations (M1–M5) to be progressively verified against the test harness.
 4. **4-Tier Test Pyramid**:

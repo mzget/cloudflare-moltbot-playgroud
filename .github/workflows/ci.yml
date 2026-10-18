@@ -24,11 +24,13 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: backend/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: backend
-        run: npm install
+        run: npm ci
+
+      - name: Build shared package
+        run: npm run build --workspace=@oaktree/shared
 
       - name: Type check
         working-directory: backend
@@ -59,11 +61,13 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: frontend
-        run: npm install
+        run: npm ci
+
+      - name: Build shared package
+        run: npm run build --workspace=@oaktree/shared
 
       - name: Type check
         working-directory: frontend
@@ -91,16 +95,22 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: mcp-worker/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: mcp-worker
-        run: npm install
+        run: npm ci
+
+      - name: Build shared package
+        run: npm run build --workspace=@oaktree/shared
 
       - name: Type check
         working-directory: mcp-worker
         run: npx tsc --noEmit || echo "No TypeScript config found, skipping type check"
         continue-on-error: true
+
+      - name: Run tests
+        working-directory: mcp-worker
+        run: npm test
 
       - name: Build check
         working-directory: mcp-worker

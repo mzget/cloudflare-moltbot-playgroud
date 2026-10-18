@@ -27,6 +27,7 @@
     "@emotion/styled": "^11.14.1",
     "@mui/joy": "^5.0.0-beta.52",
     "@napi-rs/wasm-runtime": "^1.2.4",
+    "@oaktree/shared": "*",
     "@tanstack/react-router": "^1.170.41",
     "agents": "^0.26.0",
     "ai": "^7.0.127",
@@ -51,6 +52,6 @@
     "@typescript-eslint/parser": "^8.0.0",
     "eslint": "^10.12.0",
     "typescript": "^6.0.3",
-    "vitest": "^5.0.3"
+    "vitest": "^4.1.12"
   }
 }

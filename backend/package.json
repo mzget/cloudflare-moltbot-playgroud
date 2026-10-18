@@ -21,6 +21,7 @@
   "dependencies": {
     "@cloudflare/ai-chat": "^0.10.0",
     "@cloudflare/puppeteer": "^0.0.13",
+    "@oaktree/shared": "*",
     "ai": "^6.0.300",
     "hono": "^4.13.12",
     "mimetext": "^3.0.24",

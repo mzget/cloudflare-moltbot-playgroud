@@ -6,6 +6,8 @@ dist/
 .astro/
 .wrangler/
 .cloudflare/
+.turbo/
+.turbo
 
 # Environment variables and secrets
 .env
