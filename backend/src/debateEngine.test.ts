@@ -635,5 +635,64 @@ describe('Analysis Debate Routes (Hono Endpoints)', () => {
     expect(insertedBinds[1]).toBe('Moderate Bull');
     expect(insertedBinds[2]).toContain('"debate"');
   });
+
+  it('getStoredDebate prefers stock_fundamentals.debate_json over analysis_results', async () => {
+    const { getStoredDebate } = await import('./debateEngine');
+    const mockDb: any = {
+      prepare: vi.fn((sql: string) => ({
+        bind: vi.fn(() => ({
+          first: vi.fn().mockImplementation(async () => {
+            if (sql.includes('FROM stock_fundamentals')) {
+              return {
+                debate_json: JSON.stringify({
+                  symbol: 'ARM',
+                  synthesis: { conviction_score: 8, conviction_label: 'Strong Bull', verdict_summary: 'From stock_fundamentals' }
+                })
+              };
+            }
+            return {
+              framework_results: JSON.stringify({
+                debate: { symbol: 'ARM', synthesis: { conviction_score: 2, conviction_label: 'Moderate Bull' } }
+              })
+            };
+          })
+        }))
+      }))
+    };
+
+    const res = await getStoredDebate(mockDb, 'ARM');
+    expect(res).toBeDefined();
+    expect(res?.synthesis.conviction_score).toBe(8);
+    expect(res?.synthesis.verdict_summary).toBe('From stock_fundamentals');
+  });
+
+  it('formatStoredDebateForGuruPrompt formats debate into guru context section', async () => {
+    const { formatStoredDebateForGuruPrompt } = await import('./debateEngine');
+    const mockDebate: any = {
+      symbol: 'NVDA',
+      round1: {
+        bull: { bull_thesis: 'Compute dominance', growth_catalysts: ['Blackwell'], competitive_advantages: ['CUDA'], valuation_upside: 'Fair' },
+        bear: { bear_thesis: 'Capex digestion', downside_risks: ['Margin dip'], structural_headwinds: ['Custom ASIC'], valuation_stretch: 'High' }
+      },
+      round2_rebuttal: {
+        bull_rebuttal: { rebuttal_arguments: ['CUDA moat deep'] },
+        bear_rebuttal: { rebuttal_arguments: ['ASICs gaining share'] }
+      },
+      synthesis: {
+        key_tensions: [{ topic: 'Capex Peak', bull_argument: 'Continuous', bear_argument: 'Cliff', decisive_factor: 'Hyperscaler spend' }],
+        consensus_points: ['Leader in GPUs'],
+        conviction_score: 6,
+        conviction_label: 'Moderate Bull',
+        verdict_summary: 'Bullish advantage persists'
+      }
+    };
+
+    const formatted = formatStoredDebateForGuruPrompt(mockDebate);
+    expect(formatted).toContain('=== GEMINI NOTEBOOK BULL VS. BEAR DIALECTICAL DEBATE ===');
+    expect(formatted).toContain('Conviction Score: +6 (Moderate Bull)');
+    expect(formatted).toContain('Bullish advantage persists');
+    expect(formatted).toContain('Compute dominance');
+    expect(formatted).toContain('Capex digestion');
+  });
 });
 

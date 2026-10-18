@@ -96,4 +96,14 @@
   3. Industry & Competitor Dynamics (`theme_sector_contexts`)
   4. Recent Significant Events (`market_events`)
 
+- **Gemini-Driven Dialectical Debate**:
+  การโต้วาที 3 รอบ (Bull, Bear, Arbiter) ที่ประมวลผลโดยตรงบน Google Gemini App โดยอ้างอิงเอกสารเต็มใน Gemini Notebook แล้วส่งผลลัพธ์เข้า Oaktree ผ่าน MCP
+
+- **Unified Brief & Debate Ingestion**:
+  โปรโตคอลการส่งทั้ง Fundamental Brief และ Bull vs. Bear Debate ในการเรียก `save_fundamental_brief` เพียงครั้งเดียวแบบ Single Atomic Tool Call
+
+- **Debate Preservation (`COALESCE` Guardrail)**:
+  กลไกป้องกันไม่ให้การรัน Deep Value Analysis (6 ปรมาจารย์) หรือการอัปเดตเฉพาะส่วนไปเขียนทับข้อมูล Debate ที่มาจาก Gemini โดยใช้ `COALESCE(excluded.debate_json, stock_fundamentals.debate_json)`
+
+
 

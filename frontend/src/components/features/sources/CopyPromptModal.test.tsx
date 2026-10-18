@@ -7,7 +7,7 @@ describe('CopyPromptModal & Prompt Generator', () => {
   describe('generateGeminiExtractionPrompt helper', () => {
     it('generates markdown prompt targeting the given ticker symbol', () => {
       const prompt = generateGeminiExtractionPrompt('ARM');
-      expect(prompt).toContain('# Fundamental Research Extraction Prompt: ARM');
+      expect(prompt).toContain('# Fundamental Intelligence & Bull vs. Bear Debate Extraction: ARM');
       expect(prompt).toContain('"symbol": "ARM"');
     });
 
@@ -24,6 +24,10 @@ describe('CopyPromptModal & Prompt Generator', () => {
       expect(prompt).toContain('"key_assumptions":');
       expect(prompt).toContain('"key_risks":');
       expect(prompt).toContain('"thesis_kpis":');
+      expect(prompt).toContain('"debate":');
+      expect(prompt).toContain('"round1":');
+      expect(prompt).toContain('"round2_rebuttal":');
+      expect(prompt).toContain('"synthesis":');
       expect(prompt).toContain('"as_of_date":');
     });
 
@@ -35,13 +39,13 @@ describe('CopyPromptModal & Prompt Generator', () => {
 
     it('normalizes input symbols with whitespace and casing', () => {
       const prompt = generateGeminiExtractionPrompt('  tsm  ');
-      expect(prompt).toContain('# Fundamental Research Extraction Prompt: TSM');
+      expect(prompt).toContain('# Fundamental Intelligence & Bull vs. Bear Debate Extraction: TSM');
       expect(prompt).toContain('"symbol": "TSM"');
     });
 
     it('falls back to TICKER when symbol is missing or empty', () => {
       const prompt = generateGeminiExtractionPrompt('');
-      expect(prompt).toContain('# Fundamental Research Extraction Prompt: TICKER');
+      expect(prompt).toContain('# Fundamental Intelligence & Bull vs. Bear Debate Extraction: TICKER');
       expect(prompt).toContain('"symbol": "TICKER"');
     });
 
