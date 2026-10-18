@@ -6,6 +6,9 @@ on:
       - main
     paths:
       - 'mcp-worker/**'
+      - 'packages/shared/**'
+      - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/deploy-mcp.yml'
   workflow_dispatch:
 
@@ -23,11 +26,13 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: mcp-worker/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: mcp-worker
-        run: npm install
+        run: npm ci
+
+      - name: Build shared package
+        run: npm run build --workspace=@oaktree/shared
 
       - name: Deploy to Cloudflare Workers
         uses: cloudflare/wrangler-action@v3

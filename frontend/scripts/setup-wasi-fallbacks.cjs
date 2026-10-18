@@ -13,6 +13,31 @@ function isNativeBlocked() {
   }
 }
 
+const frontendRoot = path.resolve(__dirname, '..');
+const monorepoRoot = path.resolve(frontendRoot, '..');
+
+function resolvePackageDir(pkgName) {
+  const candidateDirs = [
+    path.join(frontendRoot, 'node_modules', ...pkgName.split('/')),
+    path.join(monorepoRoot, 'node_modules', ...pkgName.split('/')),
+  ];
+
+  for (const dir of candidateDirs) {
+    if (fs.existsSync(dir) && fs.existsSync(path.join(dir, 'package.json'))) {
+      return dir;
+    }
+  }
+
+  try {
+    const pkgJsonPath = require.resolve(`${pkgName}/package.json`, {
+      paths: [frontendRoot, monorepoRoot],
+    });
+    return path.dirname(pkgJsonPath);
+  } catch {
+    return null;
+  }
+}
+
 function checkAndInstallWasiFallbacks() {
   // Only execute on Windows machines
   if (process.platform !== 'win32') {
@@ -24,11 +49,10 @@ function checkAndInstallWasiFallbacks() {
     return;
   }
 
-  const root = path.resolve(__dirname, '..');
-  const satteriDir = path.join(root, 'node_modules', 'satteri');
-  const compilerDir = path.join(root, 'node_modules', '@astrojs', 'compiler-binding');
+  const satteriDir = resolvePackageDir('satteri');
+  const compilerDir = resolvePackageDir('@astrojs/compiler-binding');
 
-  if (!fs.existsSync(satteriDir) || !fs.existsSync(compilerDir)) {
+  if (!satteriDir || !compilerDir) {
     return;
   }
 
@@ -41,6 +65,8 @@ function checkAndInstallWasiFallbacks() {
 
   console.log('[setup-wasi] Windows Smart App Control detected: setting up WASI fallbacks for Astro...');
 
+  const workDir = frontendRoot;
+
   try {
     const satteriPkg = require(path.join(satteriDir, 'package.json'));
     const compilerPkg = require(path.join(compilerDir, 'package.json'));
@@ -49,26 +75,26 @@ function checkAndInstallWasiFallbacks() {
     const compilerVersion = compilerPkg.version;
 
     const satteriTarball = execSync(`npm pack @bruits/satteri-wasm32-wasi@${satteriVersion}`, {
-      cwd: root,
+      cwd: workDir,
       encoding: 'utf8',
     }).trim().split('\n').pop().trim();
 
     const compilerTarball = execSync(`npm pack @astrojs/compiler-binding-wasm32-wasi@${compilerVersion}`, {
-      cwd: root,
+      cwd: workDir,
       encoding: 'utf8',
     }).trim().split('\n').pop().trim();
 
-    execSync(`tar -xzf "${satteriTarball}" package/satteri_napi.wasi.cjs package/satteri_napi.wasm32-wasi.wasm`, { cwd: root });
-    fs.copyFileSync(path.join(root, 'package', 'satteri_napi.wasi.cjs'), satteriWasi);
-    fs.copyFileSync(path.join(root, 'package', 'satteri_napi.wasm32-wasi.wasm'), path.join(satteriDir, 'satteri_napi.wasm32-wasi.wasm'));
+    execSync(`tar -xzf "${satteriTarball}" package/satteri_napi.wasi.cjs package/satteri_napi.wasm32-wasi.wasm`, { cwd: workDir });
+    fs.copyFileSync(path.join(workDir, 'package', 'satteri_napi.wasi.cjs'), satteriWasi);
+    fs.copyFileSync(path.join(workDir, 'package', 'satteri_napi.wasm32-wasi.wasm'), path.join(satteriDir, 'satteri_napi.wasm32-wasi.wasm'));
 
-    execSync(`tar -xzf "${compilerTarball}" package/astro.wasi.cjs package/astro.wasm32-wasi.wasm`, { cwd: root });
-    fs.copyFileSync(path.join(root, 'package', 'astro.wasi.cjs'), compilerWasi);
-    fs.copyFileSync(path.join(root, 'package', 'astro.wasm32-wasi.wasm'), path.join(compilerDir, 'astro.wasm32-wasi.wasm'));
+    execSync(`tar -xzf "${compilerTarball}" package/astro.wasi.cjs package/astro.wasm32-wasi.wasm`, { cwd: workDir });
+    fs.copyFileSync(path.join(workDir, 'package', 'astro.wasi.cjs'), compilerWasi);
+    fs.copyFileSync(path.join(workDir, 'package', 'astro.wasm32-wasi.wasm'), path.join(compilerDir, 'astro.wasm32-wasi.wasm'));
 
-    fs.rmSync(path.join(root, 'package'), { recursive: true, force: true });
-    fs.rmSync(path.join(root, satteriTarball), { force: true });
-    fs.rmSync(path.join(root, compilerTarball), { force: true });
+    fs.rmSync(path.join(workDir, 'package'), { recursive: true, force: true });
+    fs.rmSync(path.join(workDir, satteriTarball), { force: true });
+    fs.rmSync(path.join(workDir, compilerTarball), { force: true });
 
     console.log('[setup-wasi] WASI fallbacks configured successfully.');
   } catch (err) {

@@ -55,7 +55,7 @@ npm run ci:typecheck
 
 ## 3. Scope of Verified Interface Contracts
 
-The test suite enforces the public interface contracts defined in `PROJECT.md`, `ADR 0010`, `docs/CONTEXT.md`, and `specs/BULL_BEAR_DEBATE_SPEC.md`:
+The test suite enforces the public interface contracts defined in `PROJECT.md`, `ADR 0010`, `docs/CONTEXT.md`, and `docs/specs/BULL_BEAR_DEBATE_SPEC.md`:
 
 1. **D1 Schema Contract (F1)**:
    - `stock_fundamentals`: Primary key `symbol`, JSON text columns (`competitors`, `guidance`, `key_risks`, `thesis_kpis`), date index `idx_stock_fundamentals_as_of_date`.

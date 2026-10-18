@@ -6,6 +6,9 @@ on:
       - main
     paths:
       - 'backend/**'
+      - 'packages/shared/**'
+      - 'package.json'
+      - 'package-lock.json'
       - '.github/workflows/deploy-backend.yml'
   workflow_dispatch:
 
@@ -23,11 +26,13 @@ jobs:
         with:
           node-version: '22'
           cache: 'npm'
-          cache-dependency-path: backend/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
-        working-directory: backend
-        run: npm install
+        run: npm ci
+
+      - name: Build shared package
+        run: npm run build --workspace=@oaktree/shared
 
       - name: Apply D1 Migrations
         uses: cloudflare/wrangler-action@v3

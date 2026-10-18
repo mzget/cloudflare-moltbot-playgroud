@@ -194,7 +194,7 @@ test.describe('Market Intelligence - All Tabs E2E Suite', () => {
 
     // Check title and feed tabs exist
     await expect(page.getByRole('button', { name: 'All' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Symbol Reports' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Symbol Reports' })).not.toBeVisible();
     await expect(page.getByRole('button', { name: /Email Digests/i })).toBeVisible();
     await expect(page.getByRole('button', { name: /Articles & Analyses/i })).toBeVisible();
 
@@ -203,26 +203,12 @@ test.describe('Market Intelligence - All Tabs E2E Suite', () => {
     await expect(page.getByText('Semiconductor Digest')).toBeVisible();
     await expect(page.getByText('AI Revolution in Healthcare')).toBeVisible();
     await expect(page.getByText('Tech Valuation Memo')).toBeVisible();
-  });
 
-  test('2. "Symbol Reports" tab filters only reports and can mark report as read', async ({ page }) => {
-    await page.goto('/market');
-    await page.waitForLoadState('networkidle');
-
-    // Switch to Symbol Reports tab
-    await page.getByRole('button', { name: 'Symbol Reports' }).click();
-
-    // Only symbol report visible, others filtered out
-    await expect(page.getByText('Strong datacenter revenue growth across all regions.')).toBeVisible();
-    await expect(page.getByText('Semiconductor Digest')).not.toBeVisible();
-    await expect(page.getByText('AI Revolution in Healthcare')).not.toBeVisible();
-
-    // Click Mark as Read on the report
-    const markReadBtn = page.getByRole('button', { name: 'Mark as Read' });
+    // Verify mark as read on report item
+    const markReadBtn = page.getByRole('button', { name: 'Mark as Read' }).first();
     if (await markReadBtn.isVisible()) {
       await markReadBtn.click();
-      // Should show 'Read' chip
-      await expect(page.getByText('Read', { exact: true })).toBeVisible();
+      await expect(page.getByText('Read', { exact: true }).first()).toBeVisible();
     }
   });
 
