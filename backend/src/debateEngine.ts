@@ -150,7 +150,7 @@ export async function fetchQualitativeData(
     const fundamentalSql = `
       SELECT 
         symbol, business_model, moat, competitors, guidance,
-        key_risks, thesis_kpis, as_of_date, notebook_id, source_count, updated_at
+        key_risks, thesis_kpis, debate_json, as_of_date, notebook_id, source_count, updated_at
       FROM stock_fundamentals
       WHERE symbol = ?
     `;
@@ -429,4 +429,88 @@ export async function runDialecticalDebate(
     model_used: modelToUse,
     created_at: new Date().toISOString()
   };
+}
+
+/**
+ * Retrieves the stored Bull vs. Bear Dialectical Debate for a symbol:
+ * 1. Checks `stock_fundamentals.debate_json` first (Gemini Notebook source of truth)
+ * 2. Fallbacks to `analysis_results.framework_results.debate` (historical compatibility)
+ */
+export async function getStoredDebate(
+  db: D1Database | undefined,
+  symbol: string
+): Promise<DialecticalDebateResult | null> {
+  if (!db || typeof db.prepare !== 'function') return null;
+  const symbolUpper = symbol.trim().toUpperCase();
+
+  try {
+    // 1. Primary: stock_fundamentals.debate_json
+    const row = await db.prepare(
+      'SELECT debate_json FROM stock_fundamentals WHERE symbol = ?'
+    ).bind(symbolUpper).first<{ debate_json: string | null }>();
+
+    if (row && row.debate_json) {
+      const parsed = parseDebateAIJson<DialecticalDebateResult | null>(row.debate_json, null);
+      if (parsed && parsed.synthesis) {
+        return parsed;
+      }
+    }
+
+    // 2. Fallback: analysis_results.framework_results.debate
+    const analysisRow = await db.prepare(
+      "SELECT framework_results FROM analysis_results WHERE symbol = ? AND framework_results LIKE '%\"debate\"%' ORDER BY created_at DESC LIMIT 1"
+    ).bind(symbolUpper).first<{ framework_results: string }>();
+
+    if (analysisRow && analysisRow.framework_results) {
+      const fw = parseDebateAIJson<any>(analysisRow.framework_results, null);
+      if (fw && fw.debate && fw.debate.synthesis) {
+        return fw.debate as DialecticalDebateResult;
+      }
+    }
+  } catch (err) {
+    console.warn(`[DebateEngine] Failed to retrieve stored debate for ${symbolUpper}:`, err);
+  }
+
+  return null;
+}
+
+/**
+ * Formats stored Bull vs. Bear Dialectical Debate from Gemini Notebook into concise summary text
+ * for enriching the context provided to the 6 investment gurus and synthesis prompt.
+ */
+export function formatStoredDebateForGuruPrompt(debate: DialecticalDebateResult | null): string {
+  if (!debate || !debate.synthesis) return '';
+
+  const r1 = debate.round1 || { bull: {} as any, bear: {} as any };
+  const r2 = debate.round2_rebuttal || { bull_rebuttal: {} as any, bear_rebuttal: {} as any };
+  const synth = debate.synthesis;
+  const score = synth.conviction_score ?? 0;
+  const label = synth.conviction_label || calculateConvictionLabel(score);
+
+  const sections: string[] = [
+    `=== GEMINI NOTEBOOK BULL VS. BEAR DIALECTICAL DEBATE ===`,
+    `Conviction Score: ${score > 0 ? `+${score}` : score} (${label})`,
+    `Verdict: ${synth.verdict_summary || 'N/A'}`,
+    ``,
+    `[Bull Case]`,
+    `Thesis: ${r1.bull?.bull_thesis || 'N/A'}`,
+    `Growth Catalysts: ${(r1.bull?.growth_catalysts || []).join('; ') || 'N/A'}`,
+    `Competitive Advantages: ${(r1.bull?.competitive_advantages || []).join('; ') || 'N/A'}`,
+    `Valuation Upside: ${r1.bull?.valuation_upside || 'N/A'}`,
+    `Rebuttal to Bear: ${(r2.bull_rebuttal?.rebuttal_arguments || []).join('; ') || 'N/A'}`,
+    ``,
+    `[Bear Case]`,
+    `Thesis: ${r1.bear?.bear_thesis || 'N/A'}`,
+    `Downside Risks: ${(r1.bear?.downside_risks || []).join('; ') || 'N/A'}`,
+    `Structural Headwinds: ${(r1.bear?.structural_headwinds || []).join('; ') || 'N/A'}`,
+    `Valuation Stretch: ${r1.bear?.valuation_stretch || 'N/A'}`,
+    `Rebuttal to Bull: ${(r2.bear_rebuttal?.rebuttal_arguments || []).join('; ') || 'N/A'}`,
+    ``,
+    `[Key Tensions & Consensus]`,
+    `Consensus: ${(synth.consensus_points || []).join('; ') || 'N/A'}`,
+    `Key Tensions: ${(synth.key_tensions || []).map((t) => `${t.topic}: Bull says "${t.bull_argument}" vs. Bear says "${t.bear_argument}" (Pivot: ${t.decisive_factor})`).join(' | ') || 'N/A'}`,
+    `========================================================`
+  ];
+
+  return sections.join('\n');
 }

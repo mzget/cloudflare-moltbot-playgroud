@@ -22,9 +22,13 @@ import {
   saveFundamentalBrief,
   saveThemeSectorContext,
   getFundamentalBrief,
+  saveBullBearDebate,
+  getBullBearDebate,
   saveFundamentalBriefShape,
   saveThemeSectorContextShape,
-  getFundamentalBriefShape
+  getFundamentalBriefShape,
+  saveBullBearDebateShape,
+  getBullBearDebateShape
 } from "./fundamentalTools";
 
 const asText = (data: unknown) => ({
@@ -168,9 +172,23 @@ export class OaktreeMCP extends McpAgent {
 
     this.server.tool(
       "save_fundamental_brief",
-      "Save or update a single-stock qualitative fundamental research brief (business model, moat, guidance targets, risks, thesis KPIs) into Oaktree D1 and R2 storage.",
+      "Save or update a single-stock qualitative fundamental research brief (business model, moat, guidance targets, risks, thesis KPIs) and optional 3-round Bull vs. Bear Dialectical Debate in a single atomic tool call into Oaktree D1 and R2 storage.",
       saveFundamentalBriefShape,
       async (args: any) => asText(await saveFundamentalBrief(this.env as any, args))
+    );
+
+    this.server.tool(
+      "save_bull_bear_debate",
+      "Save or update a 3-round Bull vs. Bear Dialectical Debate (Opening Theses, Rebuttals, Arbiter Synthesis with conviction score) for a stock ticker into Oaktree D1 and R2 storage.",
+      saveBullBearDebateShape,
+      async (args: any) => asText(await saveBullBearDebate(this.env as any, args))
+    );
+
+    this.server.tool(
+      "get_bull_bear_debate",
+      "Retrieve stored 3-round Bull vs. Bear Dialectical Debate and conviction score for a stock ticker.",
+      getBullBearDebateShape,
+      async (args: any) => asText(await getBullBearDebate(this.env as any, args))
     );
 
     this.server.tool(

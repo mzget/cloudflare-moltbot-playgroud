@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { AppEnv } from '../env';
 import { runFullAnalysis, getOrUpdateMarketStats } from '../analysisEngine';
-import { runDialecticalDebate } from '../debateEngine';
+import { runDialecticalDebate, getStoredDebate } from '../debateEngine';
 import { formatMetricsForPrompt } from '../analysisPrompts';
 
 const analysis = new Hono<AppEnv>();
@@ -82,8 +82,23 @@ analysis.get('/api/analysis/results', async (c) => {
   const symbolUpper = symbol.toUpperCase();
   const result = await c.env.DB.prepare(
     "SELECT * FROM analysis_results WHERE symbol = ? AND summary IS NOT NULL AND summary != '' ORDER BY created_at DESC LIMIT 1"
-  ).bind(symbolUpper).first();
+  ).bind(symbolUpper).first<any>();
   if (!result) return c.json({ error: 'Analysis not found' }, 404);
+
+  // Ensure latest debate from stock_fundamentals is included in framework_results if present
+  try {
+    const storedDebate = await getStoredDebate(c.env.DB, symbolUpper);
+    if (storedDebate && result.framework_results) {
+      const fw = typeof result.framework_results === 'string' ? JSON.parse(result.framework_results) : result.framework_results;
+      if (!fw.debate || storedDebate.created_at >= (fw.debate.created_at || '')) {
+        fw.debate = storedDebate;
+        result.framework_results = JSON.stringify(fw);
+      }
+    }
+  } catch {
+    // Non-critical: return result as is
+  }
+
   return c.json(result);
 });
 
@@ -99,29 +114,17 @@ analysis.get('/api/analysis/history', async (c) => {
 });
 
 // GET /api/analysis/debate
-// Returns cached debate results from analysis_results if available
+// Returns stored debate results from stock_fundamentals.debate_json or analysis_results
 analysis.get('/api/analysis/debate', async (c) => {
   const symbol = c.req.query('symbol');
   if (!symbol) return c.json({ error: 'symbol is required' }, 400);
   const symbolUpper = symbol.toUpperCase();
 
-  const result = await c.env.DB.prepare(
-    "SELECT framework_results FROM analysis_results WHERE symbol = ? AND framework_results LIKE '%\"debate\"%' ORDER BY created_at DESC LIMIT 1"
-  ).bind(symbolUpper).first<{ framework_results: string }>();
-
-  if (!result || !result.framework_results) {
+  const debate = await getStoredDebate(c.env.DB, symbolUpper);
+  if (!debate) {
     return c.json({ error: 'Debate not found for ' + symbolUpper }, 404);
   }
-
-  try {
-    const fw = JSON.parse(result.framework_results);
-    if (!fw.debate) {
-      return c.json({ error: 'No debate record found in analysis' }, 404);
-    }
-    return c.json(fw.debate);
-  } catch {
-    return c.json({ error: 'Failed to parse debate record' }, 500);
-  }
+  return c.json(debate);
 });
 
 // POST /api/analysis/debate

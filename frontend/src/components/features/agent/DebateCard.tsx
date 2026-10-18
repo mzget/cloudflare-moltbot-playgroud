@@ -22,10 +22,12 @@ import {
   Target,
   CheckCircle2,
   ShieldAlert,
-  Zap
+  Zap,
+  Sparkles
 } from 'lucide-react';
 import { glassStyle } from '../../../styles/glass';
 import { API_BASE_URL } from '../../../config';
+import { CopyPromptModal } from '../sources/CopyPromptModal';
 
 export interface KeyTension {
   topic: string;
@@ -83,6 +85,7 @@ export default function DebateCard({ symbol, initialDebate, onDebateUpdated }: D
   const [refreshing, setRefreshing] = React.useState(false);
   const [showRebuttal, setShowRebuttal] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const [isPromptModalOpen, setIsPromptModalOpen] = React.useState(false);
 
   React.useEffect(() => {
     if (initialDebate) {
@@ -120,14 +123,10 @@ export default function DebateCard({ symbol, initialDebate, onDebateUpdated }: D
     setRefreshing(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/analysis/debate`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbol })
-      });
+      const res = await fetch(`${API_BASE_URL}/api/analysis/debate?symbol=${symbol}`);
       if (!res.ok) {
         const errData = (await res.json().catch(() => ({}))) as any;
-        throw new Error(errData.error || 'การรัน Debate ล้มเหลว');
+        throw new Error(errData.error || 'ยังไม่พบข้อมูล Debate กรุณารันใน Gemini App ก่อนซิงค์');
       }
       const data = (await res.json()) as DialecticalDebateData;
       setDebate(data);
@@ -171,28 +170,44 @@ export default function DebateCard({ symbol, initialDebate, onDebateUpdated }: D
         >
           <Box>
             <Typography level="title-md" startDecorator={<Scale size={18} />}>
-              🐂 vs 🐻 Bull vs. Bear Dialectical Debate
+              🐂 vs 🐻 Bull vs. Bear Dialectical Debate (Gemini Ingestion)
             </Typography>
             <Typography level="body-xs" sx={{ opacity: 0.6, mt: 0.5 }}>
-              ยังไม่มีข้อมูลการโต้วาทีสองขั้วสำหรับหุ้น {symbol} สามารถกดปุ่มเพื่อเริ่มประมวลผลทันที
+              ยังไม่มีข้อมูลการโต้วาทีสองขั้วสำหรับหุ้น {symbol} สามารถคัดลอก Prompt ไปรันใน Google Gemini App (ที่มีเอกสารฉบับเต็มใน Notebook) แล้วกดซิงค์ข้อมูล
             </Typography>
           </Box>
-          <Button
-            size="sm"
-            variant="solid"
-            color="primary"
-            startDecorator={<RotateCw size={14} />}
-            loading={refreshing}
-            onClick={handleRefreshDebate}
-          >
-            รัน Bull vs Bear Debate
-          </Button>
+          <Stack direction="row" spacing={1}>
+            <Button
+              size="sm"
+              variant="solid"
+              color="primary"
+              startDecorator={<Sparkles size={14} />}
+              onClick={() => setIsPromptModalOpen(true)}
+            >
+              Copy Gemini Prompt
+            </Button>
+            <Button
+              size="sm"
+              variant="soft"
+              color="neutral"
+              startDecorator={<RotateCw size={14} />}
+              loading={refreshing}
+              onClick={handleRefreshDebate}
+            >
+              ซิงค์ข้อมูลล่าสุด
+            </Button>
+          </Stack>
         </Stack>
         {error && (
           <Alert color="danger" size="sm" sx={{ mt: 2 }}>
             {error}
           </Alert>
         )}
+        <CopyPromptModal
+          open={isPromptModalOpen}
+          onClose={() => setIsPromptModalOpen(false)}
+          symbol={symbol}
+        />
       </Sheet>
     );
   }
@@ -238,11 +253,21 @@ export default function DebateCard({ symbol, initialDebate, onDebateUpdated }: D
             </Chip>
           </Stack>
           <Typography level="body-xs" sx={{ opacity: 0.6, mt: 0.5 }}>
-            การประลองวิทยานิพนธ์ 2 ขั้วตรงข้ามตามกรอบ TradingAgents เพื่อกำจัด Confirmation Bias
+            การประลองวิทยานิพนธ์ 2 ขั้วตรงข้ามด้วย Google Gemini App จากเอกสารปฐมภูมิใน Notebook
           </Typography>
         </Box>
 
         <Stack direction="row" alignItems="center" spacing={1}>
+          <Button
+            size="sm"
+            variant="outlined"
+            color="primary"
+            startDecorator={<Sparkles size={13} />}
+            onClick={() => setIsPromptModalOpen(true)}
+            sx={{ fontWeight: 600 }}
+          >
+            Copy Gemini Prompt
+          </Button>
           <Button
             size="sm"
             variant="soft"
@@ -252,7 +277,7 @@ export default function DebateCard({ symbol, initialDebate, onDebateUpdated }: D
             onClick={handleRefreshDebate}
             sx={{ fontWeight: 600 }}
           >
-            รีเฟรชการโต้วาที
+            ซิงค์ข้อมูลล่าสุด
           </Button>
         </Stack>
       </Stack>
@@ -575,6 +600,12 @@ export default function DebateCard({ symbol, initialDebate, onDebateUpdated }: D
           </Grid>
         </Grid>
       </Box>
+
+      <CopyPromptModal
+        open={isPromptModalOpen}
+        onClose={() => setIsPromptModalOpen(false)}
+        symbol={symbol}
+      />
     </Sheet>
   );
 }

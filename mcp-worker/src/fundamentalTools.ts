@@ -36,6 +36,126 @@ export const guidanceSchema = z
 export type GuidanceInfo = z.infer<typeof guidanceSchema>;
 
 /**
+ * Bull vs. Bear Dialectical Debate Zod Schemas
+ */
+export const bullOpeningSchema = z.object({
+  bull_thesis: z.string().describe("Core bull thesis and structural expansion catalysts"),
+  growth_catalysts: z.array(z.string()).describe("Key growth drivers and market adoption tailwinds"),
+  competitive_advantages: z.array(z.string()).describe("Competitive moats and pricing power durability"),
+  valuation_upside: z.string().describe("Valuation upside justification and long-term multiple expansion")
+});
+
+export const bearOpeningSchema = z.object({
+  bear_thesis: z.string().describe("Core bear thesis and structural vulnerabilities"),
+  downside_risks: z.array(z.string()).describe("Key execution risks, demand saturation, or margin compression"),
+  structural_headwinds: z.array(z.string()).describe("Technological disruption or architectural headwinds"),
+  valuation_stretch: z.string().describe("Valuation stretch, multiple compression, or consensus downside")
+});
+
+export const bullRebuttalSchema = z.object({
+  rebuttal_arguments: z.array(z.string()).describe("Rebuttal countering bear claims with concrete evidence"),
+  mitigating_factors: z.array(z.string()).describe("Mitigating structural protections and liquidity cushions")
+});
+
+export const bearRebuttalSchema = z.object({
+  rebuttal_arguments: z.array(z.string()).describe("Rebuttal countering bull catalysts with realistic friction"),
+  skeptical_counters: z.array(z.string()).describe("Skeptical counters to management guidance or market euphoria")
+});
+
+export const keyTensionSchema = z.object({
+  topic: z.string().describe("The core debate tension topic"),
+  bull_argument: z.string().describe("The bull position and supporting evidence"),
+  bear_argument: z.string().describe("The bear counter-position and risk factors"),
+  decisive_factor: z.string().describe("The critical swing factor or KPI that will resolve the debate")
+});
+
+export const arbiterSynthesisSchema = z.object({
+  key_tensions: z.array(keyTensionSchema).describe("1-3 key debate tensions between bull and bear"),
+  consensus_points: z.array(z.string()).describe("Points of agreement between bull and bear perspectives"),
+  conviction_score: z.number().describe("Dialectical conviction score (-10 strong bear to +10 strong bull)"),
+  conviction_label: z.enum(["Strong Bull", "Moderate Bull", "Neutral", "Moderate Bear", "Strong Bear"]).optional().describe("Conviction category label"),
+  verdict_summary: z.string().describe("Comprehensive dialectical verdict and risk-reward synthesis")
+});
+
+export const debatePayloadSchema = z.object({
+  round1: z.object({
+    bull: bullOpeningSchema,
+    bear: bearOpeningSchema
+  }).describe("Round 1: Parallel Opening Theses"),
+  round2_rebuttal: z.object({
+    bull_rebuttal: bullRebuttalSchema,
+    bear_rebuttal: bearRebuttalSchema
+  }).describe("Round 2: Cross-Examination Rebuttals"),
+  synthesis: arbiterSynthesisSchema.describe("Round 3: Arbiter Synthesis and Conviction"),
+  model_used: z.string().optional().describe("Model or source used (defaults to gemini_notebook)"),
+  created_at: z.string().optional().describe("ISO timestamp of debate creation")
+});
+
+export type DebatePayload = z.infer<typeof debatePayloadSchema>;
+
+export function calculateConvictionLabel(score: number): "Strong Bull" | "Moderate Bull" | "Neutral" | "Moderate Bear" | "Strong Bear" {
+  const clamped = Math.max(-10, Math.min(10, Math.round(score)));
+  if (clamped >= 7) return "Strong Bull";
+  if (clamped >= 2) return "Moderate Bull";
+  if (clamped <= -7) return "Strong Bear";
+  if (clamped <= -2) return "Moderate Bear";
+  return "Neutral";
+}
+
+export function normalizeDebatePayload(symbol: string, rawDebate: any): any {
+  if (!rawDebate || typeof rawDebate !== "object") return null;
+  const rawScore = typeof rawDebate.synthesis?.conviction_score === "number"
+    ? rawDebate.synthesis.conviction_score
+    : 0;
+  const clampedScore = Math.max(-10, Math.min(10, Math.round(rawScore)));
+  const label = rawDebate.synthesis?.conviction_label || calculateConvictionLabel(clampedScore);
+
+  return {
+    symbol: symbol.toUpperCase(),
+    round1: {
+      bull: {
+        bull_thesis: rawDebate.round1?.bull?.bull_thesis || "",
+        growth_catalysts: normalizeArrayField(rawDebate.round1?.bull?.growth_catalysts),
+        competitive_advantages: normalizeArrayField(rawDebate.round1?.bull?.competitive_advantages),
+        valuation_upside: rawDebate.round1?.bull?.valuation_upside || ""
+      },
+      bear: {
+        bear_thesis: rawDebate.round1?.bear?.bear_thesis || "",
+        downside_risks: normalizeArrayField(rawDebate.round1?.bear?.downside_risks),
+        structural_headwinds: normalizeArrayField(rawDebate.round1?.bear?.structural_headwinds),
+        valuation_stretch: rawDebate.round1?.bear?.valuation_stretch || ""
+      }
+    },
+    round2_rebuttal: {
+      bull_rebuttal: {
+        rebuttal_arguments: normalizeArrayField(rawDebate.round2_rebuttal?.bull_rebuttal?.rebuttal_arguments),
+        mitigating_factors: normalizeArrayField(rawDebate.round2_rebuttal?.bull_rebuttal?.mitigating_factors)
+      },
+      bear_rebuttal: {
+        rebuttal_arguments: normalizeArrayField(rawDebate.round2_rebuttal?.bear_rebuttal?.rebuttal_arguments),
+        skeptical_counters: normalizeArrayField(rawDebate.round2_rebuttal?.bear_rebuttal?.skeptical_counters)
+      }
+    },
+    synthesis: {
+      key_tensions: Array.isArray(rawDebate.synthesis?.key_tensions)
+        ? rawDebate.synthesis.key_tensions.map((t: any) => ({
+            topic: String(t.topic || ""),
+            bull_argument: String(t.bull_argument || ""),
+            bear_argument: String(t.bear_argument || ""),
+            decisive_factor: String(t.decisive_factor || "")
+          }))
+        : [],
+      consensus_points: normalizeArrayField(rawDebate.synthesis?.consensus_points),
+      conviction_score: clampedScore,
+      conviction_label: label,
+      verdict_summary: String(rawDebate.synthesis?.verdict_summary || "")
+    },
+    model_used: rawDebate.model_used || "gemini_notebook",
+    created_at: rawDebate.created_at || new Date().toISOString()
+  };
+}
+
+/**
  * Shape for save_fundamental_brief tool registration.
  */
 export const saveFundamentalBriefShape = {
@@ -68,6 +188,9 @@ export const saveFundamentalBriefShape = {
     .optional()
     .default([])
     .describe("3-5 quantifiable KPIs to track thesis progress"),
+  debate: debatePayloadSchema
+    .optional()
+    .describe("Optional 3-round Bull vs. Bear Dialectical Debate (round1, round2_rebuttal, synthesis)"),
   as_of_date: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "as_of_date must be in YYYY-MM-DD format")
@@ -86,6 +209,36 @@ export const saveFundamentalBriefShape = {
 
 export const SaveFundamentalBriefSchema = z.object(saveFundamentalBriefShape);
 export type SaveFundamentalBriefInput = z.infer<typeof SaveFundamentalBriefSchema>;
+
+/**
+ * Shape for save_bull_bear_debate tool registration.
+ */
+export const saveBullBearDebateShape = {
+  symbol: z
+    .string()
+    .transform((val) => val.trim().toUpperCase())
+    .refine((val) => val.length > 0, "symbol is required and cannot be empty")
+    .describe("Stock ticker symbol in uppercase (e.g. 'ARM', 'NVDA')"),
+  debate: debatePayloadSchema.describe("3-round Bull vs. Bear Dialectical Debate data")
+};
+
+export const SaveBullBearDebateSchema = z.object(saveBullBearDebateShape);
+export type SaveBullBearDebateInput = z.infer<typeof SaveBullBearDebateSchema>;
+
+/**
+ * Shape for get_bull_bear_debate tool registration.
+ */
+export const getBullBearDebateShape = {
+  symbol: z
+    .string()
+    .transform((val) => val.trim().toUpperCase())
+    .refine((val) => val.length > 0, "symbol is required and cannot be empty")
+    .describe("Stock ticker symbol in uppercase (e.g. 'ARM', 'NVDA')")
+};
+
+export const GetBullBearDebateSchema = z.object(getBullBearDebateShape);
+export type GetBullBearDebateInput = z.infer<typeof GetBullBearDebateSchema>;
+
 
 /**
  * Shape for save_theme_sector_context tool registration.
@@ -232,6 +385,7 @@ export function stockFundamentalToOkf(data: {
   guidance?: any;
   key_risks?: string[] | string | null;
   thesis_kpis?: string[] | string | null;
+  debate?: any;
 }): string {
   const symbol = sanitizeYamlScalar(data.symbol).toUpperCase();
   const rawAsOf = sanitizeYamlScalar(data.as_of_date);
@@ -327,7 +481,66 @@ export function stockFundamentalToOkf(data: {
       : OKF_FALLBACK_PLACEHOLDERS.thesis_kpis;
   const kpisSec = `## Thesis KPIs\n\n${kpisContent}`;
 
-  // 9. Assemble Document
+  // 9. Section: Bull vs. Bear Dialectical Debate (if available)
+  let debateSec = "";
+  if (data.debate && typeof data.debate === "object") {
+    const d = data.debate;
+    const r1 = d.round1 || {};
+    const r2 = d.round2_rebuttal || {};
+    const synth = d.synthesis || {};
+    const score = synth.conviction_score ?? 0;
+    const label = synth.conviction_label || calculateConvictionLabel(score);
+
+    const debateLines: string[] = [
+      "## Bull vs. Bear Dialectical Debate",
+      "",
+      `**Conviction Score**: ${score > 0 ? `+${score}` : score} (${label})`,
+      "",
+      "### Round 1: Opening Theses",
+      `#### 🐂 Bull Case`,
+      `**Thesis**: ${r1.bull?.bull_thesis || "_N/A_"}`,
+      "",
+      `**Growth Catalysts**:`,
+      ...(normalizeArrayField(r1.bull?.growth_catalysts).map((c: string) => `- ${c}`) || ["- _N/A_"]),
+      "",
+      `**Competitive Advantages**:`,
+      ...(normalizeArrayField(r1.bull?.competitive_advantages).map((c: string) => `- ${c}`) || ["- _N/A_"]),
+      "",
+      `**Valuation Upside**: ${r1.bull?.valuation_upside || "_N/A_"}`,
+      "",
+      `#### 🐻 Bear Case`,
+      `**Thesis**: ${r1.bear?.bear_thesis || "_N/A_"}`,
+      "",
+      `**Downside Risks**:`,
+      ...(normalizeArrayField(r1.bear?.downside_risks).map((c: string) => `- ${c}`) || ["- _N/A_"]),
+      "",
+      `**Structural Headwinds**:`,
+      ...(normalizeArrayField(r1.bear?.structural_headwinds).map((c: string) => `- ${c}`) || ["- _N/A_"]),
+      "",
+      `**Valuation Stretch**: ${r1.bear?.valuation_stretch || "_N/A_"}`,
+      "",
+      "### Round 2: Cross-Examination Rebuttals",
+      `#### Bull Rebuttal against Bear`,
+      ...(normalizeArrayField(r2.bull_rebuttal?.rebuttal_arguments).map((c: string) => `- ${c}`) || ["- _N/A_"]),
+      "",
+      `#### Bear Rebuttal against Bull`,
+      ...(normalizeArrayField(r2.bear_rebuttal?.rebuttal_arguments).map((c: string) => `- ${c}`) || ["- _N/A_"]),
+      "",
+      "### Round 3: Dialectical Arbiter Synthesis",
+      `**Verdict**: ${synth.verdict_summary || "_N/A_"}`,
+      "",
+      "**Consensus Points**:",
+      ...(normalizeArrayField(synth.consensus_points).map((c: string) => `- ${c}`) || ["- _N/A_"]),
+      "",
+      "**Key Tensions**:",
+      ...(Array.isArray(synth.key_tensions)
+        ? synth.key_tensions.map((t: any) => `- **${t.topic}**: Bull: ${t.bull_argument} | Bear: ${t.bear_argument} (Decisive Factor: ${t.decisive_factor})`)
+        : ["- _N/A_"])
+    ];
+    debateSec = debateLines.join("\n");
+  }
+
+  // 10. Assemble Document
   const bodySections = [
     `# Fundamental Brief: ${symbol}`,
     subtitleBadge,
@@ -336,6 +549,7 @@ export function stockFundamentalToOkf(data: {
     guidanceSec,
     risksSec,
     kpisSec,
+    ...(debateSec ? [debateSec] : [])
   ];
 
   return `${frontmatterLines.join("\n")}\n\n${bodySections.join("\n\n")}\n`;
@@ -400,12 +614,16 @@ export async function saveFundamentalBrief(
     guidance,
     key_risks,
     thesis_kpis,
+    debate,
     as_of_date,
     notebook_id,
     source_count,
   } = parsed.data;
 
-  // 1. D1 Upsert
+  const normalizedDebate = debate ? normalizeDebatePayload(symbol, debate) : null;
+  const debateJsonStr = normalizedDebate ? JSON.stringify(normalizedDebate) : null;
+
+  // 1. D1 Upsert with COALESCE guardrail on debate_json
   const upsertSql = `
     INSERT INTO stock_fundamentals (
       symbol,
@@ -415,12 +633,13 @@ export async function saveFundamentalBrief(
       guidance,
       key_risks,
       thesis_kpis,
+      debate_json,
       as_of_date,
       notebook_id,
       source_count,
       updated_at
     ) VALUES (
-      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now')
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now')
     )
     ON CONFLICT(symbol) DO UPDATE SET
       business_model = excluded.business_model,
@@ -429,6 +648,7 @@ export async function saveFundamentalBrief(
       guidance = excluded.guidance,
       key_risks = excluded.key_risks,
       thesis_kpis = excluded.thesis_kpis,
+      debate_json = COALESCE(excluded.debate_json, stock_fundamentals.debate_json),
       as_of_date = excluded.as_of_date,
       notebook_id = excluded.notebook_id,
       source_count = excluded.source_count,
@@ -443,10 +663,35 @@ export async function saveFundamentalBrief(
     guidance ? JSON.stringify(guidance) : null,
     key_risks && key_risks.length > 0 ? JSON.stringify(key_risks) : null,
     thesis_kpis && thesis_kpis.length > 0 ? JSON.stringify(thesis_kpis) : null,
+    debateJsonStr,
     as_of_date,
     notebook_id?.trim() || null,
     source_count ?? 1
   ).run();
+
+  // If debate is present, sync to latest analysis_results.framework_results.debate for backward compatibility
+  if (normalizedDebate) {
+    try {
+      const existing = await env.DB.prepare(
+        'SELECT id, framework_results FROM analysis_results WHERE symbol = ? ORDER BY created_at DESC LIMIT 1'
+      ).bind(symbol).first();
+
+      if (existing && existing.framework_results) {
+        let fw: any = {};
+        try {
+          fw = JSON.parse(existing.framework_results);
+        } catch {
+          fw = {};
+        }
+        fw.debate = normalizedDebate;
+        await env.DB.prepare(
+          'UPDATE analysis_results SET framework_results = ? WHERE id = ?'
+        ).bind(JSON.stringify(fw), existing.id).run();
+      }
+    } catch (syncErr: any) {
+      console.warn(`[saveFundamentalBrief] Non-critical error syncing debate to analysis_results for ${symbol}:`, syncErr?.message);
+    }
+  }
 
   // 2. R2 Persistence in isolated try/catch
   const targetBucket = env.KNOWLEDGE_BUCKET || env.BUCKET;
@@ -457,7 +702,10 @@ export async function saveFundamentalBrief(
   if (targetBucket) {
     try {
       r2Key = `fundamentals/${symbol}.md`;
-      const markdown = stockFundamentalToOkf(parsed.data);
+      const markdown = stockFundamentalToOkf({
+        ...parsed.data,
+        debate: normalizedDebate
+      });
       await targetBucket.put(r2Key, markdown, {
         httpMetadata: { contentType: "text/markdown" },
       });
@@ -478,6 +726,150 @@ export async function saveFundamentalBrief(
     r2_written: r2Written,
     ...(r2Error ? { r2_error: r2Error } : {}),
   };
+}
+
+/**
+ * MCP Tool Handler: save_bull_bear_debate
+ * Updates debate_json in stock_fundamentals, syncs to analysis_results, and updates R2 markdown.
+ */
+export async function saveBullBearDebate(env: any, args: any) {
+  const parsed = SaveBullBearDebateSchema.safeParse(args);
+  if (!parsed.success) {
+    const errorMsg = parsed.error.issues.map((i) => `${i.path.join(".") || "field"}: ${i.message}`).join(", ");
+    return { error: `Validation error: ${errorMsg}` };
+  }
+
+  const { symbol, debate } = parsed.data;
+  const normalized = normalizeDebatePayload(symbol, debate);
+  const debateJsonStr = JSON.stringify(normalized);
+
+  // 1. Upsert into stock_fundamentals preserving existing brief fields
+  const upsertSql = `
+    INSERT INTO stock_fundamentals (
+      symbol,
+      debate_json,
+      as_of_date,
+      updated_at
+    ) VALUES (
+      ?, ?, date('now'), datetime('now')
+    )
+    ON CONFLICT(symbol) DO UPDATE SET
+      debate_json = excluded.debate_json,
+      updated_at = datetime('now');
+  `;
+
+  await env.DB.prepare(upsertSql).bind(symbol, debateJsonStr).run();
+
+  // 2. Sync to latest analysis_results.framework_results
+  try {
+    const existing = await env.DB.prepare(
+      'SELECT id, framework_results FROM analysis_results WHERE symbol = ? ORDER BY created_at DESC LIMIT 1'
+    ).bind(symbol).first();
+
+    if (existing && existing.framework_results) {
+      let fw: any = {};
+      try {
+        fw = JSON.parse(existing.framework_results);
+      } catch {
+        fw = {};
+      }
+      fw.debate = normalized;
+      await env.DB.prepare(
+        'UPDATE analysis_results SET framework_results = ? WHERE id = ?'
+      ).bind(JSON.stringify(fw), existing.id).run();
+    }
+  } catch (syncErr: any) {
+    console.warn(`[saveBullBearDebate] Non-critical error syncing debate to analysis_results for ${symbol}:`, syncErr?.message);
+  }
+
+  // 3. Update R2 OKF file if existing fundamental brief is present
+  const targetBucket = env.KNOWLEDGE_BUCKET || env.BUCKET;
+  let r2Key: string | null = null;
+  let r2Written = false;
+  if (targetBucket) {
+    try {
+      const row = await env.DB.prepare(
+        'SELECT * FROM stock_fundamentals WHERE symbol = ?'
+      ).bind(symbol).first();
+
+      if (row) {
+        r2Key = `fundamentals/${symbol}.md`;
+        const markdown = stockFundamentalToOkf({
+          symbol: row.symbol,
+          as_of_date: row.as_of_date || new Date().toISOString().split("T")[0],
+          source_count: row.source_count,
+          notebook_id: row.notebook_id,
+          business_model: row.business_model,
+          moat: row.moat,
+          competitors: safeJsonParse<string[]>(row.competitors, []),
+          guidance: safeJsonParse<any>(row.guidance, null),
+          key_risks: safeJsonParse<string[]>(row.key_risks, []),
+          thesis_kpis: safeJsonParse<string[]>(row.thesis_kpis, []),
+          debate: normalized
+        });
+        await targetBucket.put(r2Key, markdown, {
+          httpMetadata: { contentType: "text/markdown" },
+        });
+        r2Written = true;
+      }
+    } catch (err: any) {
+      console.warn(`[saveBullBearDebate] Failed to update R2 for ${symbol}:`, err?.message);
+    }
+  }
+
+  return {
+    success: true,
+    symbol,
+    debate: normalized,
+    d1_saved: true,
+    r2_key: r2Key,
+    r2_written: r2Written
+  };
+}
+
+/**
+ * MCP Tool Handler: get_bull_bear_debate
+ * Retrieves debate from stock_fundamentals.debate_json with fallback to analysis_results
+ */
+export async function getBullBearDebate(env: any, symbolOrArgs: string | { symbol?: string }) {
+  let rawSymbol: string | undefined;
+  if (typeof symbolOrArgs === "string") {
+    rawSymbol = symbolOrArgs;
+  } else if (symbolOrArgs && typeof symbolOrArgs === "object") {
+    rawSymbol = symbolOrArgs.symbol;
+  }
+
+  if (!rawSymbol || typeof rawSymbol !== "string" || !rawSymbol.trim()) {
+    return { symbol: "", debate: null };
+  }
+
+  const symbolUpper = rawSymbol.trim().toUpperCase();
+
+  // 1. Query stock_fundamentals
+  const row = await env.DB.prepare(
+    'SELECT debate_json FROM stock_fundamentals WHERE symbol = ?'
+  ).bind(symbolUpper).first();
+
+  if (row && row.debate_json) {
+    const parsed = safeJsonParse<any>(row.debate_json, null);
+    if (parsed) {
+      return { symbol: symbolUpper, debate: parsed };
+    }
+  }
+
+  // 2. Fallback to analysis_results
+  const analysisRow = await env.DB.prepare(
+    "SELECT framework_results FROM analysis_results WHERE symbol = ? AND framework_results LIKE '%\"debate\"%' ORDER BY created_at DESC LIMIT 1"
+  ).bind(symbolUpper).first();
+
+  if (analysisRow && analysisRow.framework_results) {
+    const fw = safeJsonParse<any>(analysisRow.framework_results, null);
+    if (fw && fw.debate) {
+      return { symbol: symbolUpper, debate: fw.debate };
+    }
+  }
+
+  return { symbol: symbolUpper, debate: null };
 }
 
 /**

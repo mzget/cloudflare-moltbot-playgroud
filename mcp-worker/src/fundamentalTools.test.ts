@@ -3,7 +3,10 @@ import {
   saveFundamentalBrief,
   saveThemeSectorContext,
   getFundamentalBrief,
+  saveBullBearDebate,
+  getBullBearDebate,
   SaveFundamentalBriefSchema,
+  SaveBullBearDebateSchema,
   SaveThemeSectorContextSchema,
   GetFundamentalBriefSchema,
 } from "./fundamentalTools";
@@ -153,9 +156,10 @@ describe("fundamentalTools", () => {
       expect(upsert?.binds[4]).toBe(JSON.stringify(payload.guidance));
       expect(upsert?.binds[5]).toBe(JSON.stringify(["China JV risk", "Hyperscaler internal silicon"]));
       expect(upsert?.binds[6]).toBe(JSON.stringify(["v9 adoption rate", "CSS unit volume"]));
-      expect(upsert?.binds[7]).toBe("2026-10-01");
-      expect(upsert?.binds[8]).toBe("nb-1234");
-      expect(upsert?.binds[9]).toBe(5);
+      expect(upsert?.binds[7]).toBeNull(); // debate_json (omitted)
+      expect(upsert?.binds[8]).toBe("2026-10-01"); // as_of_date
+      expect(upsert?.binds[9]).toBe("nb-1234"); // notebook_id
+      expect(upsert?.binds[10]).toBe(5); // source_count
 
       // Verify R2 Put
       expect(mockKnowledgeBucket.put).toHaveBeenCalledTimes(1);
@@ -185,7 +189,7 @@ describe("fundamentalTools", () => {
 
       expect(result.success).toBe(true);
       const upsert = executedSql.find((e) => e.sql.includes("INSERT INTO stock_fundamentals"));
-      expect(upsert?.binds[9]).toBe(1); // default source_count
+      expect(upsert?.binds[10]).toBe(1); // default source_count
     });
 
     it("handles optional and empty fields gracefully with nulls and placeholders", async () => {
@@ -204,7 +208,10 @@ describe("fundamentalTools", () => {
       expect(upsert?.binds[4]).toBeNull(); // guidance
       expect(upsert?.binds[5]).toBeNull(); // key_risks
       expect(upsert?.binds[6]).toBeNull(); // thesis_kpis
-      expect(upsert?.binds[8]).toBeNull(); // notebook_id
+      expect(upsert?.binds[7]).toBeNull(); // debate_json
+      expect(upsert?.binds[8]).toBe("2026-08-01"); // as_of_date
+      expect(upsert?.binds[9]).toBeNull(); // notebook_id
+      expect(upsert?.binds[10]).toBe(1); // source_count
 
       // Verify R2 put uses standard placeholders
       const [, r2Body] = mockKnowledgeBucket.put.mock.calls[0];
@@ -483,6 +490,159 @@ describe("fundamentalTools", () => {
     it("GetFundamentalBriefSchema normalizes symbol to uppercase", () => {
       const parsed = GetFundamentalBriefSchema.parse({ symbol: "nvda" });
       expect(parsed.symbol).toBe("NVDA");
+    });
+
+    it("SaveBullBearDebateSchema validates full 3-round debate and normalizes symbol", () => {
+      const sampleDebate = {
+        symbol: "arm",
+        debate: {
+          round1: {
+            bull: {
+              bull_thesis: "ARMv9 royalty acceleration and AI compute penetration",
+              growth_catalysts: ["CSS adoption", "Data center market share expansion"],
+              competitive_advantages: ["High switching costs", "Ecosystem lock-in"],
+              valuation_upside: "Target 20% FCF yield growth"
+            },
+            bear: {
+              bear_thesis: "High customer concentration and China market risk",
+              downside_risks: ["China licensing delays", "Hyperscaler custom silicon"],
+              structural_headwinds: ["RISC-V competition in low-end chips"],
+              valuation_stretch: "P/E of 90x leaves no margin of safety"
+            }
+          },
+          round2_rebuttal: {
+            bull_rebuttal: {
+              rebuttal_arguments: ["Switching away from ARM ISA requires massive software rewrite"],
+              mitigating_factors: ["Diversifying into automotive and PC markets"]
+            },
+            bear_rebuttal: {
+              rebuttal_arguments: ["RISC-V is accelerating adoption in automotive and storage controllers"],
+              skeptical_counters: ["Valuation already prices in flawless execution through FY28"]
+            }
+          },
+          synthesis: {
+            key_tensions: [
+              {
+                topic: "CSS royalty rate adoption speed vs. in-house ASIC substitution",
+                bull_argument: "CSS adoption doubles royalty per chip to ~4-5%",
+                bear_argument: "Big tech giants developing RISC-V accelerators",
+                decisive_factor: "Hyperscaler Q3 FY27 Capex disclosures"
+              }
+            ],
+            consensus_points: ["Dominant in mobile market with >99% share"],
+            conviction_score: 5,
+            conviction_label: "Moderate Bull",
+            verdict_summary: "ARM possesses an irreplaceable moat in general-purpose compute, but multiple leaves thin margin of error."
+          }
+        }
+      };
+
+      const parsed = SaveBullBearDebateSchema.parse(sampleDebate);
+      expect(parsed.symbol).toBe("ARM");
+      expect(parsed.debate.synthesis.conviction_score).toBe(5);
+    });
+  });
+
+  // =========================================================================
+  // 5. Bull vs. Bear Dialectical Debate Integration Tests
+  // =========================================================================
+  describe("Bull vs. Bear Debate Integration", () => {
+    const sampleDebatePayload = {
+      round1: {
+        bull: {
+          bull_thesis: "ARMv9 royalty acceleration",
+          growth_catalysts: ["Data center adoption"],
+          competitive_advantages: ["IP architecture lock-in"],
+          valuation_upside: "Strong upside"
+        },
+        bear: {
+          bear_thesis: "Customer concentration",
+          downside_risks: ["China JV risk"],
+          structural_headwinds: ["RISC-V architecture"],
+          valuation_stretch: "Multiple compression risk"
+        }
+      },
+      round2_rebuttal: {
+        bull_rebuttal: {
+          rebuttal_arguments: ["High switching costs protect moat"],
+          mitigating_factors: ["Cash flow resilience"]
+        },
+        bear_rebuttal: {
+          rebuttal_arguments: ["Growth deceleration inevitable"],
+          skeptical_counters: ["High valuation multiple"]
+        }
+      },
+      synthesis: {
+        key_tensions: [
+          {
+            topic: "Royalty rate expansion vs. RISC-V substitution",
+            bull_argument: "Royalty rate doubling",
+            bear_argument: "Open-source alternatives",
+            decisive_factor: "Next 4 quarters CSS attach rate"
+          }
+        ],
+        consensus_points: ["Solid balance sheet"],
+        conviction_score: 6,
+        conviction_label: "Moderate Bull" as const,
+        verdict_summary: "High quality moat with moderate bullish advantage."
+      }
+    };
+
+    it("saveFundamentalBrief persists debate_json with COALESCE guardrail in single atomic call", async () => {
+      const payload = {
+        symbol: "ARM",
+        as_of_date: "2026-10-01",
+        business_model: "Licensing and royalties",
+        moat: "High switching costs",
+        debate: sampleDebatePayload
+      };
+
+      const result = await saveFundamentalBrief(mockEnv, payload);
+      expect(result.success).toBe(true);
+      expect(result.d1_saved).toBe(true);
+
+      const upsert = executedSql.find((e) => e.sql.includes("INSERT INTO stock_fundamentals"));
+      expect(upsert).toBeDefined();
+      expect(upsert?.sql).toContain("debate_json = COALESCE(excluded.debate_json, stock_fundamentals.debate_json)");
+      // debate_json should be bind param index 7
+      expect(upsert?.binds[7]).toContain("ARMv9 royalty acceleration");
+
+      // Verify R2 contains debate section
+      const [, r2Body] = mockKnowledgeBucket.put.mock.calls[0];
+      expect(r2Body).toContain("## Bull vs. Bear Dialectical Debate");
+      expect(r2Body).toContain("ARMv9 royalty acceleration");
+    });
+
+    it("saveBullBearDebate updates debate_json and syncs to analysis_results", async () => {
+      const result = await saveBullBearDebate(mockEnv, {
+        symbol: "NVDA",
+        debate: sampleDebatePayload
+      });
+
+      expect(result.success).toBe(true);
+      expect(result.debate.symbol).toBe("NVDA");
+      expect(result.debate.synthesis.conviction_score).toBe(6);
+
+      const d1Upsert = executedSql.find((e) => e.sql.includes("INSERT INTO stock_fundamentals"));
+      expect(d1Upsert).toBeDefined();
+    });
+
+    it("getBullBearDebate returns debate from stock_fundamentals", async () => {
+      mockDb.prepare = vi.fn().mockImplementation((sql: string) => ({
+        bind: vi.fn().mockReturnValue({
+          first: vi.fn().mockResolvedValue({
+            debate_json: JSON.stringify({
+              symbol: "ARM",
+              synthesis: { conviction_score: 7, conviction_label: "Strong Bull", verdict_summary: "Convincing bull thesis" }
+            })
+          })
+        })
+      }));
+
+      const res = await getBullBearDebate(mockEnv, "ARM");
+      expect(res.symbol).toBe("ARM");
+      expect(res.debate?.synthesis.conviction_score).toBe(7);
+      expect(res.debate?.synthesis.conviction_label).toBe("Strong Bull");
     });
   });
 });
