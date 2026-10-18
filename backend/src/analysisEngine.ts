@@ -13,7 +13,13 @@ import {
   getSynthesisPrompt,
   getFinalReportPrompt
 } from './analysisPrompts';
-import { runDialecticalDebate, type DialecticalDebateResult } from './debateEngine';
+import { 
+  getStoredDebate, 
+  formatStoredDebateForGuruPrompt, 
+  fetchQualitativeData, 
+  type DialecticalDebateResult 
+} from './debateEngine';
+import { formatDebateContext } from './analysisPrompts';
 
 
 function parseAIJson(text: string): any {
@@ -234,19 +240,43 @@ export async function runFullAnalysis(env: Env, symbol: string): Promise<{
   const stats = await getOrUpdateMarketStats(env, symbolUpper);
   const metricsStr = formatMetricsForPrompt(stats);
   
-  const [lynchFw, helmerFw, buffettFw, mungerFw, marksFw, greenblattFw] = await Promise.all([
+  const [lynchFw, helmerFw, buffettFw, mungerFw, marksFw, greenblattFw, qualitativeData, storedDebate] = await Promise.all([
     fetchFrameworkContent(env, 'peter_lynch'),
     fetchFrameworkContent(env, 'hamilton_helmer'),
     fetchFrameworkContent(env, 'warren_buffett'),
     fetchFrameworkContent(env, 'charlie_munger'),
     fetchFrameworkContent(env, 'howard_marks'),
-    fetchFrameworkContent(env, 'joel_greenblatt')
+    fetchFrameworkContent(env, 'joel_greenblatt'),
+    fetchQualitativeData(env.DB, symbolUpper),
+    getStoredDebate(env.DB, symbolUpper)
   ]);
+
+  // Build enriched context combining financial metrics, qualitative fundamental profile, and Gemini debate
+  const contextParts: string[] = [
+    formatDebateContext(
+      metricsStr,
+      qualitativeData.events as any[],
+      (qualitativeData.articles || []) as any[],
+      { fundamental: qualitativeData.fundamental ?? null, themes: qualitativeData.themes ?? [] }
+    )
+  ];
+
+  if (storedDebate) {
+    const debateSummary = formatStoredDebateForGuruPrompt(storedDebate);
+    if (debateSummary) {
+      contextParts.push(`\n${debateSummary}`);
+    }
+  }
+
+  const enrichedMetricsAndContextStr = contextParts.join('\n\n');
   
   const stepResults: Record<string, any> = {};
+  if (storedDebate) {
+    stepResults.debate = storedDebate;
+  }
   
   console.log('Starting Step 1 (Peter Lynch) for ' + symbolUpper + '...');
-  const lynchPrompt = getLynchPrompt(symbolUpper, metricsStr, lynchFw);
+  const lynchPrompt = getLynchPrompt(symbolUpper, enrichedMetricsAndContextStr, lynchFw);
   const lynchAIResponse = await env.AI.run(env.default_ai_model, {
     messages: [
       { role: 'system', content: lynchPrompt.system },
@@ -259,7 +289,7 @@ export async function runFullAnalysis(env: Env, symbol: string): Promise<{
   stepResults.peter_lynch = parseAIJson(lynchText);
   
   console.log('Starting Step 2 (7 Powers) for ' + symbolUpper + '...');
-  const helmerPrompt = getHelmerPrompt(symbolUpper, metricsStr, helmerFw, JSON.stringify(stepResults.peter_lynch));
+  const helmerPrompt = getHelmerPrompt(symbolUpper, enrichedMetricsAndContextStr, helmerFw, JSON.stringify(stepResults.peter_lynch));
   const helmerAIResponse = await env.AI.run(env.default_ai_model, {
     messages: [
       { role: 'system', content: helmerPrompt.system },
@@ -272,7 +302,7 @@ export async function runFullAnalysis(env: Env, symbol: string): Promise<{
   stepResults.hamilton_helmer = parseAIJson(helmerText);
   
   console.log('Starting Step 3 (Warren Buffett) for ' + symbolUpper + '...');
-  const buffettPrompt = getBuffettPrompt(symbolUpper, metricsStr, buffettFw, JSON.stringify({
+  const buffettPrompt = getBuffettPrompt(symbolUpper, enrichedMetricsAndContextStr, buffettFw, JSON.stringify({
     peter_lynch: stepResults.peter_lynch,
     hamilton_helmer: stepResults.hamilton_helmer
   }));
@@ -288,7 +318,7 @@ export async function runFullAnalysis(env: Env, symbol: string): Promise<{
   stepResults.warren_buffett = parseAIJson(buffettText);
   
   console.log('Starting Step 4 (Charlie Munger) for ' + symbolUpper + '...');
-  const mungerPrompt = getMungerPrompt(symbolUpper, metricsStr, mungerFw, JSON.stringify({
+  const mungerPrompt = getMungerPrompt(symbolUpper, enrichedMetricsAndContextStr, mungerFw, JSON.stringify({
     peter_lynch: stepResults.peter_lynch,
     hamilton_helmer: stepResults.hamilton_helmer,
     warren_buffett: stepResults.warren_buffett
@@ -305,7 +335,7 @@ export async function runFullAnalysis(env: Env, symbol: string): Promise<{
   stepResults.charlie_munger = parseAIJson(mungerText);
   
   console.log('Starting Step 5 (Howard Marks) for ' + symbolUpper + '...');
-  const marksPrompt = getMarksPrompt(symbolUpper, metricsStr, marksFw, JSON.stringify({
+  const marksPrompt = getMarksPrompt(symbolUpper, enrichedMetricsAndContextStr, marksFw, JSON.stringify({
     peter_lynch: stepResults.peter_lynch,
     hamilton_helmer: stepResults.hamilton_helmer,
     warren_buffett: stepResults.warren_buffett,
@@ -323,7 +353,7 @@ export async function runFullAnalysis(env: Env, symbol: string): Promise<{
   stepResults.howard_marks = parseAIJson(marksText);
   
   console.log('Starting Step 6 (Joel Greenblatt) for ' + symbolUpper + '...');
-  const greenblattPrompt = getGreenblattPrompt(symbolUpper, metricsStr, greenblattFw, JSON.stringify({
+  const greenblattPrompt = getGreenblattPrompt(symbolUpper, enrichedMetricsAndContextStr, greenblattFw, JSON.stringify({
     peter_lynch: stepResults.peter_lynch,
     hamilton_helmer: stepResults.hamilton_helmer,
     warren_buffett: stepResults.warren_buffett,
@@ -341,18 +371,12 @@ export async function runFullAnalysis(env: Env, symbol: string): Promise<{
   let greenblattText = (greenblattAIResponse as any).choices?.[0]?.message?.content || greenblattAIResponse.response || '';
   stepResults.joel_greenblatt = parseAIJson(greenblattText);
   
-  // Step 6.5: Bull vs. Bear Dialectical Debate (TauricResearch TradingAgents Engine)
-  console.log('Starting Step 6.5 (Bull vs. Bear Dialectical Debate) for ' + symbolUpper + '...');
-  let debateResult: DialecticalDebateResult | null = null;
-  try {
-    debateResult = await runDialecticalDebate(env, symbolUpper, metricsStr);
-    stepResults.debate = debateResult;
-  } catch (debateErr) {
-    console.warn(`[AnalysisEngine] Dialectical debate failed for ${symbolUpper}:`, debateErr);
-  }
+  // Step 6.5: Gemini Notebook Dialectical Debate preservation (Zero Overwrite)
+  console.log('Preserving Gemini Notebook Bull vs. Bear Debate for ' + symbolUpper + '...');
+  stepResults.debate = storedDebate;
 
   console.log('Starting Step 7 (Synthesis) for ' + symbolUpper + '...');
-  const synthesisPrompt = getSynthesisPrompt(symbolUpper, metricsStr, JSON.stringify(stepResults));
+  const synthesisPrompt = getSynthesisPrompt(symbolUpper, enrichedMetricsAndContextStr, JSON.stringify(stepResults));
   const synthesisAIResponse = await env.AI.run(env.default_ai_model, {
     messages: [
       { role: 'system', content: synthesisPrompt.system },
@@ -366,7 +390,7 @@ export async function runFullAnalysis(env: Env, symbol: string): Promise<{
   stepResults.synthesis = synthesis;
   
   console.log('Starting Step 8 (Markdown Compilation) for ' + symbolUpper + '...');
-  const reportPrompt = getFinalReportPrompt(symbolUpper, metricsStr, JSON.stringify(synthesis), JSON.stringify(stepResults));
+  const reportPrompt = getFinalReportPrompt(symbolUpper, enrichedMetricsAndContextStr, JSON.stringify(synthesis), JSON.stringify(stepResults));
   const reportAIResponse = await env.AI.run(env.default_ai_model, {
     messages: [
       { role: 'system', content: reportPrompt.system },
@@ -399,6 +423,6 @@ export async function runFullAnalysis(env: Env, symbol: string): Promise<{
     summary: reportMarkdown,
     conviction_level: convictionLevel,
     framework_results: frameworkResultsStr,
-    debate: debateResult
+    debate: storedDebate
   };
 }

@@ -29,7 +29,7 @@ export class OaktreeChat extends AIChatAgent<any> {
     }
 
     const result = streamText({
-      model,
+      model: model as any,
       messages: await convertToModelMessages(this.messages),
       system: buildSystemPrompt(dataContext),
       abortSignal: options?.abortSignal,

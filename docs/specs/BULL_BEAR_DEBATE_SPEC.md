@@ -31,35 +31,27 @@
 
 ---
 
-## 3. 🏗️ Architecture & Dialectical Debate Pipeline
+## 3. 🏗️ Architecture & Dialectical Debate Pipeline (Gemini MCP Push)
 
 ```mermaid
 flowchart TD
-    DataGathering["0. Data Grounding & Ingestion\n- Market Stats (Finnhub/D1)\n- Market Events (D1)\n- Notebook Articles (D1)"] --> Fork1
+    GeminiNotebook["Google Gemini Notebook (10-K, 10-Q, Earnings Calls, Thesis Slides)"] --> GeminiAgent
     
-    subgraph Round1["Round 1: Opening Theses (Parallel Execution)"]
-        Fork1 --> BullRound1["Bullish Researcher\n(Growth Thesis & Catalysts)"]
-        Fork1 --> BearRound1["Bearish Researcher\n(Risk Thesis & Vulnerabilities)"]
+    subgraph Gemini["Google Gemini App Engine (Institutional Thai Analysis)"]
+        GeminiAgent["Gemini Pro / Spark\n1. Extract Fundamental Brief\n2. Run 3-Round Dialectical Debate:\n   - Round 1: Bull & Bear Opening\n   - Round 2: Rebuttals\n   - Round 3: Arbiter Synthesis (-10 to +10)"]
     end
 
-    BullRound1 --> CrossInput
-    BearRound1 --> CrossInput
+    GeminiAgent ==>|"Single Atomic MCP Call: save_fundamental_brief(debate={...})"| MCPWorker["Oaktree MCP Worker"]
     
-    subgraph Round2["Round 2: Cross-Examination Rebuttal (Parallel Execution)"]
-        CrossInput["Exchange Claims"] --> BullRebuttal["Bull Rebuttal\n(Counters Bear's Risks)"]
-        CrossInput --> BearRebuttal["Bear Rebuttal\n(Counters Bull's Catalysts)"]
+    subgraph Storage["Preservation Storage Layer"]
+        MCPWorker --> D1[("D1: stock_fundamentals (debate_json via COALESCE)\n& analysis_results (framework_results.debate)")]
+        MCPWorker --> R2[("R2 OKF: fundamentals/{symbol}.md (Includes Debate Section)")]
     end
 
-    BullRebuttal --> ArbiterRound
-    BearRebuttal --> ArbiterRound
-    
-    subgraph Round3["Round 3: Dialectical Arbiter Synthesis"]
-        ArbiterRound["Dialectical Arbiter Agent\n- Weighs Arguments\n- Extracts Key Tensions\n- Scores Conviction (-10 to +10)"]
-    end
-
-    ArbiterRound --> StoreDB[("D1: analysis_results\n(framework_results.debate & summary)")]
-    StoreDB --> UI["Frontend: AnalysisReport.tsx\n(Dual Adversarial Glass Cards)"]
+    D1 --> DebateCard["DebateCard.tsx (Display + Refresh + Copy Gemini Prompt)"]
+    D1 --> AnalysisEngine["6-Guru Deep Value Analysis (Grounding Context, No Overwrite)"]
 ```
+
 
 ### ⚡ Edge Performance & Cloudflare Worker Optimization
 เพื่อป้องกันปัญหา Request Timeout และ Latency สูง:

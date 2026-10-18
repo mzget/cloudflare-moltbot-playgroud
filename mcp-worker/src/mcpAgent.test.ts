@@ -22,9 +22,13 @@ const fundamentalMock = vi.hoisted(() => ({
   saveFundamentalBrief: vi.fn(),
   saveThemeSectorContext: vi.fn(),
   getFundamentalBrief: vi.fn(),
+  saveBullBearDebate: vi.fn(),
+  getBullBearDebate: vi.fn(),
   saveFundamentalBriefShape: {},
   saveThemeSectorContextShape: {},
   getFundamentalBriefShape: {},
+  saveBullBearDebateShape: {},
+  getBullBearDebateShape: {},
 }));
 
 vi.mock("agents/mcp", () => ({ McpAgent: class { env: any = { id: "env" }; } }));
@@ -46,7 +50,7 @@ async function setup() {
 const textOf = (res: any) => JSON.parse(res.content[0].text);
 
 describe("OaktreeMCP", () => {
-  it("registers all fifteen tools with descriptions", async () => {
+  it("registers all seventeen tools with descriptions", async () => {
     const { tools } = await setup();
     expect([...tools.keys()]).toEqual([
       "get_portfolio",
@@ -62,6 +66,8 @@ describe("OaktreeMCP", () => {
       "get_dcf_model",
       "list_dcf_symbols",
       "save_fundamental_brief",
+      "save_bull_bear_debate",
+      "get_bull_bear_debate",
       "save_theme_sector_context",
       "get_fundamental_brief",
     ]);
@@ -125,11 +131,19 @@ describe("OaktreeMCP", () => {
     expect(dcfMock.listDcfSymbols).toHaveBeenCalledWith(agent.env);
 
     fundamentalMock.saveFundamentalBrief.mockResolvedValue({ success: true, symbol: "ARM" });
+    fundamentalMock.saveBullBearDebate.mockResolvedValue({ success: true, symbol: "ARM" });
+    fundamentalMock.getBullBearDebate.mockResolvedValue({ symbol: "ARM", debate: null });
     fundamentalMock.saveThemeSectorContext.mockResolvedValue({ success: true, notebook_id: "nb-1" });
     fundamentalMock.getFundamentalBrief.mockResolvedValue({ fundamental: { symbol: "ARM" }, themes: [] });
 
     expect(textOf(await tools.get("save_fundamental_brief")![3]({ symbol: "ARM", as_of_date: "2026-10-01" }))).toEqual({ success: true, symbol: "ARM" });
     expect(fundamentalMock.saveFundamentalBrief).toHaveBeenCalledWith(agent.env, { symbol: "ARM", as_of_date: "2026-10-01" });
+
+    expect(textOf(await tools.get("save_bull_bear_debate")![3]({ symbol: "ARM", debate: {} }))).toEqual({ success: true, symbol: "ARM" });
+    expect(fundamentalMock.saveBullBearDebate).toHaveBeenCalledWith(agent.env, { symbol: "ARM", debate: {} });
+
+    expect(textOf(await tools.get("get_bull_bear_debate")![3]({ symbol: "ARM" }))).toEqual({ symbol: "ARM", debate: null });
+    expect(fundamentalMock.getBullBearDebate).toHaveBeenCalledWith(agent.env, { symbol: "ARM" });
 
     expect(textOf(await tools.get("save_theme_sector_context")![3]({ notebook_id: "nb-1", theme_name: "AI" }))).toEqual({ success: true, notebook_id: "nb-1" });
     expect(fundamentalMock.saveThemeSectorContext).toHaveBeenCalledWith(agent.env, { notebook_id: "nb-1", theme_name: "AI" });

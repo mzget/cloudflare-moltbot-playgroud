@@ -27,13 +27,20 @@ function createRealSqliteD1() {
   const db = new DatabaseSync(":memory:");
   db.exec("PRAGMA foreign_keys = ON;");
 
-  // Load and execute migration 0041
+  // Load and execute migration 0041 and 0042
   const migrationPath = path.resolve(
     process.cwd(),
     "../backend/migrations/0041_fundamental_intelligence.sql"
   );
   const migrationSql = fs.readFileSync(migrationPath, "utf-8");
   db.exec(migrationSql);
+
+  const migration0042Path = path.resolve(
+    process.cwd(),
+    "../backend/migrations/0042_add_debate_to_stock_fundamentals.sql"
+  );
+  const migration0042Sql = fs.readFileSync(migration0042Path, "utf-8");
+  db.exec(migration0042Sql);
 
 
   const d1Shim = {

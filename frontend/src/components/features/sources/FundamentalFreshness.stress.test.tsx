@@ -168,7 +168,7 @@ describe('Empirical Adversarial Stress Suite: generateGeminiExtractionPrompt & C
       const prompt = generateGeminiExtractionPrompt('ARM');
 
       // Exact contract string checks
-      expect(prompt).toContain('# Fundamental Research Extraction Prompt: ARM');
+      expect(prompt).toContain('# Fundamental Intelligence & Bull vs. Bear Debate Extraction: ARM');
       expect(prompt).toContain('"symbol": "ARM"');
       expect(prompt).toContain('save_fundamental_brief');
       expect(prompt).toContain('"business_model":');
@@ -184,26 +184,26 @@ describe('Empirical Adversarial Stress Suite: generateGeminiExtractionPrompt & C
 
     it('handles lowercase, mixed-case, and whitespace around valid symbols', () => {
       const lowerPrompt = generateGeminiExtractionPrompt('nvda');
-      expect(lowerPrompt).toContain('# Fundamental Research Extraction Prompt: NVDA');
+      expect(lowerPrompt).toContain('# Fundamental Intelligence & Bull vs. Bear Debate Extraction: NVDA');
       expect(lowerPrompt).toContain('"symbol": "NVDA"');
 
       const paddedPrompt = generateGeminiExtractionPrompt('   aapl   ');
-      expect(paddedPrompt).toContain('# Fundamental Research Extraction Prompt: AAPL');
+      expect(paddedPrompt).toContain('# Fundamental Intelligence & Bull vs. Bear Debate Extraction: AAPL');
       expect(paddedPrompt).toContain('"symbol": "AAPL"');
     });
 
     it('evaluates behavior on empty string vs undefined vs null', () => {
       const emptyPrompt = generateGeminiExtractionPrompt('');
-      expect(emptyPrompt).toContain('# Fundamental Research Extraction Prompt: TICKER');
+      expect(emptyPrompt).toContain('# Fundamental Intelligence & Bull vs. Bear Debate Extraction: TICKER');
       expect(emptyPrompt).toContain('"symbol": "TICKER"');
 
       const undefPrompt = generateGeminiExtractionPrompt(undefined);
-      expect(undefPrompt).toContain('# Fundamental Research Extraction Prompt: TICKER');
+      expect(undefPrompt).toContain('# Fundamental Intelligence & Bull vs. Bear Debate Extraction: TICKER');
       expect(undefPrompt).toContain('"symbol": "TICKER"');
 
       // @ts-expect-error testing null
       const nullPrompt = generateGeminiExtractionPrompt(null);
-      expect(nullPrompt).toContain('# Fundamental Research Extraction Prompt: TICKER');
+      expect(nullPrompt).toContain('# Fundamental Intelligence & Bull vs. Bear Debate Extraction: TICKER');
       expect(nullPrompt).toContain('"symbol": "TICKER"');
     });
 
@@ -213,18 +213,18 @@ describe('Empirical Adversarial Stress Suite: generateGeminiExtractionPrompt & C
       // Let's document the actual behavior:
       // If ('   ' || 'TICKER') is used, ('   ') is truthy, so trim() makes it ''
       // If (symbol?.trim() || 'TICKER') had been used, it would be 'TICKER'
-      const isTicker = whitespacePrompt.includes('# Fundamental Research Extraction Prompt: TICKER');
-      const isEmpty = whitespacePrompt.includes('# Fundamental Research Extraction Prompt: \n');
+      const isTicker = whitespacePrompt.includes('# Fundamental Intelligence & Bull vs. Bear Debate Extraction: TICKER');
+      const isEmpty = whitespacePrompt.includes('# Fundamental Intelligence & Bull vs. Bear Debate Extraction: \n');
       expect(isTicker || isEmpty).toBe(true);
     });
 
     it('handles special-character symbols (e.g. BRK.A, BRK-B, BF/B)', () => {
       const dotSymbolPrompt = generateGeminiExtractionPrompt('brk.b');
-      expect(dotSymbolPrompt).toContain('# Fundamental Research Extraction Prompt: BRK.B');
+      expect(dotSymbolPrompt).toContain('# Fundamental Intelligence & Bull vs. Bear Debate Extraction: BRK.B');
       expect(dotSymbolPrompt).toContain('"symbol": "BRK.B"');
 
       const hyphenSymbolPrompt = generateGeminiExtractionPrompt('brk-a');
-      expect(hyphenSymbolPrompt).toContain('# Fundamental Research Extraction Prompt: BRK-A');
+      expect(hyphenSymbolPrompt).toContain('# Fundamental Intelligence & Bull vs. Bear Debate Extraction: BRK-A');
       expect(hyphenSymbolPrompt).toContain('"symbol": "BRK-A"');
     });
 
