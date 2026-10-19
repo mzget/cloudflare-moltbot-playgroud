@@ -15,9 +15,10 @@ analysis.post('/api/analysis/run', async (c) => {
   try {
     const result = await runFullAnalysis(c.env, symbol);
     return c.json(result);
-  } catch (e) {
-    console.error(`Analysis failed for ${symbol}:`, e);
-    return c.json({ error: (e as any).message }, 500);
+  } catch (e: any) {
+    const errorMsg = e?.message || String(e || 'Unknown analysis error');
+    console.error(`Analysis failed for ${symbol}: ${errorMsg}`, e?.stack || e);
+    return c.json({ error: errorMsg }, 500);
   }
 });
 
