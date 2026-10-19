@@ -65,8 +65,9 @@ export function parseAIJson(text: string): any {
 }
 
 /**
- * Executes a Workers AI call with retries, exponential backoff, and model fallback
- * to prevent pipeline failures from transient 504 / internal AI parsing errors.
+ * Executes a Workers AI call with immediate model fallback:
+ * If the primary model (Gemma 4) fails on its initial run, it immediately falls back
+ * to the fallback model (Llama) without wasting latency on multiple retries.
  */
 export async function runAnalysisStepAi(
   env: Env,
@@ -76,41 +77,35 @@ export async function runAnalysisStepAi(
     messages: Array<{ role: string; content: string }>;
     max_tokens?: number;
     response_format?: { type: string };
-  },
-  maxRetries = 2
+  }
 ): Promise<any> {
   const primaryModel = env.default_ai_model || '@cf/google/gemma-4-26b-a4b-it';
   const fallbackModel = env.facebook_summarize_model && env.facebook_summarize_model !== primaryModel
     ? env.facebook_summarize_model
     : null;
 
-  const modelsToTry = fallbackModel ? [primaryModel, fallbackModel] : [primaryModel];
-  let lastError: any = null;
+  // 1. Try Primary Model first (1 attempt, no redundant retry loop)
+  try {
+    return await env.AI.run(primaryModel, payload);
+  } catch (primaryErr: any) {
+    console.warn(
+      `[AnalysisEngine] Step "${stepName}" for ${symbol} failed on primary model ${primaryModel}:`,
+      primaryErr?.message || primaryErr
+    );
 
-  for (const model of modelsToTry) {
-    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-      try {
-        if (attempt > 0) {
-          const delay = Math.pow(2, attempt - 1) * 800;
-          await new Promise(res => setTimeout(res, delay));
-        }
-        const res = await env.AI.run(model, payload);
-        return res;
-      } catch (err: any) {
-        lastError = err;
-        console.warn(
-          `[AnalysisEngine] Step "${stepName}" for ${symbol} failed on model ${model} (attempt ${attempt + 1}/${maxRetries + 1}):`,
-          err?.message || err
-        );
-      }
+    if (!fallbackModel) {
+      throw new Error(`[Step: ${stepName}] AI execution failed for ${symbol}: ${primaryErr?.message || primaryErr}`);
     }
-    if (fallbackModel && model === primaryModel) {
-      console.warn(`[AnalysisEngine] Step "${stepName}" for ${symbol} falling back to model: ${fallbackModel}`);
+
+    // 2. Immediate fallback to secondary model
+    console.warn(`[AnalysisEngine] Step "${stepName}" for ${symbol} immediately falling back to: ${fallbackModel}`);
+    try {
+      return await env.AI.run(fallbackModel, payload);
+    } catch (fallbackErr: any) {
+      const errDetail = fallbackErr?.message || String(fallbackErr || 'Unknown AI error');
+      throw new Error(`[Step: ${stepName}] AI execution failed for ${symbol} on fallback ${fallbackModel}: ${errDetail}`);
     }
   }
-
-  const errDetail = lastError?.message || String(lastError || 'Unknown AI error');
-  throw new Error(`[Step: ${stepName}] AI execution failed for ${symbol}: ${errDetail}`);
 }
 
 export async function getOrUpdateMarketStats(env: Env, symbol: string): Promise<MarketStatsData> {
