@@ -22,7 +22,7 @@ import {
 import { formatDebateContext } from './analysisPrompts';
 
 
-function parseAIJson(text: string): any {
+export function parseAIJson(text: string): any {
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) {
     throw new Error('No JSON object found in AI response');
@@ -62,6 +62,55 @@ function parseAIJson(text: string): any {
     }
     return JSON.parse(cleaned);
   }
+}
+
+/**
+ * Executes a Workers AI call with retries, exponential backoff, and model fallback
+ * to prevent pipeline failures from transient 504 / internal AI parsing errors.
+ */
+export async function runAnalysisStepAi(
+  env: Env,
+  stepName: string,
+  symbol: string,
+  payload: {
+    messages: Array<{ role: string; content: string }>;
+    max_tokens?: number;
+    response_format?: { type: string };
+  },
+  maxRetries = 2
+): Promise<any> {
+  const primaryModel = env.default_ai_model || '@cf/google/gemma-4-26b-a4b-it';
+  const fallbackModel = env.facebook_summarize_model && env.facebook_summarize_model !== primaryModel
+    ? env.facebook_summarize_model
+    : null;
+
+  const modelsToTry = fallbackModel ? [primaryModel, fallbackModel] : [primaryModel];
+  let lastError: any = null;
+
+  for (const model of modelsToTry) {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          const delay = Math.pow(2, attempt - 1) * 800;
+          await new Promise(res => setTimeout(res, delay));
+        }
+        const res = await env.AI.run(model, payload);
+        return res;
+      } catch (err: any) {
+        lastError = err;
+        console.warn(
+          `[AnalysisEngine] Step "${stepName}" for ${symbol} failed on model ${model} (attempt ${attempt + 1}/${maxRetries + 1}):`,
+          err?.message || err
+        );
+      }
+    }
+    if (fallbackModel && model === primaryModel) {
+      console.warn(`[AnalysisEngine] Step "${stepName}" for ${symbol} falling back to model: ${fallbackModel}`);
+    }
+  }
+
+  const errDetail = lastError?.message || String(lastError || 'Unknown AI error');
+  throw new Error(`[Step: ${stepName}] AI execution failed for ${symbol}: ${errDetail}`);
 }
 
 export async function getOrUpdateMarketStats(env: Env, symbol: string): Promise<MarketStatsData> {
@@ -277,27 +326,27 @@ export async function runFullAnalysis(env: Env, symbol: string): Promise<{
   
   console.log('Starting Step 1 (Peter Lynch) for ' + symbolUpper + '...');
   const lynchPrompt = getLynchPrompt(symbolUpper, enrichedMetricsAndContextStr, lynchFw);
-  const lynchAIResponse = await env.AI.run(env.default_ai_model, {
+  const lynchAIResponse = await runAnalysisStepAi(env, 'Peter Lynch', symbolUpper, {
     messages: [
       { role: 'system', content: lynchPrompt.system },
       { role: 'user', content: lynchPrompt.prompt }
     ],
-    max_tokens: 8192,
+    max_tokens: 4096,
     response_format: { type: 'json_object' }
-  } as any);
+  });
   let lynchText = (lynchAIResponse as any).choices?.[0]?.message?.content || lynchAIResponse.response || '';
   stepResults.peter_lynch = parseAIJson(lynchText);
   
   console.log('Starting Step 2 (7 Powers) for ' + symbolUpper + '...');
   const helmerPrompt = getHelmerPrompt(symbolUpper, enrichedMetricsAndContextStr, helmerFw, JSON.stringify(stepResults.peter_lynch));
-  const helmerAIResponse = await env.AI.run(env.default_ai_model, {
+  const helmerAIResponse = await runAnalysisStepAi(env, 'Hamilton Helmer', symbolUpper, {
     messages: [
       { role: 'system', content: helmerPrompt.system },
       { role: 'user', content: helmerPrompt.prompt }
     ],
-    max_tokens: 8192,
+    max_tokens: 4096,
     response_format: { type: 'json_object' }
-  } as any);
+  });
   let helmerText = (helmerAIResponse as any).choices?.[0]?.message?.content || helmerAIResponse.response || '';
   stepResults.hamilton_helmer = parseAIJson(helmerText);
   
@@ -306,14 +355,14 @@ export async function runFullAnalysis(env: Env, symbol: string): Promise<{
     peter_lynch: stepResults.peter_lynch,
     hamilton_helmer: stepResults.hamilton_helmer
   }));
-  const buffettAIResponse = await env.AI.run(env.default_ai_model, {
+  const buffettAIResponse = await runAnalysisStepAi(env, 'Warren Buffett', symbolUpper, {
     messages: [
       { role: 'system', content: buffettPrompt.system },
       { role: 'user', content: buffettPrompt.prompt }
     ],
-    max_tokens: 8192,
+    max_tokens: 4096,
     response_format: { type: 'json_object' }
-  } as any);
+  });
   let buffettText = (buffettAIResponse as any).choices?.[0]?.message?.content || buffettAIResponse.response || '';
   stepResults.warren_buffett = parseAIJson(buffettText);
   
@@ -323,14 +372,14 @@ export async function runFullAnalysis(env: Env, symbol: string): Promise<{
     hamilton_helmer: stepResults.hamilton_helmer,
     warren_buffett: stepResults.warren_buffett
   }));
-  const mungerAIResponse = await env.AI.run(env.default_ai_model, {
+  const mungerAIResponse = await runAnalysisStepAi(env, 'Charlie Munger', symbolUpper, {
     messages: [
       { role: 'system', content: mungerPrompt.system },
       { role: 'user', content: mungerPrompt.prompt }
     ],
-    max_tokens: 8192,
+    max_tokens: 4096,
     response_format: { type: 'json_object' }
-  } as any);
+  });
   let mungerText = (mungerAIResponse as any).choices?.[0]?.message?.content || mungerAIResponse.response || '';
   stepResults.charlie_munger = parseAIJson(mungerText);
   
@@ -341,14 +390,14 @@ export async function runFullAnalysis(env: Env, symbol: string): Promise<{
     warren_buffett: stepResults.warren_buffett,
     charlie_munger: stepResults.charlie_munger
   }));
-  const marksAIResponse = await env.AI.run(env.default_ai_model, {
+  const marksAIResponse = await runAnalysisStepAi(env, 'Howard Marks', symbolUpper, {
     messages: [
       { role: 'system', content: marksPrompt.system },
       { role: 'user', content: marksPrompt.prompt }
     ],
-    max_tokens: 8192,
+    max_tokens: 4096,
     response_format: { type: 'json_object' }
-  } as any);
+  });
   let marksText = (marksAIResponse as any).choices?.[0]?.message?.content || marksAIResponse.response || '';
   stepResults.howard_marks = parseAIJson(marksText);
   
@@ -360,14 +409,14 @@ export async function runFullAnalysis(env: Env, symbol: string): Promise<{
     charlie_munger: stepResults.charlie_munger,
     howard_marks: stepResults.howard_marks
   }));
-  const greenblattAIResponse = await env.AI.run(env.default_ai_model, {
+  const greenblattAIResponse = await runAnalysisStepAi(env, 'Joel Greenblatt', symbolUpper, {
     messages: [
       { role: 'system', content: greenblattPrompt.system },
       { role: 'user', content: greenblattPrompt.prompt }
     ],
-    max_tokens: 8192,
+    max_tokens: 4096,
     response_format: { type: 'json_object' }
-  } as any);
+  });
   let greenblattText = (greenblattAIResponse as any).choices?.[0]?.message?.content || greenblattAIResponse.response || '';
   stepResults.joel_greenblatt = parseAIJson(greenblattText);
   
@@ -377,27 +426,27 @@ export async function runFullAnalysis(env: Env, symbol: string): Promise<{
 
   console.log('Starting Step 7 (Synthesis) for ' + symbolUpper + '...');
   const synthesisPrompt = getSynthesisPrompt(symbolUpper, enrichedMetricsAndContextStr, JSON.stringify(stepResults));
-  const synthesisAIResponse = await env.AI.run(env.default_ai_model, {
+  const synthesisAIResponse = await runAnalysisStepAi(env, 'Synthesis', symbolUpper, {
     messages: [
       { role: 'system', content: synthesisPrompt.system },
       { role: 'user', content: synthesisPrompt.prompt }
     ],
-    max_tokens: 8192,
+    max_tokens: 4096,
     response_format: { type: 'json_object' }
-  } as any);
+  });
   let synthesisText = (synthesisAIResponse as any).choices?.[0]?.message?.content || synthesisAIResponse.response || '';
   const synthesis = parseAIJson(synthesisText);
   stepResults.synthesis = synthesis;
   
   console.log('Starting Step 8 (Markdown Compilation) for ' + symbolUpper + '...');
   const reportPrompt = getFinalReportPrompt(symbolUpper, enrichedMetricsAndContextStr, JSON.stringify(synthesis), JSON.stringify(stepResults));
-  const reportAIResponse = await env.AI.run(env.default_ai_model, {
+  const reportAIResponse = await runAnalysisStepAi(env, 'Markdown Compilation', symbolUpper, {
     messages: [
       { role: 'system', content: reportPrompt.system },
       { role: 'user', content: reportPrompt.prompt }
     ],
-    max_tokens: 8192
-  } as any);
+    max_tokens: 4096
+  });
   const reportMarkdown = (reportAIResponse as any).choices?.[0]?.message?.content || reportAIResponse.response || '';
   
   const convictionLevel = synthesis.conviction_level || 'Medium';
