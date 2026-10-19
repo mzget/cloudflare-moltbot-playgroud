@@ -53,52 +53,35 @@ describe('AnalysisEngine - runAnalysisStepAi (Retry & Fallback)', () => {
     });
   });
 
-  it('retries when first attempt throws a transient parse error and succeeds on second attempt', () => {
+  it('falls back immediately to facebook_summarize_model on the very first primary failure', () => {
     return new Promise<void>((resolve, reject) => {
       (mockEnv.AI.run as any)
+        // Primary model fails immediately on attempt 1
         .mockRejectedValueOnce(new Error('Ai._parseError at cloudflare-internal:ai-api:220:24'))
+        // Fallback model succeeds
         .mockResolvedValueOnce({ response: '{"category": "Turnarounds"}' });
 
       runAnalysisStepAi(mockEnv, 'Peter Lynch', 'COIN', {
         messages: [{ role: 'user', content: 'analyze' }],
         max_tokens: 4096
-      }, 1).then((res) => {
+      }).then((res) => {
         expect(mockEnv.AI.run).toHaveBeenCalledTimes(2);
+        expect(mockEnv.AI.run).toHaveBeenNthCalledWith(1, '@cf/google/gemma-4-26b-a4b-it', expect.any(Object));
+        expect(mockEnv.AI.run).toHaveBeenNthCalledWith(2, '@cf/meta/llama-4-scout-17b-16e-instruct', expect.any(Object));
         expect(res.response).toBe('{"category": "Turnarounds"}');
         resolve();
       }).catch(reject);
     });
   });
 
-  it('falls back to facebook_summarize_model when primary model exhausts retries', () => {
-    return new Promise<void>((resolve, reject) => {
-      (mockEnv.AI.run as any)
-        // Primary model fails all retries (0 retries in this test)
-        .mockRejectedValueOnce(new Error('504 Gateway Timeout on gemma'))
-        // Fallback model succeeds
-        .mockResolvedValueOnce({ response: '{"category": "Asset Plays"}' });
-
-      runAnalysisStepAi(mockEnv, 'Peter Lynch', 'COIN', {
-        messages: [{ role: 'user', content: 'analyze' }],
-        max_tokens: 4096
-      }, 0).then((res) => {
-        expect(mockEnv.AI.run).toHaveBeenCalledTimes(2);
-        expect(mockEnv.AI.run).toHaveBeenNthCalledWith(1, '@cf/google/gemma-4-26b-a4b-it', expect.any(Object));
-        expect(mockEnv.AI.run).toHaveBeenNthCalledWith(2, '@cf/meta/llama-4-scout-17b-16e-instruct', expect.any(Object));
-        expect(res.response).toBe('{"category": "Asset Plays"}');
-        resolve();
-      }).catch(reject);
-    });
-  });
-
-  it('throws descriptive error with step name and symbol when all models fail', () => {
+  it('throws descriptive error with step name and symbol when both primary and fallback models fail', () => {
     return new Promise<void>((resolve, reject) => {
       (mockEnv.AI.run as any).mockRejectedValue(new Error('All inference nodes busy'));
 
       runAnalysisStepAi(mockEnv, 'Hamilton Helmer', 'COIN', {
         messages: [{ role: 'user', content: 'analyze' }],
         max_tokens: 4096
-      }, 0).then(() => {
+      }).then(() => {
         reject(new Error('Expected runAnalysisStepAi to throw'));
       }).catch((err: Error) => {
         expect(err.message).toContain('[Step: Hamilton Helmer]');
