@@ -50,7 +50,7 @@ async function setup() {
 const textOf = (res: any) => JSON.parse(res.content[0].text);
 
 describe("OaktreeMCP", () => {
-  it("registers all seventeen tools with descriptions", async () => {
+  it("registers all twenty tools with descriptions", async () => {
     const { tools } = await setup();
     expect([...tools.keys()]).toEqual([
       "get_portfolio",
@@ -70,6 +70,9 @@ describe("OaktreeMCP", () => {
       "get_bull_bear_debate",
       "save_theme_sector_context",
       "get_fundamental_brief",
+      "get_portfolio_risk_audit",
+      "calculate_position_size",
+      "save_risk_advisory",
     ]);
     for (const call of tools.values()) expect(typeof call[1]).toBe("string");
   });
