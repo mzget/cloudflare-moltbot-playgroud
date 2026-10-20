@@ -294,28 +294,35 @@ export default function Header({ activeTab, setActiveTab, reportsCount, onOpenSi
   ];
 
   return (
-    <Box sx={{ width: '100%', mb: { xs: 2.5, md: 3.5 } }}>
-      {/* ROW 1: Brand & System Controls */}
+    <Box sx={{ width: '100%', mb: { xs: 2, md: 2.5 } }}>
+      {/* UNIFIED NAVBAR: Brand, Desktop Navigation Tabs, & System Controls in a Single Row */}
       <Sheet
         ref={headerRef}
         sx={{
           ...glassStyle,
-          mb: { xs: 1.5, md: 1.5 },
-          px: { xs: 1.5, sm: 2.5, md: 3 },
-          py: { xs: 1.25, md: 1.75 },
+          px: { xs: 1.5, sm: 2, md: 2.5 },
+          pt: { xs: 1, md: 1 },
+          pb: { xs: 1, md: 0 },
           display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          flexDirection: 'column',
+          gap: { xs: 1, md: 2 },
           transition: 'all 0.3s ease-out',
-          position: 'relative',
+          position: 'sticky',
+          top: { xs: 8, md: 12 },
           zIndex: 1100,
-          borderRadius: '18px',
+          borderRadius: '16px',
+          boxShadow: '0 8px 30px rgba(0, 0, 0, 0.06)',
+          border: mode === 'dark' ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid rgba(0, 0, 0, 0.07)',
+          backdropFilter: 'blur(20px) saturate(180%)',
           '&:hover': {
             boxShadow: '0 12px 40px rgba(0, 0, 0, 0.08)',
           },
         }}
       >
-        <Stack direction="row" spacing={{ xs: 1.5, md: 2.5 }} alignItems="center">
+        {/* ROW 1: Brand (Left) & Controls (Right) */}
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', pb: { xs: 0, md: 0.85 } }}>
+          {/* LEFT: Mobile Menu Button & Brand */}
+        <Stack direction="row" spacing={{ xs: 1.25, md: 1.75 }} alignItems="center" sx={{ flexShrink: 0 }}>
           {onOpenSidebar && (
             <Tooltip title={t('header.menu')} placement="bottom">
               <IconButton
@@ -333,49 +340,50 @@ export default function Header({ activeTab, setActiveTab, reportsCount, onOpenSi
             ref={logoRef}
             sx={{
               background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              p: { xs: 0.75, md: 1.25 },
-              borderRadius: '14px',
+              p: { xs: 0.75, md: 0.9 },
+              borderRadius: '12px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              boxShadow: '0 8px 20px rgba(16, 185, 129, 0.3)',
+              boxShadow: '0 6px 16px rgba(16, 185, 129, 0.3)',
               transform: 'perspective(1000px) rotateY(-10deg)',
             }}
           >
-            <OaktreeIcon color="white" size={24} />
+            <OaktreeIcon color="white" size={20} />
           </Box>
           <Box>
             <Typography
               level="h2"
               sx={{
-                fontSize: { xs: '1.15rem', md: '1.35rem' },
+                fontSize: { xs: '1.1rem', md: '1.15rem' },
                 fontWeight: 800,
                 letterSpacing: '-0.03em',
                 color: 'text.primary',
+                lineHeight: 1.2,
               }}
             >
               {t('app.title')}
             </Typography>
-            <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.25 }}>
+            <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 0.2 }}>
               <Box sx={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Box
                   className="status-dot"
                   sx={{
                     position: 'absolute',
-                    width: 8,
-                    height: 8,
+                    width: 7,
+                    height: 7,
                     bgcolor: '#10b981',
                     borderRadius: '50%',
                   }}
                 />
                 <Box
                   sx={{
-                    width: 6,
-                    height: 6,
+                    width: 5,
+                    height: 5,
                     bgcolor: '#10b981',
                     borderRadius: '50%',
                     zIndex: 1,
-                    boxShadow: '0 0 8px rgba(16, 185, 129, 0.5)'
+                    boxShadow: '0 0 6px rgba(16, 185, 129, 0.5)'
                   }}
                 />
               </Box>
@@ -385,8 +393,8 @@ export default function Header({ activeTab, setActiveTab, reportsCount, onOpenSi
                   fontWeight: 600,
                   color: '#059669',
                   textTransform: 'uppercase',
-                  letterSpacing: '0.12em',
-                  fontSize: '0.65rem',
+                  letterSpacing: '0.1em',
+                  fontSize: '0.62rem',
                   opacity: 0.85
                 }}
               >
@@ -396,7 +404,8 @@ export default function Header({ activeTab, setActiveTab, reportsCount, onOpenSi
           </Box>
         </Stack>
 
-        <Stack direction="row" spacing={{ xs: 1, md: 1.5 }} alignItems="center">
+        {/* RIGHT: Notifications, Theme, Settings & User Profile */}
+        <Stack direction="row" spacing={{ xs: 1, md: 1.25 }} alignItems="center" sx={{ flexShrink: 0 }}>
           <Box sx={{ display: 'flex', gap: { xs: 1, md: 1.25 }, alignItems: 'center' }}>
             {/* Notifications Panel */}
             <Box ref={bellContainerRef} sx={{ position: 'relative' }}>
@@ -748,103 +757,112 @@ export default function Header({ activeTab, setActiveTab, reportsCount, onOpenSi
             </Dropdown>
           </Box>
         </Stack>
-      </Sheet>
+      </Box>
 
-      {/* ROW 2: Sticky Desktop Navigation Tabs */}
+      {/* ROW 2: Desktop Clean Link Navigation with Active Underline Indicator */}
       <Box
         sx={{
-          display: { xs: 'none', md: 'block' },
-          position: 'sticky',
-          top: { xs: 8, md: 12 },
-          zIndex: 1050,
+          display: { xs: 'none', md: 'flex' },
           width: '100%',
+          pt: 0.25,
+          borderTop: '1px solid',
+          borderColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+          overflowX: 'auto',
+          scrollbarWidth: 'none',
+          '&::-webkit-scrollbar': { display: 'none' },
         }}
       >
-        <Sheet
-          sx={{
-            ...glassStyle,
-            p: 0.75,
-            borderRadius: '16px',
-            display: 'flex',
-            alignItems: 'center',
-            boxShadow: '0 8px 30px rgba(0, 0, 0, 0.06)',
-            border: mode === 'dark' ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid rgba(0, 0, 0, 0.07)',
-            backdropFilter: 'blur(20px) saturate(180%)',
-          }}
+        <Stack
+          direction="row"
+          spacing={{ md: 1.5, lg: 2.5 }}
+          alignItems="center"
         >
-          <Stack
-            direction="row"
-            spacing={0.75}
-            alignItems="center"
-            sx={{
-              width: '100%',
-              overflowX: 'auto',
-              scrollbarWidth: 'none',
-              '&::-webkit-scrollbar': { display: 'none' },
-            }}
-          >
-            {menuItems.map((item) => {
-              const isSelected = activeTab === item.id;
-              return (
-                <Button
-                  key={item.id}
-                  component="a"
-                  href={`/${item.id}`}
-                  variant={isSelected ? 'soft' : 'plain'}
-                  color={isSelected ? 'primary' : 'neutral'}
-                  onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
-                    if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
-                      e.preventDefault();
-                      setActiveTab?.(item.id);
-                    }
-                  }}
-                  startDecorator={item.icon}
-                  sx={{
-                    borderRadius: '12px',
-                    fontWeight: isSelected ? 700 : 500,
-                    fontSize: '0.85rem',
-                    px: { md: 1.75, lg: 2.25 },
-                    py: 0.85,
-                    whiteSpace: 'nowrap',
+          {menuItems.map((item) => {
+            const isSelected = activeTab === item.id;
+            return (
+              <Box
+                key={item.id}
+                component="a"
+                href={`/${item.id}`}
+                onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                  if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
+                    e.preventDefault();
+                    setActiveTab?.(item.id);
+                  }
+                }}
+                sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 0.85,
+                  py: 0.85,
+                  px: 0.75,
+                  position: 'relative',
+                  textDecoration: 'none',
+                  cursor: 'pointer',
+                  color: isSelected ? 'primary.plainColor' : 'text.secondary',
+                  fontWeight: isSelected ? 700 : 500,
+                  fontSize: '0.84rem',
+                  whiteSpace: 'nowrap',
+                  transition: 'color 0.2s ease-out',
+                  '&:hover': {
+                    color: 'text.primary',
                     textDecoration: 'none',
-                    color: isSelected ? 'primary.plainColor' : 'text.secondary',
-                    bgcolor: isSelected ? 'var(--joy-palette-primary-softBg)' : 'transparent',
+                  },
+                  '&::after': {
+                    content: '""',
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 4,
+                    right: 4,
+                    height: '2px',
+                    borderRadius: '2px 2px 0 0',
+                    bgcolor: isSelected ? '#10b981' : 'transparent',
+                    boxShadow: isSelected ? '0 -1px 6px rgba(16, 185, 129, 0.5)' : 'none',
                     transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                    '&:hover': {
-                      bgcolor: isSelected ? 'var(--joy-palette-primary-softHoverBg)' : 'background.level1',
-                      color: 'text.primary',
-                      transform: 'translateY(-1px)',
-                      textDecoration: 'none',
-                    },
-                    ...(isSelected && {
-                      boxShadow: '0 2px 8px rgba(16, 185, 129, 0.15)',
-                    })
+                  }
+                }}
+              >
+                <Box sx={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  color: isSelected ? '#10b981' : 'inherit',
+                  transition: 'color 0.2s ease-out'
+                }}>
+                  {item.icon}
+                </Box>
+                <Typography
+                  level="body-sm"
+                  sx={{
+                    fontWeight: 'inherit',
+                    color: 'inherit',
+                    fontSize: 'inherit',
                   }}
                 >
                   {item.label}
-                  {item.id === 'market' && reportsCount !== undefined && reportsCount > 0 && (
-                    <Chip
-                      variant={isSelected ? 'solid' : 'soft'}
-                      color="primary"
-                      size="sm"
-                      sx={{
-                        ml: 1,
-                        height: 18,
-                        minWidth: 18,
-                        fontSize: '0.7rem',
-                        fontWeight: 700,
-                        px: 0.5,
-                      }}
-                    >
-                      {reportsCount}
-                    </Chip>
-                  )}
-                </Button>
-              );
-            })}
-          </Stack>
-        </Sheet>
+                </Typography>
+                {item.id === 'market' && reportsCount !== undefined && reportsCount > 0 && (
+                  <Chip
+                    variant={isSelected ? 'solid' : 'soft'}
+                    color="primary"
+                    size="sm"
+                    sx={{
+                      ml: 0.5,
+                      height: 18,
+                      minWidth: 18,
+                      fontSize: '0.68rem',
+                      fontWeight: 700,
+                      px: 0.5,
+                    }}
+                  >
+                    {reportsCount}
+                  </Chip>
+                )}
+              </Box>
+            );
+          })}
+        </Stack>
       </Box>
+      </Sheet>
     </Box>
   );
 }
