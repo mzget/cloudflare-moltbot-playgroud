@@ -60,6 +60,8 @@ coverage/
 !.agents/skills/dcf-valuation-model/**
 !.agents/skills/release/
 !.agents/skills/release/**
+!.agents/skills/oaktree-gemini-copilot/
+!.agents/skills/oaktree-gemini-copilot/**
 .agent/workflows/
 trace-tool/check-color.js
 trace-tool/package-lock.json
