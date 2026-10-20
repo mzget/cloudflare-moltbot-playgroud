@@ -26,9 +26,11 @@ import {
   Calculator,
   ArrowRight,
   PieChart,
+  Table2,
   Activity,
   Layers,
 } from 'lucide-react';
+import ThemeDonutChart from './ThemeDonutChart';
 import { API_BASE_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
 import { formatCurrency, formatPct } from './YahooPortfolio';
@@ -47,6 +49,7 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
 
   const [auditData, setAuditData] = React.useState<any>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [themeViewMode, setThemeViewMode] = React.useState<'chart' | 'table'>('chart');
 
   // Position Sizing Simulator state
   const [selectedSymbol, setSelectedSymbol] = React.useState<string>('');
@@ -578,61 +581,103 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
         {/* Theme Exposure Breakdown (7 cols) */}
         <Grid xs={12} lg={7}>
           <Sheet sx={{ ...glassStyle, p: 3, height: '100%', borderRadius: '16px' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <PieChart size={20} color="#0ea5e9" />
                 <Typography level="title-md" sx={{ fontWeight: 800 }}>
                   Theme & Sector Concentration (30% Cap)
                 </Typography>
               </Box>
-              <Chip variant="soft" color="neutral" size="sm">
-                {themeExposures.length} Themes
-              </Chip>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Chip variant="soft" color="neutral" size="sm">
+                  {themeExposures.length} Themes
+                </Chip>
+                <Box
+                  sx={{
+                    display: 'inline-flex',
+                    p: 0.5,
+                    borderRadius: '8px',
+                    bgcolor: 'rgba(255, 255, 255, 0.05)',
+                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    gap: 0.5,
+                  }}
+                >
+                  <IconButton
+                    size="sm"
+                    variant={themeViewMode === 'chart' ? 'solid' : 'plain'}
+                    color={themeViewMode === 'chart' ? 'primary' : 'neutral'}
+                    onClick={() => setThemeViewMode('chart')}
+                    title="Chart View"
+                    sx={{ minHeight: '28px', minWidth: '28px', p: 0.5 }}
+                  >
+                    <PieChart size={15} />
+                  </IconButton>
+                  <IconButton
+                    size="sm"
+                    variant={themeViewMode === 'table' ? 'solid' : 'plain'}
+                    color={themeViewMode === 'table' ? 'primary' : 'neutral'}
+                    onClick={() => setThemeViewMode('table')}
+                    title="Table View"
+                    sx={{ minHeight: '28px', minWidth: '28px', p: 0.5 }}
+                  >
+                    <Table2 size={15} />
+                  </IconButton>
+                </Box>
+              </Box>
             </Box>
 
-            <Sheet sx={{ overflowX: 'auto', borderRadius: '10px' }}>
-              <Table borderAxis="xBetween" hoverRow stripe="odd" sx={{ minWidth: 500 }}>
-                <thead>
-                  <tr>
-                    <th>Theme Name</th>
-                    <th>Symbols</th>
-                    <th style={{ textAlign: 'right' }}>Market Value</th>
-                    <th style={{ textAlign: 'right' }}>Weight %</th>
-                    <th style={{ textAlign: 'right' }}>30% Cap Room</th>
-                    <th style={{ textAlign: 'center' }}>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {themeExposures.map((t: any) => {
-                    const statusColor = t.status === 'breach' ? 'danger' : t.status === 'warning' ? 'warning' : 'success';
-                    return (
-                      <tr key={t.themeName}>
-                        <td style={{ fontWeight: 700 }}>{t.themeName}</td>
-                        <td>
-                          <Typography level="body-xs" sx={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {(t.symbols || []).join(', ') || '—'}
-                          </Typography>
-                        </td>
-                        <td style={{ textAlign: 'right' }}>
-                          {showMoneyValues ? formatCurrency(t.marketValueUsd, false, '$') : '••••••••'}
-                        </td>
-                        <td style={{ textAlign: 'right', fontWeight: 700 }}>
-                          {t.weightPct.toFixed(1)}%
-                        </td>
-                        <td style={{ textAlign: 'right' }}>
-                          {t.isUnassigned ? '--' : (showMoneyValues ? formatCurrency(t.roomToCapUsd, false, '$') : '••••••••')}
-                        </td>
-                        <td style={{ textAlign: 'center' }}>
-                          <Chip size="sm" variant="soft" color={statusColor} sx={{ fontWeight: 700 }}>
-                            {t.isUnassigned ? 'Unassigned' : t.status.toUpperCase()}
-                          </Chip>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </Table>
-            </Sheet>
+            {themeViewMode === 'chart' ? (
+              <ThemeDonutChart
+                themeExposures={themeExposures}
+                holdings={holdingsSizing}
+                totalPortfolioUsd={totalPortfolioUsd}
+                showMoneyValues={showMoneyValues}
+              />
+            ) : (
+              <Sheet sx={{ overflowX: 'auto', borderRadius: '10px' }}>
+                <Table borderAxis="xBetween" hoverRow stripe="odd" sx={{ minWidth: 500 }}>
+                  <thead>
+                    <tr>
+                      <th>Theme Name</th>
+                      <th>Symbols</th>
+                      <th style={{ textAlign: 'right' }}>Market Value</th>
+                      <th style={{ textAlign: 'right' }}>Weight %</th>
+                      <th style={{ textAlign: 'right' }}>30% Cap Room</th>
+                      <th style={{ textAlign: 'center' }}>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {themeExposures.map((t: any) => {
+                      const statusColor = t.status === 'breach' ? 'danger' : t.status === 'warning' ? 'warning' : 'success';
+                      return (
+                        <tr key={t.themeName}>
+                          <td style={{ fontWeight: 700 }}>{t.themeName}</td>
+                          <td>
+                            <Typography level="body-xs" sx={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {(t.symbols || []).join(', ') || '—'}
+                            </Typography>
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            {showMoneyValues ? formatCurrency(t.marketValueUsd, false, '$') : '••••••••'}
+                          </td>
+                          <td style={{ textAlign: 'right', fontWeight: 700 }}>
+                            {t.weightPct.toFixed(1)}%
+                          </td>
+                          <td style={{ textAlign: 'right' }}>
+                            {t.isUnassigned ? '--' : (showMoneyValues ? formatCurrency(t.roomToCapUsd, false, '$') : '••••••••')}
+                          </td>
+                          <td style={{ textAlign: 'center' }}>
+                            <Chip size="sm" variant="soft" color={statusColor} sx={{ fontWeight: 700 }}>
+                              {t.isUnassigned ? 'Unassigned' : t.status.toUpperCase()}
+                            </Chip>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </Table>
+              </Sheet>
+            )}
           </Sheet>
         </Grid>
 
