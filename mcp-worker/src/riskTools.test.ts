@@ -42,7 +42,7 @@ describe('mcp-worker riskTools', () => {
           return {
             all: vi.fn().mockResolvedValue({
               results: [
-                { symbol: 'AAPL', conviction_score: 90, debate_json: '{}' },
+                { symbol: 'AAPL', debate_json: '{"synthesis": {"conviction_score": 90}}' },
               ]
             })
           };

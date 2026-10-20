@@ -92,17 +92,39 @@ async function queryPortfolioRiskData(db: any) {
     }
   }
 
-  // 4. Fundamental intelligence
+  // 4. Fundamental intelligence (conviction score & debate from debate_json)
   const fundamentalsResult = await db.prepare(`
-    SELECT symbol, conviction_score, debate_json
+    SELECT symbol, debate_json
     FROM stock_fundamentals
   `).all();
 
   const fundamentalsBySymbol: Record<string, { convictionScore?: number; hasDebate?: boolean }> = {};
   for (const row of (fundamentalsResult.results || []) as any[]) {
+    let convictionScore: number | undefined = undefined;
+    let hasDebate = false;
+    if (row.debate_json) {
+      hasDebate = true;
+      try {
+        const parsed = typeof row.debate_json === 'string' ? JSON.parse(row.debate_json) : row.debate_json;
+        if (parsed && typeof parsed === 'object') {
+          const score = parsed.synthesis?.conviction_score ?? parsed.conviction_score;
+          if (typeof score === 'number' && !isNaN(score)) {
+            convictionScore = score;
+          }
+        }
+      } catch {
+        // Corrupt or non-JSON debate string
+      }
+    }
+    if (convictionScore === undefined && row.conviction_score !== null && row.conviction_score !== undefined) {
+      const num = Number(row.conviction_score);
+      if (!isNaN(num)) {
+        convictionScore = num;
+      }
+    }
     fundamentalsBySymbol[row.symbol] = {
-      convictionScore: row.conviction_score !== null ? Number(row.conviction_score) : undefined,
-      hasDebate: Boolean(row.debate_json),
+      convictionScore,
+      hasDebate,
     };
   }
 
