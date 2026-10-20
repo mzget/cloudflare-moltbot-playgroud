@@ -52,7 +52,7 @@ describe('Risk Routes & Portfolio Risk Logic', () => {
           return {
             all: vi.fn().mockResolvedValue({
               results: options.fundamentals ?? [
-                { symbol: 'AAPL', conviction_score: 85, debate_json: '{"round": 3}' },
+                { symbol: 'AAPL', debate_json: '{"round": 3, "synthesis": {"conviction_score": 85}}' },
               ]
             })
           };
@@ -67,7 +67,8 @@ describe('Risk Routes & Portfolio Risk Logic', () => {
                   { symbol: '^GSPC', date: '2026-01-01', close: 5000 },
                   { symbol: '^GSPC', date: '2026-01-02', close: 5050 },
                 ]
-              })
+              }),
+              first: vi.fn().mockResolvedValue({ maxDate: '2026-01-02' }),
             })
           };
         }

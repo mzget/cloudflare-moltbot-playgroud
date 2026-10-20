@@ -80,7 +80,7 @@ export async function ensureSymbolPrices(db: D1Database, symbol: string): Promis
   try {
     const res = await db.prepare(
       'SELECT MAX(date) as maxDate FROM historical_prices WHERE symbol = ?'
-    ).first<{ maxDate: string | null }>();
+    ).bind(symbol).first<{ maxDate: string | null }>();
 
     const now = new Date();
     const todayStr = now.toISOString().split('T')[0];
