@@ -9,8 +9,8 @@ Modern, high-performance financial intelligence terminal blending dark glassmorp
 ## 2. Color Palette & Roles
 
 ### Primary Foundation
-- **Obsidian Dark Canvas (`#050505`)**: Root application background for deep dark mode.
-- **Surface Elevation (`#121214` / `rgba(18, 18, 20, 0.7)`)**: Glassmorphic sheet surface for cards, navigation drawers, and floating panels.
+- **Obsidian Slate Canvas (`#080c14`)**: Refined dark application background avoiding muddy pitch black, providing rich spatial depth.
+- **Surface Elevation (`#111827` / `rgba(17, 24, 39, 0.85)`)**: Elevated glassmorphic sheet surface for cards, navigation drawers, and floating panels.
 - **Hairline Border (`rgba(255, 255, 255, 0.15)`)**: 1px structural separator dividing spatial sections and framing interactive containers.
 
 ### Accent & Interactive
@@ -19,9 +19,9 @@ Modern, high-performance financial intelligence terminal blending dark glassmorp
 - **Rose Pink (`#db2777`)**: Secondary ambient lighting and warm interactive highlights.
 
 ### Typography & Text Hierarchy
-- **Primary Text (`#ffffff` / `#e6edf3`)**: Crisp high-contrast readout for display titles, metrics, and data values.
-- **Secondary Metadata (`#8b949e`)**: Column headers, timestamps, and supporting analytical descriptions.
-- **Tertiary Labels (`#484f58`)**: Section group headers, uppercase category tags, and subtle captions.
+- **Primary Text (`#f8fafc` / `#ffffff`)**: Crisp high-contrast readout for display titles, metrics, and data values (WCAG AAA compliant).
+- **Secondary Metadata (`#94a3b8`)**: High-contrast slate-400 for column headers, timestamps, and supporting analytical descriptions.
+- **Tertiary Labels (`#cbd5e1`)**: Section group headers, uppercase category tags, and legible captions (avoiding excessively dim low-contrast text).
 
 ### Functional States & Financial Telemetry
 - **Bullish / Success (`#10b981`)**: Positive market performance, active crawler status, and completed tasks.
