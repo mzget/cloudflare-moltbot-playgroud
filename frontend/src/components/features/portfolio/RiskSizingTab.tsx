@@ -196,7 +196,7 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
             <ShieldAlert size={26} color="#0ea5e9" />
             Risk Manager & Position Sizing Agent
           </Typography>
-          <Typography level="body-xs" sx={{ opacity: 0.7 }}>
+          <Typography level="body-xs" sx={{ color: 'text.secondary', fontWeight: 500 }}>
             Howard Marks risk control rules: 8% Target Weight, 15% Single-Stock Cap, 30% Strictest Theme Cap
           </Typography>
         </Box>
@@ -240,7 +240,7 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
           <Sheet sx={{ ...glassStyle, p: 3, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-                <Typography level="body-xs" sx={{ fontWeight: 700, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <Typography level="body-xs" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Portfolio Health Score
                 </Typography>
                 <Chip variant="solid" color={riskLevelColor} size="sm" sx={{ fontWeight: 700 }}>
@@ -249,10 +249,10 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
               </Box>
 
               <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5, mb: 1 }}>
-                <Typography level="h1" sx={{ fontWeight: 800, fontSize: '2.4rem' }}>
+                <Typography level="h1" sx={{ fontWeight: 800, fontSize: '2.4rem', color: 'text.primary' }}>
                   {healthScore}
                 </Typography>
-                <Typography level="body-md" sx={{ opacity: 0.6 }}>/ 100</Typography>
+                <Typography level="body-md" sx={{ color: 'text.secondary', fontWeight: 600 }}>/ 100</Typography>
               </Box>
 
               <LinearProgress
@@ -265,14 +265,14 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
 
             <Box sx={{ display: 'flex', justifyContent: 'space-between', pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
               <Box>
-                <Typography level="body-xs" sx={{ opacity: 0.6 }}>Top 3 Weight</Typography>
-                <Typography level="body-md" sx={{ fontWeight: 700 }}>
+                <Typography level="body-xs" sx={{ color: 'text.secondary', fontWeight: 600 }}>Top 3 Weight</Typography>
+                <Typography level="body-md" sx={{ fontWeight: 700, color: 'text.primary' }}>
                   {concentration.top3ConcentrationPct ? `${concentration.top3ConcentrationPct.toFixed(1)}%` : '--'}
                 </Typography>
               </Box>
               <Box sx={{ textAlign: 'right' }}>
-                <Typography level="body-xs" sx={{ opacity: 0.6 }}>Effective Positions</Typography>
-                <Typography level="body-md" sx={{ fontWeight: 700 }}>
+                <Typography level="body-xs" sx={{ color: 'text.secondary', fontWeight: 600 }}>Effective Positions</Typography>
+                <Typography level="body-md" sx={{ fontWeight: 700, color: 'text.primary' }}>
                   {concentration.effectivePositions ? concentration.effectivePositions.toFixed(1) : '--'}
                 </Typography>
               </Box>
@@ -285,34 +285,34 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
           <Sheet sx={{ ...glassStyle, p: 3, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-                <Typography level="body-xs" sx={{ fontWeight: 700, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <Typography level="body-xs" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Market Sensitivity & Correlation
                 </Typography>
                 <Activity size={18} color="#0ea5e9" />
               </Box>
 
               <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5, mb: 1 }}>
-                <Typography level="h1" sx={{ fontWeight: 800, fontSize: '2.4rem' }}>
+                <Typography level="h1" sx={{ fontWeight: 800, fontSize: '2.4rem', color: 'text.primary' }}>
                   {correlation.portfolioBeta ? correlation.portfolioBeta.toFixed(2) : '1.00'}
                 </Typography>
-                <Typography level="body-sm" sx={{ opacity: 0.7 }}>Portfolio Beta vs. S&P 500</Typography>
+                <Typography level="body-sm" sx={{ color: 'text.secondary', fontWeight: 500 }}>Portfolio Beta vs. S&P 500</Typography>
               </Box>
 
-              <Typography level="body-xs" sx={{ opacity: 0.7, mb: 2 }}>
+              <Typography level="body-xs" sx={{ color: 'text.secondary', mb: 2 }}>
                 Calculated across 252 trading days from cached historical closes.
               </Typography>
             </Box>
 
             <Box sx={{ display: 'flex', justifyContent: 'space-between', pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
               <Box>
-                <Typography level="body-xs" sx={{ opacity: 0.6 }}>High-Corr Pairs (r ≥ 0.70)</Typography>
+                <Typography level="body-xs" sx={{ color: 'text.secondary', fontWeight: 600 }}>High-Corr Pairs (r ≥ 0.70)</Typography>
                 <Typography level="body-md" sx={{ fontWeight: 700, color: highCorrelationPairs.length > 0 ? 'warning.plainColor' : 'success.plainColor' }}>
                   {highCorrelationPairs.length} pair{highCorrelationPairs.length === 1 ? '' : 's'}
                 </Typography>
               </Box>
               <Box sx={{ textAlign: 'right' }}>
-                <Typography level="body-xs" sx={{ opacity: 0.6 }}>Stock Denominator</Typography>
-                <Typography level="body-md" sx={{ fontWeight: 700 }}>
+                <Typography level="body-xs" sx={{ color: 'text.secondary', fontWeight: 600 }}>Stock Denominator</Typography>
+                <Typography level="body-md" sx={{ fontWeight: 700, color: 'text.primary' }}>
                   {showMoneyValues ? formatCurrency(totalPortfolioUsd, false, '$') : '••••••••'}
                 </Typography>
               </Box>
@@ -325,7 +325,7 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
           <Sheet sx={{ ...glassStyle, p: 3, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
             <Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-                <Typography level="body-xs" sx={{ fontWeight: 700, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <Typography level="body-xs" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Governance Caps & Thresholds
                 </Typography>
                 <Scale size={18} color="#10b981" />
@@ -333,15 +333,15 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
 
               <Stack spacing={1.5} sx={{ mb: 2 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography level="body-sm" sx={{ fontWeight: 600 }}>🎯 Target Weight</Typography>
+                  <Typography level="body-sm" sx={{ fontWeight: 600, color: 'text.primary' }}>🎯 Target Weight</Typography>
                   <Chip variant="soft" color="primary" size="sm" sx={{ fontWeight: 700 }}>8.0% ($8,000 / $100k)</Chip>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography level="body-sm" sx={{ fontWeight: 600 }}>🛡️ Max Single-Stock Cap</Typography>
+                  <Typography level="body-sm" sx={{ fontWeight: 600, color: 'text.primary' }}>🛡️ Max Single-Stock Cap</Typography>
                   <Chip variant="soft" color="warning" size="sm" sx={{ fontWeight: 700 }}>15.0% ($15,000 / $100k)</Chip>
                 </Box>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography level="body-sm" sx={{ fontWeight: 600 }}>🧩 Max Strictest Theme Cap</Typography>
+                  <Typography level="body-sm" sx={{ fontWeight: 600, color: 'text.primary' }}>🧩 Max Strictest Theme Cap</Typography>
                   <Chip variant="soft" color="danger" size="sm" sx={{ fontWeight: 700 }}>30.0% ($30,000 / $100k)</Chip>
                 </Box>
               </Stack>
@@ -349,11 +349,11 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
 
             <Box sx={{ display: 'flex', justifyContent: 'space-between', pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
               <Box>
-                <Typography level="body-xs" sx={{ opacity: 0.6 }}>Active Holdings</Typography>
-                <Typography level="body-md" sx={{ fontWeight: 700 }}>{concentration.openHoldingsCount || 0}</Typography>
+                <Typography level="body-xs" sx={{ color: 'text.secondary', fontWeight: 600 }}>Active Holdings</Typography>
+                <Typography level="body-md" sx={{ fontWeight: 700, color: 'text.primary' }}>{concentration.openHoldingsCount || 0}</Typography>
               </Box>
               <Box sx={{ textAlign: 'right' }}>
-                <Typography level="body-xs" sx={{ opacity: 0.6 }}>Breaches / Warnings</Typography>
+                <Typography level="body-xs" sx={{ color: 'text.secondary', fontWeight: 600 }}>Breaches / Warnings</Typography>
                 <Typography level="body-md" sx={{ fontWeight: 700, color: health.deductions?.length > 0 ? 'warning.plainColor' : 'success.plainColor' }}>
                   {health.deductions?.length || 0} flagged
                 </Typography>
@@ -375,7 +375,7 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
         <Grid container spacing={2} sx={{ mb: 2 }}>
           {/* Controls */}
           <Grid xs={12} md={3}>
-            <Typography level="body-xs" sx={{ mb: 0.5, fontWeight: 600 }}>Select Holding or Enter Ticker</Typography>
+            <Typography level="body-xs" sx={{ mb: 0.5, fontWeight: 600, color: 'text.secondary' }}>Select Holding or Enter Ticker</Typography>
             <Select
               value={selectedSymbol}
               onChange={(_, val) => setSelectedSymbol(val as string)}
@@ -400,7 +400,7 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
           </Grid>
 
           <Grid xs={6} md={2}>
-            <Typography level="body-xs" sx={{ mb: 0.5, fontWeight: 600 }}>Trade Type</Typography>
+            <Typography level="body-xs" sx={{ mb: 0.5, fontWeight: 600, color: 'text.secondary' }}>Trade Type</Typography>
             <Select
               value={orderType}
               onChange={(_, val) => setOrderType(val as 'Buy' | 'Sell')}
@@ -412,7 +412,7 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
           </Grid>
 
           <Grid xs={6} md={2}>
-            <Typography level="body-xs" sx={{ mb: 0.5, fontWeight: 600 }}>Shares</Typography>
+            <Typography level="body-xs" sx={{ mb: 0.5, fontWeight: 600, color: 'text.secondary' }}>Shares</Typography>
             <Input
               type="number"
               value={orderShares}
@@ -422,7 +422,7 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
           </Grid>
 
           <Grid xs={12} md={2}>
-            <Typography level="body-xs" sx={{ mb: 0.5, fontWeight: 600 }}>Price ($)</Typography>
+            <Typography level="body-xs" sx={{ mb: 0.5, fontWeight: 600, color: 'text.secondary' }}>Price ($)</Typography>
             <Input
               type="number"
               value={orderPrice}
@@ -433,7 +433,7 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
 
           <Grid xs={12} md={3} sx={{ display: 'flex', alignItems: 'flex-end' }}>
             <Button
-              variant="soft"
+              variant="solid"
               color="primary"
               onClick={runSimulation}
               loading={simulating}
@@ -448,12 +448,12 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
           <Grid container spacing={2} sx={{ mt: 1, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
             {/* Target Room */}
             <Grid xs={12} sm={6} md={3}>
-              <Sheet variant="soft" sx={{ p: 2, borderRadius: '12px' }}>
+              <Sheet sx={{ p: 2, borderRadius: '12px', bgcolor: 'background.level1', border: '1px solid', borderColor: 'divider' }}>
                 <Typography level="body-xs" sx={{ fontWeight: 700, color: 'text.secondary' }}>🎯 Target Room (8%)</Typography>
-                <Typography level="title-md" sx={{ fontWeight: 800, mt: 0.5 }}>
+                <Typography level="title-md" sx={{ fontWeight: 800, mt: 0.5, color: 'text.primary' }}>
                   {formatCurrency(currentSizing.roomToTargetUsd, false, '$')}
                 </Typography>
-                <Typography level="body-xs" sx={{ opacity: 0.7 }}>
+                <Typography level="body-xs" sx={{ color: 'text.secondary', fontWeight: 500 }}>
                   {currentSizing.roomToTargetShares} shares max
                 </Typography>
               </Sheet>
@@ -461,12 +461,12 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
 
             {/* Single Stock Cap Room */}
             <Grid xs={12} sm={6} md={3}>
-              <Sheet variant="soft" sx={{ p: 2, borderRadius: '12px' }}>
+              <Sheet sx={{ p: 2, borderRadius: '12px', bgcolor: 'background.level1', border: '1px solid', borderColor: 'divider' }}>
                 <Typography level="body-xs" sx={{ fontWeight: 700, color: 'text.secondary' }}>🛡️ Stock Cap Room (15%)</Typography>
-                <Typography level="title-md" sx={{ fontWeight: 800, mt: 0.5 }}>
+                <Typography level="title-md" sx={{ fontWeight: 800, mt: 0.5, color: 'text.primary' }}>
                   {formatCurrency(currentSizing.roomToStockCapUsd, false, '$')}
                 </Typography>
-                <Typography level="body-xs" sx={{ opacity: 0.7 }}>
+                <Typography level="body-xs" sx={{ color: 'text.secondary', fontWeight: 500 }}>
                   {currentSizing.roomToStockCapShares} shares max
                 </Typography>
               </Sheet>
@@ -474,12 +474,12 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
 
             {/* Strictest Theme Room */}
             <Grid xs={12} sm={6} md={3}>
-              <Sheet variant="soft" sx={{ p: 2, borderRadius: '12px' }}>
+              <Sheet sx={{ p: 2, borderRadius: '12px', bgcolor: 'background.level1', border: '1px solid', borderColor: 'divider' }}>
                 <Typography level="body-xs" sx={{ fontWeight: 700, color: 'text.secondary' }}>🧩 Strictest Theme Cap (30%)</Typography>
-                <Typography level="title-md" sx={{ fontWeight: 800, mt: 0.5 }}>
+                <Typography level="title-md" sx={{ fontWeight: 800, mt: 0.5, color: 'text.primary' }}>
                   {currentSizing.roomToThemeCapUsd !== null ? formatCurrency(currentSizing.roomToThemeCapUsd, false, '$') : 'No Theme Limit'}
                 </Typography>
-                <Typography level="body-xs" sx={{ opacity: 0.7 }}>
+                <Typography level="body-xs" sx={{ color: 'text.secondary', fontWeight: 500 }}>
                   {currentSizing.strictestTheme ? currentSizing.strictestTheme.themeName : 'Unassigned'}
                 </Typography>
               </Sheet>
@@ -487,12 +487,22 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
 
             {/* Max Allowed Buy */}
             <Grid xs={12} sm={6} md={3}>
-              <Sheet variant="solid" color="primary" sx={{ p: 2, borderRadius: '12px' }}>
-                <Typography level="body-xs" sx={{ fontWeight: 700, opacity: 0.9 }}>🚨 Max Allowed Buy</Typography>
-                <Typography level="title-md" sx={{ fontWeight: 800, mt: 0.5 }}>
+              <Sheet
+                variant="solid"
+                color="primary"
+                sx={{
+                  p: 2,
+                  borderRadius: '12px',
+                  bgcolor: 'primary.600',
+                  color: '#ffffff',
+                  boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)',
+                }}
+              >
+                <Typography level="body-xs" sx={{ fontWeight: 700, color: 'rgba(255, 255, 255, 0.95)' }}>🚨 Max Allowed Buy</Typography>
+                <Typography level="title-md" sx={{ fontWeight: 800, mt: 0.5, color: '#ffffff' }}>
                   {formatCurrency(currentSizing.maxAllowedBuyUsd, false, '$')}
                 </Typography>
-                <Typography level="body-xs" sx={{ opacity: 0.9 }}>
+                <Typography level="body-xs" sx={{ color: 'rgba(255, 255, 255, 0.9)', fontWeight: 500 }}>
                   {currentSizing.maxAllowedBuyShares} shares ({currentSizing.bindingCapReason})
                 </Typography>
               </Sheet>
@@ -502,9 +512,27 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
 
         {/* Trade Impact Simulation Preview */}
         {currentSimulation && (
-          <Box sx={{ mt: 2, p: 2, borderRadius: '12px', bgcolor: currentSimulation.causesStockCapBreach ? 'danger.softBg' : 'background.level1' }}>
+          <Box
+            sx={{
+              mt: 2,
+              p: 2,
+              borderRadius: '12px',
+              bgcolor: currentSimulation.causesStockCapBreach ? 'rgba(239, 68, 68, 0.15)' : 'background.level1',
+              border: '1px solid',
+              borderColor: currentSimulation.causesStockCapBreach ? 'rgba(239, 68, 68, 0.4)' : 'divider',
+            }}
+          >
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
-              <Typography level="body-sm" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography
+                level="body-sm"
+                sx={{
+                  fontWeight: 700,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1,
+                  color: currentSimulation.causesStockCapBreach ? '#fecaca' : 'text.primary',
+                }}
+              >
                 {currentSimulation.causesStockCapBreach ? (
                   <AlertTriangle size={16} color="#ef4444" />
                 ) : (
@@ -514,24 +542,30 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
               </Typography>
 
               <Stack direction="row" spacing={1} alignItems="center">
-                <Typography level="body-xs" sx={{ fontWeight: 600 }}>
+                <Typography level="body-xs" sx={{ fontWeight: 600, color: 'text.secondary' }}>
                   {currentSimulation.currentStockWeightPct.toFixed(1)}%
                 </Typography>
-                <ArrowRight size={14} />
-                <Typography level="body-xs" sx={{ fontWeight: 800, color: currentSimulation.causesStockCapBreach ? 'danger.plainColor' : 'primary.plainColor' }}>
+                <ArrowRight size={14} color="var(--joy-palette-text-secondary)" />
+                <Typography
+                  level="body-xs"
+                  sx={{
+                    fontWeight: 800,
+                    color: currentSimulation.causesStockCapBreach ? '#f87171' : 'primary.plainColor',
+                  }}
+                >
                   {currentSimulation.projectedStockWeightPct.toFixed(1)}% of Stock Portfolio
                 </Typography>
               </Stack>
             </Box>
 
             {currentSimulation.causesStockCapBreach && (
-              <Typography level="body-xs" color="danger" sx={{ mt: 1, fontWeight: 700 }}>
+              <Typography level="body-xs" sx={{ mt: 1, fontWeight: 700, color: '#f87171' }}>
                 ⚠️ Warning: This trade will breach the 15.0% Single-Stock Cap! Consider sizing down to {currentSizing?.roomToStockCapShares || 0} shares.
               </Typography>
             )}
 
             {currentSimulation.causesThemeCapBreach && (
-              <Typography level="body-xs" color="danger" sx={{ mt: 0.5, fontWeight: 700 }}>
+              <Typography level="body-xs" sx={{ mt: 0.5, fontWeight: 700, color: '#f87171' }}>
                 ⚠️ Warning: This trade causes one or more mapped Themes to exceed the 30.0% Theme Cap!
               </Typography>
             )}
@@ -618,9 +652,9 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
             </Box>
 
             {highCorrelationPairs.length === 0 ? (
-              <Box sx={{ p: 4, textAlign: 'center', opacity: 0.7 }}>
+              <Box sx={{ p: 4, textAlign: 'center' }}>
                 <CheckCircle2 size={32} color="#10b981" style={{ margin: '0 auto 8px' }} />
-                <Typography level="body-sm">
+                <Typography level="body-sm" sx={{ color: 'text.secondary' }}>
                   Excellent diversification! No holding pairs exceed the 0.70 correlation threshold.
                 </Typography>
               </Box>
@@ -676,7 +710,7 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
               Holdings Risk Concentration & Sizing Capacity
             </Typography>
           </Box>
-          <Typography level="body-xs" sx={{ opacity: 0.6 }}>
+          <Typography level="body-xs" sx={{ color: 'text.secondary', fontWeight: 600 }}>
             Target: 8.0% | Cap: 15.0%
           </Typography>
         </Box>
@@ -712,7 +746,7 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
                       <Typography level="body-sm" sx={{ fontWeight: 800 }}>
                         {h.symbol}
                       </Typography>
-                      <Typography level="body-xs" sx={{ opacity: 0.6 }}>
+                      <Typography level="body-xs" sx={{ color: 'text.secondary' }}>
                         {h.name}
                       </Typography>
                     </td>
@@ -764,7 +798,7 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
             </Typography>
           </Box>
           {latestAdvisory?.created_at && (
-            <Typography level="body-xs" sx={{ opacity: 0.6 }}>
+            <Typography level="body-xs" sx={{ color: 'text.secondary' }}>
               Source: {latestAdvisory.source === 'workers_ai' ? 'Cloudflare Workers AI' : 'Gemini App via MCP'} • {new Date(latestAdvisory.created_at).toLocaleString()}
             </Typography>
           )}
@@ -772,11 +806,11 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
 
         {latestAdvisory ? (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Box sx={{ p: 2, borderRadius: '12px', bgcolor: 'background.level1' }}>
-              <Typography level="body-xs" sx={{ fontWeight: 700, opacity: 0.6, textTransform: 'uppercase', mb: 0.5 }}>
+            <Box sx={{ p: 2, borderRadius: '12px', bgcolor: 'background.level1', border: '1px solid', borderColor: 'divider' }}>
+              <Typography level="body-xs" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', mb: 0.5 }}>
                 Executive Summary
               </Typography>
-              <Typography level="body-sm" sx={{ lineHeight: 1.6, fontWeight: 500 }}>
+              <Typography level="body-sm" sx={{ lineHeight: 1.6, fontWeight: 500, color: 'text.primary' }}>
                 {latestAdvisory.executive_summary}
               </Typography>
             </Box>
@@ -822,8 +856,8 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
             </Grid>
           </Box>
         ) : (
-          <Box sx={{ p: 4, textAlign: 'center', opacity: 0.7 }}>
-            <Typography level="body-sm" sx={{ mb: 1.5 }}>
+          <Box sx={{ p: 4, textAlign: 'center' }}>
+            <Typography level="body-sm" sx={{ mb: 1.5, color: 'text.secondary' }}>
               No Risk Officer Advisory generated yet.
             </Typography>
             <Button
