@@ -50,22 +50,45 @@ async function queryPortfolioRiskData(db: any) {
     notebookId: r.notebook_id,
   }));
 
-  // 3. DCF valuation scenarios
+  // Build current price lookup from holdings
+  const priceBySymbol: Record<string, number> = {};
+  for (const h of holdingsRows) {
+    if (h.last_price !== null && h.last_price !== undefined && Number(h.last_price) > 0) {
+      priceBySymbol[h.symbol] = Number(h.last_price);
+    }
+  }
+
+  // 3. DCF valuation scenarios (Base Case & Bear Case)
   const dcfResult = await db.prepare(`
-    SELECT symbol, scenario, intrinsic_price, margin_of_safety_pct, upside_downside_pct
+    SELECT symbol, scenario_name, implied_share_price
     FROM dcf_calculations
-    WHERE scenario IN ('Base Case', 'Bear Case')
+    WHERE scenario_name IN ('Base Case', 'Bear Case')
+    ORDER BY id DESC
   `).all();
 
   const dcfBySymbol: Record<string, { baseMoS?: number; bearMoS?: number }> = {};
   for (const row of (dcfResult.results || []) as any[]) {
-    if (!dcfBySymbol[row.symbol]) {
-      dcfBySymbol[row.symbol] = {};
+    const sym = row.symbol;
+    if (!dcfBySymbol[sym]) {
+      dcfBySymbol[sym] = {};
     }
-    if (row.scenario === 'Base Case') {
-      dcfBySymbol[row.symbol].baseMoS = row.margin_of_safety_pct;
-    } else if (row.scenario === 'Bear Case') {
-      dcfBySymbol[row.symbol].bearMoS = row.margin_of_safety_pct;
+    const scenarioName = row.scenario_name || row.scenario;
+    const impliedPrice = row.implied_share_price !== null && row.implied_share_price !== undefined
+      ? Number(row.implied_share_price)
+      : (row.intrinsic_price !== null && row.intrinsic_price !== undefined ? Number(row.intrinsic_price) : undefined);
+
+    const currentPrice = priceBySymbol[sym];
+    let mos: number | undefined = undefined;
+    if (row.margin_of_safety_pct !== null && row.margin_of_safety_pct !== undefined) {
+      mos = Number(row.margin_of_safety_pct);
+    } else if (currentPrice && currentPrice > 0 && impliedPrice !== undefined && impliedPrice > 0) {
+      mos = Number((((impliedPrice - currentPrice) / currentPrice) * 100).toFixed(1));
+    }
+
+    if (scenarioName === 'Base Case' && dcfBySymbol[sym].baseMoS === undefined) {
+      dcfBySymbol[sym].baseMoS = mos;
+    } else if (scenarioName === 'Bear Case' && dcfBySymbol[sym].bearMoS === undefined) {
+      dcfBySymbol[sym].bearMoS = mos;
     }
   }
 

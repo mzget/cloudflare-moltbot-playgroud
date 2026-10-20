@@ -42,8 +42,8 @@ describe('Risk Routes & Portfolio Risk Logic', () => {
           return {
             all: vi.fn().mockResolvedValue({
               results: options.dcf ?? [
-                { symbol: 'AAPL', scenario: 'Base Case', intrinsic_price: 180, margin_of_safety_pct: 20, upside_downside_pct: 20 },
-                { symbol: 'AAPL', scenario: 'Bear Case', intrinsic_price: 130, margin_of_safety_pct: -13.3, upside_downside_pct: -13.3 },
+                { symbol: 'AAPL', scenario_name: 'Base Case', implied_share_price: 180 },
+                { symbol: 'AAPL', scenario_name: 'Bear Case', implied_share_price: 130 },
               ]
             })
           };
@@ -139,12 +139,47 @@ describe('Risk Routes & Portfolio Risk Logic', () => {
       expect(data.riskHoldings[0].symbol).toBe('AAPL');
       expect(data.themeMappings.length).toBe(2);
       expect(data.dcfBySymbol['AAPL']?.baseMoS).toBe(20);
+      expect(data.dcfBySymbol['AAPL']?.baseIntrinsic).toBe(180);
+      expect(data.dcfBySymbol['AAPL']?.bearMoS).toBe(-13.3);
+      expect(data.dcfBySymbol['AAPL']?.bearIntrinsic).toBe(130);
       expect(data.fundamentalsBySymbol['AAPL']?.convictionScore).toBe(85);
       expect(data.priceSeries['AAPL'].length).toBe(2);
       expect(data.latestAdvisory?.health_score).toBe(90);
       expect(data.latestAdvisory?.key_warnings).toEqual(['Keep an eye on MSFT']);
       // MSFT has missing prices in historical_prices mock, so waitUntil should be triggered
       expect(waitUntilMock).toHaveBeenCalled();
+    });
+
+    it('safely handles missing, invalid, or duplicate DCF calculations and computes MoS accurately', async () => {
+      const mockDb = createMockDb({
+        holdings: [
+          { symbol: 'AAPL', shares: 10, avg_cost: 140, total_cost: 1400, status: 'Open', name: 'Apple Inc.', sector_label: 'Tech', last_price: 150, previous_close: 148 },
+          { symbol: 'TSLA', shares: 5, avg_cost: 200, total_cost: 1000, status: 'Open', name: 'Tesla Inc.', sector_label: 'Auto', last_price: null, previous_close: null },
+        ],
+        dcf: [
+          // AAPL has multiple rows ordered by id desc (simulating newer run overriding older run)
+          { symbol: 'AAPL', scenario_name: 'Base Case', implied_share_price: 180 },
+          { symbol: 'AAPL', scenario_name: 'Base Case', implied_share_price: 120 }, // older row, should be ignored
+          // TSLA has null price, so MoS should be undefined even if implied_share_price exists
+          { symbol: 'TSLA', scenario_name: 'Base Case', implied_share_price: 250 },
+          // Legacy format fallback check (scenario + margin_of_safety_pct)
+          { symbol: 'LEGACY', scenario: 'Base Case', intrinsic_price: 50, margin_of_safety_pct: 15 },
+        ]
+      });
+
+      const data = await loadPortfolioRiskData(mockDb);
+
+      // AAPL should pick the first (newest) row: 180 with last_price 150 => MoS = (180 - 150) / 150 * 100 = 20%
+      expect(data.dcfBySymbol['AAPL']?.baseIntrinsic).toBe(180);
+      expect(data.dcfBySymbol['AAPL']?.baseMoS).toBe(20);
+
+      // TSLA has no valid last_price, MoS is undefined
+      expect(data.dcfBySymbol['TSLA']?.baseIntrinsic).toBe(250);
+      expect(data.dcfBySymbol['TSLA']?.baseMoS).toBeUndefined();
+
+      // LEGACY fallback check
+      expect(data.dcfBySymbol['LEGACY']?.baseIntrinsic).toBe(50);
+      expect(data.dcfBySymbol['LEGACY']?.baseMoS).toBe(15);
     });
   });
 

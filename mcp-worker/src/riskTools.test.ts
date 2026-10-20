@@ -33,7 +33,7 @@ describe('mcp-worker riskTools', () => {
           return {
             all: vi.fn().mockResolvedValue({
               results: [
-                { symbol: 'AAPL', scenario: 'Base Case', intrinsic_price: 180, margin_of_safety_pct: 20 },
+                { symbol: 'AAPL', scenario_name: 'Base Case', implied_share_price: 180 },
               ]
             })
           };
