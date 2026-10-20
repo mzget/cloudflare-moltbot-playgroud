@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import {
   Box, Typography, Sheet, Chip, Divider, Stack, IconButton, Table,
   Button, Input, Modal, ModalDialog, DialogTitle, DialogContent, ModalClose,
@@ -6,7 +7,8 @@ import {
 } from '@mui/joy';
 import {
   TrendingUp, Eye, EyeOff, Edit, Plus, Trash2, Save, Settings,
-  Coins, Landmark, Percent, RefreshCw, BarChart2, ChevronDown, ChevronUp
+  Coins, Landmark, Percent, RefreshCw, BarChart2, ChevronDown, ChevronUp,
+  ShieldAlert, ArrowRight
 } from 'lucide-react';
 import { glassStyle } from '../../../styles/glass';
 import { formatCurrency, formatPct } from './YahooPortfolio';
@@ -27,6 +29,8 @@ interface SummaryTabProps {
 }
 
 export default function SummaryTab({ summary: initialSummary, holdingsCount, openPositionsCount, holdings }: SummaryTabProps) {
+  const navigate = useNavigate();
+  const search = useSearch({ strict: false }) as any;
   const showMoneyValues = useSettingsStore(state => state.showMoneyValues);
   const setShowMoneyValues = useSettingsStore(state => state.setShowMoneyValues);
   const usdThbRate = useSettingsStore(state => state.usdThbRate);
@@ -44,6 +48,20 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
     realized_gain_amt: 0,
     total_dividends: 0
   };
+
+  // 15% Single-Stock Cap check
+  const totalStockPortfolioUsd = stocksSummary.total_market_value || 0;
+  const breachedHoldings = React.useMemo(() => {
+    if (!holdings || holdings.length === 0 || totalStockPortfolioUsd <= 0) return [];
+    return holdings
+      .filter((h: any) => (h.status || 'Open').toLowerCase() === 'open')
+      .map((h: any) => {
+        const val = (h.shares || 0) * (h.last_price || h.avg_cost || 0);
+        const weightPct = (val / totalStockPortfolioUsd) * 100;
+        return { symbol: h.symbol, weightPct, val };
+      })
+      .filter((h: any) => h.weightPct > 15.0);
+  }, [holdings, totalStockPortfolioUsd]);
 
   // Custom data states
   const [yearlyHistory, setYearlyHistory] = useState<any[]>([]);
@@ -433,6 +451,48 @@ export default function SummaryTab({ summary: initialSummary, holdingsCount, ope
 
     return (
     <Box className="tab-pane-active" sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+
+      {/* Compact Risk Officer Warning Banner */}
+      {breachedHoldings.length > 0 && (
+        <Sheet
+          variant="soft"
+          color="danger"
+          sx={{
+            p: 2,
+            borderRadius: '14px',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 1.5,
+            border: '1px solid',
+            borderColor: 'danger.outlinedBorder',
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+            <ShieldAlert size={22} color="#ef4444" />
+            <Box>
+              <Typography level="body-sm" sx={{ fontWeight: 800, color: 'danger.plainColor' }}>
+                Risk Warning: {breachedHoldings.length} stock position{breachedHoldings.length === 1 ? '' : 's'} exceed the 15% Single-Stock Cap
+              </Typography>
+              <Typography level="body-xs" sx={{ opacity: 0.85 }}>
+                {breachedHoldings.map((b: any) => `${b.symbol} (${b.weightPct.toFixed(1)}%)`).join(', ')}
+              </Typography>
+            </Box>
+          </Box>
+
+          <Button
+            size="sm"
+            variant="solid"
+            color="danger"
+            endDecorator={<ArrowRight size={14} />}
+            onClick={() => navigate({ search: { ...search, tab: 'risk' } })}
+            sx={{ borderRadius: '10px', fontWeight: 700 }}
+          >
+            Review Risk & Sizing
+          </Button>
+        </Sheet>
+      )}
 
       {/* Summary Cards Grid */}
       <Grid container spacing={2}>

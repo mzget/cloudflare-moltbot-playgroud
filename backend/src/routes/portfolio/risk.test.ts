@@ -1,0 +1,316 @@
+import { describe, it, expect, vi } from 'vitest';
+import risk, { loadPortfolioRiskData } from './risk';
+
+describe('Risk Routes & Portfolio Risk Logic', () => {
+  const createMockDb = (options: {
+    holdings?: any[];
+    themes?: any[];
+    dcf?: any[];
+    fundamentals?: any[];
+    prices?: any[];
+    advisory?: any;
+    throwOnHoldings?: boolean;
+    throwOnAdvisoryInsert?: boolean;
+  } = {}) => {
+    return {
+      prepare: vi.fn((sql: string) => {
+        if (options.throwOnHoldings && sql.includes('FROM holdings h')) {
+          throw new Error('D1 Query Failed');
+        }
+
+        if (sql.includes('FROM holdings h')) {
+          return {
+            all: vi.fn().mockResolvedValue({
+              results: options.holdings ?? [
+                { symbol: 'AAPL', shares: 10, avg_cost: 140, total_cost: 1400, status: 'Open', name: 'Apple Inc.', sector_label: 'Tech', last_price: 150, previous_close: 148 },
+                { symbol: 'MSFT', shares: 20, avg_cost: 380, total_cost: 7600, status: 'Open', name: 'Microsoft Corp.', sector_label: 'Tech', last_price: 400, previous_close: 395 },
+              ]
+            })
+          };
+        }
+        if (sql.includes('FROM theme_symbol_mappings m')) {
+          return {
+            all: vi.fn().mockResolvedValue({
+              results: options.themes ?? [
+                { symbol: 'AAPL', notebook_id: 'nb-1', theme_name: 'Consumer Tech' },
+                { symbol: 'MSFT', notebook_id: 'nb-2', theme_name: 'AI & Cloud Infrastructure' },
+              ]
+            })
+          };
+        }
+        if (sql.includes('FROM dcf_calculations')) {
+          return {
+            all: vi.fn().mockResolvedValue({
+              results: options.dcf ?? [
+                { symbol: 'AAPL', scenario: 'Base Case', intrinsic_price: 180, margin_of_safety_pct: 20, upside_downside_pct: 20 },
+                { symbol: 'AAPL', scenario: 'Bear Case', intrinsic_price: 130, margin_of_safety_pct: -13.3, upside_downside_pct: -13.3 },
+              ]
+            })
+          };
+        }
+        if (sql.includes('FROM stock_fundamentals')) {
+          return {
+            all: vi.fn().mockResolvedValue({
+              results: options.fundamentals ?? [
+                { symbol: 'AAPL', conviction_score: 85, debate_json: '{"round": 3}' },
+              ]
+            })
+          };
+        }
+        if (sql.includes('FROM historical_prices')) {
+          return {
+            bind: vi.fn().mockReturnValue({
+              all: vi.fn().mockResolvedValue({
+                results: options.prices ?? [
+                  { symbol: 'AAPL', date: '2026-01-01', close: 148 },
+                  { symbol: 'AAPL', date: '2026-01-02', close: 150 },
+                  { symbol: '^GSPC', date: '2026-01-01', close: 5000 },
+                  { symbol: '^GSPC', date: '2026-01-02', close: 5050 },
+                ]
+              })
+            })
+          };
+        }
+        if (sql.includes('FROM portfolio_risk_advisories')) {
+          return {
+            first: vi.fn().mockResolvedValue(options.advisory !== undefined ? options.advisory : {
+              id: 1,
+              health_score: 90,
+              risk_level: 'Low',
+              executive_summary: 'Healthy portfolio balance.',
+              key_warnings_json: '["Keep an eye on MSFT"]',
+              rebalancing_actions_json: '["None needed"]',
+              source: 'workers_ai',
+              created_at: '2026-10-19T10:00:00.000Z',
+            })
+          };
+        }
+        if (sql.includes('INSERT INTO portfolio_risk_advisories')) {
+          if (options.throwOnAdvisoryInsert) {
+            throw new Error('Failed to insert advisory');
+          }
+          return {
+            bind: vi.fn().mockReturnValue({
+              run: vi.fn().mockResolvedValue({
+                meta: { last_row_id: 101 }
+              })
+            })
+          };
+        }
+        return {
+          all: vi.fn().mockResolvedValue({ results: [] }),
+          first: vi.fn().mockResolvedValue(null),
+          bind: vi.fn().mockReturnValue({
+            all: vi.fn().mockResolvedValue({ results: [] }),
+            first: vi.fn().mockResolvedValue(null),
+            run: vi.fn().mockResolvedValue({ meta: {} }),
+          })
+        };
+      })
+    } as unknown as D1Database;
+  };
+
+  const createMockEnv = (db: D1Database, aiOverrides?: Partial<any>) => {
+    return {
+      DB: db,
+      default_ai_model: '@cf/google/gemma-4-26b-a4b-it',
+      AI: {
+        run: vi.fn().mockResolvedValue({
+          response: JSON.stringify({
+            executive_summary: 'Portfolio is concentrated in Tech with moderate beta.',
+            key_warnings: ['MSFT exceeds target weight of 8%'],
+            rebalancing_actions: ['Trim MSFT to target 8%']
+          })
+        }),
+        ...aiOverrides,
+      }
+    };
+  };
+
+  describe('loadPortfolioRiskData', () => {
+    it('loads holdings, themes, DCF, fundamentals, historical prices, and latest advisory', async () => {
+      const mockDb = createMockDb();
+      const waitUntilMock = vi.fn();
+      const ctx = { waitUntil: waitUntilMock };
+
+      const data = await loadPortfolioRiskData(mockDb, ctx);
+
+      expect(data.riskHoldings.length).toBe(2);
+      expect(data.riskHoldings[0].symbol).toBe('AAPL');
+      expect(data.themeMappings.length).toBe(2);
+      expect(data.dcfBySymbol['AAPL']?.baseMoS).toBe(20);
+      expect(data.fundamentalsBySymbol['AAPL']?.convictionScore).toBe(85);
+      expect(data.priceSeries['AAPL'].length).toBe(2);
+      expect(data.latestAdvisory?.health_score).toBe(90);
+      expect(data.latestAdvisory?.key_warnings).toEqual(['Keep an eye on MSFT']);
+      // MSFT has missing prices in historical_prices mock, so waitUntil should be triggered
+      expect(waitUntilMock).toHaveBeenCalled();
+    });
+  });
+
+  describe('GET /api/portfolio/risk-audit', () => {
+    it('returns 200 with concentration, correlation, health score, and holdings sizing', async () => {
+      const mockDb = createMockDb();
+      const mockEnv = createMockEnv(mockDb);
+
+      const res = await risk.request('/api/portfolio/risk-audit', { method: 'GET' }, mockEnv);
+      expect(res.status).toBe(200);
+
+      const json = await res.json() as any;
+      expect(json.concentration).toBeDefined();
+      expect(json.concentration.totalStockPortfolioUsd).toBe(9500); // AAPL 1500 + MSFT 8000
+      expect(json.correlation).toBeDefined();
+      expect(json.health).toBeDefined();
+      expect(json.health.healthScore).toBeGreaterThanOrEqual(0);
+      expect(json.holdingsSizing.length).toBe(2);
+      expect(json.latestAdvisory).toBeDefined();
+      expect(json.latestAdvisory.health_score).toBe(90);
+    });
+
+    it('handles empty portfolio gracefully', async () => {
+      const mockDb = createMockDb({ holdings: [], themes: [], dcf: [], fundamentals: [], prices: [], advisory: null });
+      const mockEnv = createMockEnv(mockDb);
+
+      const res = await risk.request('/api/portfolio/risk-audit', { method: 'GET' }, mockEnv);
+      expect(res.status).toBe(200);
+
+      const json = await res.json() as any;
+      expect(json.concentration.totalStockPortfolioUsd).toBe(0);
+      expect(json.holdingsSizing).toEqual([]);
+      expect(json.latestAdvisory).toBeNull();
+    });
+
+    it('returns 500 when database query throws', async () => {
+      const mockDb = createMockDb({ throwOnHoldings: true });
+      const mockEnv = createMockEnv(mockDb);
+
+      const res = await risk.request('/api/portfolio/risk-audit', { method: 'GET' }, mockEnv);
+      expect(res.status).toBe(500);
+
+      const json = await res.json() as any;
+      expect(json.error).toContain('D1 Query Failed');
+    });
+  });
+
+  describe('POST /api/portfolio/position-sizing', () => {
+    it('returns 400 when symbol is missing or empty', async () => {
+      const mockDb = createMockDb();
+      const mockEnv = createMockEnv(mockDb);
+
+      const res = await risk.request(
+        '/api/portfolio/position-sizing',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ symbol: '' })
+        },
+        mockEnv
+      );
+      expect(res.status).toBe(400);
+
+      const json = await res.json() as any;
+      expect(json.error).toBe('symbol is required');
+    });
+
+    it('returns 200 with sizing and pre-trade simulation impact', async () => {
+      const mockDb = createMockDb();
+      const mockEnv = createMockEnv(mockDb);
+
+      const res = await risk.request(
+        '/api/portfolio/position-sizing',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            symbol: 'AAPL',
+            price: 150,
+            shares: 5,
+            type: 'Buy',
+            config: {
+              targetWeightPct: 8,
+              maxStockCapPct: 15,
+            }
+          })
+        },
+        mockEnv
+      );
+      expect(res.status).toBe(200);
+
+      const json = await res.json() as any;
+      expect(json.symbol).toBe('AAPL');
+      expect(json.sizing).toBeDefined();
+      expect(json.sizing.maxStockCapPct).toBe(15);
+      expect(json.simulation).toBeDefined();
+      expect(json.simulation.causesStockCapBreach).toBeDefined();
+      expect(json.simulation.tradeValueUsd).toBe(750);
+      expect(json.simulation.projectedStockWeightPct).toBeGreaterThan(0);
+    });
+
+    it('returns 500 when database fails during position sizing', async () => {
+      const mockDb = createMockDb({ throwOnHoldings: true });
+      const mockEnv = createMockEnv(mockDb);
+
+      const res = await risk.request(
+        '/api/portfolio/position-sizing',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ symbol: 'AAPL', price: 150 })
+        },
+        mockEnv
+      );
+      expect(res.status).toBe(500);
+
+      const json = await res.json() as any;
+      expect(json.error).toContain('D1 Query Failed');
+    });
+  });
+
+  describe('POST /api/portfolio/risk-advisory', () => {
+    it('executes Workers AI audit, parses JSON response, and saves into D1', async () => {
+      const mockDb = createMockDb();
+      const mockEnv = createMockEnv(mockDb);
+
+      const res = await risk.request(
+        '/api/portfolio/risk-advisory',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        },
+        mockEnv
+      );
+      expect(res.status).toBe(200);
+
+      const json = await res.json() as any;
+      expect(json.success).toBe(true);
+      expect(json.advisory).toBeDefined();
+      expect(json.advisory.id).toBe(101);
+      expect(json.advisory.executive_summary).toContain('Portfolio is concentrated in Tech');
+      expect(json.advisory.key_warnings).toEqual(['MSFT exceeds target weight of 8%']);
+      expect(json.advisory.rebalancing_actions).toEqual(['Trim MSFT to target 8%']);
+      expect(mockEnv.AI.run).toHaveBeenCalled();
+    });
+
+    it('handles AI execution failure with 500', async () => {
+      const mockDb = createMockDb();
+      const mockEnv = createMockEnv(mockDb, {
+        run: vi.fn().mockRejectedValue(new Error('Workers AI model overloaded'))
+      });
+
+      const res = await risk.request(
+        '/api/portfolio/risk-advisory',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        },
+        mockEnv
+      );
+      expect(res.status).toBe(500);
+
+      const json = await res.json() as any;
+      expect(json.error).toContain('Workers AI model overloaded');
+    });
+  });
+});

@@ -68,6 +68,7 @@ trace-tool/trace.js
 .clinerules
 .cursorrules
 prototype/**
+test-results/
 frontend/test-results/
 tmp.md
 .gemini

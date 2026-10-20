@@ -8,6 +8,7 @@ import type { Holding } from './HoldingsTable';
 import FundamentalDashboard from './FundamentalDashboard';
 import SummaryTab from './SummaryTab';
 import HoldingsTab from './HoldingsTab';
+import RiskSizingTab from './RiskSizingTab';
 import { SummaryTabSkeleton, HoldingsTabSkeleton } from './DashboardSkeletons';
 import { RotateCw } from 'lucide-react';
 import '../../../styles/yahooPortfolio.css';
@@ -138,8 +139,9 @@ export default function YahooPortfolio() {
     fundamentals: 0,
     holdings: 1,
     summary: 2,
+    risk: 3,
   };
-  const tabIndexToName = ['fundamentals', 'holdings', 'summary'];
+  const tabIndexToName = ['fundamentals', 'holdings', 'summary', 'risk'];
 
   const activeTab = typeof search?.tab === 'string' && search.tab in tabNameToIndex
     ? tabNameToIndex[search.tab]
@@ -283,6 +285,18 @@ export default function YahooPortfolio() {
   const inHoldings = holdings.some(h => h.symbol === symbolUpper);
   const inWatchlist = watchlist.some(w => w.symbol === symbolUpper);
 
+  // Pre-Trade Risk Check variables
+  const totalStockPortfolioUsd = summary?.stocks?.total_market_value || summary?.total_market_value || 0;
+  const matchingHolding = holdings.find(h => h.symbol === symbolUpper);
+  const currentHoldingValue = matchingHolding ? ((matchingHolding.shares || 0) * (matchingHolding.last_price || matchingHolding.avg_cost || 0)) : 0;
+  const addedShares = parseFloat(form.shares) || 0;
+  const inputCost = parseFloat(form.cost) || (matchingHolding?.last_price || 0);
+  const tradeValue = addedShares * inputCost;
+  const projectedHoldingValue = currentHoldingValue + tradeValue;
+  const currentWeightPct = totalStockPortfolioUsd > 0 ? (currentHoldingValue / totalStockPortfolioUsd) * 100 : 0;
+  const projectedWeightPct = totalStockPortfolioUsd > 0 ? (projectedHoldingValue / totalStockPortfolioUsd) * 100 : 0;
+  const isOverStockCap = projectedWeightPct > 15.0;
+
   return (
     <Box className="yf-portfolio">
 
@@ -322,6 +336,7 @@ export default function YahooPortfolio() {
             <Tab disableIndicator>Fundamentals</Tab>
             <Tab disableIndicator>Holdings</Tab>
             <Tab disableIndicator>Summary</Tab>
+            <Tab disableIndicator>Risk & Sizing</Tab>
           </TabList>
         </Tabs>
 
@@ -388,6 +403,13 @@ export default function YahooPortfolio() {
         </Box>
       )}
 
+      {/* Risk & Sizing Tab */}
+      {optimisticTab === 3 && (
+        <Box className="tab-pane-active">
+          <RiskSizingTab onNavigateToHoldings={() => setActiveTab(1)} />
+        </Box>
+      )}
+
       {/* Add Ticker Modal */}
       <Modal open={addModalOpen} onClose={() => setAddModalOpen(false)}>
         <ModalDialog sx={{ ...glassStyle, minWidth: { xs: '90%', sm: 400 }, maxWidth: 460, borderRadius: '20px', p: 3 }}>
@@ -422,6 +444,32 @@ export default function YahooPortfolio() {
               <FormLabel>Commission ($)</FormLabel>
               <Input type="number" placeholder="e.g. 5.00" value={form.commission} onChange={handleFormChange('commission')} />
             </FormControl>
+
+            {/* Live Pre-Trade Risk Cap Check */}
+            {totalStockPortfolioUsd > 0 && addedShares > 0 && inputCost > 0 && (
+              <Box sx={{
+                p: 1.5,
+                borderRadius: '10px',
+                bgcolor: isOverStockCap ? 'danger.softBg' : 'primary.softBg',
+                border: '1px solid',
+                borderColor: isOverStockCap ? 'danger.outlinedBorder' : 'primary.outlinedBorder',
+              }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography level="body-xs" sx={{ fontWeight: 700, color: isOverStockCap ? 'danger.plainColor' : 'primary.plainColor' }}>
+                    {isOverStockCap ? '⚠️ 15% Cap Breach Warning' : '🛡️ Pre-Trade Risk Check (15% Cap)'}
+                  </Typography>
+                  <Typography level="body-xs" sx={{ fontWeight: 800, color: isOverStockCap ? 'danger.plainColor' : 'text.primary' }}>
+                    {currentWeightPct.toFixed(1)}% → {projectedWeightPct.toFixed(1)}%
+                  </Typography>
+                </Box>
+                {isOverStockCap && (
+                  <Typography level="body-xs" color="danger" sx={{ mt: 0.5, fontSize: '0.75rem', fontWeight: 600 }}>
+                    This transaction pushes {symbolUpper} over the 15% Single-Stock Cap.
+                  </Typography>
+                )}
+              </Box>
+            )}
+
             <Button variant="solid" color={inHoldings ? 'warning' : 'primary'} onClick={handleAddTicker} disabled={!form.symbol.trim()}
               sx={{ mt: 1, borderRadius: '12px', fontWeight: 700 }}>
               {inHoldings ? 'Add Transaction' : 'Add to Portfolio'}

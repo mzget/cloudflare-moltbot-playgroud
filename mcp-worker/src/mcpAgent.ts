@@ -30,6 +30,11 @@ import {
   saveBullBearDebateShape,
   getBullBearDebateShape
 } from "./fundamentalTools";
+import {
+  getPortfolioRiskAudit,
+  calculatePositionSize,
+  saveRiskAdvisory
+} from "./riskTools";
 
 const asText = (data: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(data, null, 2) }]
@@ -203,6 +208,39 @@ export class OaktreeMCP extends McpAgent {
       "Retrieve stored qualitative fundamental research and linked theme/sector dynamics for a stock symbol.",
       getFundamentalBriefShape,
       async (args: any) => asText(await getFundamentalBrief(this.env as any, args))
+    );
+
+    this.server.tool(
+      "get_portfolio_risk_audit",
+      "Get the full deterministic risk audit for the stock portfolio, including stock weights, multi-theme exposures, correlation pairs (r >= 0.70), portfolio Beta vs S&P 500, health score (0-100), and fixed-base position sizing room per holding.",
+      {},
+      async () => asText(await getPortfolioRiskAudit(this.env as any))
+    );
+
+    this.server.tool(
+      "calculate_position_size",
+      "Calculate fixed-base position sizing capacity (8% target, 15% stock cap, 30% strictest theme cap) and pre-trade simulation for a stock ticker symbol.",
+      {
+        symbol: z.string().describe("Stock ticker symbol (e.g. AAPL, MSFT)"),
+        price: z.number().optional().describe("Current or planned order price in USD"),
+        shares: z.number().optional().describe("Number of shares to simulate buying or selling"),
+        type: z.enum(['Buy', 'Sell']).optional().describe("Trade type: 'Buy' or 'Sell' (defaults to 'Buy')")
+      },
+      async (args: any) => asText(await calculatePositionSize(this.env as any, args))
+    );
+
+    this.server.tool(
+      "save_risk_advisory",
+      "Save or overwrite a Risk Officer Advisory (health score, risk level, executive summary, key warnings, rebalancing actions) into Oaktree D1.",
+      {
+        health_score: z.number().describe("Deterministic portfolio health score (0 to 100)"),
+        risk_level: z.enum(['Low', 'Moderate', 'Elevated', 'High']).describe("Risk level assessment"),
+        executive_summary: z.string().describe("Executive summary of portfolio fragility and risk balance"),
+        key_warnings: z.array(z.string()).describe("List of critical risk warnings and concentration breaches"),
+        rebalancing_actions: z.array(z.string()).describe("List of recommended rebalancing actions or position trims"),
+        source: z.string().optional().describe("Attribution source (defaults to 'gemini_spark')")
+      },
+      async (args: any) => asText(await saveRiskAdvisory(this.env as any, args))
     );
   }
 }

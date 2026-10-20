@@ -249,3 +249,6 @@ export function formatPercent(
   }
   return `${value.toFixed(decimals)}%`;
 }
+
+// ─── 3. Portfolio Risk & Sizing Engine ─────────────────────────────────────
+export * from './portfolioRisk';

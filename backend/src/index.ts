@@ -18,6 +18,7 @@ import brokers from './routes/portfolio/brokers';
 import analysis from './routes/analysis';
 import theses from './routes/theses';
 import fundamentals from './routes/fundamentals';
+import risk from './routes/portfolio/risk';
 
 export type { Env } from './env';
 export { OaktreeSyncWorkflow } from './workflow';
@@ -46,6 +47,7 @@ app.route('/', brokers);
 app.route('/', analysis);
 app.route('/', theses);
 app.route('/', fundamentals);
+app.route('/', risk);
 
 // Fallback for non-matching API routes
 app.notFound((c) => {
