@@ -17,6 +17,14 @@ import { parseAIJson } from '../../analysisEngine';
 
 const risk = new Hono<AppEnv>();
 
+function getSafeExecutionCtx(c: any): { waitUntil: (promise: Promise<any>) => void } | undefined {
+  try {
+    return c.executionCtx;
+  } catch {
+    return undefined;
+  }
+}
+
 // Helper to load portfolio audit data from D1
 export async function loadPortfolioRiskData(
   db: D1Database,
@@ -165,7 +173,7 @@ export async function loadPortfolioRiskData(
 // GET /api/portfolio/risk-audit - Deterministic Risk, Concentration, Correlation & Beta
 risk.get('/api/portfolio/risk-audit', async (c) => {
   try {
-    const data = await loadPortfolioRiskData(c.env.DB, c.executionCtx);
+    const data = await loadPortfolioRiskData(c.env.DB, getSafeExecutionCtx(c));
 
     const concentration = computeConcentrationAudit(
       data.riskHoldings,
@@ -250,7 +258,7 @@ risk.post('/api/portfolio/position-sizing', async (c) => {
       correlationThreshold: Number(body.config?.correlationThreshold) || DEFAULT_RISK_CONFIG.correlationThreshold,
     };
 
-    const data = await loadPortfolioRiskData(c.env.DB, c.executionCtx);
+    const data = await loadPortfolioRiskData(c.env.DB, getSafeExecutionCtx(c));
 
     const concentration = computeConcentrationAudit(
       data.riskHoldings,
@@ -295,7 +303,7 @@ risk.post('/api/portfolio/position-sizing', async (c) => {
 // POST /api/portfolio/risk-advisory - Run AI Risk Officer Audit using Workers AI
 risk.post('/api/portfolio/risk-advisory', async (c) => {
   try {
-    const data = await loadPortfolioRiskData(c.env.DB, c.executionCtx);
+    const data = await loadPortfolioRiskData(c.env.DB, getSafeExecutionCtx(c));
 
     const concentration = computeConcentrationAudit(
       data.riskHoldings,

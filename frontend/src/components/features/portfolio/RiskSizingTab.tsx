@@ -576,7 +576,7 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
                         <td style={{ fontWeight: 700 }}>{t.themeName}</td>
                         <td>
                           <Typography level="body-xs" sx={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {t.symbols.join(', ')}
+                            {(t.symbols || []).join(', ') || '—'}
                           </Typography>
                         </td>
                         <td style={{ textAlign: 'right' }}>
@@ -702,7 +702,7 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
               {holdingsSizing.map((h: any) => {
                 const statusColor = h.status === 'breach' ? 'danger' : h.status === 'warning' ? 'warning' : 'success';
                 const actionLabel =
-                  h.status === 'breach' ? `Trim $${Math.round(h.trimToCapUsd).toLocaleString()}` :
+                  h.status === 'breach' ? `Trim $${Math.round(h.trimToCapUsd || Math.abs(h.sizing?.roomToStockCapUsd || 0)).toLocaleString()}` :
                   h.sizing?.roomToTargetUsd > 0 ? `Buy Room $${Math.round(h.sizing.roomToTargetUsd).toLocaleString()}` :
                   'Hold (At/Over Target)';
 
@@ -718,7 +718,7 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
                     </td>
                     <td>
                       <Typography level="body-xs">
-                        {h.themes.join(', ')}
+                        {(h.themes || []).join(', ') || 'Unassigned'}
                       </Typography>
                     </td>
                     <td style={{ textAlign: 'right' }}>{h.shares?.toLocaleString()}</td>
