@@ -299,13 +299,38 @@ describe('RiskSizingTab Component', () => {
     expect(cleanHtml).toContain('WARNING');
     expect(cleanHtml).toContain('OK');
 
-    // Action column: Delete button with title on named theme rows
+    // Action column: Edit & Delete buttons with titles on named theme rows
+    expect(cleanHtml).toContain('title="Edit theme &quot;Consumer Tech&quot;"');
+    expect(cleanHtml).toContain('title="Edit theme &quot;Legacy Computing&quot;"');
+    expect(cleanHtml).toContain('title="Edit theme &quot;AI &amp; Cloud Infrastructure&quot;"');
     expect(cleanHtml).toContain('title="Delete theme &quot;Consumer Tech&quot;"');
     expect(cleanHtml).toContain('title="Delete theme &quot;Legacy Computing&quot;"');
     expect(cleanHtml).toContain('title="Delete theme &quot;AI &amp; Cloud Infrastructure&quot;"');
 
-    // Unassigned row should NEVER have a delete button
+    // Unassigned row should NEVER have an edit or delete button
+    expect(cleanHtml).not.toContain('title="Edit theme &quot;Unassigned&quot;"');
     expect(cleanHtml).not.toContain('title="Delete theme &quot;Unassigned&quot;"');
+  });
+
+  it('renders inline Input and Save/Cancel buttons in table cell when editing a theme name', () => {
+    const html = renderToString(
+      <RiskSizingTab
+        initialAuditData={mockAuditData}
+        autoFetch={false}
+        initialThemeViewMode="table"
+        initialEditingTheme="Consumer Tech"
+        initialEditedThemeValue="Next-Gen Consumer Tech"
+      />
+    );
+    const cleanHtml = html.replace(/<!--.*?-->/g, '');
+
+    // Inline input rendered inside the Theme Name cell with edited value
+    expect(cleanHtml).toContain('value="Next-Gen Consumer Tech"');
+    expect(cleanHtml).toContain('aria-label="Edit theme name for Consumer Tech"');
+
+    // Save and Cancel action buttons for the editing row
+    expect(cleanHtml).toContain('title="Save theme &quot;Consumer Tech&quot;"');
+    expect(cleanHtml).toContain('title="Cancel editing theme"');
   });
 
   it('renders Delete Theme confirmation modal dialog when deletingThemeName is set', () => {

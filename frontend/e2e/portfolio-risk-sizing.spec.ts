@@ -339,6 +339,33 @@ test.describe('Portfolio Risk Manager & Sizing Agent - E2E Suite', () => {
         }),
       });
     });
+
+    await page.route('**/api/portfolio/themes/*', async (route) => {
+      if (route.request().method() === 'PUT') {
+        const body = route.request().postDataJSON() as any;
+        const newThemeName = body?.newThemeName || 'Renamed Theme';
+        mockRiskAudit = {
+          ...mockRiskAudit,
+          concentration: {
+            ...mockRiskAudit.concentration,
+            themeExposures: mockRiskAudit.concentration.themeExposures.map((t) =>
+              t.themeName === 'Consumer Tech' ? { ...t, themeName: newThemeName } : t
+            ),
+          },
+        };
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            success: true,
+            oldThemeName: 'Consumer Tech',
+            newThemeName,
+          }),
+        });
+      } else {
+        await route.continue();
+      }
+    });
   });
 
   // -------------------------------------------------------------
@@ -388,15 +415,36 @@ test.describe('Portfolio Risk Manager & Sizing Agent - E2E Suite', () => {
   });
 
   // -------------------------------------------------------------
-  // Test 3: Concentration & Correlation Tables
+  // Test 3: Concentration & Correlation Tables + Inline Theme Rename
   // -------------------------------------------------------------
-  test('renders Theme Concentration Table and High-Correlation Pairs Table', async ({ page }) => {
+  test('renders Theme Concentration Table, supports inline theme rename, and renders High-Correlation Pairs Table', async ({ page }) => {
     await page.goto('/dashboard?tab=risk');
 
-    // Theme Concentration Table
+    // Theme Concentration Card
     await expect(page.locator('text=Theme & Sector Concentration')).toBeVisible();
+
+    // Switch to Table View
+    const tableViewBtn = page.getByTitle('Table View');
+    await expect(tableViewBtn).toBeVisible();
+    await tableViewBtn.click();
+
     await expect(page.getByRole('cell', { name: 'Consumer Tech' })).toBeVisible();
     await expect(page.getByRole('cell', { name: 'AI & Cloud Infrastructure' })).toBeVisible();
+
+    // Click Edit button on Consumer Tech row to open inline editing in table cell
+    const editBtn = page.getByTitle('Edit theme "Consumer Tech"');
+    await expect(editBtn).toBeVisible();
+    await editBtn.click();
+
+    const inlineInput = page.getByLabel('Edit theme name for Consumer Tech');
+    await expect(inlineInput).toBeVisible();
+    await inlineInput.fill('Next-Gen Consumer Tech');
+
+    const saveBtn = page.getByTitle('Save theme "Consumer Tech"');
+    await expect(saveBtn).toBeVisible();
+    await saveBtn.click();
+
+    await expect(page.getByRole('cell', { name: 'Next-Gen Consumer Tech' })).toBeVisible();
 
     // High Correlation Pairs Table
     await expect(page.locator('text=Correlated Stock Pairs (r ≥ 0.70)')).toBeVisible();

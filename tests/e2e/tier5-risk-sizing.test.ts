@@ -4,6 +4,7 @@ import {
   InMemoryR2Bucket,
   createFundamentalTools,
   handleDeleteTheme,
+  handleRenameTheme,
 } from "./contracts/contracts";
 import { loadPortfolioRiskData } from "../../backend/src/routes/portfolio/risk";
 import {
@@ -172,7 +173,20 @@ describe("Tier 5: Risk Manager & Portfolio Sizing Agent (End-to-End Lifecycles)"
     expect(db.themeSymbolMappings.some((m) => m.notebook_id === "nb_theme_deprecated")).toBe(false);
 
     // 3. Delete active theme "Active AI Hardware"
-    const delRes2 = await handleDeleteTheme(db, "Active AI Hardware");
+    // First rename "Active AI Hardware" inline to "Next-Gen AI Compute" and verify concentration audit updates
+    const renameRes = await handleRenameTheme(db, "Active AI Hardware", "Next-Gen AI Compute");
+    expect(renameRes.status).toBe(200);
+    expect(renameRes.success).toBe(true);
+    expect(renameRes.oldThemeName).toBe("Active AI Hardware");
+    expect(renameRes.newThemeName).toBe("Next-Gen AI Compute");
+
+    const afterRenameData = await loadPortfolioRiskData(db as any);
+    const afterRenameAudit = computeConcentrationAudit(afterRenameData.riskHoldings, afterRenameData.themeMappings, DEFAULT_RISK_CONFIG);
+    expect(afterRenameAudit.themeExposures.some((t) => t.themeName === "Next-Gen AI Compute")).toBe(true);
+    expect(afterRenameAudit.themeExposures.some((t) => t.themeName === "Active AI Hardware")).toBe(false);
+
+    // Now delete the renamed theme "Next-Gen AI Compute"
+    const delRes2 = await handleDeleteTheme(db, "Next-Gen AI Compute");
     expect(delRes2.status).toBe(200);
     expect(delRes2.success).toBe(true);
 
@@ -183,7 +197,7 @@ describe("Tier 5: Risk Manager & Portfolio Sizing Agent (End-to-End Lifecycles)"
     const { riskHoldings, themeMappings } = await loadPortfolioRiskData(db as any);
     const audit = computeConcentrationAudit(riskHoldings, themeMappings, DEFAULT_RISK_CONFIG);
 
-    expect(audit.themeExposures.some((t) => t.themeName === "Active AI Hardware")).toBe(false);
+    expect(audit.themeExposures.some((t) => t.themeName === "Next-Gen AI Compute")).toBe(false);
     expect(audit.themeExposures.some((t) => t.themeName === "Deprecated Clean Tech")).toBe(false);
 
     const unassigned = audit.themeExposures.find((t) => t.themeName === "Unassigned");

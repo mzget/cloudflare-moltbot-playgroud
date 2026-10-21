@@ -401,4 +401,97 @@ describe('Risk Routes & Portfolio Risk Logic', () => {
       expect(json.error).toContain('D1 Delete Failed');
     });
   });
+
+  describe('PUT /api/portfolio/themes/:name', () => {
+    it('renames a theme in theme_sector_contexts', async () => {
+      const mockDb = createMockDb();
+      const mockEnv = createMockEnv(mockDb);
+
+      const res = await risk.request(
+        '/api/portfolio/themes/Consumer%20Tech',
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ newThemeName: 'Global Consumer Technology' }),
+        },
+        mockEnv
+      );
+
+      expect(res.status).toBe(200);
+      const json = await res.json() as any;
+      expect(json.success).toBe(true);
+      expect(json.oldThemeName).toBe('Consumer Tech');
+      expect(json.newThemeName).toBe('Global Consumer Technology');
+    });
+
+    it('returns 400 when newThemeName is empty or missing', async () => {
+      const mockDb = createMockDb();
+      const mockEnv = createMockEnv(mockDb);
+
+      const res = await risk.request(
+        '/api/portfolio/themes/Consumer%20Tech',
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ newThemeName: '   ' }),
+        },
+        mockEnv
+      );
+
+      expect(res.status).toBe(400);
+      const json = await res.json() as any;
+      expect(json.error).toContain('New theme name is required');
+    });
+
+    it('returns 400 when attempting to rename to or from Unassigned', async () => {
+      const mockDb = createMockDb();
+      const mockEnv = createMockEnv(mockDb);
+
+      const resToUnassigned = await risk.request(
+        '/api/portfolio/themes/Consumer%20Tech',
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ newThemeName: 'Unassigned' }),
+        },
+        mockEnv
+      );
+      expect(resToUnassigned.status).toBe(400);
+
+      const resFromUnassigned = await risk.request(
+        '/api/portfolio/themes/Unassigned',
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ newThemeName: 'Valid Theme' }),
+        },
+        mockEnv
+      );
+      expect(resFromUnassigned.status).toBe(400);
+    });
+
+    it('returns 500 when database throws during theme rename', async () => {
+      const mockDb = createMockDb();
+      (mockDb as any).prepare = vi.fn().mockReturnValue({
+        bind: vi.fn().mockReturnValue({
+          run: vi.fn().mockRejectedValue(new Error('D1 Update Failed')),
+        }),
+      });
+      const mockEnv = createMockEnv(mockDb);
+
+      const res = await risk.request(
+        '/api/portfolio/themes/Consumer%20Tech',
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ newThemeName: 'New Consumer Tech' }),
+        },
+        mockEnv
+      );
+
+      expect(res.status).toBe(500);
+      const json = await res.json() as any;
+      expect(json.error).toContain('D1 Update Failed');
+    });
+  });
 });
