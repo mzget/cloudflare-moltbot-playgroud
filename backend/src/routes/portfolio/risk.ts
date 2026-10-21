@@ -499,4 +499,48 @@ risk.delete('/api/portfolio/themes/:name', async (c) => {
   }
 });
 
+// PUT /api/portfolio/themes/:name
+risk.put('/api/portfolio/themes/:name', async (c) => {
+  const rawName = c.req.param('name');
+  if (!rawName || !rawName.trim()) {
+    return c.json({ error: 'Theme name is required' }, 400);
+  }
+
+  const oldThemeName = decodeURIComponent(rawName).trim();
+  if (!oldThemeName || oldThemeName.toLowerCase() === 'unassigned') {
+    return c.json({ error: 'Cannot rename Unassigned theme' }, 400);
+  }
+
+  try {
+    const body = (await c.req.json().catch(() => ({}))) as any;
+    const rawNewName = body?.newThemeName ?? body?.themeName ?? '';
+    const newThemeName = typeof rawNewName === 'string' ? rawNewName.trim() : '';
+
+    if (!newThemeName) {
+      return c.json({ error: 'New theme name is required' }, 400);
+    }
+
+    if (newThemeName.toLowerCase() === 'unassigned') {
+      return c.json({ error: 'Cannot rename theme to reserved name "Unassigned"' }, 400);
+    }
+
+    const updateContextSql = `
+      UPDATE theme_sector_contexts
+      SET theme_name = ?, updated_at = datetime('now')
+      WHERE LOWER(TRIM(theme_name)) = LOWER(TRIM(?))
+    `;
+
+    await c.env.DB.prepare(updateContextSql).bind(newThemeName, oldThemeName).run();
+
+    return c.json({
+      success: true,
+      oldThemeName,
+      newThemeName,
+    });
+  } catch (error: any) {
+    console.error('[UpdateTheme] Error renaming theme:', error);
+    return c.json({ error: error.message || 'Failed to rename theme' }, 500);
+  }
+});
+
 export default risk;

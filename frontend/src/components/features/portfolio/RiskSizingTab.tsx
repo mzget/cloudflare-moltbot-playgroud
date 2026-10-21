@@ -34,6 +34,9 @@ import {
   Activity,
   Layers,
   Trash2,
+  Pencil,
+  Check,
+  X,
 } from 'lucide-react';
 import ThemeDonutChart from './ThemeDonutChart';
 import { API_BASE_URL } from '../../../config';
@@ -47,6 +50,8 @@ export interface RiskSizingTabProps {
   autoFetch?: boolean;
   initialThemeViewMode?: 'chart' | 'table';
   initialDeletingTheme?: string | null;
+  initialEditingTheme?: string | null;
+  initialEditedThemeValue?: string;
   initialSelectedSymbol?: string;
 }
 
@@ -56,6 +61,8 @@ export default function RiskSizingTab({
   autoFetch = true,
   initialThemeViewMode = 'chart',
   initialDeletingTheme = null,
+  initialEditingTheme = null,
+  initialEditedThemeValue,
   initialSelectedSymbol = '',
 }: RiskSizingTabProps) {
   const showMoneyValues = useSettingsStore(state => state.showMoneyValues);
@@ -71,6 +78,13 @@ export default function RiskSizingTab({
   // Delete Theme state
   const [deletingThemeName, setDeletingThemeName] = React.useState<string | null>(initialDeletingTheme);
   const [isDeletingTheme, setIsDeletingTheme] = React.useState(false);
+
+  // Inline Edit Theme Name state
+  const [editingThemeName, setEditingThemeName] = React.useState<string | null>(initialEditingTheme);
+  const [editedThemeValue, setEditedThemeValue] = React.useState<string>(
+    initialEditedThemeValue !== undefined ? initialEditedThemeValue : (initialEditingTheme || '')
+  );
+  const [isSavingTheme, setIsSavingTheme] = React.useState(false);
 
   // Position Sizing Simulator state
   const [selectedSymbol, setSelectedSymbol] = React.useState<string>(
@@ -184,6 +198,56 @@ export default function RiskSizingTab({
       setError(err.message || 'Failed to delete theme');
     } finally {
       setIsDeletingTheme(false);
+    }
+  };
+
+  // Inline Edit Theme Name handlers
+  const handleStartEditTheme = (themeName: string) => {
+    setEditingThemeName(themeName);
+    setEditedThemeValue(themeName);
+    setError(null);
+  };
+
+  const handleCancelEditTheme = () => {
+    setEditingThemeName(null);
+    setEditedThemeValue('');
+  };
+
+  const handleSaveTheme = async (oldThemeName: string) => {
+    const trimmedNewName = editedThemeValue.trim();
+    if (!trimmedNewName) {
+      setError('Theme name cannot be empty');
+      return;
+    }
+    if (trimmedNewName.toLowerCase() === 'unassigned') {
+      setError('Cannot rename theme to reserved name "Unassigned"');
+      return;
+    }
+    if (trimmedNewName === oldThemeName) {
+      handleCancelEditTheme();
+      return;
+    }
+
+    setIsSavingTheme(true);
+    setError(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/portfolio/themes/${encodeURIComponent(oldThemeName)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newThemeName: trimmedNewName }),
+      });
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({}))) as any;
+        throw new Error(err.error || 'Failed to rename theme');
+      }
+      setEditingThemeName(null);
+      setEditedThemeValue('');
+      await fetchAudit(true);
+    } catch (err: any) {
+      console.error('Failed to rename theme:', err);
+      setError(err.message || 'Failed to rename theme');
+    } finally {
+      setIsSavingTheme(false);
     }
   };
 
@@ -694,15 +758,43 @@ export default function RiskSizingTab({
                       <th style={{ textAlign: 'right' }}>Weight %</th>
                       <th style={{ textAlign: 'right' }}>30% Cap Room</th>
                       <th style={{ textAlign: 'center' }}>Status</th>
-                      <th style={{ textAlign: 'center', width: 64 }}>Action</th>
+                      <th style={{ textAlign: 'center', width: 88 }}>Action</th>
                     </tr>
                   </thead>
                   <tbody>
                     {themeExposures.map((t: any) => {
                       const statusColor = t.status === 'breach' ? 'danger' : t.status === 'warning' ? 'warning' : 'success';
+                      const isEditingThisRow = !t.isUnassigned && editingThemeName === t.themeName;
                       return (
                         <tr key={t.themeName}>
-                          <td style={{ fontWeight: 700 }}>{t.themeName}</td>
+                          <td style={{ fontWeight: 700 }}>
+                            {isEditingThisRow ? (
+                              <Input
+                                size="sm"
+                                value={editedThemeValue}
+                                onChange={(e) => setEditedThemeValue(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    handleSaveTheme(t.themeName);
+                                  } else if (e.key === 'Escape') {
+                                    e.preventDefault();
+                                    handleCancelEditTheme();
+                                  }
+                                }}
+                                disabled={isSavingTheme}
+                                autoFocus
+                                aria-label={`Edit theme name for ${t.themeName}`}
+                                sx={{
+                                  minWidth: 160,
+                                  fontWeight: 700,
+                                  borderRadius: '8px',
+                                }}
+                              />
+                            ) : (
+                              t.themeName
+                            )}
+                          </td>
                           <td>
                             <Typography level="body-xs" sx={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {(t.symbols || []).join(', ') || '—'}
@@ -724,23 +816,78 @@ export default function RiskSizingTab({
                           </td>
                           <td style={{ textAlign: 'center' }}>
                             {!t.isUnassigned && (
-                              <IconButton
-                                size="sm"
-                                variant="plain"
-                                color="danger"
-                                title={`Delete theme "${t.themeName}"`}
-                                onClick={() => setDeletingThemeName(t.themeName)}
-                                sx={{
-                                  minHeight: '28px',
-                                  minWidth: '28px',
-                                  p: 0.5,
-                                  '&:hover': {
-                                    bgcolor: 'rgba(239, 68, 68, 0.15)',
-                                  },
-                                }}
-                              >
-                                <Trash2 size={15} />
-                              </IconButton>
+                              isEditingThisRow ? (
+                                <Stack direction="row" spacing={0.5} justifyContent="center" alignItems="center">
+                                  <IconButton
+                                    size="sm"
+                                    variant="soft"
+                                    color="success"
+                                    loading={isSavingTheme}
+                                    disabled={!editedThemeValue.trim()}
+                                    title={`Save theme "${t.themeName}"`}
+                                    onClick={() => handleSaveTheme(t.themeName)}
+                                    sx={{
+                                      minHeight: '28px',
+                                      minWidth: '28px',
+                                      p: 0.5,
+                                    }}
+                                  >
+                                    <Check size={15} />
+                                  </IconButton>
+                                  <IconButton
+                                    size="sm"
+                                    variant="plain"
+                                    color="neutral"
+                                    disabled={isSavingTheme}
+                                    title="Cancel editing theme"
+                                    onClick={handleCancelEditTheme}
+                                    sx={{
+                                      minHeight: '28px',
+                                      minWidth: '28px',
+                                      p: 0.5,
+                                    }}
+                                  >
+                                    <X size={15} />
+                                  </IconButton>
+                                </Stack>
+                              ) : (
+                                <Stack direction="row" spacing={0.5} justifyContent="center" alignItems="center">
+                                  <IconButton
+                                    size="sm"
+                                    variant="plain"
+                                    color="primary"
+                                    title={`Edit theme "${t.themeName}"`}
+                                    onClick={() => handleStartEditTheme(t.themeName)}
+                                    sx={{
+                                      minHeight: '28px',
+                                      minWidth: '28px',
+                                      p: 0.5,
+                                      '&:hover': {
+                                        bgcolor: 'rgba(14, 165, 233, 0.15)',
+                                      },
+                                    }}
+                                  >
+                                    <Pencil size={15} />
+                                  </IconButton>
+                                  <IconButton
+                                    size="sm"
+                                    variant="plain"
+                                    color="danger"
+                                    title={`Delete theme "${t.themeName}"`}
+                                    onClick={() => setDeletingThemeName(t.themeName)}
+                                    sx={{
+                                      minHeight: '28px',
+                                      minWidth: '28px',
+                                      p: 0.5,
+                                      '&:hover': {
+                                        bgcolor: 'rgba(239, 68, 68, 0.15)',
+                                      },
+                                    }}
+                                  >
+                                    <Trash2 size={15} />
+                                  </IconButton>
+                                </Stack>
+                              )
                             )}
                           </td>
                         </tr>

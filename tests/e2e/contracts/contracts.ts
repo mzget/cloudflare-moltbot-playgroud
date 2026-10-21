@@ -417,6 +417,24 @@ class PreparedStatement {
       return { success: true, meta: { changes: deletedCount } };
     }
 
+    // 4d. Update theme_sector_contexts SET theme_name = ? WHERE LOWER(TRIM(theme_name)) = LOWER(TRIM(?))
+    if (/UPDATE\s+theme_sector_contexts[\s\S]*SET\s+theme_name\s*=\s*\?/i.test(trimmed)) {
+      const [newThemeName, oldThemeName] = this.boundArgs as [string, string];
+      const targetName = (oldThemeName || '').trim().toLowerCase();
+      let updatedCount = 0;
+      for (const [nbId, rec] of Array.from(this.db.themeSectorContexts.entries())) {
+        if ((rec.theme_name || '').trim().toLowerCase() === targetName) {
+          this.db.themeSectorContexts.set(nbId, {
+            ...rec,
+            theme_name: (newThemeName || '').trim(),
+            updated_at: new Date().toISOString(),
+          });
+          updatedCount++;
+        }
+      }
+      return { success: true, meta: { changes: updatedCount } };
+    }
+
     // 5. Insert into theme_symbol_mappings
     if (/INSERT\s+INTO\s+theme_symbol_mappings/i.test(trimmed)) {
       const [notebook_id, symbol] = this.boundArgs as [string, string];
@@ -1145,4 +1163,38 @@ export async function handleDeleteTheme(
   ]);
 
   return { status: 200, success: true, deletedTheme: themeName };
+}
+
+export async function handleRenameTheme(
+  db: InMemoryD1Database,
+  rawOldThemeName: string,
+  rawNewThemeName: string
+): Promise<{ status: number; error?: string; success?: boolean; oldThemeName?: string; newThemeName?: string }> {
+  if (!rawOldThemeName || !rawOldThemeName.trim()) {
+    return { status: 400, error: 'Theme name is required' };
+  }
+
+  const oldThemeName = decodeURIComponent(rawOldThemeName).trim();
+  if (!oldThemeName || oldThemeName.toLowerCase() === 'unassigned') {
+    return { status: 400, error: 'Cannot rename Unassigned theme' };
+  }
+
+  const newThemeName = (rawNewThemeName || '').trim();
+  if (!newThemeName) {
+    return { status: 400, error: 'New theme name is required' };
+  }
+
+  if (newThemeName.toLowerCase() === 'unassigned') {
+    return { status: 400, error: 'Cannot rename theme to reserved name "Unassigned"' };
+  }
+
+  const updateContextSql = `
+    UPDATE theme_sector_contexts
+    SET theme_name = ?, updated_at = datetime('now')
+    WHERE LOWER(TRIM(theme_name)) = LOWER(TRIM(?))
+  `;
+
+  await db.prepare(updateContextSql).bind(newThemeName, oldThemeName).run();
+
+  return { status: 200, success: true, oldThemeName, newThemeName };
 }
