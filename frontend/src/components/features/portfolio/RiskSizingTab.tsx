@@ -14,6 +14,10 @@ import {
   Stack,
   LinearProgress,
   IconButton,
+  Modal,
+  ModalDialog,
+  DialogTitle,
+  DialogContent,
 } from '@mui/joy';
 import {
   ShieldAlert,
@@ -29,6 +33,7 @@ import {
   Table2,
   Activity,
   Layers,
+  Trash2,
 } from 'lucide-react';
 import ThemeDonutChart from './ThemeDonutChart';
 import { API_BASE_URL } from '../../../config';
@@ -36,23 +41,41 @@ import { glassStyle } from '../../../styles/glass';
 import { formatCurrency, formatPct } from './YahooPortfolio';
 import { useSettingsStore } from '../../../store/settingsStore';
 
-interface RiskSizingTabProps {
+export interface RiskSizingTabProps {
   onNavigateToHoldings?: () => void;
+  initialAuditData?: any;
+  autoFetch?: boolean;
+  initialThemeViewMode?: 'chart' | 'table';
+  initialDeletingTheme?: string | null;
+  initialSelectedSymbol?: string;
 }
 
-export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabProps) {
+export default function RiskSizingTab({
+  onNavigateToHoldings,
+  initialAuditData,
+  autoFetch = true,
+  initialThemeViewMode = 'chart',
+  initialDeletingTheme = null,
+  initialSelectedSymbol = '',
+}: RiskSizingTabProps) {
   const showMoneyValues = useSettingsStore(state => state.showMoneyValues);
 
-  const [loading, setLoading] = React.useState(true);
+  const [loading, setLoading] = React.useState(!initialAuditData);
   const [refreshing, setRefreshing] = React.useState(false);
   const [runningAi, setRunningAi] = React.useState(false);
 
-  const [auditData, setAuditData] = React.useState<any>(null);
+  const [auditData, setAuditData] = React.useState<any>(initialAuditData || null);
   const [error, setError] = React.useState<string | null>(null);
-  const [themeViewMode, setThemeViewMode] = React.useState<'chart' | 'table'>('chart');
+  const [themeViewMode, setThemeViewMode] = React.useState<'chart' | 'table'>(initialThemeViewMode);
+
+  // Delete Theme state
+  const [deletingThemeName, setDeletingThemeName] = React.useState<string | null>(initialDeletingTheme);
+  const [isDeletingTheme, setIsDeletingTheme] = React.useState(false);
 
   // Position Sizing Simulator state
-  const [selectedSymbol, setSelectedSymbol] = React.useState<string>('');
+  const [selectedSymbol, setSelectedSymbol] = React.useState<string>(
+    initialSelectedSymbol || (initialAuditData?.holdingsSizing?.[0]?.symbol || '')
+  );
   const [customSymbol, setCustomSymbol] = React.useState<string>('');
   const [orderType, setOrderType] = React.useState<'Buy' | 'Sell'>('Buy');
   const [orderShares, setOrderShares] = React.useState<string>('10');
@@ -91,8 +114,10 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
   }, [selectedSymbol]);
 
   React.useEffect(() => {
-    fetchAudit();
-  }, [fetchAudit]);
+    if (autoFetch) {
+      fetchAudit();
+    }
+  }, [fetchAudit, autoFetch]);
 
   // When selected symbol changes, update order price and trigger simulation
   React.useEffect(() => {
@@ -139,6 +164,28 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
       runSimulation();
     }
   }, [activeSymbol, orderPrice, orderShares, orderType, auditData, runSimulation]);
+
+  // Delete theme handler
+  const handleDeleteTheme = async () => {
+    if (!deletingThemeName) return;
+    setIsDeletingTheme(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/portfolio/themes/${encodeURIComponent(deletingThemeName)}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({}))) as any;
+        throw new Error(err.error || 'Failed to delete theme');
+      }
+      setDeletingThemeName(null);
+      await fetchAudit(true);
+    } catch (err: any) {
+      console.error('Failed to delete theme:', err);
+      setError(err.message || 'Failed to delete theme');
+    } finally {
+      setIsDeletingTheme(false);
+    }
+  };
 
   // Trigger Workers AI Risk Advisory
   const handleRunAiAudit = async () => {
@@ -187,7 +234,10 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
     riskLevel === 'Moderate' ? 'warning' :
     riskLevel === 'Elevated' ? 'warning' : 'danger';
 
-  const currentSizing = sizingResult?.sizing;
+  const currentSizing =
+    sizingResult?.sizing ||
+    holdingsSizing.find((h: any) => h.symbol === activeSymbol)?.sizing ||
+    holdingsSizing[0]?.sizing;
   const currentSimulation = sizingResult?.simulation;
 
   return (
@@ -578,8 +628,8 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
 
       {/* 3. Theme Exposure Breakdown & High-Correlation Pairs */}
       <Grid container spacing={2}>
-        {/* Theme Exposure Breakdown (7 cols) */}
-        <Grid xs={12} lg={7}>
+        {/* Theme Exposure Breakdown (8 cols) */}
+        <Grid xs={12} lg={8} xl={8}>
           <Sheet sx={{ ...glassStyle, p: 3, height: '100%', borderRadius: '16px' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 1 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -644,6 +694,7 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
                       <th style={{ textAlign: 'right' }}>Weight %</th>
                       <th style={{ textAlign: 'right' }}>30% Cap Room</th>
                       <th style={{ textAlign: 'center' }}>Status</th>
+                      <th style={{ textAlign: 'center', width: 64 }}>Action</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -671,6 +722,27 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
                               {t.isUnassigned ? 'Unassigned' : t.status.toUpperCase()}
                             </Chip>
                           </td>
+                          <td style={{ textAlign: 'center' }}>
+                            {!t.isUnassigned && (
+                              <IconButton
+                                size="sm"
+                                variant="plain"
+                                color="danger"
+                                title={`Delete theme "${t.themeName}"`}
+                                onClick={() => setDeletingThemeName(t.themeName)}
+                                sx={{
+                                  minHeight: '28px',
+                                  minWidth: '28px',
+                                  p: 0.5,
+                                  '&:hover': {
+                                    bgcolor: 'rgba(239, 68, 68, 0.15)',
+                                  },
+                                }}
+                              >
+                                <Trash2 size={15} />
+                              </IconButton>
+                            )}
+                          </td>
                         </tr>
                       );
                     })}
@@ -681,8 +753,8 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
           </Sheet>
         </Grid>
 
-        {/* High-Correlation Watchlist (5 cols) */}
-        <Grid xs={12} lg={5}>
+        {/* High-Correlation Watchlist (4 cols) */}
+        <Grid xs={12} lg={4} xl={4}>
           <Sheet sx={{ ...glassStyle, p: 3, height: '100%', borderRadius: '16px' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -919,6 +991,57 @@ export default function RiskSizingTab({ onNavigateToHoldings }: RiskSizingTabPro
           </Box>
         )}
       </Sheet>
+
+      {/* Delete Theme Confirmation Modal */}
+      <Modal
+        open={Boolean(deletingThemeName)}
+        disablePortal
+        onClose={() => !isDeletingTheme && setDeletingThemeName(null)}
+      >
+        <ModalDialog
+          role="alertdialog"
+          variant="outlined"
+          sx={{
+            ...glassStyle,
+            maxWidth: 440,
+            borderRadius: '16px',
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
+          }}
+        >
+          <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <AlertTriangle color="#ef4444" size={20} />
+            Delete Theme
+          </DialogTitle>
+          <Divider />
+          <DialogContent>
+            <Typography level="body-md">
+              Are you sure you want to delete the theme <strong>&ldquo;{deletingThemeName}&rdquo;</strong>?
+            </Typography>
+            <Typography level="body-sm" sx={{ color: 'text.secondary', mt: 1 }}>
+              This will remove the theme and unmap any associated stocks. Holdings will become &ldquo;Unassigned&rdquo; if not in other themes. This action cannot be undone.
+            </Typography>
+          </DialogContent>
+          <Stack direction="row" spacing={1.5} justifyContent="flex-end" sx={{ mt: 2 }}>
+            <Button
+              variant="plain"
+              color="neutral"
+              disabled={isDeletingTheme}
+              onClick={() => setDeletingThemeName(null)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="solid"
+              color="danger"
+              startDecorator={<Trash2 size={16} />}
+              loading={isDeletingTheme}
+              onClick={handleDeleteTheme}
+            >
+              Delete Theme
+            </Button>
+          </Stack>
+        </ModalDialog>
+      </Modal>
     </Box>
   );
 }

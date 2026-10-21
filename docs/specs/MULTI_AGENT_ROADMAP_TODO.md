@@ -39,37 +39,36 @@ flowchart TD
 
 ## 📝 TODO List ตามลำดับ Phase
 
-### 🚀 Phase 1: Quick Wins — Bull vs. Bear Analysis & Summary
+### 🚀 Phase 1: Quick Wins — Bull vs. Bear Analysis & Summary (Completed ✅)
 > **เป้าหมาย:** เพิ่มมิติการวิเคราะห์หุ้นแบบ 2 ขั้วตรงข้าม (Adversarial View) ในหน้า Stock Analysis ทันที เพื่อลด Confirmation Bias
 
-- [ ] **Backend: Prompts & Engine (`backend/src/analysisPrompts.ts`, `backend/src/analysisEngine.ts`)**
-  - [ ] ออกแบบ Prompt แยก 2 บทบาท: `BULL_THESIS_PROMPT` (Upside catalysts, moat, growth) และ `BEAR_THESIS_PROMPT` (Risks, accounting red flags, valuation stretch)
-  - [ ] ทำฟังก์ชันรันการวิเคราะห์คู่ขนาน (Parallel LLM generation via Workers AI / Gemini)
-  - [ ] สร้าง Output schema รองรับ `{ bullPoints: string[], bearPoints: string[], keyDebateSummary: string }`
-- [ ] **API Endpoint (`backend/src/routes/`)**
-  - [ ] เพิ่ม Endpoint `POST /api/stocks/:symbol/debate-summary` หรือรวมเข้ากับ Endpoint วิเคราะห์หุ้นเดิม
-- [ ] **Frontend UI (`frontend/src/`)**
-  - [ ] ออกแบบการ์ดแสดงผลคู่ขนานแบบ Side-by-Side (MUI Joy UI `Grid` หรือ `Card`)
-  - [ ] ฝั่งซ้าย: สีเขียว/Neutral (Bull Case Catalysts)
-  - [ ] ฝั่งขวา: สีแดง/Warning (Bear Case Risks)
-  - [ ] สรุป Key Tension / จุดชี้ขาดสำคัญของหุ้นตัวนั้น
+- [x] **Backend: Prompts & Engine (`backend/src/analysisPrompts.ts`, `backend/src/analysisEngine.ts`)**
+  - [x] ออกแบบ Prompt แยก 2 บทบาท: `BULL_THESIS_PROMPT` (Upside catalysts, moat, growth) และ `BEAR_THESIS_PROMPT` (Risks, accounting red flags, valuation stretch)
+  - [x] ทำฟังก์ชันรันการวิเคราะห์คู่ขนาน (Parallel LLM generation via Workers AI / Gemini)
+  - [x] สร้าง Output schema รองรับ `{ bullPoints: string[], bearPoints: string[], keyDebateSummary: string }`
+- [x] **API Endpoint (`backend/src/routes/`)**
+  - [x] เพิ่ม Endpoint `POST /api/stocks/:symbol/debate-summary` หรือรวมเข้ากับ Endpoint วิเคราะห์หุ้นเดิม
+- [x] **Frontend UI (`frontend/src/`)**
+  - [x] ออกแบบการ์ดแสดงผลคู่ขนานแบบ Side-by-Side (MUI Joy UI `Grid` หรือ `Card`)
+  - [x] ฝั่งซ้าย: สีเขียว/Neutral (Bull Case Catalysts)
+  - [x] ฝั่งขวา: สีแดง/Warning (Bear Case Risks)
+  - [x] สรุป Key Tension / จุดชี้ขาดสำคัญของหุ้นตัวนั้น
 
 ---
 
-### 🧮 Phase 2: AI-Assisted DCF Valuation Scenarios
+### 🧮 Phase 2: AI-Assisted DCF Valuation Scenarios (In Progress 🔄)
 > **เป้าหมาย:** เชื่อมโยงผลวิเคราะห์ Multi-Agent เข้ากับโมเดล DCF ที่มีอยู่เดิมใน Oaktree เพื่อตั้งค่า Base, Bear, Bull Case อัตโนมัติ
 
-- [ ] **DCF Parameter Recommendation Agent**
-  - [ ] ให้ Agent วิเคราะห์ Historical Financials + ผล Bull/Bear เพื่อประเมินช่วงตัวเลขสมมติฐาน:
+- [x] **DCF Parameter Recommendation Agent (via Gemini App & MCP)**
+  - [x] ให้ Agent วิเคราะห์ Historical Financials + ผล Bull/Bear เพื่อประเมินช่วงตัวเลขสมมติฐาน:
     - Revenue Growth Rate (Yr 1-5)
     - Operating Margin
     - WACC / Discount Rate
     - Terminal Growth Rate
-  - [ ] แมปผลลัพธ์เป็น 3 Presets: `Bull Case`, `Base Case`, `Bear Case`
+  - [x] แมปผลลัพธ์เป็น 3 Presets: `Bull Case`, `Base Case`, `Bear Case`
 - [ ] **Integration กับ DCF Engine (`backend/src/dcfAnalysis.ts`, `frontend/src/components/DCF/`)**
-  - [ ] เพิ่มปุ่ม *"Auto-fill with AI Multi-Scenario"* ในหน้า DCF Valuation Model (ใช้ Gemini app สร้าง Bull/Bear scenarios)
-  - [ ] ใช้ mcp-worker บันทึกพารามิเตอร์ DCF ที่ได้จาก Gemini ลง D1/KV
-  - [ ] เพิ่มขั้นตอนคำนวณ Margin of Safety: เปรียบเทียบ Intrinsic Value (จากแต่ละ scenario) กับ Market Price, แสดง % Safety และสรุป Recommendation
+  - [x] ใช้ Gemini app วิเคราะห์ Bull/Bear/Base scenarios และใช้ `mcp-worker` บันทึกพารามิเตอร์ DCF ลง D1
+  - [ ] เพิ่มขั้นตอนการประเมิน Margin of Safety Workflow: เปรียบเทียบ Intrinsic Value (จากแต่ละ scenario) กับ Market Price, แสดง % Safety และสรุป Recommendation
 
 ---
 
@@ -88,15 +87,17 @@ flowchart TD
 
 ---
 
-### 🛡️ Phase 4: Risk Officer & Portfolio Health Advisory
+### 🛡️ Phase 4: Risk Officer & Portfolio Health Advisory (Completed ✅)
 > **เป้าหมาย:** ระบบตรวจสอบความเสี่ยงพอร์ตและให้คำแนะนำในการจัดขนาดสถานะการลงทุน (Position Sizing)
 
-- [ ] **Portfolio Risk Audit Engine (`backend/src/portfolioUtils.ts`)**
-  - [ ] ตรวจจับ Concentration Risk (มีหุ้นรายตัว หรือกลุ่มอุตสาหกรรมใดเกินเกณฑ์ % พอร์ต)
-  - [ ] ตรวจจับ Correlation Risk (หุ้นในพอร์ตเคลื่อนไหวไปในทิศทางเดียวกันมากเกินไป)
-- [ ] **Risk Advisor Component**
-  - [ ] แสดงข้อแนะนำเมื่อผู้ใช้เปิดดูพอร์ต เช่น *"Warning: Tech Sector สัดส่วนแตะ 42% เกินระดับปลอดภัยที่ 30%"*
-  - [ ] ให้คำแนะนำ Position Sizing ที่เหมาะสมก่อนเข้าซื้อตามหลัก Kelly Criterion หรือ Fixed Risk %
+- [x] **Portfolio Risk Audit Engine (`packages/shared/src/portfolioRisk.ts`, `backend/src/portfolioRisk.ts`)**
+  - [x] ตรวจจับ Concentration Risk (8% Target Weight, 15% Single-Stock Cap, 30% Strictest Theme Cap, HHI & Effective Positions)
+  - [x] ตรวจจับ Correlation Risk & Market Sensitivity (252-day Pearson correlation pairs `r >= 0.70` และ Portfolio Beta vs `^GSPC`)
+  - [x] คำนวณ Portfolio Health Score (0-100) พร้อมรายละเอียดการหักคะแนนตามระดับความเสี่ยง
+- [x] **Risk Advisor Component & MCP Integration (`frontend/src/components/features/portfolio/RiskSizingTab.tsx`, `ThemeDonutChart.tsx`, `mcp-worker/src/riskTools.ts`)**
+  - [x] แสดงแดชบอร์ด KPI, ตาราง Concentration & Sizing Capacity, และ Interactive Theme Donut Chart (120 FPS micro-interactions)
+  - [x] Position Sizing & Pre-Trade Simulator คำนวณ Room to Target (8%), Stock Cap (15%), Strictest Theme Cap (30%) และจำลองผลกระทบก่อนเทรด
+  - [x] ระบบ AI Risk Officer Advisory (Howard Marks Framework) รองรับทั้ง Cloudflare Workers AI และ Gemini App ผ่าน MCP (`get_portfolio_risk_audit`, `calculate_position_size`, `save_risk_advisory`)
 
 ---
 

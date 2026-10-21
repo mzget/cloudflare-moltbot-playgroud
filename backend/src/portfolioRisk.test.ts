@@ -86,6 +86,30 @@ describe('portfolioRisk engine', () => {
       expect(audit.top3ConcentrationPct).toBeCloseTo(90, 2); // 55 + 20 + 15 = 90
     });
 
+    it('includes unused themes with 0 open holdings with zero weight and status ok', () => {
+      const mappingsWithUnused: readonly ThemeMappingInput[] = [
+        ...mockThemeMappings,
+        { symbol: 'INTC', themeName: 'Legacy Computing', notebookId: 'nb-unused' },
+        { symbol: '', themeName: 'Empty Unused Theme', notebookId: 'nb-empty' },
+      ];
+      const audit = computeConcentrationAudit(mockHoldings, mappingsWithUnused, DEFAULT_RISK_CONFIG);
+
+      const legacy = audit.themeExposures.find(t => t.themeName === 'Legacy Computing');
+      expect(legacy).toBeDefined();
+      expect(legacy?.marketValueUsd).toBe(0);
+      expect(legacy?.weightPct).toBe(0);
+      expect(legacy?.status).toBe('ok');
+      expect(legacy?.symbols).toEqual(['INTC']);
+      expect(legacy?.roomToCapUsd).toBe(30000);
+
+      const emptyTheme = audit.themeExposures.find(t => t.themeName === 'Empty Unused Theme');
+      expect(emptyTheme).toBeDefined();
+      expect(emptyTheme?.marketValueUsd).toBe(0);
+      expect(emptyTheme?.weightPct).toBe(0);
+      expect(emptyTheme?.status).toBe('ok');
+      expect(emptyTheme?.symbols).toEqual([]);
+    });
+
     it('handles empty portfolio gracefully', () => {
       const audit = computeConcentrationAudit([], [], DEFAULT_RISK_CONFIG);
       expect(audit.totalStockPortfolioUsd).toBe(0);

@@ -52,18 +52,18 @@ export async function loadPortfolioRiskData(
     status: r.status,
   }));
 
-  // 2. Themes from theme_symbol_mappings and theme_sector_contexts
+  // 2. Themes from theme_sector_contexts and theme_symbol_mappings
   const themesResult = await db.prepare(`
     SELECT 
       m.symbol,
-      m.notebook_id,
+      c.notebook_id,
       c.theme_name
-    FROM theme_symbol_mappings m
-    JOIN theme_sector_contexts c ON m.notebook_id = c.notebook_id
+    FROM theme_sector_contexts c
+    LEFT JOIN theme_symbol_mappings m ON c.notebook_id = m.notebook_id
   `).all();
 
   const themeMappings: ThemeMappingInput[] = ((themesResult.results || []) as any[]).map(r => ({
-    symbol: r.symbol,
+    symbol: r.symbol || '',
     themeName: r.theme_name,
     notebookId: r.notebook_id,
   }));
@@ -458,6 +458,44 @@ Provide your Risk Officer Advisory in the specified JSON format.`;
   } catch (error: any) {
     console.error('[RiskAdvisory] Error running AI risk audit:', error);
     return c.json({ error: error.message || 'Failed to run AI risk audit' }, 500);
+  }
+});
+
+// DELETE /api/portfolio/themes/:name
+risk.delete('/api/portfolio/themes/:name', async (c) => {
+  const rawName = c.req.param('name');
+  if (!rawName || !rawName.trim()) {
+    return c.json({ error: 'Theme name is required' }, 400);
+  }
+
+  const themeName = decodeURIComponent(rawName).trim();
+
+  try {
+    const deleteMappingsSql = `
+      DELETE FROM theme_symbol_mappings
+      WHERE notebook_id IN (
+        SELECT notebook_id FROM theme_sector_contexts WHERE LOWER(TRIM(theme_name)) = LOWER(TRIM(?))
+      )
+    `;
+    const deleteContextSql = `
+      DELETE FROM theme_sector_contexts
+      WHERE LOWER(TRIM(theme_name)) = LOWER(TRIM(?))
+    `;
+
+    if (typeof c.env.DB.batch === 'function') {
+      await c.env.DB.batch([
+        c.env.DB.prepare(deleteMappingsSql).bind(themeName),
+        c.env.DB.prepare(deleteContextSql).bind(themeName),
+      ]);
+    } else {
+      await c.env.DB.prepare(deleteMappingsSql).bind(themeName).run();
+      await c.env.DB.prepare(deleteContextSql).bind(themeName).run();
+    }
+
+    return c.json({ success: true, deletedTheme: themeName });
+  } catch (error: any) {
+    console.error('[DeleteTheme] Error deleting theme:', error);
+    return c.json({ error: error.message || 'Failed to delete theme' }, 500);
   }
 });
 
