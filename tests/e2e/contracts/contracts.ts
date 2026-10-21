@@ -191,15 +191,15 @@ export function serializeToOkfMarkdown(data: {
     lines.push("");
   }
 
-  return lines.join("\n");
+  return lines.join("\r\n");
 }
 
 export function parseOkfMarkdown(content: string) {
-  const frontmatterMatch = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
+  const frontmatterMatch = content.match(/^---\r?\r\n([\s\S]*?)\r?\r\n---\r?\r\n([\s\S]*)$/);
   if (!frontmatterMatch) {
     return { frontmatter: {}, body: content };
   }
-  const fmLines = frontmatterMatch[1].split("\n");
+  const fmLines = frontmatterMatch[1].split("\r\n");
   const frontmatter: Record<string, string> = {};
   for (const line of fmLines) {
     const colonIdx = line.indexOf(":");
@@ -220,6 +220,28 @@ export class InMemoryD1Database {
   stockFundamentals = new Map<string, StockFundamentalRecord>();
   themeSectorContexts = new Map<string, ThemeSectorContextRecord>();
   themeSymbolMappings: ThemeSymbolMappingRecord[] = [];
+  holdings: Array<{
+    symbol: string;
+    shares: number;
+    avg_cost?: number;
+    total_cost?: number;
+    status: string;
+  }> = [];
+  watchlist: Array<{
+    symbol: string;
+    name?: string;
+    sector_label?: string;
+  }> = [];
+  marketStats: Array<{
+    symbol: string;
+    price?: number;
+    previous_close?: number;
+  }> = [];
+  dcfCalculations: Array<{
+    symbol: string;
+    scenario_name?: string;
+    implied_share_price?: number;
+  }> = [];
 
   indices = {
     idx_stock_fundamentals_as_of_date: true,
@@ -365,6 +387,36 @@ class PreparedStatement {
       return { success: true, meta: { changes: deleted ? 1 : 0 } };
     }
 
+    // 4b. Delete from theme_symbol_mappings where notebook_id IN (SELECT notebook_id FROM theme_sector_contexts...)
+    if (/DELETE\s+FROM\s+theme_symbol_mappings[\s\S]*WHERE\s+notebook_id\s+IN/i.test(trimmed)) {
+      const [themeName] = this.boundArgs as [string];
+      const targetName = (themeName || '').trim().toLowerCase();
+      const targetNbIds = new Set<string>();
+      for (const [nbId, rec] of this.db.themeSectorContexts.entries()) {
+        if ((rec.theme_name || '').trim().toLowerCase() === targetName) {
+          targetNbIds.add(nbId);
+        }
+      }
+      const initial = this.db.themeSymbolMappings.length;
+      this.db.themeSymbolMappings = this.db.themeSymbolMappings.filter(m => !targetNbIds.has(m.notebook_id));
+      return { success: true, meta: { changes: initial - this.db.themeSymbolMappings.length } };
+    }
+
+    // 4c. Delete from theme_sector_contexts where LOWER(TRIM(theme_name)) = LOWER(TRIM(?))
+    if (/DELETE\s+FROM\s+theme_sector_contexts[\s\S]*WHERE[\s\S]*theme_name/i.test(trimmed)) {
+      const [themeName] = this.boundArgs as [string];
+      const targetName = (themeName || '').trim().toLowerCase();
+      let deletedCount = 0;
+      for (const [nbId, rec] of Array.from(this.db.themeSectorContexts.entries())) {
+        if ((rec.theme_name || '').trim().toLowerCase() === targetName) {
+          this.db.themeSectorContexts.delete(nbId);
+          this.db.themeSymbolMappings = this.db.themeSymbolMappings.filter(m => m.notebook_id !== nbId);
+          deletedCount++;
+        }
+      }
+      return { success: true, meta: { changes: deletedCount } };
+    }
+
     // 5. Insert into theme_symbol_mappings
     if (/INSERT\s+INTO\s+theme_symbol_mappings/i.test(trimmed)) {
       const [notebook_id, symbol] = this.boundArgs as [string, string];
@@ -383,6 +435,19 @@ class PreparedStatement {
         notebook_id,
         symbol,
         created_at: new Date().toISOString(),
+      });
+      return { success: true, meta: { changes: 1 } };
+    }
+
+    // 6. Insert into holdings
+    if (/INSERT[\s\S]*INTO\s+holdings/is.test(trimmed)) {
+      const [symbol, shares, avg_cost, total_cost, status] = this.boundArgs as any[];
+      this.db.holdings.push({
+        symbol: (symbol || '').toUpperCase(),
+        shares: Number(shares) || 0,
+        avg_cost: avg_cost !== undefined ? Number(avg_cost) : undefined,
+        total_cost: total_cost !== undefined ? Number(total_cost) : undefined,
+        status: status || 'open',
       });
       return { success: true, meta: { changes: 1 } };
     }
@@ -436,6 +501,22 @@ class PreparedStatement {
       return { results: match ? ([match] as unknown as T[]) : [] };
     }
 
+    // Query all theme sector contexts with LEFT JOIN theme_symbol_mappings (for Risk Concentration Audit)
+    if (/FROM\s+theme_sector_contexts[\s\S]*LEFT\s+JOIN\s+theme_symbol_mappings/is.test(trimmed)) {
+      const results: any[] = [];
+      for (const [nbId, context] of this.db.themeSectorContexts.entries()) {
+        const mappings = this.db.themeSymbolMappings.filter(m => m.notebook_id === nbId);
+        if (mappings.length > 0) {
+          for (const m of mappings) {
+            results.push({ symbol: m.symbol, notebook_id: nbId, theme_name: context.theme_name });
+          }
+        } else {
+          results.push({ symbol: null, notebook_id: nbId, theme_name: context.theme_name });
+        }
+      }
+      return { results: results as unknown as T[] };
+    }
+
     // Query theme sector contexts joined for symbol
     if (/FROM\s+theme_sector_contexts[\s\S]*JOIN\s+theme_symbol_mappings/is.test(trimmed)) {
       const [symbol] = this.boundArgs as [string];
@@ -454,6 +535,33 @@ class PreparedStatement {
     if (/SELECT[\s\S]*FROM\s+stock_fundamentals/is.test(trimmed)) {
       const all = Array.from(this.db.stockFundamentals.values());
       return { results: all as unknown as T[] };
+    }
+
+    // Query holdings with joins for loadPortfolioRiskData
+    if (/FROM\s+holdings[\s\S]*WHERE/is.test(trimmed)) {
+      const results = this.db.holdings
+        .filter((h) => (h.status || '').toLowerCase() === 'open')
+        .map((h) => {
+          const w = this.db.watchlist.find((w) => w.symbol.toUpperCase() === h.symbol.toUpperCase());
+          const m = this.db.marketStats.find((m) => m.symbol.toUpperCase() === h.symbol.toUpperCase());
+          return {
+            symbol: h.symbol,
+            shares: h.shares,
+            avg_cost: h.avg_cost ?? 0,
+            total_cost: h.total_cost ?? (h.shares * (h.avg_cost ?? 0)),
+            status: h.status,
+            name: w?.name ?? h.symbol,
+            sector_label: w?.sector_label ?? null,
+            last_price: m?.price ?? null,
+            previous_close: m?.previous_close ?? null,
+          };
+        });
+      return { results: results as unknown as T[] };
+    }
+
+    // Query dcf_calculations
+    if (/FROM\s+dcf_calculations/is.test(trimmed)) {
+      return { results: this.db.dcfCalculations as unknown as T[] };
     }
 
     return { results: [] };
@@ -750,7 +858,7 @@ export function formatDebateContext(
   if (qualitative?.fundamental) {
     const f = qualitative.fundamental;
     const briefLines: string[] = [
-      `\n### 2. ข้อมูลเชิงคุณภาพและบทวิเคราะห์พื้นฐาน (Company Fundamental Brief) [As of: ${f.as_of_date}]:`,
+      `\r\n### 2. ข้อมูลเชิงคุณภาพและบทวิเคราะห์พื้นฐาน (Company Fundamental Brief) [As of: ${f.as_of_date}]:`,
       `- โมเดลธุรกิจ (Business Model): ${f.business_model || "N/A"}`,
       `- ปราการทางธุรกิจ (Economic Moat): ${f.moat || "N/A"}`
     ];
@@ -779,13 +887,13 @@ export function formatDebateContext(
       briefLines.push(`- ตัวชี้วัดวิทยานิพนธ์การลงทุน (Thesis KPIs): ${f.thesis_kpis.join("; ")}`);
     }
 
-    sections.push(briefLines.join("\n"));
+    sections.push(briefLines.join("\r\n"));
   }
 
   // Section 3: Sector & Competitive Dynamics
   if (qualitative?.themes && qualitative.themes.length > 0) {
     const themeLines: string[] = [
-      `\n### 3. บริบทอุตสาหกรรมและภาพรวมการแข่งขัน (Sector & Competitive Dynamics):`
+      `\r\n### 3. บริบทอุตสาหกรรมและภาพรวมการแข่งขัน (Sector & Competitive Dynamics):`
     ];
 
     qualitative.themes.forEach((t, idx) => {
@@ -796,12 +904,12 @@ export function formatDebateContext(
       if (t.macro_trends) themeLines.push(`   - แนวโน้มมหภาค: ${t.macro_trends}`);
     });
 
-    sections.push(themeLines.join("\n"));
+    sections.push(themeLines.join("\r\n"));
   }
 
   // Section 4: Recent Market Events
   if (events.length > 0) {
-    sections.push("\n### 4. ข่าวและเหตุการณ์สำคัญล่าสุด (Recent Market Events):");
+    sections.push("\r\n### 4. ข่าวและเหตุการณ์สำคัญล่าสุด (Recent Market Events):");
     events.forEach((ev, idx) => {
       sections.push(`${idx + 1}. [${ev.event_type.toUpperCase()}] ${ev.title} (${ev.event_date})${ev.description ? `: ${ev.description}` : ""}`);
     });
@@ -809,13 +917,13 @@ export function formatDebateContext(
 
   // Section 5: Research & Notes
   if (articles.length > 0) {
-    sections.push("\n### 5. บทวิเคราะห์และมุมมองสังเคราะห์ (Research & Notes):");
+    sections.push("\r\n### 5. บทวิเคราะห์และมุมมองสังเคราะห์ (Research & Notes):");
     articles.forEach((art, idx) => {
-      sections.push(`${idx + 1}. หัวข้อ: ${art.title}${art.summary ? `\nสรุป: ${art.summary}` : ""}`);
+      sections.push(`${idx + 1}. หัวข้อ: ${art.title}${art.summary ? `\r\nสรุป: ${art.summary}` : ""}`);
     });
   }
 
-  return sections.join("\n");
+  return sections.join("\r\n");
 }
 
 // ============================================================================
@@ -824,15 +932,15 @@ export function formatDebateContext(
 
 export function getBullOpeningPrompt(symbol: string, contextStr: string) {
   return {
-    system: `คุณคือ Bullish Researcher Agent (นักวิเคราะห์ฝั่งกระทิง) ตามแนวทาง TradingAgents ทำหน้าที่สร้างข้อถกเถียงเชิงบวกและโอกาสเติบโต (Long Thesis) ที่แข็งแกร่งและสมเหตุสมผลที่สุดสำหรับหุ้น ${symbol} โดยต้องอ้างอิงและ Grounding ข้อมูลจากตัวเลขการเงิน เป้าหมายการชี้นำของผู้บริหาร (Management Guidance) ความได้เปรียบทางธุรกิจ (Moat) และตัวชี้วัด Thesis KPIs\n\nคำสั่ง: ห้ามใช้เครื่องหมาย double quote ซ้อนภายในข้อความ และตอบเป็นรูปแบบ JSON เท่านั้น โดยมีโครงสร้างดังนี้:\n{\n  "bull_thesis": "บทสรุปมุมมองกระทิงและวิทยานิพนธ์การลงทุนเชิงรุก 2-3 ประโยค",\n  "growth_catalysts": ["ปัจจัยเร่งการเติบโตข้อ 1 พร้อมตัวเลขสนับสนุน", "ปัจจัยเร่งข้อ 2"],\n  "competitive_advantages": ["ความได้เปรียบในการแข่งขันหรือการขยาย Moat ข้อ 1", "ข้อ 2"],\n  "valuation_upside": "การประเมินโอกาสที่ราคาจะปรับตัวขึ้นหรือข้อได้เปรียบเชิงมูลค่า"\n}`,
-    prompt: `ข้อมูลหุ้น ${symbol}:\n${contextStr}`
+    system: `คุณคือ Bullish Researcher Agent (นักวิเคราะห์ฝั่งกระทิง) ตามแนวทาง TradingAgents ทำหน้าที่สร้างข้อถกเถียงเชิงบวกและโอกาสเติบโต (Long Thesis) ที่แข็งแกร่งและสมเหตุสมผลที่สุดสำหรับหุ้น ${symbol} โดยต้องอ้างอิงและ Grounding ข้อมูลจากตัวเลขการเงิน เป้าหมายการชี้นำของผู้บริหาร (Management Guidance) ความได้เปรียบทางธุรกิจ (Moat) และตัวชี้วัด Thesis KPIs\r\n\r\nคำสั่ง: ห้ามใช้เครื่องหมาย double quote ซ้อนภายในข้อความ และตอบเป็นรูปแบบ JSON เท่านั้น โดยมีโครงสร้างดังนี้:\r\n{\r\n  "bull_thesis": "บทสรุปมุมมองกระทิงและวิทยานิพนธ์การลงทุนเชิงรุก 2-3 ประโยค",\r\n  "growth_catalysts": ["ปัจจัยเร่งการเติบโตข้อ 1 พร้อมตัวเลขสนับสนุน", "ปัจจัยเร่งข้อ 2"],\r\n  "competitive_advantages": ["ความได้เปรียบในการแข่งขันหรือการขยาย Moat ข้อ 1", "ข้อ 2"],\r\n  "valuation_upside": "การประเมินโอกาสที่ราคาจะปรับตัวขึ้นหรือข้อได้เปรียบเชิงมูลค่า"\r\n}`,
+    prompt: `ข้อมูลหุ้น ${symbol}:\r\n${contextStr}`
   };
 }
 
 export function getBearOpeningPrompt(symbol: string, contextStr: string) {
   return {
-    system: `คุณคือ Bearish Researcher Agent (นักวิเคราะห์ฝั่งหมี) ตามแนวทาง TradingAgents ทำหน้าที่ท้าทายและค้นหาจุดอ่อน ความเสี่ยง และ downside scenario (Short/Skeptical Thesis) ที่อันตรายที่สุดสำหรับหุ้น ${symbol} โดยใช้หลัก Inversion Thinking และอ้างอิงตัวเลขจริง ปัจจัยความเสี่ยงเชิงลึก (Key Risks) และอุปสรรคเชิงโครงสร้าง (Structural Headwinds)\n\nคำสั่ง: ห้ามใช้เครื่องหมาย double quote ซ้อนภายในข้อความ และตอบเป็นรูปแบบ JSON เท่านั้น โดยมีโครงสร้างดังนี้:\n{\n  "bear_thesis": "บทสรุปมุมมองหมีและวิทยานิพนธ์ความเสี่ยงเชิงลึก 2-3 ประโยค",\n  "downside_risks": ["ความเสี่ยงและจุดเปราะบางข้อ 1 พร้อมตัวเลขสนับสนุน", "ความเสี่ยงข้อ 2"],\n  "structural_headwinds": ["อุปสรรคเชิงโครงสร้างหรือการแข่งขันที่รุนแรงขึ้นข้อ 1", "ข้อ 2"],\n  "valuation_stretch": "การประเมินความตึงตัวของ Valuation หรือโอกาสเกิด Permanent Capital Loss"\n}`,
-    prompt: `ข้อมูลหุ้น ${symbol}:\n${contextStr}`
+    system: `คุณคือ Bearish Researcher Agent (นักวิเคราะห์ฝั่งหมี) ตามแนวทาง TradingAgents ทำหน้าที่ท้าทายและค้นหาจุดอ่อน ความเสี่ยง และ downside scenario (Short/Skeptical Thesis) ที่อันตรายที่สุดสำหรับหุ้น ${symbol} โดยใช้หลัก Inversion Thinking และอ้างอิงตัวเลขจริง ปัจจัยความเสี่ยงเชิงลึก (Key Risks) และอุปสรรคเชิงโครงสร้าง (Structural Headwinds)\r\n\r\nคำสั่ง: ห้ามใช้เครื่องหมาย double quote ซ้อนภายในข้อความ และตอบเป็นรูปแบบ JSON เท่านั้น โดยมีโครงสร้างดังนี้:\r\n{\r\n  "bear_thesis": "บทสรุปมุมมองหมีและวิทยานิพนธ์ความเสี่ยงเชิงลึก 2-3 ประโยค",\r\n  "downside_risks": ["ความเสี่ยงและจุดเปราะบางข้อ 1 พร้อมตัวเลขสนับสนุน", "ความเสี่ยงข้อ 2"],\r\n  "structural_headwinds": ["อุปสรรคเชิงโครงสร้างหรือการแข่งขันที่รุนแรงขึ้นข้อ 1", "ข้อ 2"],\r\n  "valuation_stretch": "การประเมินความตึงตัวของ Valuation หรือโอกาสเกิด Permanent Capital Loss"\r\n}`,
+    prompt: `ข้อมูลหุ้น ${symbol}:\r\n${contextStr}`
   };
 }
 
@@ -899,7 +1007,7 @@ export function generateGeminiExtractionPrompt(symbol: string): string {
     "```",
     "",
     "**Strict Requirement**: Derive `as_of_date` strictly from the document publication date. Do NOT invent dates."
-  ].join("\n");
+  ].join("\r\n");
 }
 
 // ============================================================================
@@ -1005,4 +1113,36 @@ export async function handleGetFundamentalBySymbol(
     status: 200,
     data: { fundamental, themes }
   };
+}
+
+// ============================================================================
+// 11. Portfolio Risk Theme Deletion Contract
+// ============================================================================
+
+export async function handleDeleteTheme(
+  db: InMemoryD1Database,
+  rawThemeName: string
+): Promise<{ status: number; error?: string; success?: boolean; deletedTheme?: string }> {
+  if (!rawThemeName || !rawThemeName.trim()) {
+    return { status: 400, error: 'Theme name is required' };
+  }
+
+  const themeName = decodeURIComponent(rawThemeName).trim();
+  const deleteMappingsSql = `
+    DELETE FROM theme_symbol_mappings
+    WHERE notebook_id IN (
+      SELECT notebook_id FROM theme_sector_contexts WHERE LOWER(TRIM(theme_name)) = LOWER(TRIM(?))
+    )
+  `;
+  const deleteContextSql = `
+    DELETE FROM theme_sector_contexts
+    WHERE LOWER(TRIM(theme_name)) = LOWER(TRIM(?))
+  `;
+
+  await db.batch([
+    db.prepare(deleteMappingsSql).bind(themeName),
+    db.prepare(deleteContextSql).bind(themeName),
+  ]);
+
+  return { status: 200, success: true, deletedTheme: themeName };
 }

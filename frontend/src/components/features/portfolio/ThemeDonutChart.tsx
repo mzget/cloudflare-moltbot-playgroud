@@ -233,13 +233,15 @@ export default function ThemeDonutChart({
   }
 
   // Geometry computation directly matching the user's example
+  // Geometry computation directly matching the user's example
   const outerRadius = 125;
   const innerRadius = 88; // Balanced 37px thickness
   const labelRadius = 146;
-  const gap = items.length > 1 ? 0.035 : 0;
+  const activeSlices = items.filter(i => i.weightPct > 0);
+  const gap = activeSlices.length > 1 ? 0.035 : 0;
 
   let currentAngle = -Math.PI / 2;
-  const slices = items.map((item) => {
+  const slices = activeSlices.map((item) => {
     const pct = Math.max(0, item.weightPct);
     const sliceAngle = (pct / 100) * (Math.PI * 2);
     const startAngle = currentAngle + gap / 2;

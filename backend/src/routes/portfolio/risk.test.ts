@@ -13,6 +13,7 @@ describe('Risk Routes & Portfolio Risk Logic', () => {
     throwOnAdvisoryInsert?: boolean;
   } = {}) => {
     return {
+      batch: vi.fn().mockImplementation((stmts: any[]) => Promise.resolve(stmts.map(() => ({ meta: {} })))),
       prepare: vi.fn((sql: string) => {
         if (options.throwOnHoldings && sql.includes('FROM holdings h')) {
           throw new Error('D1 Query Failed');
@@ -28,7 +29,7 @@ describe('Risk Routes & Portfolio Risk Logic', () => {
             })
           };
         }
-        if (sql.includes('FROM theme_symbol_mappings m')) {
+        if (sql.includes('FROM theme_symbol_mappings m') || sql.includes('FROM theme_sector_contexts c')) {
           return {
             all: vi.fn().mockResolvedValue({
               results: options.themes ?? [
@@ -347,6 +348,57 @@ describe('Risk Routes & Portfolio Risk Logic', () => {
 
       const json = await res.json() as any;
       expect(json.error).toContain('Workers AI model overloaded');
+    });
+  });
+  describe('DELETE /api/portfolio/themes/:name', () => {
+    it('deletes theme and its mappings via atomic batch', async () => {
+      const mockDb = createMockDb();
+      const mockEnv = createMockEnv(mockDb);
+
+      const res = await risk.request(
+        '/api/portfolio/themes/AI%20%26%20Cloud%20Infrastructure',
+        { method: 'DELETE' },
+        mockEnv
+      );
+
+      expect(res.status).toBe(200);
+      const json = await res.json() as any;
+      expect(json.success).toBe(true);
+      expect(json.deletedTheme).toBe('AI & Cloud Infrastructure');
+      expect(mockDb.batch).toHaveBeenCalledTimes(1);
+    });
+
+    it('falls back to individual queries if batch is not available', async () => {
+      const mockDb = createMockDb() as any;
+      delete mockDb.batch;
+      const mockEnv = createMockEnv(mockDb);
+
+      const res = await risk.request(
+        '/api/portfolio/themes/Consumer%20Tech',
+        { method: 'DELETE' },
+        mockEnv
+      );
+
+      expect(res.status).toBe(200);
+      const json = await res.json() as any;
+      expect(json.success).toBe(true);
+      expect(json.deletedTheme).toBe('Consumer Tech');
+    });
+
+    it('returns 500 when database throws during deletion', async () => {
+      const mockDb = createMockDb();
+      (mockDb as any).batch = vi.fn().mockRejectedValue(new Error('D1 Delete Failed'));
+      const mockEnv = createMockEnv(mockDb);
+
+      const res = await risk.request(
+        '/api/portfolio/themes/Faulty%20Theme',
+        { method: 'DELETE' },
+        mockEnv
+      );
+
+      expect(res.status).toBe(500);
+      const json = await res.json() as any;
+      expect(json.error).toContain('D1 Delete Failed');
     });
   });
 });

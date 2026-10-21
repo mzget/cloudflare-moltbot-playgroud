@@ -175,18 +175,23 @@ export function computeConcentrationAudit(
   const themeSymbolsMap = new Map<string, Set<string>>();
 
   for (const tm of themeMappings) {
-    if (!symbolThemesMap.has(tm.symbol)) {
-      symbolThemesMap.set(tm.symbol, []);
-    }
-    const themes = symbolThemesMap.get(tm.symbol)!;
-    if (!themes.includes(tm.themeName)) {
-      themes.push(tm.themeName);
+    if (tm.symbol && tm.symbol.trim()) {
+      const sym = tm.symbol.trim();
+      if (!symbolThemesMap.has(sym)) {
+        symbolThemesMap.set(sym, []);
+      }
+      const themes = symbolThemesMap.get(sym)!;
+      if (!themes.includes(tm.themeName)) {
+        themes.push(tm.themeName);
+      }
     }
 
     if (!themeSymbolsMap.has(tm.themeName)) {
       themeSymbolsMap.set(tm.themeName, new Set());
     }
-    themeSymbolsMap.get(tm.themeName)!.add(tm.symbol);
+    if (tm.symbol && tm.symbol.trim()) {
+      themeSymbolsMap.get(tm.themeName)!.add(tm.symbol.trim());
+    }
   }
 
   // Build stock concentrations
@@ -235,8 +240,6 @@ export function computeConcentrationAudit(
       .filter(h => symbolsSet.has(h.symbol))
       .map(h => h.symbol);
 
-    if (openSymbolsInTheme.length === 0) continue;
-
     openSymbolsInTheme.forEach(s => coveredSymbols.add(s));
 
     const themeValueUsd = openSymbolsInTheme.reduce(
@@ -264,7 +267,7 @@ export function computeConcentrationAudit(
       marketValueUsd: themeValueUsd,
       weightPct,
       status,
-      symbols: openSymbolsInTheme,
+      symbols: openSymbolsInTheme.length > 0 ? openSymbolsInTheme : Array.from(symbolsSet),
       roomToCapUsd,
       isUnassigned: false,
     });
