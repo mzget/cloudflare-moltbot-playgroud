@@ -1,4 +1,4 @@
-import { fmtNum, fmtPct, fmtShares, gainClass } from '../../../utils/format';
+﻿import { fmtNum, fmtPct, fmtShares, gainClass } from '../../../utils/format';
 import * as React from 'react';
 import {
   Box,

@@ -107,3 +107,20 @@
 
 
 
+
+
+## Stock Financial Overview Subsystem
+
+### Terms & Concepts
+
+- **Company Statistics Matrix**:
+  ตารางข้อมูลสถิติและอัตราส่วนทางการเงินเชิงลึก 3 คอลัมน์ (Profile & Margins, Valuation & Financial Health, Growth & Dividends) ที่คัดเลือกเฉพาะตัวชี้วัดที่มีข้อมูลจริงจาก Finnhub Financial Metrics, Yahoo Finance และ Oaktree D1 โดยตัด consensus projections ที่ไม่มีข้อมูลออกเพื่อป้องกันเครื่องหมายขีด `—` ว่างเปล่า
+
+- **5-Metric Financial Performance Chart**:
+  กราฟแท่งเปรียบเทียบผลการดำเนินงาน 5 ตัวชี้วัดสำคัญของบริษัท ได้แก่ Total Revenues, Gross Profit, Operating Profit, Cash from Operations, และ Free Cash Flow พร้อมตัวเลขกำกับบน/ใต้แท่งกราฟ และเส้นแสดงจุดตัดแกนศูนย์สำหรับค่าติดลบ
+
+- **Time-Series Period Accumulation (`mergeFinancialPeriods`)**:
+  กระบวนการสะสมและรวมข้อมูลอนุกรมเวลารายไตรมาส (Quarterly) และรายปี (Annual) บันทึกลงคอลัมน์ `overview_json` ในตาราง `market_stats` เพื่อแก้ข้อจำกัดของ API ภายนอกที่คืนข้อมูลเพียง 4-5 คาบเวลาล่าสุด และเป็น Fallback ในกรณีที่ API ภายนอกขัดข้อง
+
+- **Millions USD Unit Normalization**:
+  มาตรฐานการแปลงหน่วยข้อมูลตัวเลขทางการเงินให้อยู่ในหน่วยล้านดอลลาร์สหรัฐ ($M) ในฝั่ง Backend ก่อนส่งให้ Frontend และก่อนบันทึกลง D1 เพื่อกำจัดข้อผิดพลาดความไม่สอดคล้องของสเกลตัวเลข (1,000x / 1,000,000x) ระหว่าง Yahoo Finance (Raw USD) และ Finnhub (Millions USD)

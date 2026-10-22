@@ -1,10 +1,30 @@
-import { Hono } from 'hono';
+﻿import { Hono } from 'hono';
 import type { AppEnv } from '../env';
 import { runFullAnalysis, getOrUpdateMarketStats } from '../analysisEngine';
 import { runDialecticalDebate, getStoredDebate } from '../debateEngine';
 import { formatMetricsForPrompt } from '../analysisPrompts';
 
+import { fetchFinancialOverview } from '../stockOverview';
+
 const analysis = new Hono<AppEnv>();
+
+// API: Stock Financial Overview
+// GET /api/analysis/overview?symbol=XYZ&refresh=false
+analysis.get('/api/analysis/overview', async (c) => {
+  const symbol = c.req.query('symbol');
+  if (!symbol) {
+    return c.json({ error: 'symbol query parameter is required' }, 400);
+  }
+  const refresh = c.req.query('refresh') === 'true';
+  try {
+    const data = await fetchFinancialOverview(c.env, symbol, refresh);
+    return c.json(data);
+  } catch (e: any) {
+    const errorMsg = e?.message || String(e || 'Unknown error');
+    console.error(`Failed to fetch financial overview for ${symbol}: ${errorMsg}`, e?.stack || e);
+    return c.json({ error: errorMsg }, 500);
+  }
+});
 
 
 // API: Value Investor Deep Analysis
