@@ -50,6 +50,18 @@
 
 ### Data Structure & Integration
 1. **Endpoint:** `GET /api/analysis/overview?symbol=XYZ&refresh=false`
-2. **Cache Rule:** แคชใน D1 นาน 6 ชั่วโมง หากเรียกซ้ำภายใน 6 ชั่วโมง (และไม่ได้ระบุ `refresh=true`) จะส่งข้อมูลจาก D1 ทันที
-3. **Database Migration:** `0044_add_overview_cache_to_market_stats.sql` เพิ่มคอลัมน์ `overview_json TEXT` และ `overview_updated_at TEXT` ใน `market_stats`
-4. **UI Styling:** ใช้ MUI Joy UI components ร่วมกับ `glassStyle` ตาม Oaktree Frontend Guidelines (ไม่มีการใช้ Tailwind CSS)
+2. **Data Sources Specification:**
+   - **Yahoo Finance Timeseries API (`query1.finance.yahoo.com`):**
+     - Quarterly Timeseries (`quarterlyTotalRevenue`, `quarterlyGrossProfit`, `quarterlyOperatingIncome`, `quarterlyOperatingCashFlow`, `quarterlyFreeCashFlow`) สะสมได้สูงสุด 8 ไตรมาส
+     - Annual Timeseries (`annualTotalRevenue`, `annualGrossProfit`, `annualOperatingIncome`, `annualOperatingCashFlow`, `annualFreeCashFlow`) สะสมได้สูงสุด 6 ปี
+     - Backend Normalization แปลงค่า raw USD เป็น Millions USD ($M)
+   - **Finnhub REST API (`finnhub.io`):**
+     - `/stock/metric?metric=all`: Margins (Gross/EBITDA/Op/Pre-tax/Net), Returns (ROA/ROE/ROI 5Y), Multiples (P/E, P/B, P/S, EV/EBITDA, Forward P/E, PEG), Financial Health (Debt/Equity, Current Ratio, Interest Coverage), Growth & Dividends (CAGR 3Y/5Y, Dividend Yield, Payout Ratio)
+     - `/stock/profile2`: Company profile (Name, Logo, Industry, Exchange, IPO Date)
+     - `/quote`: ราคาหุ้นปัจจุบัน (`c`)
+   - **Internal D1 Database:**
+     - `market_stats`: สถิติราคาและขนาดบริษัท (Market Cap, EV, Shares Out, 52W High/Low, ATH/ATL, FCF Margin, Total Cash/Debt, R&D/Rev, CapEx/OCF)
+     - `dcf_calculations`: ค่า `implied_share_price` จาก Base Case ล่าสุด คำนวณเป็น DCF Base Value และ Margin of Safety (%)
+3. **Cache Rule:** แคชใน D1 นาน 6 ชั่วโมง หากเรียกซ้ำภายใน 6 ชั่วโมง (และไม่ได้ระบุ `refresh=true`) จะส่งข้อมูลจาก D1 ทันที
+4. **Database Migration:** `0044_add_overview_cache_to_market_stats.sql` เพิ่มคอลัมน์ `overview_json TEXT` และ `overview_updated_at TEXT` ใน `market_stats`
+5. **UI Styling:** ใช้ MUI Joy UI components ร่วมกับ `glassStyle` ตาม Oaktree Frontend Guidelines (ไม่มีการใช้ Tailwind CSS)
