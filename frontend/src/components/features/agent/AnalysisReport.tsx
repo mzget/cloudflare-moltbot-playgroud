@@ -1,6 +1,7 @@
-import * as React from 'react';
+﻿import * as React from 'react';
 import { Box, Button, Typography, Sheet, CircularProgress, Divider, Stack, Tabs, TabList, Tab, Select, Option } from '@mui/joy';
-import { ArrowLeft, RotateCw, CheckCircle, AlertTriangle, Play, FileText, Calculator, BookOpen, TrendingUp } from 'lucide-react';
+import { ArrowLeft, RotateCw, CheckCircle, AlertTriangle, Play, FileText, Calculator, BookOpen, TrendingUp, BarChart3 } from 'lucide-react';
+import StockOverview from './StockOverview';
 import StockThesis from './StockThesis';
 import { useNavigate } from '@tanstack/react-router';
 import { API_BASE_URL } from '../../../config';
@@ -23,7 +24,7 @@ export default function AnalysisReport({ symbol, onBack, subTab }: AnalysisRepor
   const [analyzing, setAnalyzing] = React.useState(false);
   const [report, setReport] = React.useState<any>(null);
   const [error, setError] = React.useState<string | null>(null);
-  const activeToolTab = subTab === 'dcf-model' ? 1 : subTab === 'stock-thesis' ? 2 : 0;
+  const activeToolTab = subTab === 'report' ? 1 : subTab === 'dcf-model' ? 2 : subTab === 'stock-thesis' ? 3 : 0;
 
   const [symbolsList, setSymbolsList] = React.useState<string[]>(['MSFT', 'AAPL', 'NVDA', 'GOOGL', 'AMZN', 'META', 'TSLA']);
 
@@ -247,7 +248,7 @@ export default function AnalysisReport({ symbol, onBack, subTab }: AnalysisRepor
           onChange={(_, val) => {
             navigate({
               to: '/analysis',
-              search: { symbol, tab: val === 2 ? 'stock-thesis' : val === 1 ? 'dcf-model' : 'report' },
+              search: { symbol, tab: (['overview', 'report', 'dcf-model', 'stock-thesis'] as const)[val as number] || 'overview' },
             });
           }}
           sx={{ bgcolor: 'transparent' }}
@@ -281,6 +282,10 @@ export default function AnalysisReport({ symbol, onBack, subTab }: AnalysisRepor
             }}
           >
             <Tab disableIndicator>
+              <BarChart3 size={15} />
+              Overview
+            </Tab>
+            <Tab disableIndicator>
               <FileText size={15} />
               Report
             </Tab>
@@ -301,7 +306,8 @@ export default function AnalysisReport({ symbol, onBack, subTab }: AnalysisRepor
           value={symbol}
           onChange={(_, val) => {
             if (val && val !== symbol) {
-              const currentTabName = (subTab || (activeToolTab === 2 ? 'stock-thesis' : activeToolTab === 1 ? 'dcf-model' : 'report')) as 'report' | 'dcf-model' | 'stock-thesis';
+              const tabNames = ['overview', 'report', 'dcf-model', 'stock-thesis'] as const;
+              const currentTabName = (subTab || tabNames[activeToolTab] || 'overview') as 'overview' | 'report' | 'dcf-model' | 'stock-thesis';
               navigate({
                 to: '/analysis',
                 search: { symbol: val, tab: currentTabName },
@@ -338,9 +344,10 @@ export default function AnalysisReport({ symbol, onBack, subTab }: AnalysisRepor
       </Stack>
 
       {/* Tab Content */}
-      {activeToolTab === 0 && renderReportContent()}
-      {activeToolTab === 1 && <DCFModel symbol={symbol} />}
-      {activeToolTab === 2 && <StockThesis symbol={symbol} />}
+      {activeToolTab === 0 && <StockOverview symbol={symbol} />}
+      {activeToolTab === 1 && renderReportContent()}
+      {activeToolTab === 2 && <DCFModel symbol={symbol} />}
+      {activeToolTab === 3 && <StockThesis symbol={symbol} />}
     </Box>
   );
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+﻿import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useWatchlist, type WatchlistItem } from './hooks/useWatchlist';
 import { useAlertRules } from './hooks/useAlertRules';
 import { WatchlistCard } from './WatchlistCard';
