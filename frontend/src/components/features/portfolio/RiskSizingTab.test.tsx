@@ -384,9 +384,18 @@ describe('RiskSizingTab Component', () => {
     );
   });
 
-  it('renders Holdings Risk Concentration & Sizing Capacity table', () => {
+  it('renders Holdings Risk Concentration & Sizing Capacity table with clickable symbol links and coverage badges', () => {
+    const coverageMap = new Map([
+      ['MSFT', { report: true, dcf: true, thesis: true, count: 3 }],
+      ['AAPL', { report: true, dcf: false, thesis: false, count: 1 }],
+    ]);
+
     const html = renderToString(
-      <RiskSizingTab initialAuditData={mockAuditData} autoFetch={false} />
+      <RiskSizingTab
+        initialAuditData={mockAuditData}
+        autoFetch={false}
+        initialAnalysisCoverage={coverageMap}
+      />
     );
     const cleanHtml = html.replace(/<!--.*?-->/g, '');
 
@@ -395,6 +404,17 @@ describe('RiskSizingTab Component', () => {
     expect(cleanHtml).toContain('Apple Inc');
     expect(cleanHtml).toContain('1.15'); // MSFT beta
     expect(cleanHtml).toContain('0.95'); // AAPL beta
+
+    // Symbol links rendered as anchor tags with href for right-click / open in new tab support
+    expect(cleanHtml).toContain('aria-label="View analysis for MSFT"');
+    expect(cleanHtml).toContain('aria-label="View analysis for AAPL"');
+    expect(cleanHtml).toContain('href="/analysis?symbol=MSFT&amp;tab=report"');
+    expect(cleanHtml).toContain('href="/analysis?symbol=AAPL&amp;tab=report"');
+    expect(cleanHtml).toContain('MuiLink-root');
+
+    // Coverage badge counts rendered next to symbols
+    expect(cleanHtml).toContain('title="3 analysis items for MSFT"');
+    expect(cleanHtml).toContain('title="1 analysis item for AAPL"');
   });
 
   it('renders AI Risk Officer Advisory card with recommendations', () => {

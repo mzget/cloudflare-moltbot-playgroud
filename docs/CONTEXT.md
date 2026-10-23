@@ -124,3 +124,23 @@
 
 - **Millions USD Unit Normalization**:
   มาตรฐานการแปลงหน่วยข้อมูลตัวเลขทางการเงินให้อยู่ในหน่วยล้านดอลลาร์สหรัฐ ($M) ในฝั่ง Backend ก่อนส่งให้ Frontend และก่อนบันทึกลง D1 เพื่อกำจัดข้อผิดพลาดความไม่สอดคล้องของสเกลตัวเลข (1,000x / 1,000,000x) ระหว่าง Yahoo Finance (Raw USD) และ Finnhub (Millions USD)
+
+## Risk Manager & Position Sizing Subsystem
+
+### Terms & Concepts
+
+- **Stocks Only (USD) Fixed Denominator (`totalStockPortfolioUsd`)**:
+  ฐานคำนวณสัดส่วนความเสี่ยงและขนาดการซื้อเพิ่มทั้งหมดในระบบ Risk Manager จะยึดจากมูลค่ารวมของพอร์ตหุ้นรายตัวที่เปิดสถานะอยู่ (`Open` holdings) ในสกุลเงิน USD คงที่ ณ ปัจจุบัน โดยไม่นำกองทุนรวมหรือเงินสดสกุลบาทมาปน
+
+- **Governance Caps (8% / 15% / 30% Rule)**:
+  เกณฑ์ควบคุมความเสี่ยงมาตรฐานตามหลัก Howard Marks:
+  - **Target Weight (`8.0%`)**: สัดส่วนเป้าหมายมาตรฐานของหุ้น 1 ตัวในพอร์ต
+  - **Max Single-Stock Cap (`15.0%`)**: เพดานสูงสุดของหุ้นรายตัว (แจ้งเตือน `Warning` ที่ `10.0%` และ `Breach` เมื่อเกิน `15.0%`)
+  - **Max Strictest Theme Cap (`30.0%`)**: เพดานสูงสุดของกลุ่ม Theme จาก `theme_symbol_mappings` (แจ้งเตือน `Warning` ที่ `25.0%` และ `Breach` เมื่อเกิน `30.0%`)
+
+- **Strictest Theme Binding Constraint**:
+  กรณีหุ้น 1 ตัวถูกผูกไว้กับหลาย Theme ใน `theme_symbol_mappings` ระบบจะนับน้ำหนักของหุ้นตัวนั้นเข้าทุก Theme ที่สังกัด และเมื่อคำนวณวงเงินซื้อเพิ่มสูงสุด (`maxAllowedBuyUsd`) จะใช้ Theme ที่มีสัดส่วนปัจจุบันสูงที่สุด (ใกล้เต็มเพดาน 30% ที่สุด) เป็นตัวล็อกเพดาน ส่วนหุ้นที่ยังไม่มี Theme (`Unassigned`) จะไม่ถูกจำกัดด้วยเพดาน Theme Cap
+
+- **Analysis Coverage Navigation Link**:
+  ชื่อหุ้น (`symbol`) ในตาราง `Holdings Risk Concentration & Sizing Capacity` แสดงเป็นลิงก์กดไปยังหน้า `/analysis?symbol=XYZ&tab=report` พร้อมป้าย `AnalysisCoverage` แสดงจำนวนบทวิเคราะห์ที่มีอยู่ (Report, DCF, Thesis) เหมือนกับตารางในแท็บ Holdings และ Fundamentals ทุกประการ
+

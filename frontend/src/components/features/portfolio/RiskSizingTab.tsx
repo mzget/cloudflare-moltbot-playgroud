@@ -18,6 +18,7 @@ import {
   ModalDialog,
   DialogTitle,
   DialogContent,
+  Link,
 } from '@mui/joy';
 import {
   ShieldAlert,
@@ -37,16 +38,21 @@ import {
   Pencil,
   Check,
   X,
+  FileBarChart,
 } from 'lucide-react';
 import ThemeDonutChart from './ThemeDonutChart';
 import { API_BASE_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
 import { formatCurrency, formatPct } from './YahooPortfolio';
 import { useSettingsStore } from '../../../store/settingsStore';
+import { useAnalysisCoverage } from '../../../hooks/useAnalysisCoverage';
+import type { AnalysisCoverageMap } from '../../../types/analysisCoverage';
 
 export interface RiskSizingTabProps {
   onNavigateToHoldings?: () => void;
+  onNavigateToAnalysis?: (symbol: string) => void;
   initialAuditData?: any;
+  initialAnalysisCoverage?: AnalysisCoverageMap;
   autoFetch?: boolean;
   initialThemeViewMode?: 'chart' | 'table';
   initialDeletingTheme?: string | null;
@@ -57,7 +63,9 @@ export interface RiskSizingTabProps {
 
 export default function RiskSizingTab({
   onNavigateToHoldings,
+  onNavigateToAnalysis,
   initialAuditData,
+  initialAnalysisCoverage,
   autoFetch = true,
   initialThemeViewMode = 'chart',
   initialDeletingTheme = null,
@@ -98,6 +106,25 @@ export default function RiskSizingTab({
   const [sizingResult, setSizingResult] = React.useState<any>(null);
 
   const activeSymbol = selectedSymbol === '__CUSTOM__' ? customSymbol.trim().toUpperCase() : selectedSymbol;
+
+  const holdingSymbols = React.useMemo<string[]>(() => {
+    const list = auditData?.holdingsSizing || [];
+    return list.map((h: any) => h.symbol).filter(Boolean);
+  }, [auditData]);
+
+  const fetchedCoverage = useAnalysisCoverage(holdingSymbols);
+  const analysisCoverage = initialAnalysisCoverage || fetchedCoverage;
+
+  const handleNavigateToAnalysis = React.useCallback(
+    (symbol: string) => {
+      if (onNavigateToAnalysis) {
+        onNavigateToAnalysis(symbol);
+      } else if (typeof window !== 'undefined') {
+        window.location.href = `/analysis?symbol=${encodeURIComponent(symbol)}&tab=report`;
+      }
+    },
+    [onNavigateToAnalysis]
+  );
 
   // Load audit data
   const fetchAudit = React.useCallback(async (isRefresh = false) => {
@@ -1003,16 +1030,81 @@ export default function RiskSizingTab({
                   h.status === 'breach' ? `Trim $${Math.round(h.trimToCapUsd || Math.abs(h.sizing?.roomToStockCapUsd || 0)).toLocaleString()}` :
                   h.sizing?.roomToTargetUsd > 0 ? `Buy Room $${Math.round(h.sizing.roomToTargetUsd).toLocaleString()}` :
                   'Hold (At/Over Target)';
+                const coverage = analysisCoverage?.get(h.symbol);
+                const analysisHref = `/analysis?symbol=${encodeURIComponent(h.symbol)}&tab=report`;
 
                 return (
                   <tr key={h.symbol}>
                     <td>
-                      <Typography level="body-sm" sx={{ fontWeight: 800 }}>
-                        {h.symbol}
-                      </Typography>
-                      <Typography level="body-xs" sx={{ color: 'text.secondary' }}>
-                        {h.name}
-                      </Typography>
+                      <Box>
+                        <Stack direction="row" alignItems="center" spacing={0.75}>
+                          <Link
+                            href={analysisHref}
+                            level="title-sm"
+                            aria-label={`View analysis for ${h.symbol}`}
+                            onClick={(e) => {
+                              if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) {
+                                return;
+                              }
+                              e.preventDefault();
+                              handleNavigateToAnalysis(h.symbol);
+                            }}
+                            sx={{
+                              fontWeight: 800,
+                              lineHeight: 1.2,
+                              color: 'primary.plainColor',
+                              textDecoration: 'none',
+                              textAlign: 'left',
+                              justifyContent: 'flex-start',
+                              width: 'fit-content',
+                              display: 'block',
+                              '&:hover': {
+                                color: 'primary.hoverColor',
+                                textDecoration: 'underline',
+                              },
+                              transition: 'all 0.15s ease-out',
+                            }}
+                          >
+                            {h.symbol}
+                          </Link>
+
+                          {coverage && coverage.count > 0 && (
+                            <Chip
+                              component="a"
+                              href={analysisHref}
+                              size="sm"
+                              variant="soft"
+                              color="primary"
+                              title={`${coverage.count} analysis item${coverage.count === 1 ? '' : 's'} for ${h.symbol}`}
+                              startDecorator={<FileBarChart size={12} />}
+                              onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                                e.stopPropagation();
+                                if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) {
+                                  return;
+                                }
+                                e.preventDefault();
+                                handleNavigateToAnalysis(h.symbol);
+                              }}
+                              sx={{
+                                cursor: 'pointer',
+                                fontSize: '10px',
+                                fontWeight: 600,
+                                px: 0.5,
+                                py: 0,
+                                height: '18px',
+                                minHeight: '18px',
+                                textDecoration: 'none',
+                                '&:hover': { bgcolor: 'primary.softHoverBg' },
+                              }}
+                            >
+                              {coverage.count}
+                            </Chip>
+                          )}
+                        </Stack>
+                        <Typography level="body-xs" sx={{ color: 'text.secondary', mt: 0.2 }}>
+                          {h.name}
+                        </Typography>
+                      </Box>
                     </td>
                     <td>
                       <Typography level="body-xs">

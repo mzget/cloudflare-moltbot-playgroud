@@ -406,7 +406,15 @@ export default function YahooPortfolio() {
       {/* Risk & Sizing Tab */}
       {optimisticTab === 3 && (
         <Box className="tab-pane-active">
-          <RiskSizingTab onNavigateToHoldings={() => setActiveTab(1)} />
+          <RiskSizingTab
+            onNavigateToHoldings={() => setActiveTab(1)}
+            onNavigateToAnalysis={(symbol) =>
+              navigate({
+                to: '/analysis',
+                search: { symbol, tab: 'report' },
+              })
+            }
+          />
         </Box>
       )}
 

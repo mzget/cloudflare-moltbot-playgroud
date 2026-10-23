@@ -28,7 +28,7 @@
     "test:e2e": "vitest run --config tests/e2e/vitest.config.ts"
   },
   "devDependencies": {
-    "turbo": "^2.4.0",
+    "turbo": "^2.11.10",
     "vitest": "^4.1.11"
   }
 }

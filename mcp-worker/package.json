@@ -10,20 +10,20 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@cloudflare/ai-chat": "^0.9.0",
-    "@emnapi/core": "^1.10.0",
-    "@emnapi/runtime": "^1.10.0",
-    "@modelcontextprotocol/sdk": "1.29.0",
+    "@cloudflare/ai-chat": "^0.12.2",
+    "@emnapi/core": "^1.11.3",
+    "@emnapi/runtime": "^1.11.3",
+    "@modelcontextprotocol/sdk": "^1.32.1",
     "@oaktree/shared": "*",
-    "agents": "^0.17.0",
-    "ai": "^6.0.182",
-    "workers-ai-provider": "^3.1.14",
-    "zod": "4.4.1"
+    "agents": "^0.30.0",
+    "ai": "^6.0.314",
+    "workers-ai-provider": "^3.3.1",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20261003.1",
-    "typescript": "5.9.3",
-    "vitest": "^4.1.11",
-    "wrangler": "^4.147.0"
+    "@cloudflare/workers-types": "^5.20261023.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.12",
+    "wrangler": "^4.152.0"
   }
 }
