@@ -1077,7 +1077,7 @@ export default function RiskSizingTab({
                               color="primary"
                               title={`${coverage.count} analysis item${coverage.count === 1 ? '' : 's'} for ${h.symbol}`}
                               startDecorator={<FileBarChart size={12} />}
-                              onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                              onClick={(e) => {
                                 e.stopPropagation();
                                 if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) {
                                   return;
