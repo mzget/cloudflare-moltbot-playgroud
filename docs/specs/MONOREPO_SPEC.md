@@ -22,7 +22,7 @@ The unified monorepo architecture consolidates all services into a single **NPM 
 ### 1.2 Technology Stack
 - **Package Manager:** NPM 11.6.2 (`packageManager: "npm@11.6.2"` declared in root `package.json`).
 - **Lockfile Format:** Canonical lockfileVersion 3 located exclusively at repository root (`package-lock.json`).
-- **Monorepo Engine:** Turborepo 2.x (`turbo ^2.4.0`) orchestrating task pipelines with topological dependency ordering and content-hashed caching.
+- **Monorepo Engine:** Turborepo 2.x (`turbo ^2.11.10`) orchestrating task pipelines with topological dependency ordering and content-hashed caching.
 - **Backend Infrastructure:** Cloudflare Workers running Node.js compatibility mode, Hono v4, Cloudflare D1 (SQLite), Cloudflare KV, and Workers AI.
 - **Frontend Infrastructure:** Astro 7.x with React 19, MUI Joy UI (`sx` styling), TanStack Router v1, and Cloudflare Pages deployment.
 - **Agent / MCP Layer:** Cloudflare Worker implementing the Model Context Protocol (MCP) specification.
