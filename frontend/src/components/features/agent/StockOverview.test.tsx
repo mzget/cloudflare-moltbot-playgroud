@@ -137,7 +137,7 @@ describe('StockOverview Component', () => {
     expect(html).toContain('27.9');
   });
 
-  it('renders ScenarioRangeBar when dcfScenarios is provided', () => {
+  it('does not render Scenario Range in overview tab', () => {
     const payloadWithDcf = {
       ...mockPayload,
       dcfScenarios: {
@@ -148,6 +148,6 @@ describe('StockOverview Component', () => {
       },
     };
     const html = renderToString(<StockOverview symbol="META" initialData={payloadWithDcf} />);
-    expect(html).toContain('Scenario Range');
+    expect(html).not.toContain('Scenario Range');
   });
 });

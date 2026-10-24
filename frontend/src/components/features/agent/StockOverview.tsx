@@ -1,4 +1,4 @@
-﻿import * as React from 'react';
+import * as React from 'react';
 import {
   Box,
   Sheet,
@@ -12,7 +12,6 @@ import {
   Tooltip,
 } from '@mui/joy';
 import { RotateCw, AlertTriangle, Layers, Building, Globe, ExternalLink, Info } from 'lucide-react';
-import ScenarioRangeBar from '../../common/ScenarioRangeBar';
 import { API_BASE_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
 
@@ -318,7 +317,7 @@ export default function StockOverview({ symbol, initialData = null }: StockOverv
                 <Stack spacing={2}>
                   {data.companyStatistics.profileMarginsReturns.map((group, gIdx) => (
                     <Box key={gIdx}>
-                      <Typography level="body-xs" sx={{ fontWeight: 700, color: 'primary.400', textTransform: 'uppercase', letterSpacing: '0.05em', mb: 0.8, fontSize: '10px' }}>
+                      <Typography level="body-xs" sx={{ color: 'primary.plainColor', textTransform: 'uppercase', letterSpacing: '0.05em', mb: 0.8, fontSize: '10.5px', fontWeight: 800 }}>
                         {group.category}
                       </Typography>
                       <Stack spacing={0.5}>
@@ -343,14 +342,14 @@ export default function StockOverview({ symbol, initialData = null }: StockOverv
                 <Stack spacing={2}>
                   {data.companyStatistics.valuationHealth.map((group, gIdx) => (
                     <Box key={gIdx}>
-                      <Typography level="body-xs" sx={{ fontWeight: 700, color: 'primary.400', textTransform: 'uppercase', letterSpacing: '0.05em', mb: 0.8, fontSize: '10px' }}>
+                      <Typography level="body-xs" sx={{ color: 'primary.plainColor', textTransform: 'uppercase', letterSpacing: '0.05em', mb: 0.8, fontSize: '10.5px', fontWeight: 800 }}>
                         {group.category}
                       </Typography>
                       <Stack spacing={0.5}>
                         {group.items.map((item, iIdx) => {
                           const isPos = item.highlight === 'positive';
                           const isNeg = item.highlight === 'negative';
-                          const color = isPos ? '#10b981' : isNeg ? '#f43f5e' : 'text.primary';
+                          const color = isPos ? 'success.plainColor' : isNeg ? 'danger.plainColor' : 'text.primary';
                           return (
                             <Box key={iIdx} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '11px', py: 0.2 }}>
                               <Typography level="body-xs" sx={{ color: 'text.secondary', fontSize: '11px' }}>
@@ -363,20 +362,7 @@ export default function StockOverview({ symbol, initialData = null }: StockOverv
                           );
                         })}
                       </Stack>
-                      {group.category.includes('Intrinsic') && data.dcfScenarios && (data.dcfScenarios.bear || data.dcfScenarios.base || data.dcfScenarios.bull) && (
-                        <Box sx={{ mt: 1.5, pt: 1, borderTop: '1px dashed rgba(255,255,255,0.08)' }}>
-                          <Typography level="body-xs" sx={{ fontSize: '10px', opacity: 0.6, mb: 0.5, fontWeight: 600 }}>
-                            Scenario Range
-                          </Typography>
-                          <ScenarioRangeBar
-                            compact
-                            price={data.dcfScenarios.price}
-                            bear={data.dcfScenarios.bear}
-                            base={data.dcfScenarios.base}
-                            bull={data.dcfScenarios.bull}
-                          />
-                        </Box>
-                      )}
+
                     </Box>
                   ))}
                 </Stack>
@@ -387,7 +373,7 @@ export default function StockOverview({ symbol, initialData = null }: StockOverv
                 <Stack spacing={2}>
                   {data.companyStatistics.growthDividends.map((group, gIdx) => (
                     <Box key={gIdx}>
-                      <Typography level="body-xs" sx={{ fontWeight: 700, color: 'primary.400', textTransform: 'uppercase', letterSpacing: '0.05em', mb: 0.8, fontSize: '10px' }}>
+                      <Typography level="body-xs" sx={{ color: 'primary.plainColor', textTransform: 'uppercase', letterSpacing: '0.05em', mb: 0.8, fontSize: '10.5px', fontWeight: 800 }}>
                         {group.category}
                       </Typography>
                       <Stack spacing={0.5}>
@@ -486,15 +472,16 @@ export default function StockOverview({ symbol, initialData = null }: StockOverv
                           y1={t.y}
                           x2={chartWidth - padding.right}
                           y2={t.y}
-                          stroke="rgba(255, 255, 255, 0.08)"
+                          stroke="var(--joy-palette-divider)"
                           strokeDasharray={t.val === 0 ? 'none' : '3 3'}
                           strokeWidth={t.val === 0 ? 1.5 : 1}
                         />
                         <text
                           x={chartWidth - padding.right + 8}
                           y={t.y + 3}
-                          fill="rgba(255, 255, 255, 0.45)"
-                          fontSize="10"
+                          fill="var(--joy-palette-text-secondary)"
+                          fontSize="11"
+                          fontWeight="600"
                           textAnchor="start"
                           fontFamily="sans-serif"
                         >
@@ -512,7 +499,7 @@ export default function StockOverview({ symbol, initialData = null }: StockOverv
                     y1={yZero}
                     x2={chartWidth - padding.right}
                     y2={yZero}
-                    stroke="rgba(255, 255, 255, 0.25)"
+                    stroke="var(--joy-palette-neutral-outlinedBorder, var(--joy-palette-divider))"
                     strokeWidth={1.5}
                   />
 
@@ -536,7 +523,7 @@ export default function StockOverview({ symbol, initialData = null }: StockOverv
                             y={padding.top}
                             width={groupWidth}
                             height={plotHeight}
-                            fill="rgba(255, 255, 255, 0.04)"
+                            fill="var(--joy-palette-background-level1)"
                             rx={4}
                           />
                         )}
@@ -545,7 +532,7 @@ export default function StockOverview({ symbol, initialData = null }: StockOverv
                         <text
                           x={groupCenterX}
                           y={chartHeight - 12}
-                          fill={hoveredPeriodIndex === pIdx ? '#60a5fa' : 'rgba(255, 255, 255, 0.7)'}
+                          fill={hoveredPeriodIndex === pIdx ? 'var(--joy-palette-primary-plainColor)' : 'var(--joy-palette-text-primary)'}
                           fontSize="11"
                           fontWeight={hoveredPeriodIndex === pIdx ? 700 : 500}
                           textAnchor="middle"
@@ -580,9 +567,9 @@ export default function StockOverview({ symbol, initialData = null }: StockOverv
                               <text
                                 x={barX + barWidth / 2}
                                 y={labelY}
-                                fill={val >= 0 ? 'rgba(255, 255, 255, 0.85)' : '#f87171'}
-                                fontSize="8.5"
-                                fontWeight={600}
+                                fill={val >= 0 ? 'var(--joy-palette-text-primary)' : 'var(--joy-palette-danger-plainColor)'}
+                                fontSize="9.5"
+                                fontWeight={700}
                                 textAnchor="middle"
                                 fontFamily="sans-serif"
                               >
@@ -605,17 +592,17 @@ export default function StockOverview({ symbol, initialData = null }: StockOverv
                     top: 10,
                     right: 80,
                     p: 1.5,
-                    bgcolor: 'rgba(15, 23, 42, 0.95)',
-                    backdropFilter: 'blur(8px)',
-                    border: '1px solid rgba(255, 255, 255, 0.15)',
-                    borderRadius: '8px',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                    bgcolor: 'background.surface',
+                    border: '1px solid',
+                    borderColor: 'neutral.outlinedBorder',
+                    borderRadius: '10px',
+                    boxShadow: 'var(--joy-shadow-md)',
                     pointerEvents: 'none',
                     zIndex: 10,
                     minWidth: 200,
                   }}
                 >
-                  <Typography level="title-sm" sx={{ color: '#60a5fa', fontWeight: 700, mb: 0.8 }}>
+                  <Typography level="title-sm" sx={{ color: 'primary.plainColor', fontWeight: 800, mb: 0.8 }}>
                     {activePeriods[hoveredPeriodIndex].period} ({activePeriods[hoveredPeriodIndex].asOfDate})
                   </Typography>
                   <Stack spacing={0.4}>
@@ -644,7 +631,7 @@ export default function StockOverview({ symbol, initialData = null }: StockOverv
                       const om = p.operatingProfit !== null ? ((p.operatingProfit / p.totalRevenue) * 100).toFixed(1) : null;
                       const fm = p.freeCashFlow !== null ? ((p.freeCashFlow / p.totalRevenue) * 100).toFixed(1) : null;
                       return (
-                        <Box sx={{ pt: 0.8, mt: 0.8, borderTop: '1px solid rgba(255,255,255,0.1)', fontSize: '10px', color: 'text.tertiary' }}>
+                        <Box sx={{ pt: 0.8, mt: 0.8, borderTop: '1px solid', borderColor: 'divider', fontSize: '10px', color: 'text.tertiary' }}>
                           {gm && <Typography level="body-xs" sx={{ fontSize: '10px' }}>Gross Margin: <b style={{ color: '#f97316' }}>{gm}%</b></Typography>}
                           {om && <Typography level="body-xs" sx={{ fontSize: '10px' }}>Operating Margin: <b style={{ color: '#a855f7' }}>{om}%</b></Typography>}
                           {fm && <Typography level="body-xs" sx={{ fontSize: '10px' }}>FCF Margin: <b style={{ color: '#eab308' }}>{fm}%</b></Typography>}
@@ -676,10 +663,12 @@ export default function StockOverview({ symbol, initialData = null }: StockOverv
                           borderRadius: '8px',
                           cursor: 'pointer',
                           transition: 'all 0.2s ease',
-                          bgcolor: isHidden ? 'transparent' : 'rgba(255,255,255,0.03)',
+                          bgcolor: isHidden ? 'transparent' : 'background.level1',
                           opacity: isHidden ? 0.45 : 1,
+                          border: '1px solid',
+                          borderColor: isHidden ? 'transparent' : 'neutral.outlinedBorder',
                           '&:hover': {
-                            bgcolor: 'rgba(255,255,255,0.07)',
+                            bgcolor: 'background.level2',
                           },
                         }}
                       >
@@ -694,18 +683,18 @@ export default function StockOverview({ symbol, initialData = null }: StockOverv
                           }}
                         />
                         <Box sx={{ minWidth: 0, flex: 1 }}>
-                          <Typography level="body-xs" sx={{ fontWeight: 700, color: 'text.primary', fontSize: '11.5px', lineHeight: 1.2 }}>
+                          <Typography level="body-xs" sx={{ fontWeight: 800, color: 'text.primary', fontSize: '12px', lineHeight: 1.2 }}>
                             {item.label}
                           </Typography>
                           <Typography level="body-xs" sx={{ color: 'text.tertiary', fontSize: '10px' }}>
                             ({frequency === 'quarterly' ? 'Quarterly' : 'Annual'}) (Millions)
                             {item.totalChangePct !== null && (
-                              <span style={{ marginLeft: 6, color: item.totalChangePct >= 0 ? '#10b981' : '#f43f5e', fontWeight: 600 }}>
+                              <span style={{ marginLeft: 6, color: item.totalChangePct >= 0 ? 'var(--joy-palette-success-plainColor, #166534)' : 'var(--joy-palette-danger-plainColor, #dc2626)', fontWeight: 600 }}>
                                 (Total Change: {totalChangeSign}{item.totalChangePct}%)
                               </span>
                             )}
                             {item.cagrPct !== null && (
-                              <span style={{ marginLeft: 6, color: '#38bdf8', fontWeight: 600 }}>
+                              <span style={{ marginLeft: 6, color: 'var(--joy-palette-primary-plainColor, #0284c7)', fontWeight: 600 }}>
                                 (CAGR: {cagrSign}{item.cagrPct}%)
                               </span>
                             )}

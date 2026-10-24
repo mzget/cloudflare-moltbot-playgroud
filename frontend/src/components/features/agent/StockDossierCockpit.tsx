@@ -101,9 +101,9 @@ export default function StockDossierCockpit({
 
     try {
       const [overviewRes, reportRes, thesesRes, riskRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/stocks/${symbol}/overview`),
-        fetch(`${API_BASE_URL}/api/analysis/results?symbol=${symbol}`),
-        fetch(`${API_BASE_URL}/api/analysis/theses?symbol=${symbol}`),
+        fetch(`${API_BASE_URL}/api/analysis/overview?symbol=${encodeURIComponent(symbol)}`),
+        fetch(`${API_BASE_URL}/api/analysis/results?symbol=${encodeURIComponent(symbol)}`),
+        fetch(`${API_BASE_URL}/api/analysis/theses?symbol=${encodeURIComponent(symbol)}`),
         fetch(`${API_BASE_URL}/api/portfolio/risk-audit`),
       ]);
 

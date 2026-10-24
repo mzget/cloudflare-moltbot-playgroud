@@ -1,4 +1,4 @@
-﻿import { Hono } from 'hono';
+import { Hono } from 'hono';
 import type { AppEnv } from '../env';
 import { runFullAnalysis, getOrUpdateMarketStats } from '../analysisEngine';
 import { runDialecticalDebate, getStoredDebate } from '../debateEngine';
@@ -11,10 +11,11 @@ const analysis = new Hono<AppEnv>();
 
 // API: Stock Financial Overview
 // GET /api/analysis/overview?symbol=XYZ&refresh=false
-analysis.get('/api/analysis/overview', async (c) => {
-  const symbol = c.req.query('symbol');
+// GET /api/stocks/:symbol/overview (Alias route)
+const getFinancialOverviewHandler = async (c: any) => {
+  const symbol = c.req.query('symbol') || c.req.param('symbol');
   if (!symbol) {
-    return c.json({ error: 'symbol query parameter is required' }, 400);
+    return c.json({ error: 'symbol parameter is required' }, 400);
   }
   const refresh = c.req.query('refresh') === 'true';
   try {
@@ -25,7 +26,10 @@ analysis.get('/api/analysis/overview', async (c) => {
     console.error(`Failed to fetch financial overview for ${symbol}: ${errorMsg}`, e?.stack || e);
     return c.json({ error: errorMsg }, 500);
   }
-});
+};
+
+analysis.get('/api/analysis/overview', getFinancialOverviewHandler);
+analysis.get('/api/stocks/:symbol/overview', getFinancialOverviewHandler);
 
 
 // API: Value Investor Deep Analysis
@@ -358,6 +362,15 @@ analysis.post('/api/analysis/dcf-save', async (c) => {
       rationale ?? null,
       source ?? 'manual'
     ).run();
+
+    // Invalidate cached overview_json in market_stats so Overview and Cockpit reflect updated DCF immediately
+    try {
+      await c.env.DB.prepare(
+        'UPDATE market_stats SET overview_updated_at = NULL WHERE symbol = ?'
+      ).bind(symbolUpper).run();
+    } catch (cacheErr) {
+      console.warn(`Failed to invalidate overview cache for ${symbolUpper}:`, cacheErr);
+    }
 
     // Keep persisted Margin of Safety in sync (ADR-0014). Non-fatal: the scenario is already saved.
     try {
