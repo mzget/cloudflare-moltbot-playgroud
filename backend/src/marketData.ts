@@ -1,4 +1,5 @@
 import { Env } from './index';
+import { refreshMarginOfSafety } from '@oaktree/shared';
 
 // Returns true if the US stock market is currently open or in post-market close window (Mon-Fri, 9:30-16:30 ET).
 // Uses America/New_York timezone to handle EDT/EST daylight saving transitions automatically.
@@ -525,6 +526,15 @@ export async function fetchAndStoreMarketStats(env: Env, options: MarketStatsOpt
 					}
 				}
 			}
+		}
+	}
+	// 4. Refresh persisted Margin of Safety for successfully synced symbols (ADR-0014)
+	const syncedSymbols = runResults.filter(r => r.success && r.price != null).map(r => r.symbol);
+	if (syncedSymbols.length > 0) {
+		try {
+			await refreshMarginOfSafety(env.DB as any, syncedSymbols);
+		} catch (mosErr) {
+			console.error('Failed to refresh Margin of Safety after price sync:', mosErr);
 		}
 	}
 	return runResults;

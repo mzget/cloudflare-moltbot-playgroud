@@ -252,3 +252,4 @@ export function formatPercent(
 
 // ─── 3. Portfolio Risk & Sizing Engine ─────────────────────────────────────
 export * from './portfolioRisk';
+export * from './marginOfSafety';

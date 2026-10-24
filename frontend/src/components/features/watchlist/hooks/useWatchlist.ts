@@ -14,6 +14,13 @@ export interface WatchlistItem {
   active_alerts_count?: number;
   sector_label?: string | null;
   sector_label_color?: string | null;
+  /** Persisted Margin of Safety (ADR-0014); null/undefined => Unvalued. */
+  mos_price?: number | null;
+  dcf_bear?: number | null;
+  dcf_base?: number | null;
+  dcf_bull?: number | null;
+  mos_base?: number | null;
+  price_zone?: string | null;
 }
 
 const WATCHLIST_KEY = 'watchlist';

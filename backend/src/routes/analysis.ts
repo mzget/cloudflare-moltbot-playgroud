@@ -3,6 +3,7 @@ import type { AppEnv } from '../env';
 import { runFullAnalysis, getOrUpdateMarketStats } from '../analysisEngine';
 import { runDialecticalDebate, getStoredDebate } from '../debateEngine';
 import { formatMetricsForPrompt } from '../analysisPrompts';
+import { refreshMarginOfSafety } from '@oaktree/shared';
 
 import { fetchFinancialOverview } from '../stockOverview';
 
@@ -357,6 +358,13 @@ analysis.post('/api/analysis/dcf-save', async (c) => {
       rationale ?? null,
       source ?? 'manual'
     ).run();
+
+    // Keep persisted Margin of Safety in sync (ADR-0014). Non-fatal: the scenario is already saved.
+    try {
+      await refreshMarginOfSafety(c.env.DB as any, [symbolUpper]);
+    } catch (mosErr) {
+      console.error(`Failed to refresh MoS for ${symbolUpper}:`, mosErr);
+    }
 
     return c.json({ success: true });
   } catch (e) {

@@ -20,11 +20,13 @@ import {
   Button,
   Snackbar,
   Alert,
+  Chip,
 } from '@mui/joy';
 import { Trash2, Check, AlertTriangle } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
 import { API_BASE_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
+import { compareMos, matchesMosFilter, MOS_FILTER_LABELS, type MosFilter } from '../../../utils/marginOfSafety';
 
 const EMPTY_EVENTS: any[] = [];
 
@@ -168,7 +170,7 @@ export default function MyWatchlist() {
   const [sortBy, setSortBy] = useState<string>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('watchlist_sort_by');
-      if (saved && ['symbol', 'symbol-desc', 'name', 'in_portfolio', 'is_active'].includes(saved)) {
+      if (saved && ['symbol', 'symbol-desc', 'name', 'in_portfolio', 'is_active', 'mos_desc', 'mos_asc'].includes(saved)) {
         return saved;
       }
     }
@@ -198,6 +200,10 @@ export default function MyWatchlist() {
         }
         return a.symbol.localeCompare(b.symbol);
       }
+      if (sortBy === 'mos_desc' || sortBy === 'mos_asc') {
+        const c = compareMos(a.mos_base, b.mos_base, sortBy === 'mos_asc' ? 'asc' : 'desc');
+        return c !== 0 ? c : a.symbol.localeCompare(b.symbol);
+      }
       if (sortBy === 'is_active') {
         if (a.is_active !== b.is_active) {
           return b.is_active - a.is_active;
@@ -207,6 +213,13 @@ export default function MyWatchlist() {
       return 0;
     });
   }, [watchlist, sortBy]);
+
+  // Margin of Safety screener filter (ADR-0014)
+  const [mosFilter, setMosFilter] = useState<MosFilter>('all');
+  const visibleWatchlist = useMemo(
+    () => sortedWatchlist.filter((item) => matchesMosFilter(item, mosFilter)),
+    [sortedWatchlist, mosFilter]
+  );
 
   const handleOpenAlertsModal = useCallback((symbol: string) => {
     setSelectedSymbol(symbol);
@@ -367,7 +380,8 @@ export default function MyWatchlist() {
         sx={{ mb: 3 }}
       >
         <Typography level="title-md" sx={{ opacity: 0.6 }}>
-          {watchlist.length} {watchlist.length === 1 ? 'Security' : 'Securities'}
+          {mosFilter === 'all' ? watchlist.length : `${visibleWatchlist.length} / ${watchlist.length}`}{' '}
+          {watchlist.length === 1 ? 'Security' : 'Securities'}
         </Typography>
         <Stack direction="row" spacing={1.5} alignItems="center" sx={{ width: { xs: '100%', sm: 'auto' } }}>
           <Typography level="body-sm" sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>
@@ -394,12 +408,31 @@ export default function MyWatchlist() {
             <Option value="name">Company Name (A-Z)</Option>
             <Option value="in_portfolio">In Portfolio First</Option>
             <Option value="is_active">Active First</Option>
+            <Option value="mos_desc">Margin of Safety (High-Low)</Option>
+            <Option value="mos_asc">Margin of Safety (Low-High)</Option>
           </Select>
         </Stack>
       </Stack>
 
+      {/* Margin of Safety Screener */}
+      <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap sx={{ mb: 2 }} data-testid="mos-filter-chips">
+        <Typography level="body-sm" sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>MoS:</Typography>
+        {(Object.keys(MOS_FILTER_LABELS) as MosFilter[]).map((f) => (
+          <Chip
+            key={f}
+            size="sm"
+            variant={mosFilter === f ? 'solid' : 'outlined'}
+            color={mosFilter === f ? 'primary' : 'neutral'}
+            onClick={() => setMosFilter(f)}
+            sx={{ cursor: 'pointer', fontWeight: 600, transition: 'all 0.3s ease-out' }}
+          >
+            {MOS_FILTER_LABELS[f]}
+          </Chip>
+        ))}
+      </Stack>
+
       <Grid container spacing={2}>
-        {sortedWatchlist.map((item) => (
+        {visibleWatchlist.map((item) => (
           <Grid key={item.symbol} xs={12} sm={12} md={4}>
             <WatchlistCard
               item={item}

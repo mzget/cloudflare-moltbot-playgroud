@@ -1,4 +1,4 @@
-﻿# Technical Specification: Interactive DCF Model & Scenario Persistence
+# Technical Specification: Interactive DCF Model & Scenario Persistence
 
 เอกสารนี้ระบุรายละเอียดทางสถาปัตยกรรม (Architecture), โครงสร้างฐานข้อมูล (Database Schema), API Endpoints และตรรกะการคำนวณ (Calculation Engine) ของระบบ **Discounted Cash Flow (DCF) Model** ที่บันทึกและจำลองราคาหุ้นในระบบ Oaktree Agent
 
@@ -175,3 +175,48 @@ UI หน้าจอนี้ออกแบบตามสไตล์ **Antig
    - **Metrics Summary Cards:** การ์ดคำนวณสรุปราคาผลลัพธ์เป้าหมาย (Implied Price) เทียบกับราคาจริงเพื่อบอก % Upside/Downside สีสันตามทิศทางตลาด (เขียว/แดง) พร้อมทั้งบอก Enterprise Value และเป้าหมาย FCF ปีสุดท้าย
    - **Responsive SVG Chart:** กราฟจำลองสถานการณ์ที่เรนเดอร์ผ่าน SVG ดิบของ React แสดงปริมาณรายได้ (Revenue) แบบแท่งคู่ขนานกับการคาดการณ์กระแสเงินสดอิสระ (FCF) แบบเส้นพื้นที่ (Area Graph)
    - **Detailed Forecast Table:** ตารางจำลองงบการเงินอย่างละเอียด 5 ปีล่วงหน้า แสดงตัวเลขทีละบรรทัดตั้งแต่รายได้ลงไปจนถึงมูลค่าปัจจุบันของกระแสเงินสดอิสระ (PV of FCF) เพื่อการวิเคราะห์ที่แม่นยำ
+
+
+---
+
+## 7. Scenario Range & Margin of Safety (MoS) (ADR-0014)
+
+### A. นิยาม Margin of Safety (MoS)
+คิดเทียบมูลค่าที่แท้จริง (Intrinsic Value / Base Case) ตามแนวคิด Benjamin Graham / Warren Buffett:
+$$\text{MoS } \% = \frac{\text{Intrinsic Price} - \text{Current Price}}{\text{Intrinsic Price}} \times 100$$
+- **MoS เป็นบวก (+):** ราคาตลาดต่ำกว่ามูลค่าประเมิน (มีส่วนเผื่อเพื่อความปลอดภัย)
+- **MoS เป็นลบ (-):** ราคาตลาดสูงกว่ามูลค่าประเมิน (Overvalued)
+- **Unvalued:** หุ้นที่ยังไม่มีการบันทึกประเมิน `Base Case` ในระบบ จะคืนค่า `mos_base = NULL` (ไม่เป็น 0)
+- **แตกต่างจาก Upside %:** $\text{Upside } \% = \frac{\text{Intrinsic Price} - \text{Current Price}}{\text{Current Price}} \times 100$ (คำนวณเทียบกับราคาตลาดปัจจุบัน)
+
+### B. Scenario Range Bar
+แสดงช่วงราคาที่แท้จริง `[Bear Case, Bull Case]` โดยมี `Base Case` เป็นจุดอ้างอิงหลัก พร้อมหมุดบอกราคาตลาดปัจจุบัน (Current Price) และจำแนก Price Zones 4 โซน:
+1. `below_bear`: ต่ำกว่า Bear Case (Deep Value - สีเขียว)
+2. `bear_to_base`: ระหว่าง Bear Case ถึง Base Case (สีเหลือง)
+3. `base_to_bull`: ระหว่าง Base Case ถึง Bull Case (สีส้ม)
+4. `above_bull`: สูงกว่า Bull Case (Overvalued - สีแดง)
+
+### C. โครงสร้างข้อมูลและการจัดเก็บบน Database (`market_stats`)
+ผลลัพธ์ DCF Range และ MoS จะถูก Denormalize ลงตาราง `market_stats` เพื่อให้คิวรีในตาราง Watchlist และ Portfolio Holdings ได้ทันทีโดยไม่ต้องคำนวณซ้ำ:
+- `dcf_bear` (REAL): ราคาประเมิน Bear Case
+- `dcf_base` (REAL): ราคาประเมิน Base Case (Anchor Intrinsic Value)
+- `dcf_bull` (REAL): ราคาประเมิน Bull Case
+- `mos_base` (REAL): ค่า MoS % เทียบกับ Base Case
+- `price_zone` (TEXT): โซนราคาปัจจุบัน
+- `mos_updated_at` (TEXT): วันเวลาล่าสุดที่คำนวณ MoS ใหม่
+
+### D. Synchronization & Recomputation Hooks
+ระบบทำการคำนวณและอัปเดต `mos_base` อัตโนมัติใน 3 จุด:
+1. **Price Sync (`fetchAndStoreMarketStats`):** คำนวณใหม่แบบ Batch หลังจากซิงค์ราคาหุ้นเสร็จสิ้น
+2. **DCF Save (`POST /api/analysis/dcf-save`):** คำนวณใหม่สำหรับหุ้นตัวนั้นทันทีที่ผู้ใช้บันทึกหรือปรับแก้ Scenario
+3. **External MCP Ingest (`save_dcf_scenarios`):** คำนวณใหม่ทันทีเมื่อ AI Agent (เช่น Gemini Spark) บันทึก Scenario ผ่าน MCP Server
+
+### E. Watchlist & Portfolio MoS Screener
+หน้า Watchlist (`MyWatchlist`) และ Portfolio Holdings (`HoldingsTab` / `HoldingsTable`) มี Screener กรองและจัดเรียงข้อมูล:
+- **Filter Chips:**
+  - `All`: แสดงหุ้นทั้งหมด
+  - `MoS ≥ 30%`: คัดเฉพาะหุ้นที่มีส่วนเผื่อเพื่อความปลอดภัยอย่างน้อย 30%
+  - `MoS ≥ 15%`: คัดเฉพาะหุ้นที่มี MoS อย่างน้อย 15%
+  - `Overvalued`: หุ้นที่ MoS < 0% (ราคาตลาดเกินมูลค่า Base Case)
+  - `Unvalued`: หุ้นใน Watchlist ที่ยังไม่มีการบันทึกประเมิน Base Case
+- **Portfolio Fallback Rule:** หุ้นใน Portfolio Holdings ที่ไม่อยู่ใน Watchlist จะแสดงสถานะเป็น `n/a` และไม่ถูกนับรวมในตัวกรอง MoS

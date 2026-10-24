@@ -141,11 +141,28 @@ describe('dcfTools', () => {
       expect(res.success).toBe(true);
       expect(res.symbol).toBe('NVDA');
       expect(res.saved_scenarios).toEqual(['Base Case', 'Bull Case']);
-      expect(mockDb.batch).toHaveBeenCalledTimes(1);
+      // 1st batch = DELETE/INSERT scenarios, 2nd batch = Margin of Safety refresh (ADR-0014)
+      expect(mockDb.batch).toHaveBeenCalledTimes(2);
 
       // 2 scenarios * 2 statements each (DELETE + INSERT) = 4 statements
       const batchArgs = executedBatches[0];
       expect(batchArgs.length).toBe(4);
+    });
+
+    it('refreshes persisted Margin of Safety on market_stats after saving (ADR-0014)', async () => {
+      await saveDcfScenarios(mockEnv, validBasePayload);
+      const update = preparedStatements.find((p) => p.sql.includes('UPDATE market_stats'));
+      expect(update).toBeDefined();
+      expect(update!.params[update!.params.length - 1]).toBe('NVDA');
+      expect(executedBatches[1]).toHaveLength(1);
+    });
+
+    it('still succeeds when the Margin of Safety refresh fails', async () => {
+      mockDb.batch
+        .mockImplementationOnce(async (s: any[]) => s.map(() => ({ success: true })))
+        .mockRejectedValueOnce(new Error('d1 refresh down'));
+      const res = await saveDcfScenarios(mockEnv, validBasePayload);
+      expect(res.success).toBe(true);
     });
 
     it('syncs target_price to watchlist when sync_target_price is true', async () => {

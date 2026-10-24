@@ -1,3 +1,5 @@
+import { refreshMarginOfSafety } from '@oaktree/shared';
+
 export interface DcfScenarioInput {
   scenario_name: 'Base Case' | 'Bull Case' | 'Bear Case';
   mode?: 'detailed' | 'uniform';
@@ -182,6 +184,13 @@ export async function saveDcfScenarios(env: any, args: SaveDcfScenariosArgs) {
   }
 
   await env.DB.batch(batchStatements);
+
+  // Keep persisted Margin of Safety in sync (ADR-0014). Non-fatal: scenarios are already saved.
+  try {
+    await refreshMarginOfSafety(env.DB, [symbolUpper]);
+  } catch (mosErr) {
+    console.error(`Failed to refresh MoS for ${symbolUpper}:`, mosErr);
+  }
 
   return {
     success: true,

@@ -1,6 +1,6 @@
 # Oaktree MCP Server (`oaktree-mcp`)
 
-เอกสารแนะนำและคู่มือการเชื่อมต่อสำหรับ Client (เช่น Claude Desktop, Cursor, Gemini Spark, NotebookLM Bridge, หรือ Custom MCP Clients) เพื่อเรียกใช้งานเครื่องมือ (Tools) ต่างๆ บน **Oaktree MCP Server** ซึ่งรันอยู่บน Cloudflare Workers ด้วย Cloudflare Agents SDK และ `@modelcontextprotocol/sdk`
+เอกสารแนะนำและคู่มือการเชื่อมต่อสำหรับ Client (เช่น Google Gemini Custom Apps / Spark, Antigravity, Claude Desktop, Cursor, Windsurf หรือ Custom MCP Clients) เพื่อเรียกใช้งานเครื่องมือ (Tools) ทั้ง 20 รายการบน **Oaktree MCP Server** ซึ่งรันอยู่บน Cloudflare Workers ด้วย Cloudflare Agents SDK และ `@modelcontextprotocol/sdk`
 
 ---
 
@@ -9,12 +9,13 @@
 1. [ข้อมูลภาพรวมของเซิร์ฟเวอร์ (Server Overview)](#-ข้อมูลภาพรวมของเซิร์ฟเวอร์-server-overview)
 2. [การยืนยันตัวตนและการเชื่อมต่อ (Authentication & Connection)](#-การยืนยันตัวตนและการเชื่อมต่อ-authentication--connection)
 3. [ตัวอย่างการตั้งค่า Client (Client Setup Examples)](#-ตัวอย่างการตั้งค่า-client-client-setup-examples)
-   - [Claude Desktop](#1-claude-desktop-claude_desktop_configjson)
-   - [Cursor / Windsurf IDE](#2-cursor--windsurf-ide)
-   - [Python MCP Client](#3-python-mcp-client)
-   - [Node.js / TypeScript MCP Client](#4-nodejs--typescript-mcp-client)
-   - [cURL / HTTP Test](#5-curl--http-test)
-4. [รายการ Tools ทั้งหมด (MCP Tools Reference)](#-รายการ-tools-ทั้งหมด-mcp-tools-reference)
+   - [Google Gemini (Custom Apps / Spark) & Antigravity](#1-google-gemini-custom-apps--spark--antigravity-mcp_configjson)
+   - [Claude Desktop](#2-claude-desktop-claude_desktop_configjson)
+   - [Cursor / Windsurf IDE](#3-cursor--windsurf-ide)
+   - [Python MCP Client](#4-python-mcp-client)
+   - [Node.js / TypeScript MCP Client](#5-nodejs--typescript-mcp-client)
+   - [cURL / HTTP Test](#6-curl--http-test)
+4. [รายการ Tools ทั้งหมด 20 รายการ (MCP Tools Reference)](#-รายการ-tools-ทั้งหมด-20-รายการ-mcp-tools-reference)
    - [`get_portfolio`](#1-get_portfolio)
    - [`get_portfolio_history`](#2-get_portfolio_history)
    - [`get_knowledge`](#3-get_knowledge)
@@ -27,6 +28,10 @@
    - [`save_dcf_scenarios`](#10-save_dcf_scenarios)
    - [`get_dcf_model`](#11-get_dcf_model)
    - [`list_dcf_symbols`](#12-list_dcf_symbols)
+   - [`save_fundamental_brief` & `get_fundamental_brief`](#13-save_fundamental_brief--get_fundamental_brief)
+   - [`save_bull_bear_debate` & `get_bull_bear_debate`](#14-save_bull_bear_debate--get_bull_bear_debate)
+   - [`save_theme_sector_context`](#15-save_theme_sector_context)
+   - [`get_portfolio_risk_audit`, `calculate_position_size` & `save_risk_advisory`](#16-get_portfolio_risk_audit-calculate_position_size--save_risk_advisory)
 5. [Internal & Admin Endpoints เพิ่มเติม](#-internal--admin-endpoints-เพิ่มเติม)
 6. [รหัสข้อผิดพลาด (Error Codes & Troubleshooting)](#-รหัสข้อผิดพลาด-error-codes--troubleshooting)
 
@@ -34,13 +39,16 @@
 
 ## 🌐 ข้อมูลภาพรวมของเซิร์ฟเวอร์ (Server Overview)
 
-- **Server Name**: `oaktree-mcp`
-- **Protocol**: Model Context Protocol (MCP) Version 1.0.0
-- **Transport**: HTTP POST / Server-Sent Events (SSE) / Stream (`transport: "auto"`)
-- **Default Endpoints**:
-  - **Production**: `https://<YOUR_WORKER_DOMAIN>/mcp`
-  - **Local Development**: `http://localhost:8788/mcp`
-- **Durable Object Class**: `OaktreeMCP`
+| รายการ | ค่า (Value) | หมายเหตุ |
+| :--- | :--- | :--- |
+| **Server Name** | `oaktree-mcp` | Cloudflare Worker + Durable Object (`OaktreeMCP`) |
+| **Protocol** | Model Context Protocol (MCP) 1.0.0 | JSON-RPC 2.0 |
+| **Transport** | Streamable HTTP (POST) / SSE (GET) | `transport: "auto"` |
+| **Production Endpoint** | `https://oaktree-mcp.nattapon-r.workers.dev/mcp` | URL หลักสำหรับ Production |
+| **Local Dev Endpoint** | `http://localhost:8788/mcp` | รันผ่าน `npm run dev --workspace=oaktree-mcp` |
+| **MCP Secret (`MCP_SECRET`)** | ดูค่าได้ที่ไฟล์ [`.dev.vars`](./.dev.vars) | รูปแบบ `ot_mcp_<32-char-hex>` |
+| **OAuth 2.0 Client ID** | `oaktree-gemini` | สำหรับ Client ที่ใช้ OAuth 2.0 PKCE Flow |
+| **OAuth 2.0 Client Secret** | ใช้ค่าเดียวกับ `MCP_SECRET` | หรือกำหนดแยกผ่าน `OAUTH_CLIENT_SECRET` |
 
 ---
 
@@ -54,39 +62,66 @@
   ```http
   Authorization: Bearer <YOUR_MCP_SECRET>
   ```
-- **Query Parameter** (สำหรับ Client ที่ไม่สามารถใส่ Custom Header ใน SSE connection):
-  ```
-  https://<YOUR_WORKER_DOMAIN>/mcp?token=<YOUR_MCP_SECRET>
+- **Query Parameter** (สำหรับ Client ที่รับเฉพาะ URL เดียว เช่น Google Gemini Custom Apps / Spark):
+  ```text
+  https://oaktree-mcp.nattapon-r.workers.dev/mcp?token=<YOUR_MCP_SECRET>
   ```
   หรือ
-  ```
-  https://<YOUR_WORKER_DOMAIN>/mcp?key=<YOUR_MCP_SECRET>
+  ```text
+  https://oaktree-mcp.nattapon-r.workers.dev/mcp?key=<YOUR_MCP_SECRET>
   ```
 
 ### 2. OAuth 2.0 PKCE Flow
 Worker รองรับ RFC 8414 & RFC 9207 สำหรับ Client ที่ต้องการ OAuth Discovery:
-- **Protected Resource Metadata**: `GET /.well-known/oauth-protected-resource`
-- **Authorization Server Metadata**: `GET /.well-known/oauth-authorization-server`
-- **Authorize URL**: `GET /oauth/authorize`
-- **Token URL**: `POST /oauth/token`
+- **Client ID**: `oaktree-gemini`
+- **Client Secret**: `<YOUR_MCP_SECRET>`
+- **Protected Resource Metadata**: `GET https://oaktree-mcp.nattapon-r.workers.dev/.well-known/oauth-protected-resource`
+- **Authorization Server Metadata**: `GET https://oaktree-mcp.nattapon-r.workers.dev/.well-known/oauth-authorization-server`
+- **Authorize URL**: `GET https://oaktree-mcp.nattapon-r.workers.dev/oauth/authorize`
+- **Token URL**: `POST https://oaktree-mcp.nattapon-r.workers.dev/oauth/token`
 
 ---
 
 ## ⚙️ ตัวอย่างการตั้งค่า Client (Client Setup Examples)
 
-### 1. Claude Desktop (`claude_desktop_config.json`)
+### 1. Google Gemini (Custom Apps / Spark) & Antigravity (`mcp_config.json`)
 
-สำหรับ Claude Desktop สามารถเชื่อมต่อผ่าน `mcp-remote` bridge หรือ `mcp-proxy`:
+#### สำหรับ Google Gemini (Custom Apps / Spark)
+1. เข้าเว็บ [gemini.google.com](https://gemini.google.com) -> **Settings & help** -> **Connected Apps** -> **Add a custom app**
+2. วาง URL ด้านล่าง (แทนที่ `<YOUR_MCP_SECRET>` ด้วยค่าจากไฟล์ [`.dev.vars`](./.dev.vars)):
+   ```text
+   https://oaktree-mcp.nattapon-r.workers.dev/mcp?token=<YOUR_MCP_SECRET>
+   ```
+3. สำหรับคำสั่ง System Instructions ของ Custom Gem สามารถคัดลอกจาก [`.agents/skills/oaktree-gemini-copilot/SKILL.md`](../.agents/skills/oaktree-gemini-copilot/SKILL.md)
+
+#### สำหรับ Antigravity (`~/.gemini/config/mcp_config.json`)
+เพิ่มบล็อก `"oaktree-mcp"` ลงในไฟล์ `C:\Users\<USER>\.gemini\config\mcp_config.json`:
 
 ```json
 {
   "mcpServers": {
-    "oaktree": {
+    "oaktree-mcp": {
+      "serverUrl": "https://oaktree-mcp.nattapon-r.workers.dev/mcp?token=<YOUR_MCP_SECRET>"
+    }
+  }
+}
+```
+
+---
+
+### 2. Claude Desktop (`claude_desktop_config.json`)
+
+สำหรับ Claude Desktop สามารถเชื่อมต่อผ่าน `mcp-remote` bridge:
+
+```json
+{
+  "mcpServers": {
+    "oaktree-mcp": {
       "command": "npx",
       "args": [
         "-y",
         "mcp-remote",
-        "https://<YOUR_WORKER_DOMAIN>/mcp",
+        "https://oaktree-mcp.nattapon-r.workers.dev/mcp",
         "--header",
         "Authorization: Bearer <YOUR_MCP_SECRET>"
       ]
@@ -115,23 +150,24 @@ Worker รองรับ RFC 8414 & RFC 9207 สำหรับ Client ที�
 
 ---
 
-### 2. Cursor / Windsurf IDE
+### 3. Cursor / Windsurf IDE
 
 ในหน้าต่าง Settings ของ IDE ไปที่แท็บ **MCP Servers** -> **Add New Server**:
+- **Name**: `oaktree-mcp`
 - **Type**: `command` (หรือ `sse` หากรองรับ Header)
 - **Command**: `npx`
-- **Args**: `["-y", "mcp-remote", "https://<YOUR_WORKER_DOMAIN>/mcp", "--header", "Authorization: Bearer <YOUR_MCP_SECRET>"]`
+- **Args**: `["-y", "mcp-remote", "https://oaktree-mcp.nattapon-r.workers.dev/mcp", "--header", "Authorization: Bearer <YOUR_MCP_SECRET>"]`
 
 ---
 
-### 3. Python MCP Client
+### 4. Python MCP Client
 
 ```python
 import asyncio
 from mcp import ClientSession
 from mcp.client.sse import sse_client
 
-MCP_URL = "https://<YOUR_WORKER_DOMAIN>/mcp"
+MCP_URL = "https://oaktree-mcp.nattapon-r.workers.dev/mcp"
 HEADERS = {"Authorization": "Bearer <YOUR_MCP_SECRET>"}
 
 async def main():
@@ -152,7 +188,7 @@ asyncio.run(main())
 
 ---
 
-### 4. Node.js / TypeScript MCP Client
+### 5. Node.js / TypeScript MCP Client
 
 ```typescript
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -160,7 +196,7 @@ import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 
 async function run() {
   const transport = new SSEClientTransport(
-    new URL("https://<YOUR_WORKER_DOMAIN>/mcp"),
+    new URL("https://oaktree-mcp.nattapon-r.workers.dev/mcp"),
     {
       eventSourceInit: {
         headers: {
@@ -191,13 +227,14 @@ run();
 
 ---
 
-### 5. cURL / HTTP Test
+### 6. cURL / HTTP Test
 
 สามารถทดสอบเบื้องต้นผ่าน JSON-RPC 2.0:
 
 ```bash
-curl -X POST "https://<YOUR_WORKER_DOMAIN>/mcp" \
+curl -X POST "https://oaktree-mcp.nattapon-r.workers.dev/mcp" \
   -H "Content-Type: application/json" \
+  -H "Accept: application/json, text/event-stream" \
   -H "Authorization: Bearer <YOUR_MCP_SECRET>" \
   -d '{
     "jsonrpc": "2.0",
@@ -214,21 +251,32 @@ curl -X POST "https://<YOUR_WORKER_DOMAIN>/mcp" \
 
 ---
 
-## 🛠️ รายการ Tools ทั้งหมด (MCP Tools Reference)
+## 🛠️ รายการ Tools ทั้งหมด 20 รายการ (MCP Tools Reference)
 
-สรุปเครื่องมือทั้งหมด 9 รายการที่ลงทะเบียนไว้ใน `OaktreeMCP`:
+สรุปเครื่องมือทั้งหมด 20 รายการที่ลงทะเบียนไว้ใน `OaktreeMCP`:
 
-| Tool Name | คำอธิบาย | พารามิเตอร์ |
-| :--- | :--- | :--- |
-| [`get_portfolio`](#1-get_portfolio) | ดึงข้อมูลหุ้นที่ถือครองในพอร์ตจริง (19 symbols) พร้อมต้นทุน, กำไรขาดทุน และ thesis | *ไม่มี* |
-| [`get_portfolio_history`](#2-get_portfolio_history) | ดึงประวัติผลตอบแทนพอร์ตลงทุนย้อนหลังรายปี | *ไม่มี* |
-| [`get_knowledge`](#3-get_knowledge) | ดึงหลักปรัชญาและกรอบการลงทุนตาม Category ที่ระบุ | `category` (string, required) |
-| [`search_knowledge`](#4-search_knowledge) | ค้นหาบทความความรู้และรายการ Watchlist ด้วยคำค้นหา | `query` (string, required) |
-| [`get_analysis_report`](#5-get_analysis_report) | ดึงรายงานวิเคราะห์เจาะลึกแบบ Value Investor ล่าสุดของหุ้น | `symbol` (string, required) |
-| [`get_watchlist`](#6-get_watchlist) | ดึงรายการหุ้นใน Watchlist (24 symbols) พร้อมราคาเป้าหมายและราคาตลาด | `active_only` (boolean, optional) |
-| [`save_market_intelligence`](#7-save_market_intelligence) | บันทึกข่าวสารและบทวิเคราะห์ตลาดลงฐานข้อมูล D1 และ R2 Knowledge Base | `title`, `summary`, `key_takeaways`, `symbol`, ฯลฯ |
-| [`create_facebook_post_draft`](#8-create_facebook_post_draft) | สร้างร่างโพสต์ Facebook (Draft) เพื่อให้ผู้ใช้ตรวจสอบก่อนเผยแพร่ | `title`, `content` (strings, required) |
-| [`get_recent_intelligence`](#9-get_recent_intelligence) | ดึงข่าวและบทวิเคราะห์ตลาดล่าสุดที่บันทึกไว้ในระบบ | `limit`, `source` (optional) |
+| หมวดหมู่ | Tool Name | คำอธิบาย | พารามิเตอร์หลัก |
+| :--- | :--- | :--- | :--- |
+| **Portfolio & Risk** | [`get_portfolio`](#1-get_portfolio) | ดึงข้อมูลหุ้นที่ถือครองในพอร์ตจริง (19 symbols) พร้อมต้นทุน, กำไรขาดทุน และ thesis | *ไม่มี* |
+| | [`get_portfolio_history`](#2-get_portfolio_history) | ดึงประวัติผลตอบแทนพอร์ตลงทุนย้อนหลังรายปี | *ไม่มี* |
+| | [`get_portfolio_risk_audit`](#16-get_portfolio_risk_audit-calculate_position_size--save_risk_advisory) | ตรวจสอบความเสี่ยงพอร์ตแบบครบวงจร (Health Score, Beta, Correlation, น้ำหนักหุ้น/Theme, Sizing Room) | *ไม่มี* |
+| | [`calculate_position_size`](#16-get_portfolio_risk_audit-calculate_position_size--save_risk_advisory) | คำนวณขนาดไม้ลงทุนตามกฎ Fixed-Base (8% Target, 15% Stock Cap, 30% Theme Cap) และจำลองก่อนเทรด | `symbol`, `price`, `shares`, `type` |
+| | [`save_risk_advisory`](#16-get_portfolio_risk_audit-calculate_position_size--save_risk_advisory) | บันทึกคำแนะนำจาก Chief Risk Officer (Health Score, Risk Level, คำเตือน, แผนปรับพอร์ต) ลง D1 | `health_score`, `risk_level`, `executive_summary`, `key_warnings`, `rebalancing_actions` |
+| **DCF Valuation** | [`save_dcf_scenarios`](#10-save_dcf_scenarios) | บันทึกโมเดล DCF ทั้ง 3 Scenarios (`Base Case`, `Bull Case`, `Bear Case`) แบบ Atomic Overwrite | `symbol`, `scenarios`, `sync_target_price` |
+| | [`get_dcf_model`](#11-get_dcf_model) | ดึงข้อมูล DCF Scenarios ของหุ้น พร้อมคำนวณ Upside/Downside % และ Margin of Safety % | `symbol` |
+| | [`list_dcf_symbols`](#12-list_dcf_symbols) | แสดงรายชื่อหุ้นทั้งหมดที่มีโมเดล DCF ในระบบ พร้อมราคาประเมิน Base Case ล่าสุด | *ไม่มี* |
+| **Fundamental & Debate** | [`save_fundamental_brief`](#13-save_fundamental_brief--get_fundamental_brief) | บันทึกข้อมูลพื้นฐานเชิงคุณภาพของบริษัท + โต้วาที Bull vs. Bear 3 รอบ + สร้างไฟล์ OKF ลง R2 | `symbol`, `business_model`, `moat`, `competitors`, `guidance`, `key_risks`, `thesis_kpis`, `debate` |
+| | [`get_fundamental_brief`](#13-save_fundamental_brief--get_fundamental_brief) | ดึงข้อมูลวิเคราะห์พื้นฐานเชิงคุณภาพและบริบท Theme ของหุ้นที่ระบุ | `symbol` |
+| | [`save_bull_bear_debate`](#14-save_bull_bear_debate--get_bull_bear_debate) | บันทึกผลการโต้วาทีเชิงวิพากษ์ (Bull vs. Bear 3 รอบ) พร้อม `conviction_score` (-10 ถึง +10) | `symbol`, `as_of_date`, `round1`, `round2`, `round3` |
+| | [`get_bull_bear_debate`](#14-save_bull_bear_debate--get_bull_bear_debate) | ดึงข้อมูลการโต้วาที Bull vs. Bear และคะแนนความเชื่อมั่นของหุ้นที่ระบุ | `symbol` |
+| | [`save_theme_sector_context`](#15-save_theme_sector_context) | บันทึกบริบทอุตสาหกรรม/Theme (แนวโน้ม, คอขวดห่วงโซ่อุปทาน, การแข่งขัน) และผูกกับรหัสหุ้น | `theme_name`, `industry_dynamics`, `symbols`, ฯลฯ |
+| **Watchlist & News** | [`get_watchlist`](#6-get_watchlist) | ดึงรายการหุ้นใน Watchlist (24 symbols) พร้อมราคาเป้าหมายและราคาตลาด | `active_only` (optional) |
+| | [`save_market_intelligence`](#7-save_market_intelligence) | บันทึกข่าวสารและบทวิเคราะห์ตลาดลงฐานข้อมูล D1 และ R2 Knowledge Base | `title`, `summary`, `key_takeaways`, `symbol`, ฯลฯ |
+| | [`create_facebook_post_draft`](#8-create_facebook_post_draft) | สร้างร่างโพสต์ Facebook (Draft) เพื่อให้ผู้ใช้ตรวจสอบก่อนเผยแพร่ | `title`, `content` |
+| | [`get_recent_intelligence`](#9-get_recent_intelligence) | ดึงข่าวและบทวิเคราะห์ตลาดล่าสุดที่บันทึกไว้ในระบบ | `limit`, `source` (optional) |
+| | [`get_knowledge`](#3-get_knowledge) | ดึงหลักปรัชญาและกรอบการลงทุนตาม Category ที่ระบุ | `category` |
+| | [`search_knowledge`](#4-search_knowledge) | ค้นหาบทความความรู้และรายการ Watchlist ด้วยคำค้นหา | `query` |
+| | [`get_analysis_report`](#5-get_analysis_report) | ดึงรายงานวิเคราะห์เจาะลึกแบบ Value Investor ล่าสุดของหุ้น | `symbol` |
 
 ---
 
@@ -301,26 +349,6 @@ curl -X POST "https://<YOUR_WORKER_DOMAIN>/mcp" \
 | :--- | :--- | :--- | :--- |
 | `category` | `string` | **Yes** | หมวดหมู่ความรู้ เช่น `'intelligent_investor'`, `'buffett_principles'`, `'five_forces'`, `'margin_of_safety'` |
 
-#### Example Call
-```json
-{
-  "category": "buffett_principles"
-}
-```
-
-#### Response Example
-```json
-[
-  {
-    "id": 4,
-    "category": "buffett_principles",
-    "title": "Circle of Competence",
-    "content": "Know where the perimeter of your circle of competence lies and stay inside it.",
-    "created_at": "2026-01-10 12:00:00"
-  }
-]
-```
-
 ---
 
 ### 4. `search_knowledge`
@@ -332,25 +360,6 @@ curl -X POST "https://<YOUR_WORKER_DOMAIN>/mcp" \
 | :--- | :--- | :--- | :--- |
 | `query` | `string` | **Yes** | คำค้นหา เช่น `'margin of safety'`, `'moat'`, `'watchlist'`, หรือชื่อแนวคิดการลงทุน |
 
-#### Example Call
-```json
-{
-  "query": "moat"
-}
-```
-
-#### Response Example
-```json
-[
-  {
-    "id": 12,
-    "category": "five_forces",
-    "title": "Economic Moats & Competitive Advantage",
-    "content": "A sustainable competitive advantage that allows a company to maintain superior profitability..."
-  }
-]
-```
-
 ---
 
 ### 5. `get_analysis_report`
@@ -360,26 +369,6 @@ curl -X POST "https://<YOUR_WORKER_DOMAIN>/mcp" \
 | Field | Type | Required | Description |
 | :--- | :--- | :--- | :--- |
 | `symbol` | `string` | **Yes** | สัญลักษณ์หุ้น (Ticker symbol) เช่น `AAPL`, `MSFT`, `NVDA` |
-
-#### Example Call
-```json
-{
-  "symbol": "AAPL"
-}
-```
-
-#### Response Example
-```json
-{
-  "id": 105,
-  "symbol": "AAPL",
-  "score": 85,
-  "recommendation": "BUY",
-  "dcf_fair_value": 245.0,
-  "summary": "Apple retains unprecedented brand equity and ecosystem stickiness...",
-  "created_at": "2026-10-01 10:30:00"
-}
-```
 
 ---
 
@@ -391,35 +380,10 @@ curl -X POST "https://<YOUR_WORKER_DOMAIN>/mcp" \
 | :--- | :--- | :--- | :--- |
 | `active_only` | `boolean` | No | หากเป็น `true` จะดึงเฉพาะหุ้นที่มีสถานะ Active (21 หุ้น), หากละเว้นหรือเป็น `false` จะดึงทั้งหมด 24 หุ้น |
 
-#### Example Call
-```json
-{
-  "active_only": true
-}
-```
-
-#### Response Example
-```json
-[
-  {
-    "symbol": "NVDA",
-    "name": "NVIDIA Corporation",
-    "sector": "Semiconductors",
-    "target_price": 110.0,
-    "thesis": "Dominant GPU supplier for accelerated AI compute workloads.",
-    "is_active": 1,
-    "current_price": 125.40,
-    "pe_ratio": 48.2,
-    "fifty_two_week_high": 140.76,
-    "fifty_two_week_low": 45.12
-  }
-]
-```
-
 ---
 
 ### 7. `save_market_intelligence`
-บันทึกสรุปข่าวสารตลาดและบทวิเคราะห์การลงทุน (เช่น จาก Gemini Spark หรือ External Agent) ลงสู่:
+บันทึกสรุปข่าวสารตลาดและบทวิเคราะห์การลงทุนลงสู่:
 1. ฐานข้อมูล D1 ตาราง `notebook_articles`
 2. Cloudflare R2 Knowledge Bucket ในรูปแบบ OKF Markdown (`articles/<slug>.md`)
 3. (ตัวเลือก) จัดคิวลง `facebook_posts` หากตั้งค่า `auto_publish_facebook: true`
@@ -436,37 +400,6 @@ curl -X POST "https://<YOUR_WORKER_DOMAIN>/mcp" \
 | `url` | `string` | No | ลิงก์อ้างอิงต้นทางของข่าว |
 | `auto_publish_facebook` | `boolean` | No | หากเป็น `true` จะจัดคิวส่งโพสต์ไปยัง Facebook Page อัตโนมัติ |
 
-#### Example Call
-```json
-{
-  "title": "Fed Rate Decision and Semiconductor Capex Outlook",
-  "summary": "Federal Reserve indicates gradual rate adjustments as hyperscalers increase datacenter capex spending.",
-  "key_takeaways": [
-    "Hyperscaler capex projected to increase 18% YoY",
-    "Supply chain constraints easing for advanced packaging",
-    "Valuation multiples remain within historical 5-year averages"
-  ],
-  "symbol": "NVDA",
-  "category": "Semiconductors",
-  "source": "gemini_spark",
-  "url": "https://example.com/news/123",
-  "auto_publish_facebook": false
-}
-```
-
-#### Response Example
-```json
-{
-  "success": true,
-  "id": 42,
-  "title": "Fed Rate Decision and Semiconductor Capex Outlook",
-  "symbol": "NVDA",
-  "source": "gemini_spark",
-  "auto_publish": false,
-  "r2_key": "articles/fed_rate_decision_and_semiconductor_capex_outlook.md"
-}
-```
-
 ---
 
 ### 8. `create_facebook_post_draft`
@@ -478,23 +411,6 @@ curl -X POST "https://<YOUR_WORKER_DOMAIN>/mcp" \
 | `title` | `string` | **Yes** | หัวข้อเรื่อง หรือประเด็นของโพสต์ |
 | `content` | `string` | **Yes** | ข้อความเนื้อหาภาษาไทยสำหรับโพสต์ลง Facebook |
 
-#### Example Call
-```json
-{
-  "title": "ข้อคิดเรื่อง Circle of Competence จาก Howard Marks",
-  "content": "ในการลงทุน การรู้ว่าเราไม่รู้อะไรสำคัญกว่าการพยายามรู้ทุกเรื่อง... #ValueInvesting #Oaktree"
-}
-```
-
-#### Response Example
-```json
-{
-  "success": true,
-  "message": "Facebook post draft created successfully",
-  "title": "ข้อคิดเรื่อง Circle of Competence จาก Howard Marks"
-}
-```
-
 ---
 
 ### 9. `get_recent_intelligence`
@@ -505,30 +421,6 @@ curl -X POST "https://<YOUR_WORKER_DOMAIN>/mcp" \
 | :--- | :--- | :--- | :--- |
 | `limit` | `number` | No | จำนวนบทความที่ต้องการดึง (Default: 10, สูงสุด 50) |
 | `source` | `string` | No | กรองตามแหล่งที่มา เช่น `'gemini_spark'` หรือ `'notebooklm'` |
-
-#### Example Call
-```json
-{
-  "limit": 5,
-  "source": "gemini_spark"
-}
-```
-
-#### Response Example
-```json
-[
-  {
-    "id": 42,
-    "title": "Fed Rate Decision and Semiconductor Capex Outlook",
-    "symbol": "NVDA",
-    "summary": "Federal Reserve indicates gradual rate adjustments...",
-    "key_takeaways": "[\"Hyperscaler capex projected to increase 18% YoY\"]",
-    "source": "gemini_spark",
-    "category": "Semiconductors",
-    "created_at": "2026-10-07 10:41:00"
-  }
-]
-```
 
 ---
 
@@ -546,7 +438,7 @@ curl -X POST "https://<YOUR_WORKER_DOMAIN>/mcp" \
 - `scenario_name` (*Required*): `'Base Case'` \| `'Bull Case'` \| `'Bear Case'`
 - `mode` (*Optional*): `'detailed'` (Default) หรือ `'uniform'`
 - `base_revenue` (*Required*): รายได้ตั้งต้น ($B)
-- `shares_outstanding` (*Required*): จำนวนหุ้นทั้งหมดในหน่วย **ล้านหุ้น ($M$)** (ห้ามใส่หน่วยพันล้าน เช่น หุ้น 15B ให้ใส่ 15000)
+- `shares_outstanding` (*Required*): จำนวนหุ้นทั้งหมดในหน่วย **ล้านหุ้น ($M)** (เช่น หุ้น 15B ให้ใส่ `15000`)
 - `net_cash` (*Optional*): เงินสดสุทธิ ($B) (Total Cash - Total Debt) (Default: `0`)
 - `wacc` (*Required*): อัตราคิดลด / WACC (%)
 - `terminal_growth` (*Required*): Perpetual growth rate (%) ต้องน้อยกว่า WACC
@@ -570,37 +462,33 @@ curl -X POST "https://<YOUR_WORKER_DOMAIN>/mcp" \
 | :--- | :--- | :--- | :--- |
 | `symbol` | `string` | **Yes** | รหัสย่อหุ้น เช่น `NVDA` |
 
-#### Response Example
-```json
-{
-  "symbol": "NVDA",
-  "current_price": 125.40,
-  "scenarios": [
-    {
-      "scenario_name": "Base Case",
-      "implied_share_price": 142.50,
-      "upside_downside_pct": 13.64,
-      "margin_of_safety_pct": 12.00,
-      "mode": "detailed",
-      "wacc": 10.5,
-      "terminal_growth": 3.0,
-      "exit_multiple": 25.0,
-      "yearly_growth": [35, 25, 20, 15, 12],
-      "rationale": "Base case assumes sustained data center capex...",
-      "source": "gemini_spark",
-      "created_at": "2026-10-08 23:30:00"
-    }
-  ]
-}
-```
-
 ---
 
 ### 12. `list_dcf_symbols`
 ดึงรายชื่อหุ้นทั้งหมดที่มีการประเมินและบันทึกโมเดล DCF ไว้ในระบบ พร้อมสรุปราคาประเมิน Base Case และวันที่ประเมินล่าสุด
 
-#### Parameters
-*ไม่มีพารามิเตอร์*
+---
+
+### 13. `save_fundamental_brief` & `get_fundamental_brief`
+บันทึกหรือดึงข้อมูลวิจัยพื้นฐานเชิงคุณภาพของบริษัท (`business_model`, `moat`, `competitors`, `guidance`, `key_risks`, `thesis_kpis`) พร้อมตัวเลือกแนบผลโต้วาที Bull vs. Bear 3 รอบ (`debate`) ในการเรียกครั้งเดียวแบบ Atomic ลงฐานข้อมูล D1 และสร้างไฟล์ OKF Markdown ลง R2
+
+---
+
+### 14. `save_bull_bear_debate` & `get_bull_bear_debate`
+บันทึกหรือดึงข้อมูลการโต้วาทีเชิงวิพากษ์ 3 รอบ (Round 1 Opening Theses, Round 2 Cross-Examination Rebuttals, Round 3 Arbiter Synthesis) พร้อมคะแนนความเชื่อมั่น `conviction_score` (สเกล `-10` Strong Bear ถึง `+10` Strong Bull)
+
+---
+
+### 15. `save_theme_sector_context`
+บันทึกบริบทอุตสาหกรรมหรือ Theme การลงทุน (`theme_name`, `industry_dynamics`, `supply_chain_bottlenecks`, `competitive_landscape`, `macro_trends`) และผูกความสัมพันธ์เข้ากับรายการหุ้น (`symbols`)
+
+---
+
+### 16. `get_portfolio_risk_audit`, `calculate_position_size` & `save_risk_advisory`
+ชุดเครื่องมือบริหารความเสี่ยงพอร์ตตามหลักการของ Howard Marks:
+- `get_portfolio_risk_audit`: คำนวณความเสี่ยงพอร์ตแบบครบวงจร (น้ำหนักรายตัวเทียบเพดาน 15%, น้ำหนักราย Theme เทียบเพดาน 30%, คู่หุ้นที่มี Correlation $\ge 0.70$, Portfolio Beta เทียบ S&P 500, Health Score 0-100 และวงเงินที่ซื้อเพิ่มได้ของแต่ละหุ้น)
+- `calculate_position_size`: คำนวณขนาดไม้ลงทุนตามกฎ Fixed-Base (8% Target, 15% Stock Cap, 30% Theme Cap) และจำลองผลกระทบก่อนส่งคำสั่งซื้อ/ขายจริง
+- `save_risk_advisory`: บันทึกบทวิเคราะห์และคำเตือนจาก Chief Risk Officer (`health_score`, `risk_level`, `executive_summary`, `key_warnings`, `rebalancing_actions`) ลง D1 เพื่อแสดงผลบนหน้าแดชบอร์ด
 
 ---
 
@@ -611,14 +499,7 @@ curl -X POST "https://<YOUR_WORKER_DOMAIN>/mcp" \
 ### 1. Database Agent Tools (`/database-chat`)
 เมื่อเปิดใช้งาน `ENABLE_DATABASE_AGENT = "true"` ในตัวแปรสภาพแวดล้อม:
 - Endpoint: `POST /database-chat` (ต้องมี JWT Authentication)
-- เครื่องมือที่มี:
-  - `list_d1_tables`: แสดงรายชื่อตารางทั้งหมดใน D1
-  - `get_d1_table_schema`: ดูนิยามคอลัมน์ของตาราง
-  - `execute_d1_sql`: รันคำสั่ง SQL โดยตรง (SELECT สูงสุด 100 แถว, INSERT, UPDATE, DDL)
-  - `list_r2_objects`: แสดงไฟล์ใน Bucket `oaktree-assets`
-  - `get_r2_object`: อ่านไฟล์ข้อความหรือ JSON จาก R2
-  - `put_r2_object`: อัปโหลดหรือเขียนทับไฟล์ใน R2
-  - `delete_r2_object`: ลบไฟล์ใน R2
+- เครื่องมือที่มี: `list_d1_tables`, `get_d1_table_schema`, `execute_d1_sql`, `list_r2_objects`, `get_r2_object`, `put_r2_object`, `delete_r2_object`
 
 ### 2. Oaktree Chat Agent (`/agents/oaktree-chat/:sessionId`)
 - สตรีมข้อความตอบโต้กับ AI Assistant ที่ถูก Inject บริบทของ Portfolio และ Watchlist แบบเรียลไทม์
@@ -632,7 +513,7 @@ curl -X POST "https://<YOUR_WORKER_DOMAIN>/mcp" \
 | :--- | :--- | :--- | :--- |
 | `-32000` | `401 Unauthorized` | ขาด Token หรือ Token ไม่ถูกต้อง | ตรวจสอบว่าได้แนบ Header `Authorization: Bearer <MCP_SECRET>` หรือ parameter `?token=<SECRET>` ถูกต้องหรือไม่ |
 | `-32603` | `500 Internal Error` | เกิดข้อผิดพลาดภายใน Worker | ตรวจสอบ Cloudflare Worker Logs (`npx wrangler tail`) หรือตรวจสอบการเชื่อมต่อฐานข้อมูล D1 |
-| `-32601` | `400 Method not found` | ไม่พบชื่อ Tool ที่เรียก | ตรวจสอบว่าสะกดชื่อ Tool ถูกต้องตามรายการทั้ง 9 ตัวข้างต้น |
+| `-32601` | `400 Method not found` | ไม่พบชื่อ Tool ที่เรียก | ตรวจสอบว่าสะกดชื่อ Tool ถูกต้องตามรายการทั้ง 20 ตัวข้างต้น |
 | `-32602` | `400 Invalid params` | พารามิเตอร์ไม่ตรงตาม Zod Schema | ตรวจสอบชนิดข้อมูล (Types) และฟิลด์ที่ Required ให้ครบถ้วน |
 
 ---
@@ -643,5 +524,4 @@ curl -X POST "https://<YOUR_WORKER_DOMAIN>/mcp" \
 ```bash
 npm test
 ```
-ครอบคลุมการตรวจสอบความถูกต้องของการลงทะเบียน Tools ทั้ง 9 รายการ, Input Validation, Authentication, และการสื่อสารผ่าน MCP Transport
-
+ครอบคลุมการตรวจสอบความถูกต้องของการลงทะเบียน Tools ทั้ง 20 รายการ, Input Validation, Authentication, และการสื่อสารผ่าน MCP Transport
