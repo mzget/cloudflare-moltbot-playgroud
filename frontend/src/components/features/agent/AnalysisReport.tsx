@@ -1,8 +1,9 @@
-﻿import * as React from 'react';
+import * as React from 'react';
 import { Box, Button, Typography, Sheet, CircularProgress, Divider, Stack, Tabs, TabList, Tab, Select, Option } from '@mui/joy';
-import { ArrowLeft, RotateCw, CheckCircle, AlertTriangle, Play, FileText, Calculator, BookOpen, TrendingUp, BarChart3 } from 'lucide-react';
+import { ArrowLeft, RotateCw, CheckCircle, AlertTriangle, Play, FileText, Calculator, BookOpen, TrendingUp, BarChart3, LayoutDashboard } from 'lucide-react';
 import StockOverview from './StockOverview';
 import StockThesis from './StockThesis';
+import StockDossierCockpit from './StockDossierCockpit';
 import { useNavigate } from '@tanstack/react-router';
 import { API_BASE_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
@@ -10,6 +11,7 @@ import MarkdownRenderer from '../../common/MarkdownRenderer';
 import DCFModel from './DCFModel';
 import DebateCard from './DebateCard';
 
+const TAB_KEYS = ['dossier', 'overview', 'report', 'dcf-model', 'stock-thesis'] as const;
 
 interface AnalysisReportProps {
   symbol: string;
@@ -24,7 +26,16 @@ export default function AnalysisReport({ symbol, onBack, subTab }: AnalysisRepor
   const [analyzing, setAnalyzing] = React.useState(false);
   const [report, setReport] = React.useState<any>(null);
   const [error, setError] = React.useState<string | null>(null);
-  const activeToolTab = subTab === 'report' ? 1 : subTab === 'dcf-model' ? 2 : subTab === 'stock-thesis' ? 3 : 0;
+  const activeToolTab =
+    subTab === 'overview'
+      ? 1
+      : subTab === 'report'
+      ? 2
+      : subTab === 'dcf-model'
+      ? 3
+      : subTab === 'stock-thesis'
+      ? 4
+      : 0;
 
   const [symbolsList, setSymbolsList] = React.useState<string[]>(['MSFT', 'AAPL', 'NVDA', 'GOOGL', 'AMZN', 'META', 'TSLA']);
 
@@ -248,7 +259,7 @@ export default function AnalysisReport({ symbol, onBack, subTab }: AnalysisRepor
           onChange={(_, val) => {
             navigate({
               to: '/analysis',
-              search: { symbol, tab: (['overview', 'report', 'dcf-model', 'stock-thesis'] as const)[val as number] || 'overview' },
+              search: { symbol, tab: TAB_KEYS[val as number] || 'dossier' },
             });
           }}
           sx={{ bgcolor: 'transparent' }}
@@ -282,6 +293,10 @@ export default function AnalysisReport({ symbol, onBack, subTab }: AnalysisRepor
             }}
           >
             <Tab disableIndicator>
+              <LayoutDashboard size={15} />
+              Cockpit
+            </Tab>
+            <Tab disableIndicator>
               <BarChart3 size={15} />
               Overview
             </Tab>
@@ -306,8 +321,8 @@ export default function AnalysisReport({ symbol, onBack, subTab }: AnalysisRepor
           value={symbol}
           onChange={(_, val) => {
             if (val && val !== symbol) {
-              const tabNames = ['overview', 'report', 'dcf-model', 'stock-thesis'] as const;
-              const currentTabName = (subTab || tabNames[activeToolTab] || 'overview') as 'overview' | 'report' | 'dcf-model' | 'stock-thesis';
+              const currentTabName: (typeof TAB_KEYS)[number] =
+                TAB_KEYS.find((k) => k === subTab) || TAB_KEYS[activeToolTab] || 'dossier';
               navigate({
                 to: '/analysis',
                 search: { symbol: val, tab: currentTabName },
@@ -344,10 +359,22 @@ export default function AnalysisReport({ symbol, onBack, subTab }: AnalysisRepor
       </Stack>
 
       {/* Tab Content */}
-      {activeToolTab === 0 && <StockOverview symbol={symbol} />}
-      {activeToolTab === 1 && renderReportContent()}
-      {activeToolTab === 2 && <DCFModel symbol={symbol} />}
-      {activeToolTab === 3 && <StockThesis symbol={symbol} />}
+      {activeToolTab === 0 && (
+        <StockDossierCockpit
+          symbol={symbol}
+          initialReport={report}
+          onNavigateTab={(tab) => {
+            navigate({
+              to: '/analysis',
+              search: { symbol, tab },
+            });
+          }}
+        />
+      )}
+      {activeToolTab === 1 && <StockOverview symbol={symbol} />}
+      {activeToolTab === 2 && renderReportContent()}
+      {activeToolTab === 3 && <DCFModel symbol={symbol} />}
+      {activeToolTab === 4 && <StockThesis symbol={symbol} />}
     </Box>
   );
 }
