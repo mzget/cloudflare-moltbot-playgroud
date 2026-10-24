@@ -61,7 +61,7 @@ Do NOT load domain-specific guidelines or all skills at the start of every turn.
    - *Condition*: Working on stock valuation, DCF calculations, DCF parameters entry, or DCF UI components.
    - *Path*: [dcf-valuation-model/SKILL.md](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/.agents/skills/dcf-valuation-model/SKILL.md)
 9. **Release Management Guidelines (tostaging / tomain)**:
-   - *Condition*: Merging branches, preparing staging/production releases, or executing release commands.
+   - *Condition*: Merging branches, preparing staging/production releases, or executing release commands. Delegates release execution to a `flash_lite` sub-agent (`Workspace: 'inherit'`).
    - *Path*: [release/SKILL.md](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/.agents/skills/release/SKILL.md)
 
 ---

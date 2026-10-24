@@ -1,6 +1,6 @@
 ---
 name: release
-description: Release management guidelines for Oaktree Agent. Automates merging and pushing code to staging (develop) and production (main) with strict safety guardrails and mandatory type checking (ci:typecheck) before push.
+description: Release management guidelines for Oaktree Agent. Automates merging and pushing code to staging (develop) and production (main) via a dedicated flash_lite sub-agent with strict safety guardrails and mandatory type checking (ci:typecheck) before push.
 ---
 
 # Release Management Skill (`release`)
@@ -9,14 +9,39 @@ This skill defines the standardized workflow for safely promoting code between b
 
 ---
 
+## 🤖 Sub-agent Delegation Protocol (Flash Lite)
+
+Whenever a release task (`tostaging`, `tomain`, or release command) is triggered, the **Parent Agent MUST delegate the execution to a dedicated sub-agent** running on `flash_lite`.
+
+### Invocation Specifications:
+- **`TypeName`**: `"self"`
+- **`Role`**: `"Release Manager"`
+- **`Model`**: `"flash_lite"` *(Mandatory: lightweight, cost-effective, and fast execution)*
+- **`Workspace`**: `"inherit"` *(Mandatory: Git operations must execute directly on the project's working directory, NOT an isolated branch clone)*
+- **`Prompt`**: Explicit instructions for the sub-agent to execute either `tostaging` or `tomain` adhering strictly to this skill, verify all quality gates, halt immediately upon any error, and return the final execution summary to the parent agent.
+
+### Example Parent Agent Delegation:
+```json
+{
+  "TypeName": "self",
+  "Role": "Release Manager",
+  "Model": "flash_lite",
+  "Workspace": "inherit",
+  "Prompt": "Execute the release workflow for <tostaging | tomain> strictly following .agents/skills/release/SKILL.md. Run all pre-push quality gates (ci:typecheck, backend tests, frontend tests). If all gates pass cleanly, push automatically and switch back to the working branch. If ANY error or conflict occurs, halt immediately without pushing and report the exact trace."
+}
+```
+
+---
+
 ## 🛡️ Guardrails & Safety Rules (Mandatory)
 
-1. **Clean Working State**: Never start any release step if `git status` reports uncommitted or unstaged changes.
-2. **No Force Push**: Strictly **forbidden** to use `git push --force` or `--force-with-lease` on public branches (`develop`, `main`).
-3. **No Destructive Operations**: Never delete, hard-reset (`git reset --hard`), or rebase public branches.
-4. **Immediate Stop on Conflicts**: If merge conflicts occur at any point, **stop immediately**. Do NOT attempt automatic resolution. Notify the user to resolve conflicts manually.
-5. **Mandatory Quality Gates**: Before executing any `git push`, all 3 verification gates must pass: (1) TypeScript type checks (`npm run ci:typecheck`), (2) Unit tests (`npm test` in backend and frontend), and (3) relevant E2E tests (if touched features affect UI or workflows with existing specs).
-6. **Automated Push on Quality Gates**: Do NOT wait for a separate push command or manual confirmation from the user. When all quality gates pass cleanly, proceed to `git push` automatically. If ANY gate fails, **STOP immediately**, do NOT push, and report the errors.
+1. **Sub-agent Execution**: Release tasks must be delegated to a `flash_lite` sub-agent with `Workspace: 'inherit'`.
+2. **Clean Working State**: Never start any release step if `git status` reports uncommitted or unstaged changes.
+3. **No Force Push**: Strictly **forbidden** to use `git push --force` or `--force-with-lease` on public branches (`develop`, `main`).
+4. **No Destructive Operations**: Never delete, hard-reset (`git reset --hard`), or rebase public branches.
+5. **Immediate Stop on Conflicts**: If merge conflicts occur at any point, **stop immediately**. Do NOT attempt automatic resolution. Notify the user to resolve conflicts manually.
+6. **Mandatory Quality Gates**: Before executing any `git push`, all 3 verification gates must pass: (1) TypeScript type checks (`npm run ci:typecheck`), (2) Unit tests (`npm test` in backend and frontend), and (3) relevant E2E tests (if touched features affect UI or workflows with existing specs).
+7. **Automated Push on Quality Gates**: Do NOT wait for a separate push command or manual confirmation from the user. When all quality gates pass cleanly, proceed to `git push` automatically. If ANY gate fails, **STOP immediately**, do NOT push, and report the errors.
 
 ---
 
@@ -57,7 +82,7 @@ cd frontend && npx playwright test
 > [!NOTE]
 > The workspace runs on a single production Cloudflare environment. Pushing to `develop` runs Continuous Integration (testing, typecheck, dry-run build) only; Continuous Deployment (CD) occurs exclusively upon pushing to `main`.
 
-### Step-by-Step Procedure
+### Step-by-Step Procedure (Executed by Sub-agent)
 
 1. **Inspect Working Tree & Active Branch**:
    - Run `git status` to verify the working directory is clean.
@@ -95,13 +120,16 @@ cd frontend && npx playwright test
    git status
    ```
 
+7. **Report Status**:
+   - Send completion summary to parent agent with commit hash, gates status, and branch returned to.
+
 ---
 
 ## 🌟 Command 2: `tomain`
 
 **Objective**: Merge `develop` into `main` (production release) and push to remote.
 
-### Step-by-Step Procedure
+### Step-by-Step Procedure (Executed by Sub-agent)
 
 1. **Inspect Working Tree**:
    - Run `git status` to verify the working directory is clean.
@@ -139,6 +167,9 @@ cd frontend && npx playwright test
    git checkout <initial-branch>
    git status
    ```
+
+7. **Report Status**:
+   - Send completion summary to parent agent with commit hash, gates status, and branch returned to.
 
 ---
 
