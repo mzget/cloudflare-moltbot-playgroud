@@ -107,16 +107,38 @@ flowchart TD
 
 ---
 
-### 📜 Phase 5: Decision Trace & Auditability UI
-> **เป้าหมาย:** ทำให้นักลงทุนสามารถตรวจสอบตรรกะและที่มาของการตัดสินใจของ AI ได้อย่างโปร่งใส
+### 📜 Phase 5: Unified "Investment Dossier & Decision Trace" UI (One-Page Stock Cockpit) (Completed ✅)
+> **เป้าหมาย:** รวมศูนย์การวิเคราะห์และตรวจสอบตรรกะการตัดสินใจของ AI ทุกมิติ (Valuation, Adversarial Debate, Portfolio Governance, Thesis) ไว้ในหน้าเดียว (One-Page Stock Cockpit) ตามสถาปัตยกรรม [ADR-0016](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/docs/adr/0016-unified-stock-dossier-cockpit-and-decision-trace.md)
 
-- [ ] **Timeline / Reasoning Flow UI (`frontend/src/`)**
-  - [ ] สร้าง Accordion หรือ Timeline Component แสดงลำดับการประมวลผล:
-    1. *Data Gathered* (งบการเงิน + ข่าวที่ใช้อ้างอิง)
-    2. *Analyst Insights* (สรุปจากแต่ละ Agent)
-    3. *Debate Transcript* (การโต้แย้งระหว่าง Bull vs Bear)
-    4. *Final Thesis & Risk Officer Note*
-  - [ ] เพิ่ม Toggle ให้ผู้ใช้เลือกระหว่าง "Executive Summary" (แบบสั้น) กับ "Deep Dive Reasoning" (แบบละเอียด)
+- [x] **1. Navigation & Master Layout (`frontend/src/components/features/agent/`)**
+  - [x] เพิ่ม Tab แรก "Cockpit / Dossier" (Tab 0) ใน [AnalysisReport.tsx](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/frontend/src/components/features/agent/AnalysisReport.tsx) โดยยังคง Tab เดิม (`Overview`, `Report`, `DCF Model`, `Stock Thesis`) ไว้เป็น Deep-Dive Tools
+  - [x] สร้าง Component หลัก [StockDossierCockpit.tsx](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/frontend/src/components/features/agent/StockDossierCockpit.tsx)
+  - [x] จัดทำ Toggle สลับมุมมอง: "Executive Cockpit" (Summary Mode) vs "Decision Trace Flow" (Audit Timeline Mode)
+
+- [x] **2. Cockpit Hero & Actionability Banner**
+  - [x] แสดงสัญลักษณ์หุ้น, ชื่อบริษัท, ราคาปัจจุบัน, P/E, P/FCF, Theme/Sector Tag
+  - [x] ฝัง [ScenarioRangeBar.tsx](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/frontend/src/components/common/ScenarioRangeBar.tsx) แสดงกรอบ `[Bear — Base — Bull]` และ MoS %
+  - [x] แสดง Position Sizing Capacity Badge (Room to 8% target, 15% single cap, 30% theme cap) จาก `@oaktree/shared`
+  - [x] Quick Action Buttons: ไปยัง DCF Model, แก้ไข Thesis, หรือกด Quick Pre-Trade Simulator
+
+- [x] **3. 4-Quadrant High-Density Intelligence Grid**
+  - [x] **Quadrant A (Valuation Anchor):** สรุปผล DCF Intrinsic Value ทั้ง 3 Scenarios, Margin of Safety %, WACC, และ Terminal Growth
+  - [x] **Quadrant B (Adversarial Debate):** สรุป Bull Catalysts vs Bear Downside Risks, Key Tensions, และ Conviction Score จาก Dialectical Debate
+  - [x] **Quadrant C (Portfolio Governance & Sizing):** ผลกระทบต่อ Portfolio Health Score, Correlation risk กับหุ้นอื่นในพอร์ต, และขนาดการซื้อที่ปลอดภัย
+  - [x] **Quadrant D (Investor Thesis & Catalysts):** สรุปสมมติฐานการลงทุนของผู้ใช้, Target Price, วันทบทวนถัดไป, และบันทึก Journal ล่าสุด
+
+- [x] **4. Hybrid Real-Time Decision Trace Flow (Auditability Timeline)**
+  - [x] สังเคราะห์ Timeline อัตโนมัติจากข้อมูลใน D1 โดยไม่ต้องสร้างตารางใหม่:
+    1. *Stage 1: Data Ingestion & Freshness* (รอบงบการเงิน D1 + ข่าวล่าสุด)
+    2. *Stage 2: Adversarial Debate Synthesis* (จุดขัดแย้งสำคัญและคะแนน Conviction)
+    3. *Stage 3: DCF Valuation Modeling* (การแปลงข้อถกเถียงเป็นพารามิเตอร์ DCF และ MoS %)
+    4. *Stage 4: Portfolio Risk Audit* (การตรวจสอบเกณฑ์ 8%/15%/30% และ Portfolio Beta)
+    5. *Stage 5: Final Execution Advisory* (คำแนะนำสถานะการลงทุน)
+
+- [x] **5. Client-Side Orchestration (`Promise.all`)**
+  - [x] ดึงข้อมูลพร้อมกัน 4 Endpoint ในฝั่ง Client: `/overview`, `/analysis/results`, `/analysis/theses`, และ `/portfolio/risk-audit`
+  - [x] ใช้ Pure functions จาก `@oaktree/shared` คำนวณ Sizing Room และ MoS แบบ Instant 0ms
+  - [x] เขียนชุดการทดสอบครอบคลุมทุกมุมมองใน [StockDossierCockpit.test.tsx](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/frontend/src/components/features/agent/StockDossierCockpit.test.tsx)
 
 ---
 

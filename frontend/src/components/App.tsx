@@ -72,7 +72,7 @@ if (typeof window !== 'undefined') {
 // 1. Define the Search Schema (Validation)
 const analysisSearchSchema = z.object({
   symbol: z.string().optional(),
-  tab: z.enum(['overview', 'report', 'dcf-model', 'stock-thesis']).catch('overview'),
+  tab: z.enum(['dossier', 'overview', 'report', 'dcf-model', 'stock-thesis']).catch('dossier'),
 });
 
 const generalSearchSchema = z.object({
