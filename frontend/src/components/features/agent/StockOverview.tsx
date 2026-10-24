@@ -12,6 +12,7 @@ import {
   Tooltip,
 } from '@mui/joy';
 import { RotateCw, AlertTriangle, Layers, Building, Globe, ExternalLink, Info } from 'lucide-react';
+import ScenarioRangeBar from '../../common/ScenarioRangeBar';
 import { API_BASE_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
 
@@ -53,6 +54,12 @@ export interface CompanyOverviewPayload {
     valuationHealth: CompanyStatisticsGroup[];
     growthDividends: CompanyStatisticsGroup[];
   };
+  dcfScenarios?: {
+    bear: number | null;
+    base: number | null;
+    bull: number | null;
+    price: number | null;
+  } | null;
   updatedAt: string;
 }
 
@@ -356,6 +363,20 @@ export default function StockOverview({ symbol, initialData = null }: StockOverv
                           );
                         })}
                       </Stack>
+                      {group.category.includes('Intrinsic') && data.dcfScenarios && (data.dcfScenarios.bear || data.dcfScenarios.base || data.dcfScenarios.bull) && (
+                        <Box sx={{ mt: 1.5, pt: 1, borderTop: '1px dashed rgba(255,255,255,0.08)' }}>
+                          <Typography level="body-xs" sx={{ fontSize: '10px', opacity: 0.6, mb: 0.5, fontWeight: 600 }}>
+                            Scenario Range
+                          </Typography>
+                          <ScenarioRangeBar
+                            compact
+                            price={data.dcfScenarios.price}
+                            bear={data.dcfScenarios.bear}
+                            base={data.dcfScenarios.base}
+                            bull={data.dcfScenarios.bull}
+                          />
+                        </Box>
+                      )}
                     </Box>
                   ))}
                 </Stack>

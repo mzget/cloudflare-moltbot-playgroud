@@ -44,6 +44,12 @@ export interface CompanyOverviewPayload {
     readonly valuationHealth: readonly CompanyStatisticsGroup[];
     readonly growthDividends: readonly CompanyStatisticsGroup[];
   };
+  readonly dcfScenarios?: {
+    readonly bear: number | null;
+    readonly base: number | null;
+    readonly bull: number | null;
+    readonly price: number | null;
+  } | null;
   readonly updatedAt: string;
 }
 
@@ -592,8 +598,8 @@ export async function fetchFinancialOverview(
     .catch(e => { console.warn(`Yahoo timeseries annual fetch failed for ${symbol}:`, e); return null; });
 
   const fetchDcf = env.DB.prepare(
-    'SELECT implied_share_price FROM dcf_calculations WHERE symbol = ? AND scenario_name = ? ORDER BY created_at DESC LIMIT 1'
-  ).bind(symbol, 'Base Case').first().catch((e: any) => { console.warn(`DCF query failed for ${symbol}:`, e); return null; });
+    'SELECT scenario_name, implied_share_price FROM dcf_calculations WHERE symbol = ?'
+  ).bind(symbol).all().catch((e: any) => { console.warn(`DCF query failed for ${symbol}:`, e); return { results: [] }; });
 
   const fetchWatchlist = env.DB.prepare(
     'SELECT sector_label FROM watchlist WHERE symbol = ? LIMIT 1'
@@ -637,11 +643,16 @@ export async function fetchFinancialOverview(
 
   const currentPrice = (finnhubQuoteRes as any)?.c ?? null;
 
+  const dcfRows = Array.isArray((dcfRes as any)?.results) ? (dcfRes as any).results : (dcfRes ? [dcfRes] : []);
+  const baseRec = dcfRows.find((r: any) => r.scenario_name === 'Base Case') || (dcfRes && typeof (dcfRes as any).implied_share_price === 'number' ? dcfRes : null);
+  const bearRec = dcfRows.find((r: any) => r.scenario_name === 'Bear Case');
+  const bullRec = dcfRows.find((r: any) => r.scenario_name === 'Bull Case');
+
   const companyStats = buildCompanyStatistics({
     finnhubMetric: (finnhubMetricRes as any)?.metric || {},
     finnhubProfile: (finnhubProfileRes as any) || {},
     marketStats: existingRow,
-    dcfCalc: dcfRes as any,
+    dcfCalc: baseRec as any,
     currentPrice,
   });
 
@@ -659,6 +670,12 @@ export async function fetchFinancialOverview(
     quarterly: mergedQuarterly,
     annual: mergedAnnual,
     companyStatistics: companyStats,
+    dcfScenarios: {
+      bear: typeof bearRec?.implied_share_price === 'number' ? bearRec.implied_share_price : null,
+      base: typeof baseRec?.implied_share_price === 'number' ? baseRec.implied_share_price : null,
+      bull: typeof bullRec?.implied_share_price === 'number' ? bullRec.implied_share_price : null,
+      price: currentPrice,
+    },
     updatedAt: now.toISOString(),
   };
 

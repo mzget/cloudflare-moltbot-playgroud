@@ -80,3 +80,19 @@ A comprehensive financial analysis or market memo record (`notebook_articles`) p
 ### Knowledge Vault
 Durable Cloudflare R2 bucket (`oaktree-knowledge`) used to preserve full-text Markdown articles, external research reports, and agent documents for future context retrieval.
 
+
+
+### Margin of Safety (MoS)
+The discount of the current market price relative to DCF intrinsic value: `MoS % = ((Intrinsic - Price) / Intrinsic) * 100`.
+- Positive = trading below intrinsic value; zero or negative = fairly valued/overvalued.
+- Distinct from **Upside %** (`(Intrinsic - Price) / Price`), which remains in the DCF model UI.
+- Intrinsic value is the saved `Base Case` `implied_share_price`. Without a saved Base Case the stock is **Unvalued** (MoS is `NULL`, never 0).
+- Persisted on `market_stats` (`mos_base`, `price_zone`) and recomputed on price sync and on DCF save (ADR-0014).
+_Avoid_: Upside, Discount
+
+### Scenario Range
+The `[Bear Case, Bull Case]` implied share price interval of a stock, with `Base Case` as a marker, built only from saved scenarios (ADR-0004). A missing Bear/Bull omits that end.
+- **Price Zone**: `below_bear` (deep value), `bear_to_base`, `base_to_bull`, `above_bull` (overvalued).
+
+### MoS Screener
+Filter/sort controls inside the existing Watchlist and Portfolio Holdings tables using MoS and Price Zone. Presets: MoS >= 30%, MoS >= 15%, Overvalued (MoS < 0), Unvalued.

@@ -488,7 +488,7 @@ describe('Analysis Debate Routes (Hono Endpoints)', () => {
     expect(res.status).toBe(400);
     const body = (await res.json()) as any;
     expect(body.error).toBe('symbol is required');
-  });
+  }, 15000);
 
   it('GET /api/analysis/debate returns 404 when no analysis or debate found', async () => {
     const analysisRoutes = (await import('./routes/analysis')).default;

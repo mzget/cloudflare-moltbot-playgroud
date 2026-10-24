@@ -9,10 +9,12 @@ watchlist.get('/api/watchlist', async (c) => {
   const { results } = await c.env.DB.prepare(`
 		SELECT w.*, 
 		       (CASE WHEN (p.symbol IS NOT NULL OR (h.symbol IS NOT NULL AND h.shares > 0)) THEN 1 ELSE 0 END) as in_portfolio,
-		       (SELECT COUNT(*) FROM alert_rules ar WHERE ar.symbol = w.symbol AND ar.is_active = 1) as active_alerts_count
+		       (SELECT COUNT(*) FROM alert_rules ar WHERE ar.symbol = w.symbol AND ar.is_active = 1) as active_alerts_count,
+		       m.price as mos_price, m.dcf_bear, m.dcf_base, m.dcf_bull, m.mos_base, m.price_zone, m.mos_updated_at
 		FROM watchlist w
 		LEFT JOIN portfolio_holdings p ON w.symbol = p.symbol
 		LEFT JOIN holdings h ON w.symbol = h.symbol
+		LEFT JOIN market_stats m ON w.symbol = m.symbol
 	`).all();
   return c.json(results);
 });

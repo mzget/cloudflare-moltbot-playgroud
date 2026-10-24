@@ -8,6 +8,7 @@ import { Calculator, Info } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
 import DebouncedInput from '../../common/DebouncedInput';
+import ScenarioRangeBar from '../../common/ScenarioRangeBar';
 
 // ─── DCF Calculator Core ──────────────────────────────────────────────────
 
@@ -784,6 +785,24 @@ export default function DCFModel({ symbol }: DCFModelProps) {
           </Stack>
         </Stack>
       </Box>
+
+      {/* Scenario Range & Margin of Safety (ADR-0014): saved Bear/Base/Bull vs current price */}
+      {currentPrice !== null && currentPrice > 0 && (
+        <Box sx={{ px: 3, py: 2, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <Typography
+            level="title-sm"
+            sx={{ fontWeight: 700, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem', mb: 1 }}
+          >
+            Scenario Range &amp; Margin of Safety
+          </Typography>
+          <ScenarioRangeBar
+            price={currentPrice}
+            bear={getScenarioRecord('Bear Case')?.implied_share_price}
+            base={getScenarioRecord('Base Case')?.implied_share_price}
+            bull={getScenarioRecord('Bull Case')?.implied_share_price}
+          />
+        </Box>
+      )}
 
       {/* Main Container */}
       <Box

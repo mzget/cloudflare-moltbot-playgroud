@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { Box, Typography, Sheet, Button, ButtonGroup, Stack } from '@mui/joy';
+import { Box, Typography, Sheet, Button, ButtonGroup, Stack, Chip } from '@mui/joy';
 import { Plus } from 'lucide-react';
 import { glassStyle } from '../../../styles/glass';
 import HoldingsTable from './HoldingsTable';
@@ -7,6 +7,7 @@ import type { Holding } from './HoldingsTable';
 import { useSettingsStore, type DensityMode } from '../../../store/settingsStore';
 import ExpandedRow from '../watchlist/ExpandedRow';
 import { useAnalysisCoverage } from '../../../hooks/useAnalysisCoverage';
+import { matchesMosFilter, MOS_FILTER_LABELS, type MosFilter } from '../../../utils/marginOfSafety';
 
 interface HoldingsTabProps {
   holdings: Holding[];
@@ -20,12 +21,13 @@ export default function HoldingsTab({ holdings, loading, onAddTicker, onDataChan
   const [sortBy, setSortBy] = useState<string>('total_cost');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const density = useSettingsStore((state) => state.density);
+  const [mosFilter, setMosFilter] = useState<MosFilter>('all');
 
   const symbols = useMemo(() => holdings.map(h => h.symbol), [holdings]);
   const analysisCoverage = useAnalysisCoverage(symbols);
 
   const sortedHoldings = useMemo(() => {
-    return [...holdings].sort((a, b) => {
+    return holdings.filter((h) => matchesMosFilter(h, mosFilter)).sort((a, b) => {
       const aVal = (a as any)[sortBy];
       const bVal = (b as any)[sortBy];
       if (aVal === null || aVal === undefined) return 1;
@@ -33,7 +35,7 @@ export default function HoldingsTab({ holdings, loading, onAddTicker, onDataChan
       const cmp = typeof aVal === 'string' ? aVal.localeCompare(bVal) : (aVal as number) - (bVal as number);
       return sortDir === 'asc' ? cmp : -cmp;
     });
-  }, [holdings, sortBy, sortDir]);
+  }, [holdings, sortBy, sortDir, mosFilter]);
 
   const handleSort = useCallback((column: string) => {
     if (sortBy === column) {
@@ -64,6 +66,21 @@ export default function HoldingsTab({ holdings, loading, onAddTicker, onDataChan
             <Typography level="title-md" sx={{ fontWeight: 700 }}>
               Positions
             </Typography>
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap data-testid="mos-filter-chips">
+              <Typography level="body-sm" sx={{ fontWeight: 600, whiteSpace: 'nowrap' }}>MoS:</Typography>
+              {(Object.keys(MOS_FILTER_LABELS) as MosFilter[]).map((f) => (
+                <Chip
+                  key={f}
+                  size="sm"
+                  variant={mosFilter === f ? 'solid' : 'outlined'}
+                  color={mosFilter === f ? 'primary' : 'neutral'}
+                  onClick={() => setMosFilter(f)}
+                  sx={{ cursor: 'pointer', fontWeight: 600, transition: 'all 0.3s ease-out' }}
+                >
+                  {MOS_FILTER_LABELS[f]}
+                </Chip>
+              ))}
+            </Stack>
             <Button variant="outlined" color="neutral" size="sm" startDecorator={<Plus size={16} />}
               onClick={onAddTicker} sx={{ borderRadius: '20px', fontWeight: 600, px: 2 }}>
               Add Ticker

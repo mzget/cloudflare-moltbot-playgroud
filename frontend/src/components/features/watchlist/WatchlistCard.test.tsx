@@ -76,4 +76,31 @@ describe('WatchlistCard Component', () => {
     expect(html).toContain('No linked research themes');
     expect(html).toContain('Copy Prompt');
   });
+
+  it('renders Margin of Safety section and formatted MoS chip', () => {
+    const itemWithMos: WatchlistItem = {
+      ...mockItem,
+      mos_base: 25.5,
+      mos_price: 100,
+      dcf_bear: 80,
+      dcf_base: 134.2,
+      dcf_bull: 160,
+    };
+
+    const html = renderToString(
+      <WatchlistCard
+        item={itemWithMos}
+        fundamental={null}
+        onEdit={vi.fn()}
+        onAlertsClick={vi.fn()}
+        onViewAnalysis={vi.fn()}
+        onCopyPrompt={vi.fn()}
+        onToggleActive={vi.fn()}
+        onTogglePortfolio={vi.fn()}
+      />
+    );
+
+    expect(html).toContain('Margin of Safety');
+    expect(html).toContain('+25.5%');
+  });
 });

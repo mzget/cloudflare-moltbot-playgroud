@@ -139,6 +139,29 @@ describe('Analysis API - DCF Calculations', () => {
       expect(insertParams[insertParams.length - 1]).toBe('manual');
     });
 
+    const saveReq = () => new Request('http://localhost/api/analysis/dcf-save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ symbol: 'nvda', scenarioName: 'Base Case', impliedSharePrice: 100, wacc: 10 }),
+    });
+
+    it('refreshes persisted Margin of Safety on market_stats after saving (ADR-0014)', async () => {
+      mockDb.batch = vi.fn().mockResolvedValue([]);
+      const res = await worker.fetch(saveReq(), mockEnv, {} as any);
+      expect(res.status).toBe(200);
+      expect(mockDb.batch).toHaveBeenCalledTimes(1);
+      const updateIdx = executedSqls.findIndex((q) => q.includes('UPDATE market_stats'));
+      expect(updateIdx).toBeGreaterThan(1); // after DELETE + INSERT
+      expect(boundParams.some((p) => p[p.length - 1] === 'NVDA' && p.length === 7)).toBe(true);
+    });
+
+    it('still returns success when the Margin of Safety refresh fails', async () => {
+      mockDb.batch = vi.fn().mockRejectedValue(new Error('boom'));
+      const res = await worker.fetch(saveReq(), mockEnv, {} as any);
+      expect(res.status).toBe(200);
+      expect(((await res.json()) as any).success).toBe(true);
+    });
+
     it('returns 400 when symbol is missing', async () => {
       const req = new Request('http://localhost/api/analysis/dcf-save', {
         method: 'POST',

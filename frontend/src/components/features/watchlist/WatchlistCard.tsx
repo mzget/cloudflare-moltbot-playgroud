@@ -5,6 +5,8 @@ import type { WatchlistItem } from './hooks/useWatchlist';
 import type { FundamentalStatusItem } from '../sources/FundamentalIntelligenceTab';
 import { FundamentalFreshnessBadge } from '../sources/FundamentalFreshnessBadge';
 import { glassStyle } from '../../../styles/glass';
+import ScenarioRangeBar from '../../common/ScenarioRangeBar';
+import { formatMosLabel } from '../../../utils/marginOfSafety';
 
 interface WatchlistCardProps {
   item: WatchlistItem;
@@ -41,7 +43,12 @@ function areWatchlistCardPropsEqual(
     prevItem.type !== nextItem.type ||
     prevItem.active_alerts_count !== nextItem.active_alerts_count ||
     prevItem.sector_label !== nextItem.sector_label ||
-    prevItem.sector_label_color !== nextItem.sector_label_color
+    prevItem.sector_label_color !== nextItem.sector_label_color ||
+    prevItem.mos_base !== nextItem.mos_base ||
+    prevItem.mos_price !== nextItem.mos_price ||
+    prevItem.dcf_bear !== nextItem.dcf_bear ||
+    prevItem.dcf_base !== nextItem.dcf_base ||
+    prevItem.dcf_bull !== nextItem.dcf_bull
   ) {
     return false;
   }
@@ -218,6 +225,30 @@ export const WatchlistCard: React.FC<WatchlistCardProps> = React.memo(({
             </Badge>
           </Stack>
         </Stack>
+
+        {/* Margin of Safety (ADR-0014) */}
+        <Box sx={{ mt: 0.5 }} data-testid="mos-section">
+          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
+            <Typography level="body-xs" sx={{ fontWeight: 600, opacity: 0.7 }}>Margin of Safety</Typography>
+            <Chip
+              size="sm"
+              variant="soft"
+              color={item.mos_base == null ? 'neutral' : item.mos_base >= 0 ? 'success' : 'danger'}
+              sx={{ fontWeight: 700, fontSize: '0.7rem' }}
+            >
+              {formatMosLabel(item.mos_base, true)}
+            </Chip>
+          </Stack>
+          {item.mos_base != null && (
+            <ScenarioRangeBar
+              compact
+              price={item.mos_price}
+              bear={item.dcf_bear}
+              base={item.dcf_base}
+              bull={item.dcf_bull}
+            />
+          )}
+        </Box>
 
         {/* Fundamental Intelligence Section */}
         <Box

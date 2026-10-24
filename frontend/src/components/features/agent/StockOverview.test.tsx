@@ -136,4 +136,18 @@ describe('StockOverview Component', () => {
     expect(html).toContain('CAGR:');
     expect(html).toContain('27.9');
   });
+
+  it('renders ScenarioRangeBar when dcfScenarios is provided', () => {
+    const payloadWithDcf = {
+      ...mockPayload,
+      dcfScenarios: {
+        bear: 450.0,
+        base: 650.0,
+        bull: 800.0,
+        price: 580.0,
+      },
+    };
+    const html = renderToString(<StockOverview symbol="META" initialData={payloadWithDcf} />);
+    expect(html).toContain('Scenario Range');
+  });
 });

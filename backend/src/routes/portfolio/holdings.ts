@@ -5,6 +5,7 @@ import { recordDailyPortfolioHistory, getPortfolioHistory } from '../../portfoli
 import { sortTransactions } from '../../portfolioUtils';
 import { calculatePerformanceComparison } from '../../historicalPrices';
 import { recalcHoldings } from '../../portfolioRecalc';
+import { holdingMosFields } from '../../holdingMos';
 
 const holdings = new Hono<AppEnv>();
 
@@ -17,6 +18,12 @@ holdings.get('/api/portfolio/holdings', async (c) => {
       h.symbol, h.shares, h.avg_cost, h.total_cost, h.status,
       w.name, w.sector_label, w.sector_label_color,
       m.price as last_price, m.previous_close, m.market_cap, m.p_e, m.price_updated_at, m.updated_at as stats_updated_at,
+      CASE WHEN w.symbol IS NOT NULL THEN 1 ELSE 0 END as in_watchlist,
+      CASE WHEN w.symbol IS NOT NULL THEN m.dcf_bear END as dcf_bear,
+      CASE WHEN w.symbol IS NOT NULL THEN m.dcf_base END as dcf_base,
+      CASE WHEN w.symbol IS NOT NULL THEN m.dcf_bull END as dcf_bull,
+      CASE WHEN w.symbol IS NOT NULL THEN m.mos_base END as mos_base,
+      CASE WHEN w.symbol IS NOT NULL THEN m.price_zone END as price_zone,
       COALESCE(d.total_dividends, 0) as tot_div_income,
       COALESCE(t.realized_gain_sum, 0) as realized_gain_amt,
       COALESCE(t.realized_cost_basis, 0) as realized_cost_basis
@@ -82,6 +89,7 @@ holdings.get('/api/portfolio/holdings', async (c) => {
       stats_updated_at: row.stats_updated_at || null,
       sector_label: row.sector_label || null,
       sector_label_color: row.sector_label_color || null,
+      ...holdingMosFields(row),
     };
   });
 
