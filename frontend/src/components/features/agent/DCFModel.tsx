@@ -1257,8 +1257,6 @@ export default function DCFModel({ symbol }: DCFModelProps) {
                   borderBottom: '1px solid',
                   borderColor: 'neutral.outlinedBorder',
                   fontFamily: 'monospace',
-                  fontSize: '0.8rem',
-                  fontWeight: 500,
                 },
               }}
             >
