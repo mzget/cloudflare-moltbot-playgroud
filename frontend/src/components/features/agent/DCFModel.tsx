@@ -232,14 +232,14 @@ function DCFChart({ data }: { data: YearlyData[] }) {
             y1={t.y}
             x2={padL + chartW}
             y2={t.y}
-            stroke="rgba(255,255,255,0.06)"
+            stroke="var(--joy-palette-divider)"
             strokeDasharray="4 4"
           />
           <text
             x={padL - 8}
             y={t.y + 4}
             textAnchor="end"
-            fill="rgba(255,255,255,0.4)"
+            fill="var(--joy-palette-text-tertiary)"
             fontSize="9"
             fontFamily="monospace"
           >
@@ -268,7 +268,7 @@ function DCFChart({ data }: { data: YearlyData[] }) {
               x={padL + i * gap + gap / 2}
               y={padT + chartH + 16}
               textAnchor="middle"
-              fill="rgba(255,255,255,0.6)"
+              fill="var(--joy-palette-text-secondary)"
               fontSize="10"
               fontWeight="600"
               fontFamily="inherit"
@@ -290,11 +290,11 @@ function DCFChart({ data }: { data: YearlyData[] }) {
       })}
 
       <rect x={padL} y={2} width={10} height={10} rx={2} fill="rgba(59, 130, 246, 0.5)" />
-      <text x={padL + 14} y={11} fill="rgba(255,255,255,0.6)" fontSize="9" fontFamily="inherit">
+      <text x={padL + 14} y={11} fill="var(--joy-palette-text-secondary)" fontSize="9" fontFamily="inherit">
         Revenue ($B)
       </text>
       <circle cx={padL + 105} cy={7} r={4} fill="#10b981" />
-      <text x={padL + 113} y={11} fill="rgba(255,255,255,0.6)" fontSize="9" fontFamily="inherit">
+      <text x={padL + 113} y={11} fill="var(--joy-palette-text-secondary)" fontSize="9" fontFamily="inherit">
         Free Cash Flow ($B)
       </text>
     </svg>
@@ -338,7 +338,7 @@ function SliderRow({
         <Typography
           level="body-xs"
           sx={{
-            color: 'primary.400',
+            color: 'primary.plainColor',
             fontWeight: 700,
             fontFamily: 'monospace',
             minWidth: '55px',
@@ -726,7 +726,8 @@ export default function DCFModel({ symbol }: DCFModelProps) {
         sx={{
           p: 3,
           background: 'linear-gradient(135deg, rgba(37, 99, 235, 0.18) 0%, rgba(16, 185, 129, 0.12) 100%)',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          borderBottom: '1px solid',
+          borderColor: 'neutral.outlinedBorder',
         }}
       >
         <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2}>
@@ -754,7 +755,7 @@ export default function DCFModel({ symbol }: DCFModelProps) {
                   {symbol}
                 </Chip>
               </Stack>
-              <Typography level="body-xs" sx={{ opacity: 0.6 }}>
+              <Typography level="body-xs" sx={{ color: 'text.secondary' }}>
                 5-Year Discounted Cash Flow & Exit Multiple Projection (FY{baseYear+1}–FY{baseYear+5})
               </Typography>
             </Box>
@@ -762,7 +763,7 @@ export default function DCFModel({ symbol }: DCFModelProps) {
 
           {/* Quick Scenario Preset Switcher */}
           <Stack direction="row" spacing={1} alignItems="center">
-            <Typography level="body-xs" sx={{ opacity: 0.5, display: { xs: 'none', md: 'block' } }}>
+            <Typography level="body-xs" sx={{ color: 'text.secondary', display: { xs: 'none', md: 'block' } }}>
               Preset Scenarios:
             </Typography>
             {(['Bear Case', 'Base Case', 'Bull Case'] as const).map((sc) => {
@@ -788,10 +789,10 @@ export default function DCFModel({ symbol }: DCFModelProps) {
 
       {/* Scenario Range & Margin of Safety (ADR-0014): saved Bear/Base/Bull vs current price */}
       {currentPrice !== null && currentPrice > 0 && (
-        <Box sx={{ px: 3, py: 2, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <Box sx={{ px: 3, py: 2, borderBottom: '1px solid', borderColor: 'neutral.outlinedBorder' }}>
           <Typography
             level="title-sm"
-            sx={{ fontWeight: 700, opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem', mb: 1 }}
+            sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.7rem', mb: 1 }}
           >
             Scenario Range &amp; Margin of Safety
           </Typography>
@@ -816,8 +817,10 @@ export default function DCFModel({ symbol }: DCFModelProps) {
         <Box
           sx={{
             p: 3,
-            borderRight: { lg: '1px solid rgba(255,255,255,0.06)' },
-            borderBottom: { xs: '1px solid rgba(255,255,255,0.06)', lg: 'none' },
+            borderRight: { lg: '1px solid' },
+            borderColor: { lg: 'neutral.outlinedBorder' },
+            borderBottom: { xs: '1px solid', lg: 'none' },
+            borderBottomColor: { xs: 'neutral.outlinedBorder', lg: 'transparent' },
             overflowY: 'auto',
             maxHeight: { lg: '850px' },
           }}
@@ -835,13 +838,13 @@ export default function DCFModel({ symbol }: DCFModelProps) {
           <Tabs
             value={mode}
             onChange={(_, val) => setMode(val as 'uniform' | 'detailed')}
-            sx={{ mb: 3, borderRadius: '8px', background: 'rgba(255,255,255,0.03)' }}
+            sx={{ mb: 3, borderRadius: '10px', bgcolor: 'background.level1', border: '1px solid', borderColor: 'neutral.outlinedBorder' }}
           >
             <TabList size="sm" disableUnderline sx={{ width: '100%', p: 0.5, gap: 0.5 }}>
-              <Tab value="detailed" sx={{ flex: 1, borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700 }}>
+              <Tab value="detailed" sx={{ flex: 1, borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, '&.Mui-selected': { bgcolor: 'background.surface', boxShadow: 'sm' } }}>
                 Detailed (Per-Year)
               </Tab>
-              <Tab value="uniform" sx={{ flex: 1, borderRadius: '6px', fontSize: '0.75rem', fontWeight: 700 }}>
+              <Tab value="uniform" sx={{ flex: 1, borderRadius: '8px', fontSize: '0.75rem', fontWeight: 700, '&.Mui-selected': { bgcolor: 'background.surface', boxShadow: 'sm' } }}>
                 Quick (Uniform)
               </Tab>
             </TabList>
@@ -884,7 +887,7 @@ export default function DCFModel({ symbol }: DCFModelProps) {
 
           {/* Uniform Mode Sliders */}
           {mode === 'uniform' && (
-            <Box sx={{ p: 2, borderRadius: '12px', background: 'rgba(255,255,255,0.02)', mb: 2, border: '1px solid rgba(255,255,255,0.05)' }}>
+            <Box sx={{ p: 2, borderRadius: '12px', bgcolor: 'background.level1', mb: 2, border: '1px solid', borderColor: 'neutral.outlinedBorder', boxShadow: 'sm' }}>
               <SliderRow label="Revenue Growth %" value={revGrowth} min={2} max={40} step={0.5} format={fmtPct} onChange={setRevGrowth} tooltip="Average annual revenue growth" />
               <SliderRow label="Operating Margin %" value={opMargin} min={10} max={60} step={0.5} format={fmtPct} onChange={setOpMargin} tooltip="Operating income margin" />
               <SliderRow label="FCF Conversion %" value={fcfConversion} min={30} max={100} step={1} format={fmtPct} onChange={setFcfConversion} tooltip="FCF as % of NOPAT" />
@@ -971,7 +974,7 @@ export default function DCFModel({ symbol }: DCFModelProps) {
                 onChange={(_, newValue) => {
                   if (newValue) handleSelectScenario(newValue as ScenarioPresetName);
                 }}
-                sx={{ background: 'rgba(255,255,255,0.03)' }}
+                sx={{ bgcolor: 'background.level1', border: '1px solid', borderColor: 'neutral.outlinedBorder' }}
               >
                 {(['Base Case', 'Bear Case', 'Bull Case'] as const).map((sc) => {
                   const rec = getScenarioRecord(sc);
@@ -992,7 +995,7 @@ export default function DCFModel({ symbol }: DCFModelProps) {
                 placeholder="ระบุเหตุผลหรือสมมติฐานเบื้องหลังของ Scenario นี้..."
                 value={rationale}
                 onChange={(e) => setRationale(e.target.value)}
-                sx={{ background: 'rgba(255,255,255,0.03)', fontSize: '0.8rem' }}
+                sx={{ bgcolor: 'background.level1', border: '1px solid', borderColor: 'neutral.outlinedBorder', fontSize: '0.8rem' }}
               />
             </FormControl>
             <Button
@@ -1027,7 +1030,7 @@ export default function DCFModel({ symbol }: DCFModelProps) {
                     <Typography level="title-sm" sx={{ fontWeight: 700, color: '#eab308' }}>
                       ยังไม่มีการประเมินมูลค่าสำหรับ {symbol} (Unvalued)
                     </Typography>
-                    <Typography level="body-xs" sx={{ opacity: 0.8 }}>
+                    <Typography level="body-xs" sx={{ color: 'text.secondary' }}>
                       หุ้นนี้ยังไม่มีประวัติการประเมินมูลค่า DCF กรุณากรอกตัวเลขสมมติฐานทางด้านซ้าย หรือดึงสถิติตลาดเริ่มต้นเพื่อประเมิน
                     </Typography>
                   </Box>
@@ -1053,12 +1056,11 @@ export default function DCFModel({ symbol }: DCFModelProps) {
                 p: 2.5,
                 mb: 3,
                 borderRadius: '16px',
-                background: source === 'gemini_spark' || source === 'gemini_app'
-                  ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(168, 85, 247, 0.06) 100%)'
-                  : 'rgba(255,255,255,0.03)',
-                border: source === 'gemini_spark' || source === 'gemini_app'
-                  ? '1px solid rgba(168, 85, 247, 0.3)'
-                  : '1px solid rgba(255,255,255,0.08)',
+                background: source === 'gemini_spark' || source === 'gemini_app' ? 'linear-gradient(135deg, rgba(99, 102, 241, 0.12) 0%, rgba(168, 85, 247, 0.06) 100%)' : undefined,
+                bgcolor: source === 'gemini_spark' || source === 'gemini_app' ? undefined : 'background.level1',
+                border: '1px solid',
+                borderColor: source === 'gemini_spark' || source === 'gemini_app' ? 'rgba(168, 85, 247, 0.3)' : 'neutral.outlinedBorder',
+                boxShadow: 'sm',
               }}
             >
               <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: rationale ? 1.5 : 0 }}>
@@ -1104,7 +1106,7 @@ export default function DCFModel({ symbol }: DCFModelProps) {
                 position: 'relative',
               }}
             >
-              <Typography level="body-xs" sx={{ fontWeight: 700, color: 'primary.300', mb: 0.5, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>
+              <Typography level="body-xs" sx={{ fontWeight: 700, color: 'primary.plainColor', mb: 0.5, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>
                 Intrinsic Value Today
               </Typography>
               <Typography
@@ -1147,7 +1149,7 @@ export default function DCFModel({ symbol }: DCFModelProps) {
                 textAlign: 'center',
               }}
             >
-              <Typography level="body-xs" sx={{ fontWeight: 700, color: 'success.300', mb: 0.5, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>
+              <Typography level="body-xs" sx={{ fontWeight: 700, color: 'success.plainColor', mb: 0.5, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.65rem' }}>
                 Target Price FY{baseYear+5}
               </Typography>
               <Typography
@@ -1181,10 +1183,10 @@ export default function DCFModel({ symbol }: DCFModelProps) {
             <Sheet
               sx={{
                 p: 2.5,
-                borderRadius: '16px',
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.06)',
-                display: 'flex',
+                bgcolor: 'background.level1',
+                border: '1px solid',
+                borderColor: 'neutral.outlinedBorder',
+                boxShadow: 'sm',
                 flexDirection: 'column',
                 justifyContent: 'center',
               }}
@@ -1203,7 +1205,7 @@ export default function DCFModel({ symbol }: DCFModelProps) {
                 <Divider sx={{ opacity: 0.1 }} />
                 <Stack direction="row" justifyContent="space-between">
                   <Typography level="body-xs" sx={{ fontWeight: 700 }}>Equity Value:</Typography>
-                  <Typography level="body-xs" sx={{ fontWeight: 800, fontFamily: 'monospace', color: 'primary.300' }}>
+                  <Typography level="body-xs" sx={{ fontWeight: 800, fontFamily: 'monospace', color: 'primary.plainColor' }}>
                     {fmt(result.equityValue)}B
                   </Typography>
                 </Stack>
@@ -1217,8 +1219,10 @@ export default function DCFModel({ symbol }: DCFModelProps) {
               mb: 3,
               p: 2,
               borderRadius: '16px',
-              background: 'rgba(255,255,255,0.02)',
-              border: '1px solid rgba(255,255,255,0.05)',
+              bgcolor: 'background.level1',
+              border: '1px solid',
+              borderColor: 'neutral.outlinedBorder',
+              boxShadow: 'sm',
             }}
           >
             <DCFChart data={result.yearlyData} />
@@ -1229,7 +1233,10 @@ export default function DCFModel({ symbol }: DCFModelProps) {
             sx={{
               borderRadius: '16px',
               overflow: 'hidden',
-              border: '1px solid rgba(255,255,255,0.06)',
+              border: '1px solid',
+              borderColor: 'neutral.outlinedBorder',
+              bgcolor: 'background.surface',
+              boxShadow: 'sm',
               mb: 2,
             }}
           >
@@ -1245,10 +1252,10 @@ export default function DCFModel({ symbol }: DCFModelProps) {
                   fontSize: '0.7rem',
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em',
-                  opacity: 0.7,
-                  background: 'rgba(255,255,255,0.04)',
-                },
-                '& tbody td': {
+                  color: 'text.secondary',
+                  bgcolor: 'background.level1',
+                  borderBottom: '1px solid',
+                  borderColor: 'neutral.outlinedBorder',
                   fontFamily: 'monospace',
                   fontSize: '0.8rem',
                   fontWeight: 500,
@@ -1291,7 +1298,7 @@ export default function DCFModel({ symbol }: DCFModelProps) {
                           value={d.growth}
                           onChange={(val) => handleYearlyChange(i, 'growth', parseFloat(val) || 0)}
                           slotProps={{ input: { step: 0.5, style: { textAlign: 'right', padding: '2px 6px', fontSize: '0.8rem' } } }}
-                          sx={{ width: '85px', ml: 'auto', background: 'rgba(255,255,255,0.06)', '--Input-minHeight': '30px' }}
+                          sx={{ width: '85px', ml: 'auto', bgcolor: 'background.level2', border: '1px solid', borderColor: 'neutral.outlinedBorder', '--Input-minHeight': '30px' }}
                         />
                       ) : (
                         <span style={{ color: '#60a5fa' }}>{fmtPct(d.growth)}</span>
@@ -1324,7 +1331,7 @@ export default function DCFModel({ symbol }: DCFModelProps) {
                           value={d.opMargin}
                           onChange={(val) => handleYearlyChange(i, 'opMargin', parseFloat(val) || 0)}
                           slotProps={{ input: { step: 0.1, style: { textAlign: 'right', padding: '2px 6px', fontSize: '0.8rem' } } }}
-                          sx={{ width: '85px', ml: 'auto', background: 'rgba(255,255,255,0.06)', '--Input-minHeight': '30px' }}
+                          sx={{ width: '85px', ml: 'auto', bgcolor: 'background.level2', border: '1px solid', borderColor: 'neutral.outlinedBorder', '--Input-minHeight': '30px' }}
                         />
                       ) : (
                         <span>{fmtPct(d.opMargin)}</span>
@@ -1357,7 +1364,7 @@ export default function DCFModel({ symbol }: DCFModelProps) {
                           value={d.fcfConv}
                           onChange={(val) => handleYearlyChange(i, 'fcfConv', parseFloat(val) || 0)}
                           slotProps={{ input: { step: 1, style: { textAlign: 'right', padding: '2px 6px', fontSize: '0.8rem' } } }}
-                          sx={{ width: '85px', ml: 'auto', background: 'rgba(255,255,255,0.06)', '--Input-minHeight': '30px' }}
+                          sx={{ width: '85px', ml: 'auto', bgcolor: 'background.level2', border: '1px solid', borderColor: 'neutral.outlinedBorder', '--Input-minHeight': '30px' }}
                         />
                       ) : (
                         <span>{fmtPct(d.fcfConv)}</span>
@@ -1405,8 +1412,8 @@ export default function DCFModel({ symbol }: DCFModelProps) {
           {/* Valuation Calculations Breakdown */}
           <Grid container spacing={2} sx={{ mt: 1 }}>
             <Grid xs={12} md={6}>
-              <Sheet sx={{ p: 2, borderRadius: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                <Typography level="title-sm" sx={{ fontWeight: 700, mb: 1, color: 'primary.300' }}>
+              <Sheet sx={{ p: 2, borderRadius: '12px', bgcolor: 'background.level1', border: '1px solid', borderColor: 'neutral.outlinedBorder', boxShadow: 'sm' }}>
+                <Typography level="title-sm" sx={{ fontWeight: 700, mb: 1, color: 'primary.plainColor' }}>
                   1. Sum of PV & Terminal Value (Gordon Growth)
                 </Typography>
                 <Stack spacing={0.5}>
@@ -1427,8 +1434,8 @@ export default function DCFModel({ symbol }: DCFModelProps) {
             </Grid>
 
             <Grid xs={12} md={6}>
-              <Sheet sx={{ p: 2, borderRadius: '12px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                <Typography level="title-sm" sx={{ fontWeight: 700, mb: 1, color: 'success.300' }}>
+              <Sheet sx={{ p: 2, borderRadius: '12px', bgcolor: 'background.level1', border: '1px solid', borderColor: 'neutral.outlinedBorder', boxShadow: 'sm' }}>
+                <Typography level="title-sm" sx={{ fontWeight: 700, mb: 1, color: 'success.plainColor' }}>
                   2. Exit Multiple Valuation (FY{baseYear+5} Target)
                 </Typography>
                 <Stack spacing={0.5}>

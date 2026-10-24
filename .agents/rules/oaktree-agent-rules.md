@@ -32,9 +32,12 @@ The agent is explicitly authorized and encouraged to:
 
 Do NOT load domain-specific guidelines or all skills at the start of every turn. Only call `view_file` to load the instructions of a specific skill when the task matches the following conditions:
 
-1. **Frontend UI Guidelines**:
-   - *Condition*: Working on React components, Astro pages, MUI Joy UI components, tables, modals, buttons, or styling.
-   - *Path*: [oaktree-frontend/SKILL.md](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/.agents/skills/oaktree-frontend/SKILL.md)
+1. **Frontend UI Guidelines (Mandatory Skills Trio)**:
+   - *Condition*: Working on React components, Astro pages, MUI Joy UI components, tables, modals, buttons, UX/UI design, or styling.
+   - *Paths*:
+     - [oaktree-frontend/SKILL.md](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/.agents/skills/oaktree-frontend/SKILL.md)
+     - [stitch/SKILL.md](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/.agents/skills/stitch/SKILL.md)
+     - [@antigravity-design-expert/SKILL.md](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/.agents/skills/@antigravity-design-expert/SKILL.md)
 2. **Backend & Cloudflare Database Guidelines**:
    - *Condition*: Working on backend Workers, API routes, database schemas (D1, KV, R2), Worker AI models, or batch queries.
    - *Path*: [oaktree-backend/SKILL.md](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/.agents/skills/oaktree-backend/SKILL.md)

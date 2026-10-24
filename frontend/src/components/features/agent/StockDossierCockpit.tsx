@@ -327,7 +327,7 @@ export default function StockDossierCockpit({
           ...glassStyle,
           p: { xs: 2.5, md: 3 },
           borderRadius: '24px',
-          border: '1px solid rgba(255, 255, 255, 0.12)',
+          
           boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15)',
         }}
       >
@@ -386,7 +386,7 @@ export default function StockDossierCockpit({
                   p: 0.5,
                   borderRadius: '14px',
                   bgcolor: 'rgba(255, 255, 255, 0.05)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
+                  
                 }}
               >
                 <Button
@@ -444,7 +444,7 @@ export default function StockDossierCockpit({
           <Grid container spacing={2} alignItems="center">
             {/* Price & Conviction */}
             <Grid xs={12} sm={6} md={3}>
-              <Box sx={{ p: 1.5, borderRadius: '16px', bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <Box sx={{ p: 1.5, borderRadius: '16px', bgcolor: 'background.level1', border: '1px solid', borderColor: 'neutral.outlinedBorder', boxShadow: 'sm' }}>
                 <Typography level="body-xs" sx={{ color: 'text.tertiary', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                   Current Market Price
                 </Typography>
@@ -462,7 +462,7 @@ export default function StockDossierCockpit({
 
             {/* Scenario Range Bar (Bear - Base - Bull) */}
             <Grid xs={12} sm={6} md={5}>
-              <Box sx={{ p: 1.5, borderRadius: '16px', bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <Box sx={{ p: 1.5, borderRadius: '16px', bgcolor: 'background.level1', border: '1px solid', borderColor: 'neutral.outlinedBorder', boxShadow: 'sm' }}>
                 <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
                   <Typography level="body-xs" sx={{ color: 'text.tertiary', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     DCF Valuation & MoS Range
@@ -497,8 +497,10 @@ export default function StockDossierCockpit({
                 sx={{
                   p: 1.5,
                   borderRadius: '16px',
-                  bgcolor: 'rgba(255,255,255,0.03)',
-                  border: '1px solid rgba(255,255,255,0.06)',
+                  bgcolor: 'background.level1',
+                  border: '1px solid',
+                  borderColor: 'neutral.outlinedBorder',
+                  boxShadow: 'sm',
                   position: 'relative',
                 }}
               >
@@ -570,7 +572,7 @@ export default function StockDossierCockpit({
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
+                
               }}
             >
               <Box>
@@ -597,24 +599,24 @@ export default function StockDossierCockpit({
 
                 <Grid container spacing={1.5} sx={{ mb: 2 }}>
                   <Grid xs={4}>
-                    <Box sx={{ p: 1.25, borderRadius: '12px', bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', textAlign: 'center' }}>
-                      <Typography level="body-xs" sx={{ color: 'danger.300', fontWeight: 600 }}>Bear Case</Typography>
+                    <Box sx={{ p: 1.25, borderRadius: '12px', bgcolor: 'background.level1', border: '1px solid', borderColor: 'neutral.outlinedBorder', boxShadow: 'sm', textAlign: 'center' }}>
+                      <Typography level="body-xs" sx={{ color: 'danger.plainColor', fontWeight: 700 }}>Bear Case</Typography>
                       <Typography level="title-sm" sx={{ fontWeight: 800, mt: 0.5 }}>
                         {overview?.dcfScenarios?.bear ? formatCurrency(overview.dcfScenarios.bear) : '—'}
                       </Typography>
                     </Box>
                   </Grid>
                   <Grid xs={4}>
-                    <Box sx={{ p: 1.25, borderRadius: '12px', bgcolor: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.2)', textAlign: 'center' }}>
-                      <Typography level="body-xs" sx={{ color: 'success.300', fontWeight: 700 }}>Base Fair Value</Typography>
+                    <Box sx={{ p: 1.25, borderRadius: '12px', bgcolor: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.25)', textAlign: 'center', boxShadow: 'sm' }}>
+                      <Typography level="body-xs" sx={{ color: 'success.plainColor', fontWeight: 800 }}>Base Fair Value</Typography>
                       <Typography level="title-sm" sx={{ fontWeight: 900, mt: 0.5, color: '#10b981' }}>
                         {overview?.dcfScenarios?.base ? formatCurrency(overview.dcfScenarios.base) : '—'}
                       </Typography>
                     </Box>
                   </Grid>
                   <Grid xs={4}>
-                    <Box sx={{ p: 1.25, borderRadius: '12px', bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', textAlign: 'center' }}>
-                      <Typography level="body-xs" sx={{ color: 'primary.300', fontWeight: 600 }}>Bull Case</Typography>
+                    <Box sx={{ p: 1.25, borderRadius: '12px', bgcolor: 'background.level1', border: '1px solid', borderColor: 'neutral.outlinedBorder', boxShadow: 'sm', textAlign: 'center' }}>
+                      <Typography level="body-xs" sx={{ color: 'primary.plainColor', fontWeight: 700 }}>Bull Case</Typography>
                       <Typography level="title-sm" sx={{ fontWeight: 800, mt: 0.5 }}>
                         {overview?.dcfScenarios?.bull ? formatCurrency(overview.dcfScenarios.bull) : '—'}
                       </Typography>
@@ -659,7 +661,7 @@ export default function StockDossierCockpit({
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
+                
               }}
             >
               <Box>
@@ -687,10 +689,10 @@ export default function StockDossierCockpit({
                 {debateData ? (
                   <Stack spacing={1.5}>
                     {/* Top Bull Catalyst */}
-                    <Box sx={{ p: 1.5, borderRadius: '14px', bgcolor: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.15)' }}>
+                    <Box sx={{ p: 1.5, borderRadius: '14px', bgcolor: 'rgba(16, 185, 129, 0.06)', border: '1px solid rgba(16, 185, 129, 0.2)', boxShadow: 'sm' }}>
                       <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
                         <TrendingUp size={15} color="#10b981" />
-                        <Typography level="title-sm" sx={{ color: 'success.300', fontWeight: 700 }}>
+                        <Typography level="title-sm" sx={{ color: 'success.plainColor', fontWeight: 700 }}>
                           Bull Catalyst
                         </Typography>
                       </Stack>
@@ -702,10 +704,10 @@ export default function StockDossierCockpit({
                     </Box>
 
                     {/* Top Bear Downside Risk */}
-                    <Box sx={{ p: 1.5, borderRadius: '14px', bgcolor: 'rgba(244, 63, 94, 0.05)', border: '1px solid rgba(244, 63, 94, 0.15)' }}>
+                    <Box sx={{ p: 1.5, borderRadius: '14px', bgcolor: 'rgba(244, 63, 94, 0.06)', border: '1px solid rgba(244, 63, 94, 0.2)', boxShadow: 'sm' }}>
                       <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
                         <TrendingDown size={15} color="#f43f5e" />
-                        <Typography level="title-sm" sx={{ color: 'danger.300', fontWeight: 700 }}>
+                        <Typography level="title-sm" sx={{ color: 'danger.plainColor', fontWeight: 700 }}>
                           Bear Risk
                         </Typography>
                       </Stack>
@@ -753,7 +755,7 @@ export default function StockDossierCockpit({
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
+                
               }}
             >
               <Box>
@@ -781,7 +783,7 @@ export default function StockDossierCockpit({
                 </Stack>
 
                 <Stack spacing={1.5}>
-                  <Box sx={{ p: 1.5, borderRadius: '14px', bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <Box sx={{ p: 1.5, borderRadius: '14px', bgcolor: 'background.level1', border: '1px solid', borderColor: 'neutral.outlinedBorder', boxShadow: 'sm' }}>
                     <Stack direction="row" justifyContent="space-between" alignItems="center">
                       <Typography level="body-xs" sx={{ color: 'text.secondary' }}>Howard Marks Governance:</Typography>
                       <Chip size="sm" variant="soft" color="success" sx={{ fontSize: '0.7rem', fontWeight: 700 }}>
@@ -806,7 +808,7 @@ export default function StockDossierCockpit({
                   </Box>
 
                   {/* Correlation status */}
-                  <Box sx={{ p: 1.5, borderRadius: '14px', bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                  <Box sx={{ p: 1.5, borderRadius: '14px', bgcolor: 'background.level1', border: '1px solid', borderColor: 'neutral.outlinedBorder', boxShadow: 'sm' }}>
                     <Stack direction="row" justifyContent="space-between" alignItems="center">
                       <Typography level="body-xs" sx={{ color: 'text.secondary' }}>Correlated Stock Pairs (r ≥ 0.70):</Typography>
                       <Typography level="body-xs" sx={{ fontWeight: 700, color: correlatedPairs.length > 0 ? '#f59e0b' : '#10b981' }}>
@@ -846,7 +848,7 @@ export default function StockDossierCockpit({
                 display: 'flex',
                 flexDirection: 'column',
                 justifyContent: 'space-between',
-                border: '1px solid rgba(255, 255, 255, 0.08)',
+                
               }}
             >
               <Box>
@@ -873,7 +875,7 @@ export default function StockDossierCockpit({
 
                 {activeThesis ? (
                   <Stack spacing={1.5}>
-                    <Box sx={{ p: 1.5, borderRadius: '14px', bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                    <Box sx={{ p: 1.5, borderRadius: '14px', bgcolor: 'background.level1', border: '1px solid', borderColor: 'neutral.outlinedBorder', boxShadow: 'sm' }}>
                       <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
                         <Typography level="title-sm" sx={{ fontWeight: 800 }}>
                           {activeThesis.title}
@@ -889,7 +891,7 @@ export default function StockDossierCockpit({
 
                     <Grid container spacing={1}>
                       <Grid xs={6}>
-                        <Box sx={{ p: 1.25, borderRadius: '12px', bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <Box sx={{ p: 1.25, borderRadius: '12px', bgcolor: 'background.level1', border: '1px solid', borderColor: 'neutral.outlinedBorder', boxShadow: 'sm' }}>
                           <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>Target Buy Price:</Typography>
                           <Typography level="title-sm" sx={{ fontWeight: 800, mt: 0.2 }}>
                             {activeThesis.buy_price ? formatCurrency(activeThesis.buy_price) : '—'}
@@ -897,7 +899,7 @@ export default function StockDossierCockpit({
                         </Box>
                       </Grid>
                       <Grid xs={6}>
-                        <Box sx={{ p: 1.25, borderRadius: '12px', bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <Box sx={{ p: 1.25, borderRadius: '12px', bgcolor: 'background.level1', border: '1px solid', borderColor: 'neutral.outlinedBorder', boxShadow: 'sm' }}>
                           <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>Target Sell Price:</Typography>
                           <Typography level="title-sm" sx={{ fontWeight: 800, mt: 0.2 }}>
                             {activeThesis.sell_price ? formatCurrency(activeThesis.sell_price) : '—'}
@@ -936,7 +938,7 @@ export default function StockDossierCockpit({
             ...glassStyle,
             p: { xs: 2.5, md: 4 },
             borderRadius: '24px',
-            border: '1px solid rgba(255, 255, 255, 0.1)',
+            
           }}
         >
           <Stack spacing={3}>
@@ -958,8 +960,9 @@ export default function StockDossierCockpit({
                 sx={{
                   p: 2.5,
                   borderRadius: '16px',
-                  bgcolor: 'rgba(255,255,255,0.02)',
-                  border: '1px solid rgba(59, 130, 246, 0.2)',
+                  bgcolor: 'background.level1',
+                  border: '1px solid rgba(59, 130, 246, 0.3)',
+                  boxShadow: 'sm',
                   position: 'relative',
                 }}
               >
@@ -990,8 +993,9 @@ export default function StockDossierCockpit({
                 sx={{
                   p: 2.5,
                   borderRadius: '16px',
-                  bgcolor: 'rgba(255,255,255,0.02)',
-                  border: '1px solid rgba(234, 179, 8, 0.2)',
+                  bgcolor: 'background.level1',
+                  border: '1px solid rgba(234, 179, 8, 0.35)',
+                  boxShadow: 'sm',
                 }}
               >
                 <Stack direction="row" spacing={2} alignItems="flex-start">
@@ -1011,7 +1015,7 @@ export default function StockDossierCockpit({
                       Synthesized competing adversarial perspectives to stress-test confirmation bias.
                     </Typography>
                     {debateData?.synthesis?.verdict_summary && (
-                      <Box sx={{ p: 1.5, mt: 1.5, borderRadius: '10px', bgcolor: 'rgba(255,255,255,0.02)', borderLeft: '3px solid #eab308' }}>
+                      <Box sx={{ p: 1.5, mt: 1.5, borderRadius: '10px', bgcolor: 'background.level2', borderLeft: '3px solid #eab308' }}>
                         <Typography level="body-xs" sx={{ color: 'text.secondary' }}>
                           "{debateData.synthesis.verdict_summary}"
                         </Typography>
@@ -1026,8 +1030,9 @@ export default function StockDossierCockpit({
                 sx={{
                   p: 2.5,
                   borderRadius: '16px',
-                  bgcolor: 'rgba(255,255,255,0.02)',
-                  border: '1px solid rgba(16, 185, 129, 0.2)',
+                  bgcolor: 'background.level1',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  boxShadow: 'sm',
                 }}
               >
                 <Stack direction="row" spacing={2} alignItems="flex-start">
@@ -1058,8 +1063,9 @@ export default function StockDossierCockpit({
                 sx={{
                   p: 2.5,
                   borderRadius: '16px',
-                  bgcolor: 'rgba(255,255,255,0.02)',
-                  border: '1px solid rgba(168, 85, 247, 0.2)',
+                  bgcolor: 'background.level1',
+                  border: '1px solid rgba(168, 85, 247, 0.3)',
+                  boxShadow: 'sm',
                 }}
               >
                 <Stack direction="row" spacing={2} alignItems="flex-start">
@@ -1090,8 +1096,9 @@ export default function StockDossierCockpit({
                 sx={{
                   p: 2.5,
                   borderRadius: '16px',
-                  bgcolor: 'rgba(255,255,255,0.02)',
-                  border: '1px solid rgba(249, 115, 22, 0.2)',
+                  bgcolor: 'background.level1',
+                  border: '1px solid rgba(249, 115, 22, 0.3)',
+                  boxShadow: 'sm',
                 }}
               >
                 <Stack direction="row" spacing={2} alignItems="flex-start">
@@ -1130,7 +1137,7 @@ export default function StockDossierCockpit({
             width: '100%',
             maxWidth: 500,
             borderRadius: '24px',
-            border: '1px solid rgba(255, 255, 255, 0.15)',
+            
           }}
         >
           <DialogTitle sx={{ fontWeight: 800, fontSize: '1.25rem' }}>
@@ -1192,8 +1199,10 @@ export default function StockDossierCockpit({
                   sx={{
                     p: 2,
                     borderRadius: '14px',
-                    bgcolor: 'rgba(255,255,255,0.03)',
-                    border: '1px solid rgba(255,255,255,0.08)',
+                    bgcolor: 'background.level1',
+                    border: '1px solid',
+                    borderColor: 'neutral.outlinedBorder',
+                    boxShadow: 'sm',
                   }}
                 >
                   <Stack spacing={1}>
@@ -1221,7 +1230,7 @@ export default function StockDossierCockpit({
                       </Chip>
                     </Stack>
                     {(simImpact.causesStockCapBreach || simImpact.causesThemeCapBreach) && (
-                      <Typography level="body-xs" sx={{ color: 'danger.300', mt: 0.5 }}>
+                      <Typography level="body-xs" sx={{ color: 'danger.plainColor', fontWeight: 600, mt: 0.5 }}>
                         ⚠️ Order exceeds maximum permitted governance allocation for this asset.
                       </Typography>
                     )}

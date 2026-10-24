@@ -1,6 +1,6 @@
 ---
 name: oaktree-frontend
-description: MUI Joy UI component guidelines, glassmorphism styling, layout structure, table standardization, modal dialogs, and button loading spinners. Load when writing or editing frontend UI code.
+description: MUI Joy UI component guidelines, Stitch and Antigravity Design integration, theme-first token rules, glassmorphism styling, layout structure, table standardization, modal dialogs, and button loading spinners. Load when writing or editing frontend UI code.
 ---
 
 # Oaktree Frontend Guidelines
@@ -9,18 +9,39 @@ Guidelines and standards for building the frontend of the Oaktree Agent applicat
 
 ---
 
-## 🎨 Antigravity UI Style (Adapted for MUI Joy UI)
+## 🎨 Mandatory UI/UX Skills Trio (Stitch + Antigravity Design + Oaktree Frontend)
 
-Apply these design principles using MUI Joy UI `sx` props (do not load the `@antigravity-design-expert` skill to avoid Tailwind/GSAP stack conflicts):
-- **Glassmorphism**: Use translucent backgrounds (`rgba`), blur effects (`backdropFilter: 'blur(12px)'`), and thin subtle borders.
-- **Weightlessness**: Add soft, layered, and diffused shadows.
-- **Motion**: Ensure all hover/focus/active state changes have smooth transitions (`transition: 'all 0.3s ease-out'`).
-- **React Entrypoint**: `src/components/App.tsx` **MUST** remain directly under `src/components/` to integrate with Astro.
-- **Component Folder Structure**:
-  - `src/components/layout/` – Shell components (`Header.tsx`, `Sidebar.tsx`).
-  - `src/components/common/` – Reusable contexts/helpers (`AuthContext.tsx`, `ThemeToggle.tsx`).
-  - `src/components/features/` – Domain-specific views in subfolders (e.g., `agent/`, `portfolio/`).
-- **Relative Paths**: Always use relative paths (e.g., `../../common/`) rather than flat imports when crossing folder boundaries.
+When creating, reviewing, or modifying any UX/UI interfaces, components, or layouts, **ALWAYS** integrate the principles of:
+1. **`stitch`**: Use for screen structure, user journeys, responsive density, information layout, and component hierarchy.
+2. **`@antigravity-design-expert`**: Use for spatial depth, layered Z-axis planes, weightless elevation, glassmorphism, and buttery-smooth transitions (`transition: 'all 0.3s ease-out'`).
+3. **Stack Adaptation**: Implement all concepts exclusively through **MUI Joy UI** components and `sx` props (Strictly **NO Tailwind CSS**). The project stack constraints take absolute precedence over external skill defaults.
+4. **React Entrypoint**: `src/components/App.tsx` **MUST** remain directly under `src/components/` to integrate with Astro.
+5. **Component Folder Structure**:
+   - `src/components/layout/` – Shell components (`Header.tsx`, `Sidebar.tsx`).
+   - `src/components/common/` – Reusable contexts/helpers (`AuthContext.tsx`, `ThemeToggle.tsx`).
+   - `src/components/features/` – Domain-specific views in subfolders (e.g., `agent/`, `portfolio/`).
+6. **Relative Paths**: Always use relative paths (e.g., `../../common/`) rather than flat imports when crossing folder boundaries.
+
+---
+
+## 🚫 Strict Invariant: No Hardcoded Styles — Use Theme Tokens as Primary Source
+
+Strictly **FORBID** hardcoding static colors, borders, or shadows in component `sx` props (e.g. `rgba(255, 255, 255, 0.05)`, `#ffffff`, `#111827`, `border: '1px solid rgba(255,255,255,0.1)'`). Hardcoded values break theme switching between Light and Dark modes.
+
+Always use MUI Joy UI Theme tokens and variables:
+- **Surfaces & Hierarchy (Spatial Planes)**:
+  - Base Page / Canvas: `background.body`
+  - Level 1 Outer Glass Container: `...glassStyle` or `background.surface` (frosted glass)
+  - Level 2 Inner Cards / Telemetry Boxes: `background.level1` (`#f1f5f9` in Light / Slate in Dark)
+  - Level 3 Sub-containers / Controls: `background.level2`
+- **Borders & Dividers**:
+  - Use `border: '1px solid', borderColor: 'neutral.outlinedBorder'` or `divider`.
+  - **Never override** `glassStyle` with white-only borders (e.g. `rgba(255,255,255,0.08)`). Let `glassStyle.border` dynamically resolve via `neutral.outlinedBorder`.
+- **Semantic Typography & Status Colors**:
+  - Always use theme-aware color tokens: `color: 'danger.plainColor'`, `color: 'success.plainColor'`, `color: 'primary.plainColor'`, or `color: 'text.secondary'`.
+  - **Never use fixed pastel text** like `danger.300` or `success.300` on light background cards as they become unreadable in Light Theme.
+- **Elevation & Shadows**:
+  - Use Joy UI shadow tokens: `boxShadow: 'sm'`, `boxShadow: 'md'`, or `boxShadow: 'var(--joy-shadow-md)'`.
 
 ---
 
@@ -62,4 +83,3 @@ Always use MUI Joy UI `<Grid container spacing={2}>` as the default layout mecha
   - **`lg` & `md` (Medium / Large 900px - 1535px)**: Use `lg={6} md={6}` for 2 cards per row.
   - **`sm` & `xs` (Mobile / Small < 900px)**: Use `xs={12} sm={12}` for 1 card per row.
 - **Visual Harmony**: Combine Grid items with glassmorphic `<Sheet sx={{ ...glassStyle, p: 3, height: '100%' }}>` to ensure uniform card height and alignment across rows.
-
