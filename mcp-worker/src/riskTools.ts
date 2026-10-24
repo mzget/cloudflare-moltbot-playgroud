@@ -10,20 +10,56 @@ import {
   type PriceSeriesBySymbol,
 } from '@oaktree/shared';
 
-// Helper to query all necessary portfolio data from D1
-async function queryPortfolioRiskData(db: any) {
-  // 1. Open Holdings
-  const holdingsResult = await db.prepare(`
-    SELECT 
-      h.symbol, h.shares, h.avg_cost, h.total_cost, h.status,
-      w.name, w.sector_label,
-      m.price as last_price, m.previous_close
-    FROM holdings h
-    LEFT JOIN watchlist w ON h.symbol = w.symbol
-    LEFT JOIN market_stats m ON h.symbol = m.symbol
-    WHERE LOWER(h.status) = 'open'
-    ORDER BY h.symbol ASC
-  `).all();
+// Helper to query all necessary portfolio data from D1 using parallel query execution (ADR-0015)
+export async function queryPortfolioRiskData(db: any) {
+  // Stage 1: Execute the 5 independent queries concurrently via Promise.all
+  const [
+    holdingsResult,
+    themesResult,
+    dcfResult,
+    fundamentalsResult,
+    latestAdvisoryResult,
+  ] = await Promise.all([
+    // 1. Open Holdings
+    db.prepare(`
+      SELECT 
+        h.symbol, h.shares, h.avg_cost, h.total_cost, h.status,
+        w.name, w.sector_label,
+        m.price as last_price, m.previous_close
+      FROM holdings h
+      LEFT JOIN watchlist w ON h.symbol = w.symbol
+      LEFT JOIN market_stats m ON h.symbol = m.symbol
+      WHERE LOWER(h.status) = 'open'
+      ORDER BY h.symbol ASC
+    `).all(),
+    // 2. Theme mappings (including empty themes via LEFT JOIN)
+    db.prepare(`
+      SELECT 
+        m.symbol,
+        c.notebook_id,
+        c.theme_name
+      FROM theme_sector_contexts c
+      LEFT JOIN theme_symbol_mappings m ON c.notebook_id = m.notebook_id
+    `).all(),
+    // 3. DCF valuation scenarios (Base Case & Bear Case)
+    db.prepare(`
+      SELECT symbol, scenario_name, implied_share_price
+      FROM dcf_calculations
+      WHERE scenario_name IN ('Base Case', 'Bear Case')
+      ORDER BY id DESC
+    `).all(),
+    // 4. Fundamental intelligence (conviction score & debate from debate_json)
+    db.prepare(`
+      SELECT symbol, debate_json
+      FROM stock_fundamentals
+    `).all(),
+    // 6. Latest saved advisory
+    db.prepare(`
+      SELECT id, health_score, risk_level, executive_summary, key_warnings_json, rebalancing_actions_json, source, created_at
+      FROM portfolio_risk_advisories
+      ORDER BY id DESC LIMIT 1
+    `).first(),
+  ]);
 
   const holdingsRows = (holdingsResult.results || []) as any[];
 
@@ -34,18 +70,8 @@ async function queryPortfolioRiskData(db: any) {
     status: r.status,
   }));
 
-  // 2. Theme mappings
-  const themesResult = await db.prepare(`
-    SELECT 
-      m.symbol,
-      m.notebook_id,
-      c.theme_name
-    FROM theme_symbol_mappings m
-    JOIN theme_sector_contexts c ON m.notebook_id = c.notebook_id
-  `).all();
-
   const themeMappings: ThemeMappingInput[] = ((themesResult.results || []) as any[]).map(r => ({
-    symbol: r.symbol,
+    symbol: r.symbol || '',
     themeName: r.theme_name,
     notebookId: r.notebook_id,
   }));
@@ -58,15 +84,7 @@ async function queryPortfolioRiskData(db: any) {
     }
   }
 
-  // 3. DCF valuation scenarios (Base Case & Bear Case)
-  const dcfResult = await db.prepare(`
-    SELECT symbol, scenario_name, implied_share_price
-    FROM dcf_calculations
-    WHERE scenario_name IN ('Base Case', 'Bear Case')
-    ORDER BY id DESC
-  `).all();
-
-  const dcfBySymbol: Record<string, { baseMoS?: number; bearMoS?: number }> = {};
+  const dcfBySymbol: Record<string, { baseMoS?: number; bearMoS?: number; baseIntrinsic?: number; bearIntrinsic?: number }> = {};
   for (const row of (dcfResult.results || []) as any[]) {
     const sym = row.symbol;
     if (!dcfBySymbol[sym]) {
@@ -85,18 +103,14 @@ async function queryPortfolioRiskData(db: any) {
       mos = Number((((impliedPrice - currentPrice) / currentPrice) * 100).toFixed(1));
     }
 
-    if (scenarioName === 'Base Case' && dcfBySymbol[sym].baseMoS === undefined) {
+    if (scenarioName === 'Base Case' && dcfBySymbol[sym].baseIntrinsic === undefined && dcfBySymbol[sym].baseMoS === undefined) {
       dcfBySymbol[sym].baseMoS = mos;
-    } else if (scenarioName === 'Bear Case' && dcfBySymbol[sym].bearMoS === undefined) {
+      dcfBySymbol[sym].baseIntrinsic = impliedPrice;
+    } else if (scenarioName === 'Bear Case' && dcfBySymbol[sym].bearIntrinsic === undefined && dcfBySymbol[sym].bearMoS === undefined) {
       dcfBySymbol[sym].bearMoS = mos;
+      dcfBySymbol[sym].bearIntrinsic = impliedPrice;
     }
   }
-
-  // 4. Fundamental intelligence (conviction score & debate from debate_json)
-  const fundamentalsResult = await db.prepare(`
-    SELECT symbol, debate_json
-    FROM stock_fundamentals
-  `).all();
 
   const fundamentalsBySymbol: Record<string, { convictionScore?: number; hasDebate?: boolean }> = {};
   for (const row of (fundamentalsResult.results || []) as any[]) {
@@ -128,7 +142,7 @@ async function queryPortfolioRiskData(db: any) {
     };
   }
 
-  // 5. Historical prices (last 380 calendar days)
+  // Stage 2: Historical prices (last 380 calendar days)
   const now = new Date();
   const d = new Date();
   d.setFullYear(now.getFullYear() - 1);
@@ -158,13 +172,6 @@ async function queryPortfolioRiskData(db: any) {
     }
     Object.assign(priceSeries, mutableSeries);
   }
-
-  // 6. Latest saved advisory
-  const latestAdvisoryResult = await db.prepare(`
-    SELECT id, health_score, risk_level, executive_summary, key_warnings_json, rebalancing_actions_json, source, created_at
-    FROM portfolio_risk_advisories
-    ORDER BY id DESC LIMIT 1
-  `).first();
 
   let latestAdvisory = null;
   if (latestAdvisoryResult) {
@@ -236,6 +243,8 @@ export async function getPortfolioRiskAudit(env: any) {
         stockAnnualizedVol: correlation.stockAnnualizedVolatilities[sc.symbol] ?? 20.0,
         dcfBaseMoS: dcf?.baseMoS ?? null,
         dcfBearMoS: dcf?.bearMoS ?? null,
+        dcfBaseIntrinsic: dcf?.baseIntrinsic ?? null,
+        dcfBearIntrinsic: dcf?.bearIntrinsic ?? null,
         convictionScore: fund?.convictionScore ?? null,
         hasDebate: fund?.hasDebate ?? false,
         sizing,
@@ -247,6 +256,7 @@ export async function getPortfolioRiskAudit(env: any) {
       correlation,
       health,
       holdingsSizing,
+      themeMappings: data.themeMappings,
       latestAdvisory: data.latestAdvisory,
     };
   } catch (error: any) {
@@ -362,7 +372,7 @@ export async function saveRiskAdvisory(env: any, args: SaveRiskAdvisoryArgs) {
     `).bind(
       health_score,
       risk_level,
-      executive_summary,
+      executiveSummarySanitize(executive_summary),
       JSON.stringify(key_warnings),
       JSON.stringify(rebalancing_actions),
       source
@@ -378,4 +388,8 @@ export async function saveRiskAdvisory(env: any, args: SaveRiskAdvisoryArgs) {
   } catch (error: any) {
     return { error: error.message || 'Failed to save risk advisory' };
   }
+}
+
+function executiveSummarySanitize(str: string): string {
+  return str;
 }

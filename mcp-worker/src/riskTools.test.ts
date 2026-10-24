@@ -19,7 +19,7 @@ describe('mcp-worker riskTools', () => {
             })
           };
         }
-        if (sql.includes('FROM theme_symbol_mappings m')) {
+        if (sql.includes('FROM theme_symbol_mappings') || sql.includes('FROM theme_sector_contexts')) {
           return {
             all: vi.fn().mockResolvedValue({
               results: [
@@ -90,7 +90,7 @@ describe('mcp-worker riskTools', () => {
     };
   };
 
-  it('getPortfolioRiskAudit computes audit and returns structured data', async () => {
+  it('getPortfolioRiskAudit computes audit and returns structured data including themeMappings', async () => {
     const mockEnv = { DB: createMockDb() };
     const res = await getPortfolioRiskAudit(mockEnv);
 
@@ -103,6 +103,58 @@ describe('mcp-worker riskTools', () => {
     expect(res.health).toBeDefined();
     expect(res.health.healthScore).toBeGreaterThanOrEqual(0);
     expect(res.holdingsSizing.length).toBe(2);
+    expect(res.themeMappings).toBeDefined();
+    expect(res.themeMappings.length).toBe(2);
+  });
+
+  it('getPortfolioRiskAudit dispatches the 5 independent D1 queries concurrently via Promise.all', async () => {
+    const callOrder: string[] = [];
+    let resolveAll!: () => void;
+    const gate = new Promise<void>(r => {
+      resolveAll = r;
+    });
+
+    const mockDb = {
+      prepare: vi.fn((sql: string) => {
+        if (sql.includes('FROM holdings h')) {
+          callOrder.push('holdings');
+          return { all: vi.fn(() => gate.then(() => ({ results: [{ symbol: 'AAPL', shares: 100, last_price: 150, status: 'Open' }] }))) };
+        }
+        if (sql.includes('FROM theme_symbol_mappings') || sql.includes('FROM theme_sector_contexts')) {
+          callOrder.push('themes');
+          return { all: vi.fn(() => gate.then(() => ({ results: [{ symbol: 'AAPL', theme_name: 'Consumer Tech', notebook_id: 'nb-1' }] }))) };
+        }
+        if (sql.includes('FROM dcf_calculations')) {
+          callOrder.push('dcf');
+          return { all: vi.fn(() => gate.then(() => ({ results: [] }))) };
+        }
+        if (sql.includes('FROM stock_fundamentals')) {
+          callOrder.push('fundamentals');
+          return { all: vi.fn(() => gate.then(() => ({ results: [] }))) };
+        }
+        if (sql.includes('FROM portfolio_risk_advisories')) {
+          callOrder.push('advisories');
+          return { first: vi.fn(() => gate.then(() => null)) };
+        }
+        if (sql.includes('FROM historical_prices')) {
+          callOrder.push('historical_prices');
+          return {
+            bind: vi.fn().mockReturnValue({
+              all: vi.fn().mockResolvedValue({ results: [] }),
+            }),
+          };
+        }
+        return { all: vi.fn().mockResolvedValue({ results: [] }), first: vi.fn().mockResolvedValue(null) };
+      }),
+    };
+
+    const promise = getPortfolioRiskAudit({ DB: mockDb });
+    expect(callOrder).toEqual(['holdings', 'themes', 'dcf', 'fundamentals', 'advisories']);
+
+    resolveAll();
+    const res = await promise;
+    expect(callOrder).toEqual(['holdings', 'themes', 'dcf', 'fundamentals', 'advisories', 'historical_prices']);
+    expect('error' in res).toBe(false);
   });
 
   it('calculatePositionSize calculates room and simulation for a ticker', async () => {
