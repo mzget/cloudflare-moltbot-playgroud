@@ -183,10 +183,61 @@ describe('Risk Routes & Portfolio Risk Logic', () => {
       expect(data.dcfBySymbol['LEGACY']?.baseIntrinsic).toBe(50);
       expect(data.dcfBySymbol['LEGACY']?.baseMoS).toBe(15);
     });
+
+    it('dispatches the 5 independent D1 queries concurrently via Promise.all before resolving', async () => {
+      const callOrder: string[] = [];
+      let resolveAll!: () => void;
+      const gate = new Promise<void>(r => {
+        resolveAll = r;
+      });
+
+      const mockDb = {
+        prepare: vi.fn((sql: string) => {
+          if (sql.includes('FROM holdings h')) {
+            callOrder.push('holdings');
+            return { all: vi.fn(() => gate.then(() => ({ results: [{ symbol: 'AAPL', shares: 10, last_price: 150, status: 'Open' }] }))) };
+          }
+          if (sql.includes('FROM theme_sector_contexts c')) {
+            callOrder.push('themes');
+            return { all: vi.fn(() => gate.then(() => ({ results: [{ symbol: 'AAPL', notebook_id: 'nb-1', theme_name: 'Consumer Tech' }] }))) };
+          }
+          if (sql.includes('FROM dcf_calculations')) {
+            callOrder.push('dcf');
+            return { all: vi.fn(() => gate.then(() => ({ results: [] }))) };
+          }
+          if (sql.includes('FROM stock_fundamentals')) {
+            callOrder.push('fundamentals');
+            return { all: vi.fn(() => gate.then(() => ({ results: [] }))) };
+          }
+          if (sql.includes('FROM portfolio_risk_advisories')) {
+            callOrder.push('advisories');
+            return { first: vi.fn(() => gate.then(() => null)) };
+          }
+          if (sql.includes('FROM historical_prices')) {
+            callOrder.push('historical_prices');
+            return {
+              bind: vi.fn().mockReturnValue({
+                all: vi.fn().mockResolvedValue({ results: [] }),
+              }),
+            };
+          }
+          return { all: vi.fn().mockResolvedValue({ results: [] }), first: vi.fn().mockResolvedValue(null) };
+        }),
+      } as unknown as D1Database;
+
+      const promise = loadPortfolioRiskData(mockDb);
+      // Before gate resolves, all 5 independent queries must already be initiated concurrently
+      expect(callOrder).toEqual(['holdings', 'themes', 'dcf', 'fundamentals', 'advisories']);
+
+      resolveAll();
+      const result = await promise;
+      expect(callOrder).toEqual(['holdings', 'themes', 'dcf', 'fundamentals', 'advisories', 'historical_prices']);
+      expect(result.riskHoldings.length).toBe(1);
+    });
   });
 
   describe('GET /api/portfolio/risk-audit', () => {
-    it('returns 200 with concentration, correlation, health score, and holdings sizing', async () => {
+    it('returns 200 with concentration, correlation, health score, holdings sizing, and themeMappings', async () => {
       const mockDb = createMockDb();
       const mockEnv = createMockEnv(mockDb);
 
@@ -200,6 +251,9 @@ describe('Risk Routes & Portfolio Risk Logic', () => {
       expect(json.health).toBeDefined();
       expect(json.health.healthScore).toBeGreaterThanOrEqual(0);
       expect(json.holdingsSizing.length).toBe(2);
+      expect(json.themeMappings).toBeDefined();
+      expect(json.themeMappings.length).toBe(2);
+      expect(json.themeMappings[0]).toEqual({ symbol: 'AAPL', themeName: 'Consumer Tech', notebookId: 'nb-1' });
       expect(json.latestAdvisory).toBeDefined();
       expect(json.latestAdvisory.health_score).toBe(90);
     });
@@ -214,6 +268,7 @@ describe('Risk Routes & Portfolio Risk Logic', () => {
       const json = await res.json() as any;
       expect(json.concentration.totalStockPortfolioUsd).toBe(0);
       expect(json.holdingsSizing).toEqual([]);
+      expect(json.themeMappings).toEqual([]);
       expect(json.latestAdvisory).toBeNull();
     });
 
@@ -350,6 +405,7 @@ describe('Risk Routes & Portfolio Risk Logic', () => {
       expect(json.error).toContain('Workers AI model overloaded');
     });
   });
+
   describe('DELETE /api/portfolio/themes/:name', () => {
     it('deletes theme and its mappings via atomic batch', async () => {
       const mockDb = createMockDb();

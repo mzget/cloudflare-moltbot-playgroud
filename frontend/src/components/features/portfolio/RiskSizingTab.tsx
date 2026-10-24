@@ -28,6 +28,7 @@ import {
   CheckCircle2,
   Sparkles,
   RefreshCw,
+  RotateCcw,
   Calculator,
   ArrowRight,
   PieChart,
@@ -40,10 +41,16 @@ import {
   X,
   FileBarChart,
 } from 'lucide-react';
+import {
+  DEFAULT_RISK_CONFIG,
+  calculateFixedBasePositionSize,
+  simulatePreTradeImpact,
+  type ThemeMappingInput,
+} from '@oaktree/shared';
 import ThemeDonutChart from './ThemeDonutChart';
 import { API_BASE_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
-import { formatCurrency, formatPct } from './YahooPortfolio';
+import { formatCurrency } from './YahooPortfolio';
 import { useSettingsStore } from '../../../store/settingsStore';
 import { useAnalysisCoverage } from '../../../hooks/useAnalysisCoverage';
 import type { AnalysisCoverageMap } from '../../../types/analysisCoverage';
@@ -59,10 +66,13 @@ export interface RiskSizingTabProps {
   initialEditingTheme?: string | null;
   initialEditedThemeValue?: string;
   initialSelectedSymbol?: string;
+  initialCustomSymbol?: string;
+  initialOrderType?: 'Buy' | 'Sell';
+  initialOrderShares?: string;
+  initialOrderPrice?: string;
 }
 
 export default function RiskSizingTab({
-  onNavigateToHoldings,
   onNavigateToAnalysis,
   initialAuditData,
   initialAnalysisCoverage,
@@ -72,6 +82,10 @@ export default function RiskSizingTab({
   initialEditingTheme = null,
   initialEditedThemeValue,
   initialSelectedSymbol = '',
+  initialCustomSymbol = '',
+  initialOrderType = 'Buy',
+  initialOrderShares = '10',
+  initialOrderPrice,
 }: RiskSizingTabProps) {
   const showMoneyValues = useSettingsStore(state => state.showMoneyValues);
 
@@ -94,16 +108,21 @@ export default function RiskSizingTab({
   );
   const [isSavingTheme, setIsSavingTheme] = React.useState(false);
 
-  // Position Sizing Simulator state
-  const [selectedSymbol, setSelectedSymbol] = React.useState<string>(
-    initialSelectedSymbol || (initialAuditData?.holdingsSizing?.[0]?.symbol || '')
+  // Position Sizing Simulator state (0ms client-side via @oaktree/shared)
+  const initialDefaultSymbol = initialSelectedSymbol || (initialAuditData?.holdingsSizing?.[0]?.symbol || '');
+  const initialDefaultHolding = (initialAuditData?.holdingsSizing || []).find(
+    (h: any) => h.symbol === initialDefaultSymbol
   );
-  const [customSymbol, setCustomSymbol] = React.useState<string>('');
-  const [orderType, setOrderType] = React.useState<'Buy' | 'Sell'>('Buy');
-  const [orderShares, setOrderShares] = React.useState<string>('10');
-  const [orderPrice, setOrderPrice] = React.useState<string>('');
-  const [simulating, setSimulating] = React.useState(false);
-  const [sizingResult, setSizingResult] = React.useState<any>(null);
+
+  const [selectedSymbol, setSelectedSymbol] = React.useState<string>(initialDefaultSymbol);
+  const [customSymbol, setCustomSymbol] = React.useState<string>(initialCustomSymbol);
+  const [orderType, setOrderType] = React.useState<'Buy' | 'Sell'>(initialOrderType);
+  const [orderShares, setOrderShares] = React.useState<string>(initialOrderShares);
+  const [orderPrice, setOrderPrice] = React.useState<string>(
+    initialOrderPrice !== undefined
+      ? initialOrderPrice
+      : (initialDefaultHolding?.lastPrice ? String(initialDefaultHolding.lastPrice) : '')
+  );
 
   const activeSymbol = selectedSymbol === '__CUSTOM__' ? customSymbol.trim().toUpperCase() : selectedSymbol;
 
@@ -160,7 +179,7 @@ export default function RiskSizingTab({
     }
   }, [fetchAudit, autoFetch]);
 
-  // When selected symbol changes, update order price and trigger simulation
+  // When selected symbol changes, update order price to holding's lastPrice if available
   React.useEffect(() => {
     if (!auditData?.holdingsSizing) return;
     const match = auditData.holdingsSizing.find((h: any) => h.symbol === activeSymbol);
@@ -169,42 +188,82 @@ export default function RiskSizingTab({
     }
   }, [activeSymbol, auditData]);
 
-  // Sizing & Simulation calculation
-  const runSimulation = React.useCallback(async () => {
-    if (!activeSymbol) return;
-    setSimulating(true);
-
-    try {
-      const priceNum = parseFloat(orderPrice) || 0;
-      const sharesNum = parseFloat(orderShares) || 0;
-
-      const res = await fetch(`${API_BASE_URL}/api/portfolio/position-sizing`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          symbol: activeSymbol,
-          price: priceNum,
-          shares: sharesNum,
-          type: orderType,
-        }),
-      });
-
-      if (res.ok) {
-        const data = await res.json();
-        setSizingResult(data);
+  // Resolve themeMappings from auditData.themeMappings with fallback to concentration.themeExposures (ADR-0015)
+  const resolvedThemeMappings = React.useMemo<ThemeMappingInput[]>(() => {
+    if (Array.isArray(auditData?.themeMappings) && auditData.themeMappings.length > 0) {
+      return auditData.themeMappings;
+    }
+    const exposures = auditData?.concentration?.themeExposures || [];
+    const derived: ThemeMappingInput[] = [];
+    for (const te of exposures) {
+      if (te.isUnassigned) continue;
+      for (const sym of te.symbols || []) {
+        if (sym) {
+          derived.push({ symbol: sym, themeName: te.themeName });
+        }
       }
-    } catch (e) {
-      console.error('Simulation error:', e);
-    } finally {
-      setSimulating(false);
     }
-  }, [activeSymbol, orderPrice, orderShares, orderType]);
+    return derived;
+  }, [auditData]);
 
-  React.useEffect(() => {
-    if (activeSymbol && auditData) {
-      runSimulation();
+  // Instant 0ms client-side Sizing & Pre-Trade Simulation via @oaktree/shared (ADR-0015)
+  const liveSizingResult = React.useMemo(() => {
+    if (!activeSymbol || !auditData?.concentration) {
+      return null;
     }
-  }, [activeSymbol, orderPrice, orderShares, orderType, auditData, runSimulation]);
+
+    const match = (auditData.holdingsSizing || []).find((h: any) => h.symbol === activeSymbol);
+    const parsedPrice = parseFloat(orderPrice);
+    const priceNum = !isNaN(parsedPrice) && parsedPrice > 0
+      ? parsedPrice
+      : (match?.lastPrice ? Number(match.lastPrice) : 0);
+    const parsedShares = parseFloat(orderShares);
+    const sharesNum = !isNaN(parsedShares) && parsedShares > 0 ? parsedShares : 0;
+
+    const audit = {
+      totalStockPortfolioUsd: auditData.concentration.totalStockPortfolioUsd || 0,
+      openHoldingsCount: auditData.concentration.openHoldingsCount || 0,
+      stockConcentrations: auditData.concentration.stockConcentrations || [],
+      themeExposures: auditData.concentration.themeExposures || [],
+      hhi: auditData.concentration.hhi || 0,
+      effectivePositions: auditData.concentration.effectivePositions || 0,
+      top3ConcentrationPct: auditData.concentration.top3ConcentrationPct || 0,
+      top5ConcentrationPct: auditData.concentration.top5ConcentrationPct || 0,
+    };
+
+    const sizing = calculateFixedBasePositionSize({
+      symbol: activeSymbol,
+      currentPrice: priceNum,
+      audit,
+      themeMappings: resolvedThemeMappings,
+      config: DEFAULT_RISK_CONFIG,
+    });
+
+    const simulation =
+      sharesNum > 0 && priceNum > 0
+        ? simulatePreTradeImpact({
+            audit,
+            order: {
+              symbol: activeSymbol,
+              type: orderType,
+              shares: sharesNum,
+              price: priceNum,
+            },
+            themeMappings: resolvedThemeMappings,
+            config: DEFAULT_RISK_CONFIG,
+          })
+        : null;
+
+    return { sizing, simulation };
+  }, [activeSymbol, orderPrice, orderShares, orderType, auditData, resolvedThemeMappings]);
+
+  // Reset simulator inputs to defaults (Buy, 10 shares, current holding's lastPrice)
+  const handleResetSimulation = React.useCallback(() => {
+    setOrderType('Buy');
+    setOrderShares('10');
+    const match = (auditData?.holdingsSizing || []).find((h: any) => h.symbol === activeSymbol);
+    setOrderPrice(match?.lastPrice ? String(match.lastPrice) : '');
+  }, [auditData, activeSymbol]);
 
   // Delete theme handler
   const handleDeleteTheme = async () => {
@@ -326,10 +385,10 @@ export default function RiskSizingTab({
     riskLevel === 'Elevated' ? 'warning' : 'danger';
 
   const currentSizing =
-    sizingResult?.sizing ||
+    liveSizingResult?.sizing ||
     holdingsSizing.find((h: any) => h.symbol === activeSymbol)?.sizing ||
     holdingsSizing[0]?.sizing;
-  const currentSimulation = sizingResult?.simulation;
+  const currentSimulation = liveSizingResult?.simulation;
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -577,13 +636,14 @@ export default function RiskSizingTab({
 
           <Grid xs={12} md={3} sx={{ display: 'flex', alignItems: 'flex-end' }}>
             <Button
-              variant="solid"
-              color="primary"
-              onClick={runSimulation}
-              loading={simulating}
+              variant="soft"
+              color="neutral"
+              startDecorator={<RotateCcw size={16} />}
+              onClick={handleResetSimulation}
+              title="Reset simulation parameters"
               sx={{ width: '100%', borderRadius: '10px', fontWeight: 700 }}
             >
-              Calculate Sizing Room
+              Reset
             </Button>
           </Grid>
         </Grid>

@@ -56,8 +56,8 @@ flowchart TD
 
 ---
 
-### 🧮 Phase 2: AI-Assisted DCF Valuation Scenarios (In Progress 🔄)
-> **เป้าหมาย:** เชื่อมโยงผลวิเคราะห์ Multi-Agent เข้ากับโมเดล DCF ที่มีอยู่เดิมใน Oaktree เพื่อตั้งค่า Base, Bear, Bull Case อัตโนมัติ
+### 🧮 Phase 2: AI-Assisted DCF Valuation Scenarios (Completed ✅)
+> **เป้าหมาย:** เชื่อมโยงผลวิเคราะห์ Multi-Agent เข้ากับโมเดล DCF ที่มีอยู่เดิมใน Oaktree เพื่อตั้งค่า Base, Bear, Bull Case อัตโนมัติ พร้อมประเมิน Margin of Safety
 
 - [x] **DCF Parameter Recommendation Agent (via Gemini App & MCP)**
   - [x] ให้ Agent วิเคราะห์ Historical Financials + ผล Bull/Bear เพื่อประเมินช่วงตัวเลขสมมติฐาน:
@@ -66,9 +66,10 @@ flowchart TD
     - WACC / Discount Rate
     - Terminal Growth Rate
   - [x] แมปผลลัพธ์เป็น 3 Presets: `Bull Case`, `Base Case`, `Bear Case`
-- [ ] **Integration กับ DCF Engine (`backend/src/dcfAnalysis.ts`, `frontend/src/components/DCF/`)**
+- [x] **Integration กับ DCF Engine & Margin of Safety Workflow (`packages/shared/src/marginOfSafety.ts`, `frontend/src/components/common/ScenarioRangeBar.tsx`)**
   - [x] ใช้ Gemini app วิเคราะห์ Bull/Bear/Base scenarios และใช้ `mcp-worker` บันทึกพารามิเตอร์ DCF ลง D1
-  - [ ] เพิ่มขั้นตอนการประเมิน Margin of Safety Workflow: เปรียบเทียบ Intrinsic Value (จากแต่ละ scenario) กับ Market Price, แสดง % Safety และสรุป Recommendation
+  - [x] **Scenario Range & Margin of Safety Bar (ในหน้า DCF / Stock Detail):** แสดงแถบเปรียบเทียบ Current Market Price เทียบกับกรอบ `[Bear — Base — Bull]` พร้อมคำนวณ MoS %, Upside/Downside %, และ Asymmetric Risk/Reward Ratio
+  - [x] **Watchlist / Portfolio MoS Screener (`MyWatchlist.tsx`, `HoldingsTab.tsx`, `HoldingsTable.tsx`):** เพิ่มการแสดงผล กรอง และจัดเรียงหุ้นตาม DCF Base MoS % และสถานะ Margin of Safety
 
 ---
 
@@ -99,6 +100,10 @@ flowchart TD
   - [x] Position Sizing & Pre-Trade Simulator คำนวณ Room to Target (8%), Stock Cap (15%), Strictest Theme Cap (30%) และจำลองผลกระทบก่อนเทรด
   - [x] ระบบ AI Risk Officer Advisory (Howard Marks Framework) รองรับทั้ง Cloudflare Workers AI และ Gemini App ผ่าน MCP (`get_portfolio_risk_audit`, `calculate_position_size`, `save_risk_advisory`)
   - [-] ~~Conviction & MoS-Weighted Dynamic Sizing~~ *(Skipped — ใช้ Fixed Governance Caps 8% / 15% / 30% เป็นเกณฑ์มาตรฐาน และให้ผู้ลงทุนพิจารณา Conviction แบบ Manual ด้วยตัวเอง)*
+- [x] **Technical Polish & Instant UX (ADR-0015)**
+  - [x] **Instant 0ms Client-Side Position Sizing Simulator (`RiskSizingTab.tsx`):** คำนวณ `calculateFixedBasePositionSize` และ `simulatePreTradeImpact` จาก `@oaktree/shared` บนฝั่ง Client แบบ `0ms` ทันทีที่เปลี่ยนค่า พร้อมปุ่ม `Reset` และแนบ `themeMappings` ใน `GET /api/portfolio/risk-audit` เพื่อรองรับหุ้นใหม่ที่ผูก Theme ไว้แต่ยังไม่อยู่ในพอร์ต
+  - [x] **Deduplicate `@oaktree/shared` Risk Engine:** เปลี่ยน `backend/src/portfolioRisk.ts` ให้ Re-export จาก `@oaktree/shared` เป็น Single Source of Truth เดียวกันทั้ง `backend`, `mcp-worker`, และ `frontend`
+  - [x] **Parallelize D1 Risk Audit Queries (`backend/src/routes/portfolio/risk.ts`, `mcp-worker/src/riskTools.ts`):** รัน 5 คำสั่ง D1 ที่เป็นอิสระต่อกันแบบขนานด้วย `Promise.all` ลด Latency ของ Risk Audit ลงเหลือ 2 sequential stages
 
 ---
 

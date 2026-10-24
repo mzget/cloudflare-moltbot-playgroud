@@ -9,9 +9,8 @@ import {
   computePortfolioHealthScore,
   type RiskHoldingInput,
   type ThemeMappingInput,
-  type PriceSeriesBySymbol,
   type RiskCapConfig,
-} from '../../portfolioRisk';
+} from '@oaktree/shared';
 import { ensureSymbolPrices, getStartDate } from '../../historicalPrices';
 import { parseAIJson } from '../../analysisEngine';
 
@@ -25,23 +24,59 @@ function getSafeExecutionCtx(c: any): { waitUntil: (promise: Promise<any>) => vo
   }
 }
 
-// Helper to load portfolio audit data from D1
+// Helper to load portfolio audit data from D1 using parallel query execution (ADR-0015)
 export async function loadPortfolioRiskData(
   db: D1Database,
   executionCtx?: { waitUntil: (promise: Promise<any>) => void }
 ) {
-  // 1. Open Holdings & quotes
-  const holdingsResult = await db.prepare(`
-    SELECT 
-      h.symbol, h.shares, h.avg_cost, h.total_cost, h.status,
-      w.name, w.sector_label,
-      m.price as last_price, m.previous_close
-    FROM holdings h
-    LEFT JOIN watchlist w ON h.symbol = w.symbol
-    LEFT JOIN market_stats m ON h.symbol = m.symbol
-    WHERE LOWER(h.status) = 'open'
-    ORDER BY h.symbol ASC
-  `).all();
+  // Stage 1: Execute the 5 independent queries concurrently via Promise.all
+  const [
+    holdingsResult,
+    themesResult,
+    dcfResult,
+    fundamentalsResult,
+    latestAdvisoryResult,
+  ] = await Promise.all([
+    // 1. Open Holdings & quotes
+    db.prepare(`
+      SELECT 
+        h.symbol, h.shares, h.avg_cost, h.total_cost, h.status,
+        w.name, w.sector_label,
+        m.price as last_price, m.previous_close
+      FROM holdings h
+      LEFT JOIN watchlist w ON h.symbol = w.symbol
+      LEFT JOIN market_stats m ON h.symbol = m.symbol
+      WHERE LOWER(h.status) = 'open'
+      ORDER BY h.symbol ASC
+    `).all(),
+    // 2. Themes from theme_sector_contexts and theme_symbol_mappings
+    db.prepare(`
+      SELECT 
+        m.symbol,
+        c.notebook_id,
+        c.theme_name
+      FROM theme_sector_contexts c
+      LEFT JOIN theme_symbol_mappings m ON c.notebook_id = m.notebook_id
+    `).all(),
+    // 3. DCF valuation scenarios (Base Case & Bear Case)
+    db.prepare(`
+      SELECT symbol, scenario_name, implied_share_price
+      FROM dcf_calculations
+      WHERE scenario_name IN ('Base Case', 'Bear Case')
+      ORDER BY id DESC
+    `).all(),
+    // 4. Fundamental intelligence (conviction score & debate from debate_json)
+    db.prepare(`
+      SELECT symbol, debate_json
+      FROM stock_fundamentals
+    `).all(),
+    // 6. Latest saved advisory
+    db.prepare(`
+      SELECT id, health_score, risk_level, executive_summary, key_warnings_json, rebalancing_actions_json, source, created_at
+      FROM portfolio_risk_advisories
+      ORDER BY id DESC LIMIT 1
+    `).first<any>(),
+  ]);
 
   const holdingsRows = (holdingsResult.results || []) as any[];
 
@@ -51,16 +86,6 @@ export async function loadPortfolioRiskData(
     lastPrice: r.last_price !== null && r.last_price !== undefined ? Number(r.last_price) : null,
     status: r.status,
   }));
-
-  // 2. Themes from theme_sector_contexts and theme_symbol_mappings
-  const themesResult = await db.prepare(`
-    SELECT 
-      m.symbol,
-      c.notebook_id,
-      c.theme_name
-    FROM theme_sector_contexts c
-    LEFT JOIN theme_symbol_mappings m ON c.notebook_id = m.notebook_id
-  `).all();
 
   const themeMappings: ThemeMappingInput[] = ((themesResult.results || []) as any[]).map(r => ({
     symbol: r.symbol || '',
@@ -75,14 +100,6 @@ export async function loadPortfolioRiskData(
       priceBySymbol[h.symbol] = Number(h.last_price);
     }
   }
-
-  // 3. DCF valuation scenarios (Base Case & Bear Case)
-  const dcfResult = await db.prepare(`
-    SELECT symbol, scenario_name, implied_share_price
-    FROM dcf_calculations
-    WHERE scenario_name IN ('Base Case', 'Bear Case')
-    ORDER BY id DESC
-  `).all();
 
   const dcfBySymbol: Record<string, { baseMoS?: number; bearMoS?: number; baseIntrinsic?: number; bearIntrinsic?: number }> = {};
   for (const row of (dcfResult.results || []) as any[]) {
@@ -111,12 +128,6 @@ export async function loadPortfolioRiskData(
       dcfBySymbol[sym].bearIntrinsic = impliedPrice;
     }
   }
-
-  // 4. Fundamental intelligence (conviction score & debate from debate_json)
-  const fundamentalsResult = await db.prepare(`
-    SELECT symbol, debate_json
-    FROM stock_fundamentals
-  `).all();
 
   const fundamentalsBySymbol: Record<string, { convictionScore?: number; hasDebate?: boolean }> = {};
   for (const row of (fundamentalsResult.results || []) as any[]) {
@@ -148,7 +159,7 @@ export async function loadPortfolioRiskData(
     };
   }
 
-  // 5. Historical prices (last 380 calendar days for ~252 trading days)
+  // Stage 2: Historical prices (last 380 calendar days for ~252 trading days)
   const startDate = getStartDate('1y');
   const symbolsToFetch = Array.from(new Set([...riskHoldings.map(h => h.symbol), '^GSPC']));
 
@@ -183,13 +194,6 @@ export async function loadPortfolioRiskData(
       }
     }
   }
-
-  // 6. Latest saved advisory
-  const latestAdvisoryResult = await db.prepare(`
-    SELECT id, health_score, risk_level, executive_summary, key_warnings_json, rebalancing_actions_json, source, created_at
-    FROM portfolio_risk_advisories
-    ORDER BY id DESC LIMIT 1
-  `).first<any>();
 
   let latestAdvisory = null;
   if (latestAdvisoryResult) {
@@ -273,6 +277,7 @@ risk.get('/api/portfolio/risk-audit', async (c) => {
       correlation,
       health,
       holdingsSizing,
+      themeMappings: data.themeMappings,
       latestAdvisory: data.latestAdvisory,
     });
   } catch (error: any) {

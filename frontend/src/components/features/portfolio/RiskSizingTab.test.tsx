@@ -186,6 +186,14 @@ describe('RiskSizingTab Component', () => {
         },
       },
     ],
+    themeMappings: [
+      { symbol: 'MSFT', themeName: 'AI & Cloud Infrastructure', notebookId: 'nb-1' },
+      { symbol: 'NVDA', themeName: 'AI & Cloud Infrastructure', notebookId: 'nb-1' },
+      { symbol: 'NVDA', themeName: 'Semiconductor Leaders', notebookId: 'nb-2' },
+      { symbol: 'AAPL', themeName: 'Consumer Tech', notebookId: 'nb-3' },
+      { symbol: 'INTC', themeName: 'Legacy Computing', notebookId: 'nb-4' },
+      { symbol: 'TSM', themeName: 'Semiconductor Leaders', notebookId: 'nb-2' },
+    ],
     latestAdvisory: {
       id: 42,
       health_score: 65,
@@ -231,7 +239,7 @@ describe('RiskSizingTab Component', () => {
     expect(cleanHtml).toContain('30.0%');
   });
 
-  it('renders Position Sizing & Pre-Trade Simulator Card', () => {
+  it('renders Position Sizing & Pre-Trade Simulator Card with instant 0ms simulation and Reset button', () => {
     const html = renderToString(
       <RiskSizingTab
         initialAuditData={mockAuditData}
@@ -243,11 +251,39 @@ describe('RiskSizingTab Component', () => {
 
     expect(cleanHtml).toContain('Position Sizing &amp; Pre-Trade Simulator');
     expect(cleanHtml).toContain('Select Holding or Enter Ticker');
-    expect(cleanHtml).toContain('Calculate Sizing Room');
+    expect(cleanHtml).toContain('title="Reset simulation parameters"');
+    expect(cleanHtml).toContain('Reset');
+    expect(cleanHtml).not.toContain('Calculate Sizing Room');
     expect(cleanHtml).toContain('Target Room (8%)');
     expect(cleanHtml).toContain('Stock Cap Room (15%)');
     expect(cleanHtml).toContain('Strictest Theme Cap (30%)');
     expect(cleanHtml).toContain('Max Allowed Buy');
+
+    // Instant 0ms client-side pre-trade simulation for MSFT (Buy 10 shares @ $400 = $4,000, weight 35.0% -> 39.0%)
+    expect(cleanHtml).toContain('Pre-Trade Weight Simulation: MSFT Buy 10 shares ($4,000)');
+    expect(cleanHtml).toContain('35.0%');
+    expect(cleanHtml).toContain('39.0% of Stock Portfolio');
+  });
+
+  it('computes 0ms Strictest Theme Cap (30%) for a custom non-holding ticker mapped in themeMappings', () => {
+    const html = renderToString(
+      <RiskSizingTab
+        initialAuditData={mockAuditData}
+        autoFetch={false}
+        initialSelectedSymbol="__CUSTOM__"
+        initialCustomSymbol="TSM"
+        initialOrderShares="30"
+        initialOrderPrice="200"
+      />
+    );
+    const cleanHtml = html.replace(/<!--.*?-->/g, '');
+
+    // TSM is not in holdings (0% stock weight), but is mapped to Semiconductor Leaders (currently $25,000 / 25.0%)
+    // 30% Theme Cap room is $5,000 (25 shares @ $200). Buying 30 shares ($6,000) breaches the 30% Theme Cap!
+    expect(cleanHtml).toContain('Semiconductor Leaders');
+    expect(cleanHtml).toContain('Pre-Trade Weight Simulation: TSM Buy 30 shares ($6,000)');
+    expect(cleanHtml).toContain('6.0% of Stock Portfolio');
+    expect(cleanHtml).toContain('Warning: This trade causes one or more mapped Themes to exceed the 30.0% Theme Cap!');
   });
 
   it('verifies responsive Grid 8 and 4 layout structure for Theme Concentration and Correlated Pairs cards', () => {

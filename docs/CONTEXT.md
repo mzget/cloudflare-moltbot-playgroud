@@ -144,3 +144,6 @@
 - **Analysis Coverage Navigation Link**:
   ชื่อหุ้น (`symbol`) ในตาราง `Holdings Risk Concentration & Sizing Capacity` แสดงเป็นลิงก์กดไปยังหน้า `/analysis?symbol=XYZ&tab=report` พร้อมป้าย `AnalysisCoverage` แสดงจำนวนบทวิเคราะห์ที่มีอยู่ (Report, DCF, Thesis) เหมือนกับตารางในแท็บ Holdings และ Fundamentals ทุกประการ
 
+
+- **Instant 0ms Client-Side Position Sizing Simulation (ADR-0015)**:
+  การคำนวณวงเงินซื้อเพิ่มสูงสุด (`calculateFixedBasePositionSize`) และจำลองผลกระทบสัดส่วนพอร์ตก่อนเทรด (`simulatePreTradeImpact`) ใน `RiskSizingTab.tsx` ทำงานแบบ Synchronous (`0ms` ผ่าน `React.useMemo`) บนฝั่ง Frontend โดยใช้ Pure Functions จาก `@oaktree/shared` ร่วมกับ `themeMappings` ที่แนบมากับ `/api/portfolio/risk-audit` (พร้อมปุ่ม `Reset` สำหรับคืนค่าเริ่มต้น) โดยไม่ต้องยิง API รอบใหม่ทุกครั้งที่พิมพ์เปลี่ยนจำนวนหุ้นหรือราคา
