@@ -98,6 +98,7 @@ flowchart TD
   - [x] แสดงแดชบอร์ด KPI, ตาราง Concentration & Sizing Capacity, และ Interactive Theme Donut Chart (120 FPS micro-interactions)
   - [x] Position Sizing & Pre-Trade Simulator คำนวณ Room to Target (8%), Stock Cap (15%), Strictest Theme Cap (30%) และจำลองผลกระทบก่อนเทรด
   - [x] ระบบ AI Risk Officer Advisory (Howard Marks Framework) รองรับทั้ง Cloudflare Workers AI และ Gemini App ผ่าน MCP (`get_portfolio_risk_audit`, `calculate_position_size`, `save_risk_advisory`)
+  - [-] ~~Conviction & MoS-Weighted Dynamic Sizing~~ *(Skipped — ใช้ Fixed Governance Caps 8% / 15% / 30% เป็นเกณฑ์มาตรฐาน และให้ผู้ลงทุนพิจารณา Conviction แบบ Manual ด้วยตัวเอง)*
 
 ---
 
