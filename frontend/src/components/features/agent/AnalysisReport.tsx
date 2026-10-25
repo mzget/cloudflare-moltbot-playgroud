@@ -361,6 +361,7 @@ export default function AnalysisReport({ symbol, onBack, subTab }: AnalysisRepor
       {/* Tab Content */}
       {activeToolTab === 0 && (
         <StockDossierCockpit
+          key={symbol}
           symbol={symbol}
           initialReport={report}
           onNavigateTab={(tab) => {

@@ -1,3 +1,5 @@
+import { resolveDcfScenarios, DcfRow } from '@oaktree/shared';
+
 export interface FinancialBarPeriod {
   readonly period: string;
   readonly asOfDate: string;
@@ -49,9 +51,26 @@ export interface CompanyOverviewPayload {
     readonly base: number | null;
     readonly bull: number | null;
     readonly price: number | null;
+    readonly wacc?: number | null;
+    readonly terminalGrowth?: number | null;
+    readonly scenarioName?: string | null;
   } | null;
   readonly updatedAt: string;
 }
+
+export const attachLiveValuation = (
+  payload: Omit<CompanyOverviewPayload, 'dcfScenarios'>,
+  dcfRows: ReadonlyArray<DcfRow>,
+  price: number | null,
+): CompanyOverviewPayload => {
+  const r = resolveDcfScenarios(dcfRows);
+  const scenarioName =
+    r.base !== null ? 'Base Case' : r.bull !== null ? 'Bull Case' : r.bear !== null ? 'Bear Case' : null;
+  return {
+    ...payload,
+    dcfScenarios: { ...r, price, scenarioName },
+  };
+};
 
 export function formatPeriodLabel(asOfDate: string, frequency: 'quarterly' | 'annual'): string {
   if (!asOfDate) return '—';
@@ -545,7 +564,7 @@ export async function fetchFinancialOverview(
   let existingRow: any = null;
   try {
     existingRow = await env.DB.prepare(
-      'SELECT symbol, market_cap, revenues, revenue_3y_cagr, revenue_1y_growth, gross_profit_margin, operating_margin, ev_ebit, ev_sales, p_ocf, p_fcf, capex_to_ocf, rd_to_revenue, debt_equity, p_e, fcf_margin, total_cash, total_debt, net_debt, dividend_yield, fifty_two_week_high, fifty_two_week_low, all_time_high, all_time_low, overview_json, overview_updated_at FROM market_stats WHERE symbol = ?'
+      'SELECT symbol, price, market_cap, revenues, revenue_3y_cagr, revenue_1y_growth, gross_profit_margin, operating_margin, ev_ebit, ev_sales, p_ocf, p_fcf, capex_to_ocf, rd_to_revenue, debt_equity, p_e, fcf_margin, total_cash, total_debt, net_debt, dividend_yield, fifty_two_week_high, fifty_two_week_low, all_time_high, all_time_low, overview_json, overview_updated_at FROM market_stats WHERE symbol = ?'
     ).bind(symbol).first();
   } catch (err) {
     console.warn(`[fetchFinancialOverview] Error querying market_stats for ${symbol}:`, err);
@@ -557,7 +576,18 @@ export async function fetchFinancialOverview(
       try {
         const cached = JSON.parse(existingRow.overview_json);
         if (cached && Array.isArray(cached.quarterly)) {
-          return cached;
+          let dcfRows: DcfRow[] = [];
+          try {
+            const dcfRowsRes = await env.DB.prepare(
+              'SELECT scenario_name, implied_share_price, wacc, terminal_growth FROM dcf_calculations WHERE symbol = ? ORDER BY created_at DESC, id DESC'
+            ).bind(symbol).all();
+            dcfRows = Array.isArray(dcfRowsRes?.results) ? dcfRowsRes.results : (dcfRowsRes ? [dcfRowsRes] : []);
+          } catch (dcfErr) {
+            console.warn(`[fetchFinancialOverview] Error querying dcf_calculations for cached ${symbol}:`, dcfErr);
+          }
+          const { dcfScenarios: _ignoredDcf, ...cachedWithoutDcf } = cached;
+          const livePrice = existingRow?.price ?? _ignoredDcf?.price ?? null;
+          return attachLiveValuation(cachedWithoutDcf, dcfRows, livePrice);
         }
       } catch (err) {
         console.warn(`[fetchFinancialOverview] Corrupt overview_json cache for ${symbol}, refetching:`, err);
@@ -598,7 +628,7 @@ export async function fetchFinancialOverview(
     .catch(e => { console.warn(`Yahoo timeseries annual fetch failed for ${symbol}:`, e); return null; });
 
   const fetchDcf = env.DB.prepare(
-    'SELECT scenario_name, implied_share_price FROM dcf_calculations WHERE symbol = ?'
+    'SELECT scenario_name, implied_share_price, wacc, terminal_growth FROM dcf_calculations WHERE symbol = ? ORDER BY created_at DESC, id DESC'
   ).bind(symbol).all().catch((e: any) => { console.warn(`DCF query failed for ${symbol}:`, e); return { results: [] }; });
 
   const fetchWatchlist = env.DB.prepare(
@@ -643,10 +673,8 @@ export async function fetchFinancialOverview(
 
   const currentPrice = (finnhubQuoteRes as any)?.c ?? null;
 
-  const dcfRows = Array.isArray((dcfRes as any)?.results) ? (dcfRes as any).results : (dcfRes ? [dcfRes] : []);
-  const baseRec = dcfRows.find((r: any) => r.scenario_name === 'Base Case') || (dcfRes && typeof (dcfRes as any).implied_share_price === 'number' ? dcfRes : null);
-  const bearRec = dcfRows.find((r: any) => r.scenario_name === 'Bear Case');
-  const bullRec = dcfRows.find((r: any) => r.scenario_name === 'Bull Case');
+  const dcfRows: DcfRow[] = Array.isArray((dcfRes as any)?.results) ? (dcfRes as any).results : (dcfRes ? [dcfRes] : []);
+  const baseRec = dcfRows.find((r) => r.scenario_name === 'Base Case') ?? null;
 
   const companyStats = buildCompanyStatistics({
     finnhubMetric: (finnhubMetricRes as any)?.metric || {},
@@ -658,7 +686,7 @@ export async function fetchFinancialOverview(
 
   const profile = (finnhubProfileRes as any) || {};
 
-  const payload: CompanyOverviewPayload = {
+  const basePayload: Omit<CompanyOverviewPayload, 'dcfScenarios'> = {
     symbol,
     name: profile.name || symbol,
     logo: profile.logo || null,
@@ -670,17 +698,11 @@ export async function fetchFinancialOverview(
     quarterly: mergedQuarterly,
     annual: mergedAnnual,
     companyStatistics: companyStats,
-    dcfScenarios: {
-      bear: typeof bearRec?.implied_share_price === 'number' ? bearRec.implied_share_price : null,
-      base: typeof baseRec?.implied_share_price === 'number' ? baseRec.implied_share_price : null,
-      bull: typeof bullRec?.implied_share_price === 'number' ? bullRec.implied_share_price : null,
-      price: currentPrice,
-    },
     updatedAt: now.toISOString(),
   };
 
-  // 3. Persist to D1 market_stats asynchronously
-  const serialized = JSON.stringify(payload);
+  // 3. Persist to D1 market_stats asynchronously (payload hygiene: cacheable payload excludes dcfScenarios)
+  const serialized = JSON.stringify(basePayload);
   const isoNow = now.toISOString();
 
   try {
@@ -697,5 +719,5 @@ export async function fetchFinancialOverview(
     console.warn(`[fetchFinancialOverview] Error saving overview cache to D1 for ${symbol}:`, err);
   }
 
-  return payload;
+  return attachLiveValuation(basePayload, dcfRows, currentPrice ?? existingRow?.price ?? null);
 }

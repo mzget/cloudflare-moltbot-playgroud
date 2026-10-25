@@ -134,10 +134,16 @@ export default function StockDossierCockpit({
     };
   }, [symbol, fetchDossierData, initialOverview, initialReport, initialTheses, initialRiskAudit]);
 
+  // DCF Scenarios: single source from overview.dcfScenarios
+  const dcf = overview?.dcfScenarios ?? null;
+
   // Derived current market price
   const currentPrice = React.useMemo<number | null>(() => {
-    if (overview?.dcfScenarios?.price && overview.dcfScenarios.price > 0) {
-      return overview.dcfScenarios.price;
+    if (dcf?.price && dcf.price > 0) {
+      return dcf.price;
+    }
+    if (overview?.price && overview.price > 0) {
+      return overview.price;
     }
     // Search holdings for price
     const holdingMatch = riskAudit?.concentration?.holdings?.find(
@@ -147,7 +153,7 @@ export default function StockDossierCockpit({
       return holdingMatch.currentPrice;
     }
     return null;
-  }, [overview, riskAudit, symbol]);
+  }, [dcf, overview, riskAudit, symbol]);
 
   // Sync simulator price when current price resolves
   React.useEffect(() => {
@@ -160,11 +166,11 @@ export default function StockDossierCockpit({
   const mosResult = React.useMemo(() => {
     return computeMarginOfSafety({
       price: currentPrice,
-      bear: overview?.dcfScenarios?.bear,
-      base: overview?.dcfScenarios?.base,
-      bull: overview?.dcfScenarios?.bull,
+      bear: dcf?.bear,
+      base: dcf?.base,
+      bull: dcf?.bull,
     });
-  }, [currentPrice, overview]);
+  }, [currentPrice, dcf]);
 
   // Resolved Theme Mappings (ADR-0015)
   const resolvedThemeMappings = React.useMemo<readonly ThemeMappingInput[]>(() => {
@@ -484,9 +490,9 @@ export default function StockDossierCockpit({
                 </Stack>
                 <ScenarioRangeBar
                   price={currentPrice}
-                  bear={overview?.dcfScenarios?.bear}
-                  base={overview?.dcfScenarios?.base}
-                  bull={overview?.dcfScenarios?.bull}
+                  bear={dcf?.bear}
+                  base={dcf?.base}
+                  bull={dcf?.bull}
                 />
               </Box>
             </Grid>
@@ -602,7 +608,7 @@ export default function StockDossierCockpit({
                     <Box sx={{ p: 1.25, borderRadius: '12px', bgcolor: 'background.level1', border: '1px solid', borderColor: 'neutral.outlinedBorder', boxShadow: 'sm', textAlign: 'center' }}>
                       <Typography level="body-xs" sx={{ color: 'danger.plainColor', fontWeight: 700 }}>Bear Case</Typography>
                       <Typography level="title-sm" sx={{ fontWeight: 800, mt: 0.5 }}>
-                        {overview?.dcfScenarios?.bear ? formatCurrency(overview.dcfScenarios.bear) : '—'}
+                        {dcf?.bear != null ? formatCurrency(dcf.bear) : '—'}
                       </Typography>
                     </Box>
                   </Grid>
@@ -610,7 +616,7 @@ export default function StockDossierCockpit({
                     <Box sx={{ p: 1.25, borderRadius: '12px', bgcolor: 'rgba(16, 185, 129, 0.1)', border: '1px solid rgba(16, 185, 129, 0.25)', textAlign: 'center', boxShadow: 'sm' }}>
                       <Typography level="body-xs" sx={{ color: 'success.plainColor', fontWeight: 800 }}>Base Fair Value</Typography>
                       <Typography level="title-sm" sx={{ fontWeight: 900, mt: 0.5, color: '#10b981' }}>
-                        {overview?.dcfScenarios?.base ? formatCurrency(overview.dcfScenarios.base) : '—'}
+                        {dcf?.base != null ? formatCurrency(dcf.base) : '—'}
                       </Typography>
                     </Box>
                   </Grid>
@@ -618,7 +624,7 @@ export default function StockDossierCockpit({
                     <Box sx={{ p: 1.25, borderRadius: '12px', bgcolor: 'background.level1', border: '1px solid', borderColor: 'neutral.outlinedBorder', boxShadow: 'sm', textAlign: 'center' }}>
                       <Typography level="body-xs" sx={{ color: 'primary.plainColor', fontWeight: 700 }}>Bull Case</Typography>
                       <Typography level="title-sm" sx={{ fontWeight: 800, mt: 0.5 }}>
-                        {overview?.dcfScenarios?.bull ? formatCurrency(overview.dcfScenarios.bull) : '—'}
+                        {dcf?.bull != null ? formatCurrency(dcf.bull) : '—'}
                       </Typography>
                     </Box>
                   </Grid>
@@ -634,9 +640,25 @@ export default function StockDossierCockpit({
                   <Stack direction="row" justifyContent="space-between">
                     <Typography level="body-xs" sx={{ color: 'text.secondary' }}>Asymmetric Upside/Downside:</Typography>
                     <Typography level="body-xs" sx={{ fontWeight: 700 }}>
-                      {overview?.dcfScenarios?.bull && overview?.dcfScenarios?.bear && currentPrice
-                        ? `+${formatPercent(((overview.dcfScenarios.bull - currentPrice) / currentPrice) * 100)} / -${formatPercent(Math.abs((overview.dcfScenarios.bear - currentPrice) / currentPrice) * 100)}`
+                      {dcf?.bull != null && dcf?.bear != null && currentPrice && currentPrice > 0
+                        ? (() => {
+                            const bullPct = ((dcf.bull - currentPrice) / currentPrice) * 100;
+                            const bearPct = ((dcf.bear - currentPrice) / currentPrice) * 100;
+                            return `${bullPct >= 0 ? '+' : ''}${formatPercent(bullPct)} / ${bearPct >= 0 ? '+' : ''}${formatPercent(bearPct)}`;
+                          })()
+                        : dcf?.base != null && currentPrice && currentPrice > 0
+                        ? `${dcf.base >= currentPrice ? '+' : ''}${formatPercent(((dcf.base - currentPrice) / currentPrice) * 100)} (Base vs Current)`
+                        : dcf?.bull != null && currentPrice && currentPrice > 0
+                        ? `${dcf.bull >= currentPrice ? '+' : ''}${formatPercent(((dcf.bull - currentPrice) / currentPrice) * 100)} (Bull vs Current)`
+                        : dcf?.bear != null && currentPrice && currentPrice > 0
+                        ? `${dcf.bear >= currentPrice ? '+' : ''}${formatPercent(((dcf.bear - currentPrice) / currentPrice) * 100)} (Bear vs Current)`
                         : '—'}
+                    </Typography>
+                  </Stack>
+                  <Stack direction="row" justifyContent="space-between">
+                    <Typography level="body-xs" sx={{ color: 'text.secondary' }}>Model Assumptions:</Typography>
+                    <Typography level="body-xs" sx={{ color: 'text.tertiary', fontWeight: 600 }}>
+                      WACC: {dcf?.wacc != null ? `${dcf.wacc}%` : '—'} • Terminal Growth: {dcf?.terminalGrowth != null ? `${dcf.terminalGrowth}%` : '—'}
                     </Typography>
                   </Stack>
                   <Stack direction="row" justifyContent="space-between">
@@ -1047,7 +1069,7 @@ export default function StockDossierCockpit({
                       <Chip size="sm" variant="soft" color="success">Calibrated</Chip>
                     </Stack>
                     <Typography level="body-sm" sx={{ color: 'text.secondary', mt: 0.5 }}>
-                      Debate catalysts and risks mapped to Cash Flow assumptions, generating Bear ({overview?.dcfScenarios?.bear ? formatCurrency(overview.dcfScenarios.bear) : '—'}), Base ({overview?.dcfScenarios?.base ? formatCurrency(overview.dcfScenarios.base) : '—'}), and Bull ({overview?.dcfScenarios?.bull ? formatCurrency(overview.dcfScenarios.bull) : '—'}).
+                      Debate catalysts and risks mapped to Cash Flow assumptions, generating Bear ({dcf?.bear != null ? formatCurrency(dcf.bear) : '—'}), Base ({dcf?.base != null ? formatCurrency(dcf.base) : '—'}), and Bull ({dcf?.bull != null ? formatCurrency(dcf.bull) : '—'}).
                     </Typography>
                     {mosResult.mosBase !== null && (
                       <Typography level="body-xs" sx={{ color: mosChipColor, fontWeight: 700, mt: 1 }}>
