@@ -652,7 +652,7 @@ export default function RiskSizingTab({
           <Grid container spacing={2} sx={{ mt: 1, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
             {/* Target Room */}
             <Grid xs={12} sm={6} md={3}>
-              <Sheet sx={{ p: 2, borderRadius: '12px', bgcolor: 'background.level1', border: '1px solid', borderColor: 'divider' }}>
+              <Sheet sx={{ p: 2, borderRadius: '12px', bgcolor: 'background.level1', border: '1px solid', borderColor: 'neutral.outlinedBorder' }}>
                 <Typography level="body-xs" sx={{ fontWeight: 700, color: 'text.secondary' }}>🎯 Target Room (8%)</Typography>
                 <Typography level="title-md" sx={{ fontWeight: 800, mt: 0.5, color: 'text.primary' }}>
                   {formatCurrency(currentSizing.roomToTargetUsd, false, '$')}
@@ -665,7 +665,7 @@ export default function RiskSizingTab({
 
             {/* Single Stock Cap Room */}
             <Grid xs={12} sm={6} md={3}>
-              <Sheet sx={{ p: 2, borderRadius: '12px', bgcolor: 'background.level1', border: '1px solid', borderColor: 'divider' }}>
+              <Sheet sx={{ p: 2, borderRadius: '12px', bgcolor: 'background.level1', border: '1px solid', borderColor: 'neutral.outlinedBorder' }}>
                 <Typography level="body-xs" sx={{ fontWeight: 700, color: 'text.secondary' }}>🛡️ Stock Cap Room (15%)</Typography>
                 <Typography level="title-md" sx={{ fontWeight: 800, mt: 0.5, color: 'text.primary' }}>
                   {formatCurrency(currentSizing.roomToStockCapUsd, false, '$')}
@@ -678,7 +678,7 @@ export default function RiskSizingTab({
 
             {/* Strictest Theme Room */}
             <Grid xs={12} sm={6} md={3}>
-              <Sheet sx={{ p: 2, borderRadius: '12px', bgcolor: 'background.level1', border: '1px solid', borderColor: 'divider' }}>
+              <Sheet sx={{ p: 2, borderRadius: '12px', bgcolor: 'background.level1', border: '1px solid', borderColor: 'neutral.outlinedBorder' }}>
                 <Typography level="body-xs" sx={{ fontWeight: 700, color: 'text.secondary' }}>🧩 Strictest Theme Cap (30%)</Typography>
                 <Typography level="title-md" sx={{ fontWeight: 800, mt: 0.5, color: 'text.primary' }}>
                   {currentSizing.roomToThemeCapUsd !== null ? formatCurrency(currentSizing.roomToThemeCapUsd, false, '$') : 'No Theme Limit'}
@@ -697,16 +697,16 @@ export default function RiskSizingTab({
                 sx={{
                   p: 2,
                   borderRadius: '12px',
-                  bgcolor: 'primary.600',
+                  bgcolor: 'primary.solidBg',
                   color: '#ffffff',
-                  boxShadow: '0 4px 14px rgba(16, 185, 129, 0.25)',
+                  boxShadow: '0 4px 14px rgba(4, 120, 87, 0.25)',
                 }}
               >
-                <Typography level="body-xs" sx={{ fontWeight: 700, color: 'rgba(255, 255, 255, 0.95)' }}>🚨 Max Allowed Buy</Typography>
+                <Typography level="body-xs" sx={{ fontWeight: 700, color: '#ffffff' }}>🚨 Max Allowed Buy</Typography>
                 <Typography level="title-md" sx={{ fontWeight: 800, mt: 0.5, color: '#ffffff' }}>
                   {formatCurrency(currentSizing.maxAllowedBuyUsd, false, '$')}
                 </Typography>
-                <Typography level="body-xs" sx={{ color: 'rgba(255, 255, 255, 0.9)', fontWeight: 500 }}>
+                <Typography level="body-xs" sx={{ color: '#ffffff', fontWeight: 600 }}>
                   {currentSizing.maxAllowedBuyShares} shares ({currentSizing.bindingCapReason})
                 </Typography>
               </Sheet>
@@ -721,9 +721,9 @@ export default function RiskSizingTab({
               mt: 2,
               p: 2,
               borderRadius: '12px',
-              bgcolor: currentSimulation.causesStockCapBreach ? 'rgba(239, 68, 68, 0.15)' : 'background.level1',
+              bgcolor: currentSimulation.causesStockCapBreach || currentSimulation.causesThemeCapBreach ? 'danger.softBg' : 'background.level1',
               border: '1px solid',
-              borderColor: currentSimulation.causesStockCapBreach ? 'rgba(239, 68, 68, 0.4)' : 'divider',
+              borderColor: currentSimulation.causesStockCapBreach || currentSimulation.causesThemeCapBreach ? 'danger.outlinedBorder' : 'neutral.outlinedBorder',
             }}
           >
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1 }}>
@@ -734,19 +734,19 @@ export default function RiskSizingTab({
                   display: 'flex',
                   alignItems: 'center',
                   gap: 1,
-                  color: currentSimulation.causesStockCapBreach ? '#fecaca' : 'text.primary',
+                  color: currentSimulation.causesStockCapBreach || currentSimulation.causesThemeCapBreach ? 'danger.plainColor' : 'text.primary',
                 }}
               >
-                {currentSimulation.causesStockCapBreach ? (
-                  <AlertTriangle size={16} color="#ef4444" />
+                {currentSimulation.causesStockCapBreach || currentSimulation.causesThemeCapBreach ? (
+                  <AlertTriangle size={16} color="var(--joy-palette-danger-plainColor, #b91c1c)" />
                 ) : (
-                  <CheckCircle2 size={16} color="#10b981" />
+                  <CheckCircle2 size={16} color="var(--joy-palette-success-plainColor, #047857)" />
                 )}
                 Pre-Trade Weight Simulation: {activeSymbol} {currentSimulation.type} {orderShares} shares (${Math.round(currentSimulation.tradeValueUsd).toLocaleString()})
               </Typography>
 
               <Stack direction="row" spacing={1} alignItems="center">
-                <Typography level="body-xs" sx={{ fontWeight: 600, color: 'text.secondary' }}>
+                <Typography level="body-xs" sx={{ fontWeight: 700, color: 'text.primary' }}>
                   {currentSimulation.currentStockWeightPct.toFixed(1)}%
                 </Typography>
                 <ArrowRight size={14} color="var(--joy-palette-text-secondary)" />
@@ -754,7 +754,7 @@ export default function RiskSizingTab({
                   level="body-xs"
                   sx={{
                     fontWeight: 800,
-                    color: currentSimulation.causesStockCapBreach ? '#f87171' : 'primary.plainColor',
+                    color: currentSimulation.causesStockCapBreach ? 'danger.plainColor' : 'primary.plainColor',
                   }}
                 >
                   {currentSimulation.projectedStockWeightPct.toFixed(1)}% of Stock Portfolio
@@ -763,13 +763,13 @@ export default function RiskSizingTab({
             </Box>
 
             {currentSimulation.causesStockCapBreach && (
-              <Typography level="body-xs" sx={{ mt: 1, fontWeight: 700, color: '#f87171' }}>
+              <Typography level="body-xs" sx={{ mt: 1, fontWeight: 700, color: 'danger.plainColor' }}>
                 ⚠️ Warning: This trade will breach the 15.0% Single-Stock Cap! Consider sizing down to {currentSizing?.roomToStockCapShares || 0} shares.
               </Typography>
             )}
 
             {currentSimulation.causesThemeCapBreach && (
-              <Typography level="body-xs" sx={{ mt: 0.5, fontWeight: 700, color: '#f87171' }}>
+              <Typography level="body-xs" sx={{ mt: 0.5, fontWeight: 700, color: 'danger.plainColor' }}>
                 ⚠️ Warning: This trade causes one or more mapped Themes to exceed the 30.0% Theme Cap!
               </Typography>
             )}
@@ -790,7 +790,7 @@ export default function RiskSizingTab({
                 </Typography>
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Chip variant="soft" color="neutral" size="sm">
+                <Chip variant="soft" color="neutral" size="sm" sx={{ fontWeight: 700 }}>
                   {themeExposures.length} Themes
                 </Chip>
                 <Box
@@ -798,8 +798,9 @@ export default function RiskSizingTab({
                     display: 'inline-flex',
                     p: 0.5,
                     borderRadius: '8px',
-                    bgcolor: 'rgba(255, 255, 255, 0.05)',
-                    border: '1px solid rgba(255, 255, 255, 0.1)',
+                    bgcolor: 'background.level1',
+                    border: '1px solid',
+                    borderColor: 'neutral.outlinedBorder',
                     gap: 0.5,
                   }}
                 >
@@ -835,7 +836,7 @@ export default function RiskSizingTab({
                 showMoneyValues={showMoneyValues}
               />
             ) : (
-              <Sheet sx={{ overflowX: 'auto', borderRadius: '10px' }}>
+              <Sheet sx={{ overflowX: 'auto', borderRadius: '10px', border: '1px solid', borderColor: 'neutral.outlinedBorder' }}>
                 <Table borderAxis="xBetween" hoverRow stripe="odd" sx={{ minWidth: 500 }}>
                   <thead>
                     <tr>
@@ -883,11 +884,11 @@ export default function RiskSizingTab({
                             )}
                           </td>
                           <td>
-                            <Typography level="body-xs" sx={{ maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            <Typography level="body-xs" sx={{ color: 'text.secondary', fontWeight: 500, maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                               {(t.symbols || []).join(', ') || '—'}
                             </Typography>
                           </td>
-                          <td style={{ textAlign: 'right' }}>
+                          <td style={{ textAlign: 'right', fontWeight: 600 }}>
                             {showMoneyValues ? formatCurrency(t.marketValueUsd, false, '$') : '••••••••'}
                           </td>
                           <td style={{ textAlign: 'right', fontWeight: 700 }}>
@@ -997,7 +998,7 @@ export default function RiskSizingTab({
                   Correlated Stock Pairs (r ≥ 0.70)
                 </Typography>
               </Box>
-              <Chip variant="soft" color="warning" size="sm">
+              <Chip variant="soft" color="warning" size="sm" sx={{ fontWeight: 700 }}>
                 252 Trading Days
               </Chip>
             </Box>
@@ -1010,7 +1011,7 @@ export default function RiskSizingTab({
                 </Typography>
               </Box>
             ) : (
-              <Sheet sx={{ overflowX: 'auto', borderRadius: '10px' }}>
+              <Sheet sx={{ overflowX: 'auto', borderRadius: '10px', border: '1px solid', borderColor: 'neutral.outlinedBorder' }}>
                 <Table borderAxis="xBetween" hoverRow stripe="odd">
                   <thead>
                     <tr>
@@ -1026,10 +1027,10 @@ export default function RiskSizingTab({
                         <td style={{ fontWeight: 700 }}>
                           {p.symbolA} & {p.symbolB}
                         </td>
-                        <td style={{ textAlign: 'right', fontWeight: 800, color: 'warning.plainColor' }}>
+                        <td style={{ textAlign: 'right', fontWeight: 800, color: 'var(--joy-palette-warning-plainColor)' }}>
                           {p.correlation.toFixed(2)}
                         </td>
-                        <td style={{ textAlign: 'right' }}>
+                        <td style={{ textAlign: 'right', fontWeight: 600 }}>
                           {p.combinedWeightPct.toFixed(1)}%
                         </td>
                         <td style={{ textAlign: 'center' }}>
@@ -1066,12 +1067,12 @@ export default function RiskSizingTab({
           </Typography>
         </Box>
 
-        <Sheet sx={{ overflowX: 'auto', borderRadius: '10px' }}>
-          <Table borderAxis="xBetween" hoverRow stripe="odd" sx={{ minWidth: 900 }}>
+        <Sheet sx={{ overflowX: 'auto', borderRadius: '10px', border: '1px solid', borderColor: 'neutral.outlinedBorder' }}>
+          <Table borderAxis="xBetween" hoverRow stripe="odd" sx={{ minWidth: 960 }}>
             <thead>
               <tr>
                 <th>Symbol</th>
-                <th>Themes</th>
+                <th style={{ width: 190 }}>Themes</th>
                 <th style={{ textAlign: 'right' }}>Shares</th>
                 <th style={{ textAlign: 'right' }}>Price</th>
                 <th style={{ textAlign: 'right' }}>Market Value</th>
@@ -1080,7 +1081,7 @@ export default function RiskSizingTab({
                 <th style={{ textAlign: 'right' }}>DCF Base MoS</th>
                 <th style={{ textAlign: 'right' }}>Room to 8%</th>
                 <th style={{ textAlign: 'right' }}>Room to 15%</th>
-                <th style={{ textAlign: 'center' }}>Status / Action</th>
+                <th style={{ textAlign: 'center', width: 165 }}>Status / Action</th>
               </tr>
             </thead>
             <tbody>
@@ -1161,13 +1162,13 @@ export default function RiskSizingTab({
                             </Chip>
                           )}
                         </Stack>
-                        <Typography level="body-xs" sx={{ color: 'text.secondary', mt: 0.2 }}>
+                        <Typography level="body-xs" sx={{ color: 'text.secondary', fontWeight: 500, mt: 0.2 }}>
                           {h.name}
                         </Typography>
                       </Box>
                     </td>
                     <td>
-                      <Typography level="body-xs">
+                      <Typography level="body-xs" sx={{ color: 'text.secondary', fontWeight: 500 }}>
                         {(h.themes || []).join(', ') || 'Unassigned'}
                       </Typography>
                     </td>
@@ -1182,7 +1183,18 @@ export default function RiskSizingTab({
                     <td style={{ textAlign: 'right' }}>
                       {h.stockBeta !== undefined ? h.stockBeta.toFixed(2) : '1.00'}
                     </td>
-                    <td style={{ textAlign: 'right', fontWeight: 600, color: h.dcfBaseMoS >= 15 ? 'success.plainColor' : h.dcfBaseMoS < 0 ? 'danger.plainColor' : 'neutral.plainColor' }}>
+                    <td
+                      style={{
+                        textAlign: 'right',
+                        fontWeight: 700,
+                        color:
+                          h.dcfBaseMoS >= 15
+                            ? 'var(--joy-palette-success-plainColor)'
+                            : h.dcfBaseMoS < 0
+                            ? 'var(--joy-palette-danger-plainColor)'
+                            : 'var(--joy-palette-text-primary)',
+                      }}
+                    >
                       {h.dcfBaseMoS !== null && h.dcfBaseMoS !== undefined ? `${h.dcfBaseMoS.toFixed(1)}%` : '--'}
                     </td>
                     <td style={{ textAlign: 'right' }}>
@@ -1191,8 +1203,8 @@ export default function RiskSizingTab({
                     <td style={{ textAlign: 'right' }}>
                       {showMoneyValues ? formatCurrency(h.sizing?.roomToStockCapUsd, false, '$') : '••••••••'}
                     </td>
-                    <td style={{ textAlign: 'center' }}>
-                      <Chip size="sm" variant="soft" color={statusColor} sx={{ fontWeight: 700 }}>
+                    <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                      <Chip size="sm" variant="soft" color={statusColor} sx={{ fontWeight: 700, whiteSpace: 'nowrap' }}>
                         {actionLabel}
                       </Chip>
                     </td>
@@ -1214,7 +1226,7 @@ export default function RiskSizingTab({
             </Typography>
           </Box>
           {latestAdvisory?.created_at && (
-            <Typography level="body-xs" sx={{ color: 'text.secondary' }}>
+            <Typography level="body-xs" sx={{ color: 'text.secondary', fontWeight: 500 }}>
               Source: {latestAdvisory.source === 'workers_ai' ? 'Cloudflare Workers AI' : 'Gemini App via MCP'} • {new Date(latestAdvisory.created_at).toLocaleString()}
             </Typography>
           )}
@@ -1222,7 +1234,7 @@ export default function RiskSizingTab({
 
         {latestAdvisory ? (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Box sx={{ p: 2, borderRadius: '12px', bgcolor: 'background.level1', border: '1px solid', borderColor: 'divider' }}>
+            <Box sx={{ p: 2, borderRadius: '12px', bgcolor: 'background.level1', border: '1px solid', borderColor: 'neutral.outlinedBorder' }}>
               <Typography level="body-xs" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', mb: 0.5 }}>
                 Executive Summary
               </Typography>
@@ -1233,38 +1245,38 @@ export default function RiskSizingTab({
 
             <Grid container spacing={2}>
               <Grid xs={12} md={6}>
-                <Sheet variant="soft" color="warning" sx={{ p: 2, borderRadius: '12px', height: '100%' }}>
-                  <Typography level="title-sm" sx={{ fontWeight: 700, mb: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Sheet variant="soft" color="warning" sx={{ p: 2, borderRadius: '12px', height: '100%', border: '1px solid', borderColor: 'warning.outlinedBorder' }}>
+                  <Typography level="title-sm" sx={{ fontWeight: 800, mb: 1, display: 'flex', alignItems: 'center', gap: 0.5, color: 'warning.plainColor' }}>
                     <AlertTriangle size={16} /> Key Warnings
                   </Typography>
                   <Stack spacing={0.75}>
                     {latestAdvisory.key_warnings && latestAdvisory.key_warnings.length > 0 ? (
                       latestAdvisory.key_warnings.map((w: string, idx: number) => (
-                        <Typography key={idx} level="body-xs" sx={{ fontWeight: 600 }}>
+                        <Typography key={idx} level="body-xs" sx={{ fontWeight: 600, color: 'text.primary', lineHeight: 1.5 }}>
                           • {w}
                         </Typography>
                       ))
                     ) : (
-                      <Typography level="body-xs">No active risk warnings flagged.</Typography>
+                      <Typography level="body-xs" sx={{ color: 'text.primary' }}>No active risk warnings flagged.</Typography>
                     )}
                   </Stack>
                 </Sheet>
               </Grid>
 
               <Grid xs={12} md={6}>
-                <Sheet variant="soft" color="primary" sx={{ p: 2, borderRadius: '12px', height: '100%' }}>
-                  <Typography level="title-sm" sx={{ fontWeight: 700, mb: 1, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                <Sheet variant="soft" color="primary" sx={{ p: 2, borderRadius: '12px', height: '100%', border: '1px solid', borderColor: 'primary.outlinedBorder' }}>
+                  <Typography level="title-sm" sx={{ fontWeight: 800, mb: 1, display: 'flex', alignItems: 'center', gap: 0.5, color: 'primary.plainColor' }}>
                     <Scale size={16} /> Recommended Rebalancing Actions
                   </Typography>
                   <Stack spacing={0.75}>
                     {latestAdvisory.rebalancing_actions && latestAdvisory.rebalancing_actions.length > 0 ? (
                       latestAdvisory.rebalancing_actions.map((a: string, idx: number) => (
-                        <Typography key={idx} level="body-xs" sx={{ fontWeight: 600 }}>
+                        <Typography key={idx} level="body-xs" sx={{ fontWeight: 600, color: 'text.primary', lineHeight: 1.5 }}>
                           ✓ {a}
                         </Typography>
                       ))
                     ) : (
-                      <Typography level="body-xs">Portfolio is aligned with risk caps.</Typography>
+                      <Typography level="body-xs" sx={{ color: 'text.primary' }}>Portfolio is aligned with risk caps.</Typography>
                     )}
                   </Stack>
                 </Sheet>
@@ -1304,11 +1316,10 @@ export default function RiskSizingTab({
             ...glassStyle,
             maxWidth: 440,
             borderRadius: '16px',
-            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.4)',
           }}
         >
           <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <AlertTriangle color="#ef4444" size={20} />
+            <AlertTriangle color="var(--joy-palette-danger-plainColor, #b91c1c)" size={20} />
             Delete Theme
           </DialogTitle>
           <Divider />

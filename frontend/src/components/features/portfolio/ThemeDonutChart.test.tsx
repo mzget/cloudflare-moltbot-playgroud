@@ -103,6 +103,22 @@ describe('ThemeDonutChart Component', () => {
     expect(cleanHtml).toContain('<path');
   });
 
+  it('uses Joy UI theme CSS variables for slice labels, center text, and legend labels to ensure Light/Dark theme legibility', () => {
+    const html = renderToString(
+      <ThemeDonutChart
+        themeExposures={mockThemes}
+        holdings={mockHoldings}
+        totalPortfolioUsd={75000}
+        showMoneyValues={true}
+      />
+    );
+
+    expect(html).toContain('fill: var(--joy-palette-text-primary');
+    expect(html).toContain('fill: var(--joy-palette-text-secondary');
+    expect(html).toContain('color: var(--joy-palette-text-primary');
+    expect(html).not.toContain('fill: #ffffff;');
+  });
+
   it('masks values when showMoneyValues is false', () => {
     const html = renderToString(
       <ThemeDonutChart

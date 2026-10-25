@@ -1,4 +1,4 @@
-﻿import { fmtNum, fmtPct, fmtShares, gainClass } from '../../../utils/format';
+import { fmtNum, fmtPct, fmtShares, gainClass } from '../../../utils/format';
 import * as React from 'react';
 import {
   Box,
@@ -217,8 +217,8 @@ export default function HoldingsTable({
   }, [holdings]);
 
   const thSx = {
-    color: 'text.tertiary',
-    fontWeight: 600,
+    color: 'text.secondary',
+    fontWeight: 700,
     fontSize: densityStyles.headerSize,
     letterSpacing: '0.05em',
     textTransform: 'uppercase' as const,
@@ -268,7 +268,10 @@ export default function HoldingsTable({
             },
           },
           '& tbody tr:hover .sticky-td': {
-            bgcolor: 'background.hover',
+            background: '#f1f5f9',
+            '[data-joy-color-scheme="dark"] &': {
+              background: '#262626',
+            },
           },
         }}
       >
@@ -436,9 +439,8 @@ export default function HoldingsTable({
                         sx={{
                           mt: 0.2,
                           fontSize: densityStyles.nameSize,
-                          opacity: h.sector_label ? 1 : 0.5,
-                          color: h.sector_label && h.sector_label_color ? h.sector_label_color : undefined,
-                          fontWeight: h.sector_label ? 600 : 400,
+                          color: h.sector_label && h.sector_label_color ? h.sector_label_color : 'text.secondary',
+                          fontWeight: h.sector_label ? 600 : 500,
                         }}
                       >
                         {h.sector_label || h.name}
@@ -461,7 +463,7 @@ export default function HoldingsTable({
                     {h.price_updated_at && (() => {
                       const { text, isStale } = formatRelativeTime(h.price_updated_at);
                       return (
-                        <Typography level="body-xs" sx={{ color: isStale ? 'danger.plainColor' : 'text.tertiary', fontSize: '0.6rem', lineHeight: 1.2 }}>
+                        <Typography level="body-xs" sx={{ color: isStale ? 'danger.plainColor' : 'text.secondary', fontWeight: 500, fontSize: '0.62rem', lineHeight: 1.2 }}>
                           {text}
                         </Typography>
                       );
@@ -501,7 +503,7 @@ export default function HoldingsTable({
                     <Typography
                       level="body-sm"
                       className={gainClass(h.day_gain_pct)}
-                      sx={{ fontVariantNumeric: 'tabular-nums', fontSize: densityStyles.fontSize }}
+                      sx={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: densityStyles.fontSize }}
                     >
                       {displayPct(h.day_gain_pct)}
                     </Typography>
@@ -512,7 +514,7 @@ export default function HoldingsTable({
                     <Typography
                       level="body-sm"
                       className={gainClass(h.day_gain_amt)}
-                      sx={{ fontVariantNumeric: 'tabular-nums', fontSize: densityStyles.fontSize }}
+                      sx={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: densityStyles.fontSize }}
                     >
                       {displayNum(h.day_gain_amt)}
                     </Typography>
@@ -523,7 +525,7 @@ export default function HoldingsTable({
                     <Typography
                       level="body-sm"
                       className={gainClass(h.tot_gain_pct)}
-                      sx={{ fontVariantNumeric: 'tabular-nums', fontSize: densityStyles.fontSize }}
+                      sx={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: densityStyles.fontSize }}
                     >
                       {displayPct(h.tot_gain_pct)}
                     </Typography>
@@ -534,7 +536,7 @@ export default function HoldingsTable({
                     <Typography
                       level="body-sm"
                       className={gainClass(h.tot_gain_amt)}
-                      sx={{ fontVariantNumeric: 'tabular-nums', fontSize: densityStyles.fontSize }}
+                      sx={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: densityStyles.fontSize }}
                     >
                       {displayNum(h.tot_gain_amt)}
                     </Typography>
@@ -545,7 +547,7 @@ export default function HoldingsTable({
                     <Typography
                       level="body-sm"
                       className={gainClass(h.realized_gain_pct)}
-                      sx={{ fontVariantNumeric: 'tabular-nums', fontSize: densityStyles.fontSize }}
+                      sx={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: densityStyles.fontSize }}
                     >
                       {displayPct(h.realized_gain_pct)}
                     </Typography>
@@ -556,7 +558,7 @@ export default function HoldingsTable({
                     <Typography
                       level="body-sm"
                       className={gainClass(h.realized_gain_amt)}
-                      sx={{ fontVariantNumeric: 'tabular-nums', fontSize: densityStyles.fontSize }}
+                      sx={{ fontVariantNumeric: 'tabular-nums', fontWeight: 600, fontSize: densityStyles.fontSize }}
                     >
                       {displayNum(h.realized_gain_amt)}
                     </Typography>
@@ -570,7 +572,7 @@ export default function HoldingsTable({
                         fontVariantNumeric: 'tabular-nums',
                         fontSize: densityStyles.fontSize,
                         fontWeight: 600,
-                        color: h.mos_base == null ? 'text.tertiary' : h.mos_base >= 0 ? 'success.plainColor' : 'danger.plainColor',
+                        color: h.mos_base == null ? 'text.secondary' : h.mos_base >= 0 ? 'success.plainColor' : 'danger.plainColor',
                       }}
                     >
                       {formatMosLabel(h.mos_base, h.in_watchlist !== false)}
@@ -589,7 +591,7 @@ export default function HoldingsTable({
                         {expandedContent ? (
                           expandedContent(h.symbol, h.last_price, TOTAL_COL_SPAN)
                         ) : (
-                          <Typography level="body-sm" sx={{ opacity: 0.5 }}>
+                          <Typography level="body-sm" sx={{ color: 'text.secondary' }}>
                             Loading details...
                           </Typography>
                         )}
@@ -604,7 +606,7 @@ export default function HoldingsTable({
           {holdings.length === 0 && (
             <tr>
               <td colSpan={TOTAL_COL_SPAN} style={{ textAlign: 'center', padding: '32px 12px' }}>
-                <Typography level="body-md" sx={{ opacity: 0.5 }}>
+                <Typography level="body-md" sx={{ color: 'text.secondary' }}>
                   No holdings found.
                 </Typography>
               </td>

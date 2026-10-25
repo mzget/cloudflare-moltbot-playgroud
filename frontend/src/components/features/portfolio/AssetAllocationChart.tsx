@@ -318,7 +318,7 @@ export default function AssetAllocationChart({
             <Typography
               level="body-xs"
               sx={{
-                opacity: 0.6,
+                color: 'text.secondary',
                 fontWeight: 700,
                 textTransform: 'uppercase',
                 letterSpacing: '0.05em',
@@ -360,11 +360,11 @@ export default function AssetAllocationChart({
             py: 0.5,
             '&::-webkit-scrollbar': { width: '4px' },
             '&::-webkit-scrollbar-thumb': { 
-              backgroundColor: 'rgba(255,255,255,0.08)', 
+              backgroundColor: 'var(--joy-palette-neutral-outlinedBorder)', 
               borderRadius: '4px' 
             },
             '&::-webkit-scrollbar-thumb:hover': {
-              backgroundColor: 'rgba(255,255,255,0.15)'
+              backgroundColor: 'var(--joy-palette-text-tertiary)'
             }
           }}
         >

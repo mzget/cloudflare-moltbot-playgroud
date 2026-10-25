@@ -1,4 +1,4 @@
-﻿import * as React from 'react';
+import * as React from 'react';
 import {
   Sheet,
   Table,
@@ -350,8 +350,8 @@ export default function CompanyStatsTable({
   }, [density]);
 
   const thSx = {
-    color: 'text.tertiary',
-    fontWeight: 600,
+    color: 'text.secondary',
+    fontWeight: 700,
     fontSize: densityStyles.headerSize,
     letterSpacing: '0.05em',
     textTransform: 'uppercase' as const,
@@ -402,7 +402,10 @@ export default function CompanyStatsTable({
             },
           },
           '& tbody tr:hover .sticky-td': {
-            bgcolor: 'background.hover',
+            background: '#f1f5f9',
+            '[data-joy-color-scheme="dark"] &': {
+              background: '#262626',
+            },
           },
         }}
       >
@@ -410,8 +413,8 @@ export default function CompanyStatsTable({
           <tr>
             {/* Fixed company column */}
             <th style={{
-              color: 'var(--joy-palette-text-tertiary)',
-              fontWeight: 600,
+              color: 'var(--joy-palette-text-secondary)',
+              fontWeight: 700,
               fontSize: densityStyles.headerSize,
               letterSpacing: '0.05em',
               textTransform: 'uppercase',
@@ -441,7 +444,7 @@ export default function CompanyStatsTable({
           </tr>
         </thead>
         <tbody>
-          {sorted.map((company, idx) => {
+          {sorted.map((company) => {
             const coverage = analysisCoverage?.get(company.symbol);
 
             return (
@@ -523,7 +526,8 @@ export default function CompanyStatsTable({
                     <Typography
                       level="body-xs"
                       sx={{
-                        opacity: 0.5,
+                        color: 'text.secondary',
+                        fontWeight: 500,
                         mt: densityStyles.rowGap,
                         fontSize: densityStyles.tickerSubSize
                       }}
