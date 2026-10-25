@@ -97,6 +97,12 @@ When executing CLI/SQL database operations or seeding DCF scenario data:
 
 External AI agents (such as Google Gemini Spark or Gemini App) that compute DCF models from SEC 10-K/10-Q filings can directly persist and retrieve models via the `oaktree-mcp` server.
 
+### 🧮 Single Source of Truth: Code-Only Intrinsic Valuation Calculation
+- **Deterministic Code Engine**: The intrinsic share price (`implied_share_price`) is calculated exclusively by the deterministic code engine (`@oaktree/shared::calculateDCF`).
+- **AI Agent Role**: AI agents (Gemini Spark / Gemini App) provide only the qualitative rationale and financial parameters (Revenue, Growth, Margins, WACC, Terminal Growth, Shares, Net Cash).
+- **No Target Price Guessing**: AI agents do NOT need to specify `implied_share_price` in `save_dcf_scenarios` (it is optional and overridden by code).
+- **Rationale Cleanliness**: In the `rationale` string, AI agents must focus exclusively on fundamental drivers, assumptions, and catalyst explanations. Do NOT state a calculated target price in the rationale text (e.g. avoid "...คำนวณราคาเหมาะสม Equity Basis ได้ $142.88 ต่อหุ้น") to avoid text discrepancies with the live calculated price.
+
 ### 1. Ingest Scenarios: `save_dcf_scenarios`
 Saves 1 to 3 scenarios in an atomic batch.
 

@@ -103,7 +103,7 @@ Oaktree MCP Server (20 Tools)
     - `shares_outstanding` (*number*): Diluted shares in **Millions ($M)** (e.g. `15000` for 15B shares).
     - `wacc` (*number*): Discount rate in **percent (%)** (e.g. `10.5` for 10.5%).
     - `terminal_growth` (*number*): Perpetual growth rate in **percent (%)** (must be $< \text{WACC}$).
-    - `implied_share_price` (*number*): Calculated intrinsic value per share ($).
+    - `implied_share_price` (*number*, optional): Optional. System automatically computes the exact intrinsic price from parameters using code. Note: Do NOT specify target prices in the `rationale` text.
     - `net_cash` (*number*, optional): Net cash (Cash - Debt) in **Billions USD ($B)**.
     - `yearly_growth` (*number[]*, optional): 5-year YoY revenue growth rates in %: `[yr1, yr2, yr3, yr4, yr5]`.
     - `yearly_op_margin` (*number[]*, optional): 5-year operating margins in %: `[yr1, yr2, yr3, yr4, yr5]`.

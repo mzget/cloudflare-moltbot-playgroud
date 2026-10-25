@@ -106,6 +106,7 @@ describe('StockOverview Component', () => {
 
     // Company Statistics
     expect(html).toContain('Company Statistics');
+    expect(html).toContain('Source: Finnhub &amp; Oaktree D1');
     expect(html).toContain('$1.78T');
     expect(html).toContain('81.8%');
     expect(html).toContain('26.0x');
@@ -119,6 +120,7 @@ describe('StockOverview Component', () => {
 
     // Chart titles & controls
     expect(html).toContain('Financial Performance');
+    expect(html).toContain('Source: Yahoo Finance');
     expect(html).toContain('Quarterly');
     expect(html).toContain('Annual');
 

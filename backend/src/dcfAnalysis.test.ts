@@ -117,6 +117,40 @@ describe('Analysis API - DCF Calculations', () => {
       expect(executedSqls.some((sql) => sql.includes('overview_updated_at'))).toBe(false);
     });
 
+    it('calculates impliedSharePrice with single source of truth code engine', async () => {
+      const payload = {
+        symbol: 'RDDT',
+        scenarioName: 'Base Case',
+        baseRevenue: 3.35,
+        sharesOutstanding: 207,
+        netCash: 2.8,
+        wacc: 10.5,
+        terminalGrowth: 2.5,
+        taxRate: 15.0,
+        mode: 'detailed',
+        yearlyGrowth: [30, 26, 22, 20, 18],
+        yearlyOpMargin: [41.5, 41.7, 41.9, 42.1, 42.3],
+        yearlyFcfConv: [90, 90, 90, 90, 90],
+        impliedSharePrice: 142.88, // Old wrong value from client
+      };
+
+      const req = new Request('http://localhost/api/analysis/dcf-save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const res = await worker.fetch(req, mockEnv, {} as any);
+      expect(res.status).toBe(200);
+      const data = await res.json() as any;
+      expect(data.success).toBe(true);
+      expect(data.impliedSharePrice).toBe(166.81);
+
+      // Verify bound parameter in INSERT statement is 166.81
+      const insertParams = boundParams[1];
+      expect(insertParams).toContain(166.81);
+    });
+
     it('defaults source to manual when omitted', async () => {
       const payload = {
         symbol: 'AAPL',
