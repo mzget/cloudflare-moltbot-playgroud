@@ -1,15 +1,15 @@
 /* Yahoo Finance Portfolio Styles */
 :root {
   --yf-bg: #ffffff;
-  --yf-border: #e0e0e0;
-  --yf-header-bg: #f7f7f7;
-  --yf-text: #1d1d1f;
-  --yf-text-secondary: #6b6b6b;
-  --yf-positive: #00a651;
-  --yf-negative: #ff3333;
-  --yf-link: #0f69ff;
-  --yf-row-hover: #f5f8ff;
-  --yf-expanded-bg: #fafafa;
+  --yf-border: #e2e8f0;
+  --yf-header-bg: #f8fafc;
+  --yf-text: #0f172a;
+  --yf-text-secondary: #334155;
+  --yf-positive: #047857;
+  --yf-negative: #b91c1c;
+  --yf-link: #047857;
+  --yf-row-hover: #f1f5f9;
+  --yf-expanded-bg: #f8fafc;
 }
 
 [data-joy-color-scheme='dark'] {
@@ -388,4 +388,3 @@
 .tab-pane-active {
   animation: tabFadeIn 0.3s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
-

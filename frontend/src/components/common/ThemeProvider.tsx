@@ -16,28 +16,44 @@ const theme = extendTheme({
           700: '#047857',
           800: '#065f46',
           900: '#064e3b',
-          solidBg: '#059669',
+          solidBg: '#047857',
           solidColor: '#ffffff',
-          solidHoverBg: '#047857',
-          plainColor: '#059669',
+          solidHoverBg: '#065f46',
+          plainColor: '#047857',
+        },
+        success: {
+          plainColor: '#047857',
+          softColor: '#065f46',
+          softBg: '#dcfce7',
+        },
+        warning: {
+          plainColor: '#b45309',
+          softColor: '#92400e',
+          softBg: '#fef3c7',
+        },
+        danger: {
+          plainColor: '#b91c1c',
+          softColor: '#991b1b',
+          softBg: '#fee2e2',
         },
         background: {
-          body: '#f8fafc',
-          surface: 'rgba(255, 255, 255, 0.88)',
+          body: '#f1f5f9',
+          surface: 'rgba(255, 255, 255, 0.95)',
           level1: '#f1f5f9',
           level2: '#e2e8f0',
           level3: '#cbd5e1',
           popup: '#ffffff',
         },
         neutral: {
-          outlinedBorder: 'rgba(15, 23, 42, 0.12)',
-          softBg: 'rgba(15, 23, 42, 0.04)',
+          outlinedBorder: 'rgba(15, 23, 42, 0.14)',
+          softBg: 'rgba(15, 23, 42, 0.06)',
+          softColor: '#1e293b',
           plainColor: '#0f172a',
         },
         text: {
           primary: '#0f172a',
-          secondary: '#475569',
-          tertiary: '#64748b',
+          secondary: '#334155',
+          tertiary: '#475569',
         },
       },
     },
@@ -97,6 +113,12 @@ const theme = extendTheme({
           },
           '& td': {
             color: theme.vars.palette.text.primary,
+          },
+          '[data-joy-color-scheme="light"] & tbody tr:nth-of-type(odd):not([data-selected="true"]) > td': {
+            backgroundColor: '#f8fafc',
+          },
+          '[data-joy-color-scheme="light"] & tbody tr:hover > td': {
+            backgroundColor: '#f1f5f9',
           },
         }),
       },
@@ -180,14 +202,21 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
               transition: 'background-color 0.3s ease, color 0.3s ease',
               minHeight: '100vh',
             },
+            'html[data-joy-color-scheme="dark"]': {
+              '--oaktree-glass-shadow': '0 8px 32px rgba(0, 0, 0, 0.35)',
+            },
+            'html[data-joy-color-scheme="light"]': {
+              '--oaktree-glass-shadow': '0 4px 20px -2px rgba(15, 23, 42, 0.08), 0 2px 6px -1px rgba(15, 23, 42, 0.04)',
+            },
             'html[data-joy-color-scheme="dark"] body': {
               backgroundColor: '#080c14',
               backgroundImage:
                 'radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.05) 0px, transparent 50%), radial-gradient(at 100% 0%, rgba(124, 58, 237, 0.04) 0px, transparent 50%)',
             },
             'html[data-joy-color-scheme="light"] body': {
+              backgroundColor: '#f1f5f9',
               backgroundImage:
-                'radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.06) 0px, transparent 50%), radial-gradient(at 100% 0%, rgba(16, 185, 129, 0.06) 0px, transparent 50%)',
+                'radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.06) 0px, transparent 50%), radial-gradient(at 100% 0%, rgba(14, 165, 233, 0.05) 0px, transparent 50%)',
             },
           }}
         />

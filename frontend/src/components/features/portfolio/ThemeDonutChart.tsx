@@ -38,14 +38,14 @@ export interface ThemeDonutChartProps {
 
 // Chart Palette directly matching the user's interactive example
 const THEME_PALETTE = [
-  '#9dd2ff', // Soft Luminous Sky Blue
-  '#60d673', // Vibrant Mint Green
-  '#ffdb0f', // Bright Sunshine Yellow
-  '#ff5a59', // Vibrant Coral Red
-  '#969dff', // Soft Periwinkle / Lavender
-  '#ff88d3', // Vibrant Orchid Pink
-  '#38bdf8', // Cyan
-  '#fb923c', // Tangerine Orange
+  '#3b82f6', // Sky / Royal Blue
+  '#10b981', // Vibrant Emerald Green
+  '#f59e0b', // Amber Gold
+  '#ef4444', // Vibrant Coral Red
+  '#8b5cf6', // Periwinkle / Violet
+  '#ec4899', // Orchid Pink
+  '#06b6d4', // Cyan
+  '#f97316', // Tangerine Orange
 ];
 
 const UNASSIGNED_COLOR = '#94a3b8';
@@ -233,7 +233,6 @@ export default function ThemeDonutChart({
   }
 
   // Geometry computation directly matching the user's example
-  // Geometry computation directly matching the user's example
   const outerRadius = 125;
   const innerRadius = 88; // Balanced 37px thickness
   const labelRadius = 146;
@@ -300,15 +299,15 @@ export default function ThemeDonutChart({
         }
         .donut-slice:focus-visible {
           outline: none;
-          stroke: #ffffff;
+          stroke: var(--joy-palette-text-primary, #0f172a);
           stroke-width: 3px;
           stroke-linejoin: round;
         }
 
         .slice-label {
-          font-size: 13px;
-          font-weight: 500;
-          fill: #ffffff;
+          font-size: 12px;
+          font-weight: 700;
+          fill: var(--joy-palette-text-primary, #0f172a);
           pointer-events: none;
           transition: opacity 0.3s ease;
           font-variant-numeric: tabular-nums;
@@ -320,21 +319,21 @@ export default function ThemeDonutChart({
         }
         .center-title {
           font-size: 13px;
-          font-weight: 400;
-          fill: #94a3b8;
+          font-weight: 600;
+          fill: var(--joy-palette-text-secondary, #334155);
           letter-spacing: -0.01em;
         }
         .center-value {
           font-size: 28px;
-          font-weight: 600;
-          fill: #f8fafc;
+          font-weight: 800;
+          fill: var(--joy-palette-text-primary, #0f172a);
           letter-spacing: -0.02em;
           font-variant-numeric: tabular-nums;
         }
         .center-sub {
           font-size: 13px;
-          font-weight: 400;
-          fill: #94a3b8;
+          font-weight: 500;
+          fill: var(--joy-palette-text-secondary, #334155);
         }
 
         /* Floating Cursor Tooltip */
@@ -350,7 +349,7 @@ export default function ThemeDonutChart({
           opacity: 0;
           transition: opacity 0.15s ease;
           z-index: 9999;
-          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
           white-space: nowrap;
           display: flex;
           flex-direction: column;
@@ -361,7 +360,7 @@ export default function ThemeDonutChart({
           align-items: center;
           gap: 8px;
           font-size: 13px;
-          font-weight: 500;
+          font-weight: 600;
           color: #f8fafc;
         }
         .tt-dot {
@@ -374,7 +373,7 @@ export default function ThemeDonutChart({
           display: flex;
           justify-content: space-between;
           gap: 20px;
-          color: #94a3b8;
+          color: #cbd5e1;
           font-variant-numeric: tabular-nums;
           font-size: 12px;
         }
@@ -399,11 +398,11 @@ export default function ThemeDonutChart({
           border: 1px solid transparent;
         }
         .legend-item:hover {
-          background: rgba(255, 255, 255, 0.08);
+          background: var(--joy-palette-background-level1, rgba(15, 23, 42, 0.05));
         }
         .legend-item.active {
-          background: rgba(255, 255, 255, 0.14);
-          border-color: rgba(255, 255, 255, 0.2);
+          background: var(--joy-palette-background-level2, rgba(15, 23, 42, 0.1));
+          border-color: var(--joy-palette-neutral-outlinedBorder, rgba(15, 23, 42, 0.18));
         }
         .legend-item.dimmed {
           opacity: 0.35;
@@ -416,13 +415,12 @@ export default function ThemeDonutChart({
         }
         .legend-label {
           font-size: 13px;
-          font-weight: 500;
-          color: #f1f5f9;
+          font-weight: 600;
+          color: var(--joy-palette-text-primary, #0f172a);
         }
         .legend-pct {
           font-size: 12px;
-          color: #94a3b8;
-          opacity: 0.7;
+          color: var(--joy-palette-text-secondary, #334155);
           font-variant-numeric: tabular-nums;
         }
 
@@ -441,7 +439,7 @@ export default function ThemeDonutChart({
           justify-content: space-between;
           margin-bottom: 20px;
           padding-bottom: 12px;
-          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          border-bottom: 1px solid var(--joy-palette-divider, rgba(15, 23, 42, 0.12));
         }
         .category-title-area {
           display: flex;
@@ -456,26 +454,27 @@ export default function ThemeDonutChart({
         }
         .category-title {
           font-size: 18px;
-          font-weight: 600;
-          color: #f8fafc;
+          font-weight: 700;
+          color: var(--joy-palette-text-primary, #0f172a);
           letter-spacing: -0.01em;
+          margin: 0;
         }
         .back-btn {
           display: inline-flex;
           align-items: center;
           gap: 6px;
-          background: rgba(255, 255, 255, 0.08);
-          color: #f8fafc;
-          border: none;
+          background: var(--joy-palette-background-level1, #f1f5f9);
+          color: var(--joy-palette-text-primary, #0f172a);
+          border: 1px solid var(--joy-palette-neutral-outlinedBorder, rgba(15, 23, 42, 0.14));
           padding: 6px 16px;
           border-radius: 999px;
           font-size: 13px;
-          font-weight: 500;
+          font-weight: 600;
           cursor: pointer;
           transition: background 0.2s ease;
         }
         .back-btn:hover {
-          background: rgba(255, 255, 255, 0.16);
+          background: var(--joy-palette-background-level2, #e2e8f0);
         }
 
         .category-meta {
@@ -491,19 +490,20 @@ export default function ThemeDonutChart({
         }
         .meta-val {
           font-size: 20px;
-          font-weight: 600;
-          color: #f8fafc;
+          font-weight: 700;
+          color: var(--joy-palette-text-primary, #0f172a);
           font-variant-numeric: tabular-nums;
         }
         .meta-label {
           font-size: 13px;
-          color: #94a3b8;
+          font-weight: 500;
+          color: var(--joy-palette-text-secondary, #334155);
           margin-top: 2px;
         }
         .meta-divider {
           width: 1px;
           height: 32px;
-          background: rgba(255, 255, 255, 0.1);
+          background: var(--joy-palette-divider, rgba(15, 23, 42, 0.12));
         }
 
         /* Holdings List */
@@ -528,36 +528,39 @@ export default function ThemeDonutChart({
           gap: 10px;
         }
         .ticker-badge {
-          background: rgba(255, 255, 255, 0.1);
-          color: #ffffff;
+          background: var(--joy-palette-background-level1, #f1f5f9);
+          border: 1px solid var(--joy-palette-neutral-outlinedBorder, rgba(15, 23, 42, 0.14));
+          color: var(--joy-palette-text-primary, #0f172a);
           font-size: 12px;
-          font-weight: 600;
+          font-weight: 700;
           padding: 3px 8px;
           border-radius: 6px;
           font-variant-numeric: tabular-nums;
         }
         .company-name {
           font-size: 14px;
-          color: #f1f5f9;
+          font-weight: 500;
+          color: var(--joy-palette-text-primary, #0f172a);
         }
         .holding-value-group {
           text-align: right;
         }
         .holding-val {
           font-size: 14px;
-          font-weight: 600;
-          color: #f8fafc;
+          font-weight: 700;
+          color: var(--joy-palette-text-primary, #0f172a);
           font-variant-numeric: tabular-nums;
         }
         .holding-pct {
           font-size: 12px;
-          color: #94a3b8;
+          font-weight: 500;
+          color: var(--joy-palette-text-secondary, #334155);
           font-variant-numeric: tabular-nums;
         }
         .progress-bar-bg {
           width: 100%;
           height: 5px;
-          background: rgba(255, 255, 255, 0.08);
+          background: var(--joy-palette-background-level2, #e2e8f0);
           border-radius: 999px;
           overflow: hidden;
         }
@@ -783,10 +786,10 @@ export default function ThemeDonutChart({
                   style={{
                     color:
                       selectedTheme.weightPct > 30
-                        ? '#ff5a59'
+                        ? 'var(--joy-palette-danger-plainColor, #dc2626)'
                         : selectedTheme.weightPct >= 25
-                        ? '#ffdb0f'
-                        : '#f8fafc',
+                        ? 'var(--joy-palette-warning-plainColor, #d97706)'
+                        : 'var(--joy-palette-text-primary, #0f172a)',
                   }}
                 >
                   {Math.round(selectedTheme.weightPct)}%
