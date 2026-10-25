@@ -35,20 +35,26 @@ Use when year-by-year granular projections (FY+1, FY+2, FY+3, FY+4, FY+5) are pr
 2. **Operating Income (EBIT)**:
    $$\text{EBIT}_i = \text{Revenue}_i \times \text{OpMargin}_i$$
 3. **Net Operating Profit After Tax (NOPAT)**:
-   $$\text{NOPAT}_i = \text{EBIT}_i \times (1 - \text{Tax Rate})$$
+   $$\text{NOPAT}_i = \begin{cases} \text{EBIT}_i \times (1 - \text{Tax Rate}) & \text{if } \text{EBIT}_i > 0 \\ \text{EBIT}_i & \text{if } \text{EBIT}_i \le 0 \end{cases}$$
+   *(Note: Tax Rate is clamped to $[0\%, 100\%]$; operating losses carry a $0\%$ effective tax rate without immediate cash tax shield.)*
 4. **Free Cash Flow (FCF)**:
    $$\text{FCF}_i = \text{NOPAT}_i \times \text{FCF Conversion}_i$$
 5. **Present Value of FCF (PV of FCF)**:
    $$\text{PV of FCF}_i = \frac{\text{FCF}_i}{(1 + \text{WACC})^i}$$
 6. **Terminal Value (TV - Gordon Growth Model)**:
-   $$\text{TV} = \frac{\text{FCF}_5 \times (1 + g)}{\text{WACC} - g}$$
+   $$\text{TV} = \begin{cases} \dfrac{\text{FCF}_5 \times (1 + g)}{\max(0.005, \text{WACC} - g)} & \text{if } \text{FCF}_5 > 0 \\ 0 & \text{if } \text{FCF}_5 \le 0 \end{cases}$$
+   *(Guardrail: Minimum spread $\text{WACC} - g \ge 0.5\%$ (`0.005`) prevents explosive terminal values.)*
 7. **PV of Terminal Value**:
    $$\text{PV of TV} = \frac{\text{TV}}{(1 + \text{WACC})^5}$$
 8. **Enterprise Value (EV)**:
    $$\text{EV} = \sum_{i=1}^5 \text{PV of FCF}_i + \text{PV of TV}$$
 9. **Implied Intrinsic Share Price**:
-   $$\text{Implied Price} = \frac{\text{EV} + \text{Net Cash}}{\text{Diluted Shares Outstanding (in Billions)}}$$
-10. **Share Count Unit Conversion (Strict Rule)**:
+   $$\text{Implied Price} = \frac{\max(0, \text{EV} + \text{Net Cash})}{\text{Diluted Shares Outstanding (in Billions)}}$$
+   *(Guardrail: Equity value per share is floored at $0$ per limited liability.)*
+10. **5-Year Target Price (P/FCF Exit Multiple Valuation)**:
+    $$\text{Target Market Cap}_5 = \max(0, \text{FCF}_5 \times \text{Exit Multiple (P/FCF)})$$
+    $$\text{Target Share Price}_5 = \frac{\text{Target Market Cap}_5}{\text{Target Shares}_5\text{ (in Billions)}}$$
+11. **Share Count Unit Conversion (Strict Rule)**:
     - Input parameters `sharesOutstanding` and `targetShares` MUST ALWAYS be provided in **Millions ($M$)**.
     - Always convert Millions to Billions directly by dividing by 1,000:
       $$\text{Shares (in Billions)} = \frac{\text{Shares (in Millions)}}{1000}$$

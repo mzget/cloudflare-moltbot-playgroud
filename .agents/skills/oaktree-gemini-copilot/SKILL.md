@@ -102,13 +102,13 @@ Oaktree MCP Server (20 Tools)
     - `base_revenue` (*number*): Base Year Revenue in **Billions USD ($B)**.
     - `shares_outstanding` (*number*): Diluted shares in **Millions ($M)** (e.g. `15000` for 15B shares).
     - `wacc` (*number*): Discount rate in **percent (%)** (e.g. `10.5` for 10.5%).
-    - `terminal_growth` (*number*): Perpetual growth rate in **percent (%)** (must be $< \text{WACC}$).
+    - `terminal_growth` (*number*): Perpetual growth rate in **percent (%)** (must be $< \text{WACC}$ with a minimum spread of $\text{WACC} - g \ge 0.5\%$).
     - `implied_share_price` (*number*, optional): Optional. System automatically computes the exact intrinsic price from parameters using code. Note: Do NOT specify target prices in the `rationale` text.
     - `net_cash` (*number*, optional): Net cash (Cash - Debt) in **Billions USD ($B)**.
     - `yearly_growth` (*number[]*, optional): 5-year YoY revenue growth rates in %: `[yr1, yr2, yr3, yr4, yr5]`.
     - `yearly_op_margin` (*number[]*, optional): 5-year operating margins in %: `[yr1, yr2, yr3, yr4, yr5]`.
     - `yearly_fcf_conv` (*number[]*, optional): 5-year FCF conversion of NOPAT in %: `[yr1, yr2, yr3, yr4, yr5]`.
-    - `exit_multiple` (*number*, optional): 5-year terminal exit multiple (e.g. `20.0`).
+    - `exit_multiple` (*number*, optional): 5-year terminal **P/FCF (Price-to-FCF)** exit multiple (e.g. `20.0`).
     - `rationale` (*string*, optional): Qualitative explanation of assumptions.
     - `source` (*string*, optional): Attribution (e.g. `"gemini_app"`).
 
@@ -174,7 +174,7 @@ Oaktree MCP Server (20 Tools)
 1. **Revenues & Cash**: ALWAYS provide in **Billions USD ($B)** (e.g. `27.0` for \$27 Billion, NOT `27000000000`).
 2. **Shares**: ALWAYS provide in **Millions ($M)** (e.g. `15000` for 15 Billion shares, NOT `15`).
 3. **Rates & Percentages**: Provide as standard percentages (e.g. `10.5` for 10.5%, NOT `0.105`).
-4. **DCF WACC Constraint**: `terminal_growth` MUST ALWAYS be strictly less than `wacc` ($\text{terminal\_growth} < \text{wacc}$).
+4. **DCF WACC Constraint**: `terminal_growth` MUST ALWAYS be strictly less than `wacc` with at least a $0.5\%$ spread ($\text{wacc} - \text{terminal\_growth} \ge 0.5\%$).
 5. **Conviction Score**: Scale is strictly from `-10` (Strong Bear) to `+10` (Strong Bull).
 6. **Health Score**: Scale is strictly from `0` to `100`.
 7. **Risk Level**: Must be exactly one of: `'Low'`, `'Moderate'`, `'Elevated'`, `'High'`.
@@ -213,10 +213,10 @@ When the user asks you to perform an investment or risk analysis, execute the ma
 1. Read the company's financial statements or consensus estimates.
 2. Formulate 3 distinct scenarios: 'Base Case' (primary baseline), 'Bull Case' (optimistic expansion), 'Bear Case' (downside stress test).
 3. Call tool `save_dcf_scenarios`:
-   - Units: base_revenue ($B), shares_outstanding ($M), wacc (%), terminal_growth (%), implied_share_price ($).
-   - Provide yearly_growth, yearly_op_margin, and yearly_fcf_conv 5-year arrays.
-   - Include a comprehensive rationale for each scenario.
-   - Set source: "gemini_app".
+   - Units: `base_revenue` ($B), `shares_outstanding` ($M), `net_cash` ($B), `wacc` (%), `terminal_growth` (%, must be at least 0.5% below WACC), `exit_multiple` (5-year P/FCF multiple).
+   - Provide `yearly_growth`, `yearly_op_margin`, and `yearly_fcf_conv` 5-year arrays.
+   - Include a comprehensive qualitative `rationale` for each scenario (do NOT hardcode calculated target prices inside the rationale text; the deterministic code engine calculates `implied_share_price` automatically).
+   - Set `source`: "gemini_app".
 
 ### WORKFLOW 3: FUNDAMENTAL RESEARCH & BULL VS. BEAR DEBATE
 1. Analyze business model, competitive moat, guidance, and key risks.

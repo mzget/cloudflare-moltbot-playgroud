@@ -48,8 +48,8 @@ export interface DcfCalculationInput {
   readonly yearlyOpMargin?: readonly number[]; // % e.g. [41.5, 41.7, 41.9, 42.1, 42.3]
   readonly yearlyFcfConv?: readonly number[]; // % e.g. [90, 90, 90, 90, 90]
 
-  // Exit Multiple Valuation
-  readonly exitMultiple?: number; // e.g. 22.0
+  // Exit Multiple Valuation (P/FCF Multiple)
+  readonly exitMultiple?: number; // Expected Year 5 P/FCF multiple (e.g. 22.0)
   readonly targetShares?: number; // Expected shares at Year 5 in Millions ($M)
   readonly currentPrice?: number | null; // Current market price for upside & CAGR
 }
@@ -65,7 +65,7 @@ export interface DcfCalculationResult {
   readonly equityValue: number;
   readonly impliedSharePrice: number; // Rounded to 2 decimals
 
-  // 5-Year Target Price via Exit Multiple Valuation
+  // 5-Year Target Price via P/FCF Exit Multiple Valuation
   readonly targetMarketCapYr5: number;
   readonly targetSharePriceYr5: number; // Rounded to 2 decimals
   readonly cagrYr5: number | null;
@@ -78,8 +78,9 @@ export interface DcfCalculationResult {
  */
 export function calculateDCF(params: DcfCalculationInput): DcfCalculationResult {
   const baseYear = params.baseYear ?? 2026;
-  const taxRate = params.taxRate ?? 21.0;
-  const taxDecimal = taxRate / 100;
+  const rawTaxRate = params.taxRate ?? 21.0;
+  const clampedTaxRate = Math.min(100, Math.max(0, rawTaxRate));
+  const taxDecimal = clampedTaxRate / 100;
   const wacc = params.wacc;
   const waccDecimal = wacc / 100;
   const terminalGrowth = params.terminalGrowth;
@@ -99,7 +100,8 @@ export function calculateDCF(params: DcfCalculationInput): DcfCalculationResult 
     : baseRev * (opMargin / 100);
 
   const baseOpMargin = baseRev > 0 ? (baseEbit / baseRev) * 100 : 0;
-  const baseNopat = baseEbit * (1 - taxDecimal);
+  // Apply corporate tax only when operating income is positive (0% effective tax on operating losses)
+  const baseNopat = baseEbit > 0 ? baseEbit * (1 - taxDecimal) : baseEbit;
 
   const baseYearData: BaseYearDcfData = {
     yearLabel: `FY${baseYear} (A)`,
@@ -131,7 +133,7 @@ export function calculateDCF(params: DcfCalculationInput): DcfCalculationResult 
 
     currentRev = currentRev * (1 + growth / 100);
     const ebit = currentRev * (currentOpMargin / 100);
-    const nopat = ebit * (1 - taxDecimal);
+    const nopat = ebit > 0 ? ebit * (1 - taxDecimal) : ebit;
     const fcf = nopat * (fcfConv / 100);
 
     const discountFactor = waccDecimal > -1 ? 1 / Math.pow(1 + waccDecimal, i + 1) : 0;
@@ -154,19 +156,21 @@ export function calculateDCF(params: DcfCalculationInput): DcfCalculationResult 
   }
 
   const lastFcf = yearlyData.length === 5 ? yearlyData[4].fcf : 0;
-  const denom = Math.max(0.0001, waccDecimal - termGrowthDecimal);
-  const terminalValue = (lastFcf * (1 + termGrowthDecimal)) / denom;
+  // Minimum WACC - g spread of 0.5% (0.005) to prevent explosive terminal value when WACC <= g
+  const denom = Math.max(0.005, waccDecimal - termGrowthDecimal);
+  const terminalValue = lastFcf > 0 ? (lastFcf * (1 + termGrowthDecimal)) / denom : 0;
   const pvOfTerminalValue = waccDecimal > -1 ? terminalValue / Math.pow(1 + waccDecimal, 5) : 0;
   const enterpriseValue = sumPvFcf + pvOfTerminalValue;
   const equityValue = enterpriseValue + netCash;
 
   // Implied Share Price: Shares outstanding in Millions divided by 1000 = Billions
+  // Floor equity value at 0 for per-share price (limited liability)
   const sharesInBillions = params.sharesOutstanding > 0 ? params.sharesOutstanding / 1000 : 0;
-  const rawImpliedPrice = sharesInBillions > 0 ? equityValue / sharesInBillions : 0;
+  const rawImpliedPrice = sharesInBillions > 0 ? Math.max(0, equityValue) / sharesInBillions : 0;
   const impliedSharePrice = Number(rawImpliedPrice.toFixed(2));
 
-  // 5-Year Target Price via Exit Multiple Valuation
-  const targetMarketCapYr5 = lastFcf * exitMultiple;
+  // 5-Year Target Price via P/FCF Exit Multiple Valuation
+  const targetMarketCapYr5 = Math.max(0, lastFcf * exitMultiple);
   const targetSharesInBillions = targetShares > 0 ? targetShares / 1000 : 0;
   const rawTargetSharePriceYr5 = targetSharesInBillions > 0 ? targetMarketCapYr5 / targetSharesInBillions : 0;
   const targetSharePriceYr5 = Number(rawTargetSharePriceYr5.toFixed(2));
