@@ -19,6 +19,7 @@ describe('Analysis API - DCF Calculations', () => {
     boundParams = [];
 
     mockDb = {
+      batch: vi.fn().mockImplementation(async (stmts: any[]) => stmts.map(() => ({ success: true }))),
       prepare: vi.fn().mockImplementation((sql: string) => {
         executedSqls.push(sql);
         let currentParams: any[] = [];
@@ -98,6 +99,9 @@ describe('Analysis API - DCF Calculations', () => {
       const data = await res.json() as any;
       expect(data.success).toBe(true);
 
+      // Verify atomic batch was called
+      expect(mockDb.batch).toHaveBeenCalled();
+
       // Verify DELETE was called for overwrite
       expect(executedSqls[0]).toContain('DELETE FROM dcf_calculations WHERE symbol = ? AND scenario_name = ?');
       expect(boundParams[0]).toEqual(['NVDA', 'Base Case']);
@@ -108,6 +112,9 @@ describe('Analysis API - DCF Calculations', () => {
       const insertParams = boundParams[1];
       expect(insertParams[insertParams.length - 2]).toBe('Robust demand for Blackwell AI compute');
       expect(insertParams[insertParams.length - 1]).toBe('gemini_spark');
+
+      // Verify NO overview_updated_at invalidation was executed
+      expect(executedSqls.some((sql) => sql.includes('overview_updated_at'))).toBe(false);
     });
 
     it('defaults source to manual when omitted', async () => {
@@ -146,17 +153,21 @@ describe('Analysis API - DCF Calculations', () => {
     });
 
     it('refreshes persisted Margin of Safety on market_stats after saving (ADR-0014)', async () => {
-      mockDb.batch = vi.fn().mockResolvedValue([]);
       const res = await worker.fetch(saveReq(), mockEnv, {} as any);
       expect(res.status).toBe(200);
-      expect(mockDb.batch).toHaveBeenCalledTimes(1);
+      expect(mockDb.batch).toHaveBeenCalledTimes(2); // 1 for save, 1 for refreshMarginOfSafety
       const updateIdx = executedSqls.findIndex((q) => q.includes('UPDATE market_stats'));
       expect(updateIdx).toBeGreaterThan(1); // after DELETE + INSERT
       expect(boundParams.some((p) => p[p.length - 1] === 'NVDA' && p.length === 7)).toBe(true);
     });
 
     it('still returns success when the Margin of Safety refresh fails', async () => {
-      mockDb.batch = vi.fn().mockRejectedValue(new Error('boom'));
+      mockDb.batch = vi.fn().mockImplementation(async (stmts: any[]) => {
+        if (stmts.length === 2) {
+          return [{ success: true }, { success: true }];
+        }
+        throw new Error('boom');
+      });
       const res = await worker.fetch(saveReq(), mockEnv, {} as any);
       expect(res.status).toBe(200);
       expect(((await res.json()) as any).success).toBe(true);

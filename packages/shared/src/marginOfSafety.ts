@@ -64,14 +64,10 @@ export interface MosDatabase {
   batch(statements: MosStatement[]): Promise<unknown>;
 }
 
+import { resolveDcfScenarios, DcfRow } from './dcfScenarios';
+
 // Stay well under D1's bound-parameter limit (100) per statement.
 const SYMBOL_CHUNK_SIZE = 50;
-
-const SCENARIO_KEYS: Readonly<Record<string, 'bear' | 'base' | 'bull'>> = {
-  'Bear Case': 'bear',
-  'Base Case': 'base',
-  'Bull Case': 'bull',
-};
 
 const chunk = <T>(items: ReadonlyArray<T>, size: number): T[][] =>
   Array.from({ length: Math.ceil(items.length / size) }, (_, i) => items.slice(i * size, (i + 1) * size));
@@ -98,20 +94,27 @@ export async function refreshMarginOfSafety(db: MosDatabase, symbols: ReadonlyAr
         .bind(...group).all<{ symbol: string; price: number | null }>(),
     ]);
 
-    const scenarios = new Map<string, { bear: number | null; base: number | null; bull: number | null }>();
+    const rowsBySymbol = new Map<string, DcfRow[]>();
     for (const row of dcfRes.results ?? []) {
-      const key = SCENARIO_KEYS[row.scenario_name];
-      if (!key) continue;
-      const cur = scenarios.get(row.symbol) ?? { bear: null, base: null, bull: null };
-      scenarios.set(row.symbol, { ...cur, [key]: row.implied_share_price ?? null });
+      const existing = rowsBySymbol.get(row.symbol);
+      if (existing) {
+        existing.push(row);
+      } else {
+        rowsBySymbol.set(row.symbol, [row]);
+      }
     }
     const prices = new Map<string, number | null>(
       (priceRes.results ?? []).map((r) => [r.symbol, r.price ?? null])
     );
 
     const updates = group.map((symbol) => {
-      const sc = scenarios.get(symbol) ?? { bear: null, base: null, bull: null };
-      const result = computeMarginOfSafety({ price: prices.get(symbol), ...sc });
+      const sc = resolveDcfScenarios(rowsBySymbol.get(symbol) ?? []);
+      const result = computeMarginOfSafety({
+        price: prices.get(symbol),
+        bear: sc.bear,
+        base: sc.base,
+        bull: sc.bull,
+      });
       return db.prepare(
         `UPDATE market_stats
          SET dcf_bear = ?, dcf_base = ?, dcf_bull = ?, mos_base = ?, price_zone = ?, mos_updated_at = ?

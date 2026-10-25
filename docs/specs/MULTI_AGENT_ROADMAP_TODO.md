@@ -136,9 +136,15 @@ flowchart TD
     5. *Stage 5: Final Execution Advisory* (คำแนะนำสถานะการลงทุน)
 
 - [x] **5. Client-Side Orchestration (`Promise.all`)**
-  - [x] ดึงข้อมูลพร้อมกัน 4 Endpoint ในฝั่ง Client: `/overview`, `/analysis/results`, `/analysis/theses`, และ `/portfolio/risk-audit`
+  - [x] ดึงข้อมูลพร้อมกันในฝั่ง Client: `/overview`, `/analysis/results`, `/analysis/theses`, และ `/portfolio/risk-audit`
   - [x] ใช้ Pure functions จาก `@oaktree/shared` คำนวณ Sizing Room และ MoS แบบ Instant 0ms
   - [x] เขียนชุดการทดสอบครอบคลุมทุกมุมมองใน [StockDossierCockpit.test.tsx](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/frontend/src/components/features/agent/StockDossierCockpit.test.tsx)
+- [x] **6. Single Source of Truth (SSOT) Architecture & Domain Decoupling ([ADR-0017](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/docs/adr/0017-single-source-of-truth-architecture-and-domain-decoupling.md))** (Completed ✅)
+  - [x] **Phase 1: DCF Data Hygiene & Unique Constraint**: Migration `0046_dcf_scenario_normalize_unique.sql` normalize ชื่อ preset, ลบ duplicates, สร้าง unique index `(symbol, scenario_name)`, และ atomic batch ใน `/dcf-save`
+  - [x] **Phase 2: Single Shared Resolver**: ย้ายการ resolve canonical presets สู่ `resolveDcfScenarios` ใน `@oaktree/shared` ใช้งานร่วมกันทั้ง Overview, `refreshMarginOfSafety`, และ MCP
+  - [x] **Phase 3: Payload Hygiene & Handler Composition**: แยก pure `attachLiveValuation` ใน backend, attach ราคาตลาดสดจาก `market_stats.price`, ตัด `dcfScenarios` ออกจากการ serialize แคช `overview_json`
+  - [x] **Phase 4: Frontend Cockpit Single Source**: ให้ Cockpit อ่าน DCF จาก `overview.dcfScenarios` แหล่งเดียว, แก้ไข `!= null` checks, และตัดการดึง `/dcf-history` ใน Cockpit
+
 
 ---
 
