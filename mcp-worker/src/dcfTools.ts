@@ -1,4 +1,4 @@
-import { refreshMarginOfSafety } from '@oaktree/shared';
+import { refreshMarginOfSafety, calculateDCF } from '@oaktree/shared';
 
 export interface DcfScenarioInput {
   scenario_name: 'Base Case' | 'Bull Case' | 'Bear Case';
@@ -11,7 +11,7 @@ export interface DcfScenarioInput {
   tax_rate?: number;          // in percent (%)
   exit_multiple?: number;     // e.g. 20.0
   target_shares?: number;     // in Millions ($M)
-  implied_share_price: number;
+  implied_share_price?: number;
   yearly_growth?: number[];   // 5 numbers
   yearly_op_margin?: number[];// 5 numbers
   yearly_fcf_conv?: number[]; // 5 numbers
@@ -105,8 +105,27 @@ export async function saveDcfScenarios(env: any, args: SaveDcfScenariosArgs) {
   let baseCasePrice: number | null = null;
 
   for (const sc of scenarios) {
+    const dcfResult = calculateDCF({
+      baseRev: sc.base_revenue,
+      wacc: sc.wacc,
+      terminalGrowth: sc.terminal_growth,
+      sharesOutstanding: sc.shares_outstanding,
+      netCash: sc.net_cash ?? 0,
+      taxRate: sc.tax_rate ?? 21.0,
+      exitMultiple: sc.exit_multiple ?? 20.0,
+      targetShares: sc.target_shares ?? sc.shares_outstanding,
+      mode: sc.mode ?? 'detailed',
+      revGrowth: sc.revenue_growth ?? 0,
+      opMargin: sc.operating_margin ?? (sc.yearly_op_margin?.[0] ?? 0),
+      fcfConversion: sc.fcf_conversion ?? (sc.yearly_fcf_conv?.[0] ?? 75),
+      yearlyGrowth: sc.yearly_growth,
+      yearlyOpMargin: sc.yearly_op_margin,
+      yearlyFcfConv: sc.yearly_fcf_conv,
+    });
+    const calculatedPrice = dcfResult.impliedSharePrice;
+
     if (sc.scenario_name === 'Base Case') {
-      baseCasePrice = sc.implied_share_price;
+      baseCasePrice = calculatedPrice;
     }
 
     // Delete existing scenario for overwrite protocol (ADR 0004)
@@ -131,7 +150,6 @@ export async function saveDcfScenarios(env: any, args: SaveDcfScenariosArgs) {
     const netCash = sc.net_cash ?? 0;
     const exitMultiple = sc.exit_multiple ?? 20.0;
     const targetShares = sc.target_shares ?? sc.shares_outstanding;
-    const impliedSharePrice = sc.implied_share_price;
     const yearlyGrowth = sc.yearly_growth ? JSON.stringify(sc.yearly_growth) : null;
     const yearlyOpMargin = sc.yearly_op_margin ? JSON.stringify(sc.yearly_op_margin) : null;
     const yearlyFcfConv = sc.yearly_fcf_conv ? JSON.stringify(sc.yearly_fcf_conv) : null;
@@ -162,7 +180,7 @@ export async function saveDcfScenarios(env: any, args: SaveDcfScenariosArgs) {
         netCash,
         exitMultiple,
         targetShares,
-        impliedSharePrice,
+        calculatedPrice,
         mode,
         yearlyGrowth,
         yearlyOpMargin,

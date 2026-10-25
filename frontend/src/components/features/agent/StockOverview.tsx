@@ -302,9 +302,14 @@ export default function StockOverview({ symbol, initialData = null }: StockOverv
         <Grid xs={12} xl={5}>
           <Sheet sx={{ ...glassStyle, p: 2.5, height: '100%', display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ pb: 1, borderBottom: '1px solid', borderColor: 'divider' }}>
-              <Typography level="title-md" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
-                Company Statistics
-              </Typography>
+              <Box>
+                <Typography level="title-md" sx={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 1 }}>
+                  Company Statistics
+                </Typography>
+                <Typography level="body-xs" sx={{ color: 'text.tertiary', fontSize: '11px', mt: 0.2 }}>
+                  Source: Finnhub &amp; Oaktree D1
+                </Typography>
+              </Box>
               <Chip size="sm" variant="soft" color="neutral" sx={{ fontSize: '11px', fontWeight: 600 }}>
                 USD
               </Chip>
@@ -401,9 +406,14 @@ export default function StockOverview({ symbol, initialData = null }: StockOverv
           <Sheet sx={{ ...glassStyle, p: 2.5, height: '100%', display: 'flex', flexDirection: 'column', gap: 2 }}>
             {/* Chart Control Header */}
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ flexWrap: 'wrap', gap: 1.5 }}>
-              <Typography level="title-md" sx={{ fontWeight: 700 }}>
-                Financial Performance
-              </Typography>
+              <Box>
+                <Typography level="title-md" sx={{ fontWeight: 700 }}>
+                  Financial Performance
+                </Typography>
+                <Typography level="body-xs" sx={{ color: 'text.tertiary', fontSize: '11px', mt: 0.2 }}>
+                  Source: Yahoo Finance
+                </Typography>
+              </Box>
 
               <Stack direction="row" alignItems="center" spacing={1}>
                 {/* Quarterly / Annual Switcher */}

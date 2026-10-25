@@ -165,6 +165,36 @@ describe('dcfTools', () => {
       expect(res.success).toBe(true);
     });
 
+    it('automatically calculates implied_share_price with code when omitted or overridden', async () => {
+      const payload: SaveDcfScenariosArgs = {
+        symbol: 'RDDT',
+        scenarios: [
+          {
+            scenario_name: 'Base Case',
+            mode: 'detailed',
+            base_revenue: 3.35,
+            shares_outstanding: 207,
+            net_cash: 2.8,
+            wacc: 10.5,
+            terminal_growth: 2.5,
+            tax_rate: 15.0,
+            yearly_growth: [30, 26, 22, 20, 18],
+            yearly_op_margin: [41.5, 41.7, 41.9, 42.1, 42.3],
+            yearly_fcf_conv: [90, 90, 90, 90, 90],
+            implied_share_price: 142.88, // AI hallucinated value
+          }
+        ]
+      };
+
+      const res = await saveDcfScenarios(mockEnv, payload);
+      expect(res.success).toBe(true);
+
+      const insertStmt = preparedStatements.find(p => p.sql.includes('INSERT INTO dcf_calculations'));
+      expect(insertStmt).toBeDefined();
+      // Must be recalculated to 166.81 by single source of truth code engine
+      expect(insertStmt!.params).toContain(166.81);
+    });
+
     it('syncs target_price to watchlist when sync_target_price is true', async () => {
       const payload: SaveDcfScenariosArgs = {
         ...validBasePayload,

@@ -144,7 +144,7 @@ export class OaktreeMCP extends McpAgent {
             tax_rate: z.number().optional().describe("Effective corporate tax rate in percent (%)"),
             exit_multiple: z.number().optional().describe("5-Year terminal exit multiple (e.g. 20.0)"),
             target_shares: z.number().optional().describe("Expected shares outstanding at Year 5 in Millions ($M)"),
-            implied_share_price: z.number().describe("Calculated intrinsic share price ($)"),
+            implied_share_price: z.number().optional().describe("Optional calculated intrinsic share price ($). Note: The system will automatically compute the exact intrinsic share price from the financial parameters using code."),
             yearly_growth: z.array(z.number()).optional().describe("5-year YoY revenue growth rates in %: [yr1, yr2, yr3, yr4, yr5]"),
             yearly_op_margin: z.array(z.number()).optional().describe("5-year operating margins in %: [yr1, yr2, yr3, yr4, yr5]"),
             yearly_fcf_conv: z.array(z.number()).optional().describe("5-year FCF conversion of NOPAT in %: [yr1, yr2, yr3, yr4, yr5]"),

@@ -3,7 +3,7 @@ import type { AppEnv } from '../env';
 import { runFullAnalysis, getOrUpdateMarketStats } from '../analysisEngine';
 import { runDialecticalDebate, getStoredDebate } from '../debateEngine';
 import { formatMetricsForPrompt } from '../analysisPrompts';
-import { refreshMarginOfSafety } from '@oaktree/shared';
+import { refreshMarginOfSafety, calculateDCF } from '@oaktree/shared';
 
 import { fetchFinancialOverview } from '../stockOverview';
 
@@ -326,6 +326,29 @@ analysis.post('/api/analysis/dcf-save', async (c) => {
     const symbolUpper = symbol.toUpperCase();
     const finalScenarioName = scenarioName || 'Base Case';
 
+    const parsedYearlyGrowth = typeof yearlyGrowth === 'string' ? JSON.parse(yearlyGrowth) : yearlyGrowth;
+    const parsedYearlyOpMargin = typeof yearlyOpMargin === 'string' ? JSON.parse(yearlyOpMargin) : yearlyOpMargin;
+    const parsedYearlyFcfConv = typeof yearlyFcfConv === 'string' ? JSON.parse(yearlyFcfConv) : yearlyFcfConv;
+
+    const dcfResult = calculateDCF({
+      baseRev: baseRevenue ?? 0,
+      wacc: wacc ?? 10.0,
+      terminalGrowth: terminalGrowth ?? 2.5,
+      sharesOutstanding: sharesOutstanding ?? 0,
+      netCash: netCash ?? 0,
+      taxRate: taxRate ?? 21.0,
+      exitMultiple: exitMultiple ?? 20.0,
+      targetShares: targetShares ?? sharesOutstanding ?? 0,
+      mode: mode ?? 'detailed',
+      revGrowth: revenueGrowth ?? 0,
+      opMargin: baseGrossMargin ?? 0,
+      fcfConversion: fcfConversion ?? 75.0,
+      yearlyGrowth: parsedYearlyGrowth,
+      yearlyOpMargin: parsedYearlyOpMargin,
+      yearlyFcfConv: parsedYearlyFcfConv,
+    });
+    const calculatedPrice = dcfResult.impliedSharePrice;
+
     // Atomic delete and insert to achieve overwrite persistence (ADR-0004)
     await c.env.DB.batch([
       c.env.DB.prepare(
@@ -354,7 +377,7 @@ analysis.post('/api/analysis/dcf-save', async (c) => {
         netCash ?? 0,
         exitMultiple ?? 20.0,
         targetShares ?? sharesOutstanding ?? 0,
-        impliedSharePrice,
+        calculatedPrice,
         mode ?? 'detailed',
         typeof yearlyGrowth === 'object' ? JSON.stringify(yearlyGrowth) : (yearlyGrowth ?? null),
         typeof yearlyOpMargin === 'object' ? JSON.stringify(yearlyOpMargin) : (yearlyOpMargin ?? null),
@@ -371,7 +394,7 @@ analysis.post('/api/analysis/dcf-save', async (c) => {
       console.error(`Failed to refresh MoS for ${symbolUpper}:`, mosErr);
     }
 
-    return c.json({ success: true });
+    return c.json({ success: true, impliedSharePrice: calculatedPrice });
   } catch (e) {
     console.error('Failed to save DCF calculation:', e);
     return c.json({ error: (e as any).message }, 500);
