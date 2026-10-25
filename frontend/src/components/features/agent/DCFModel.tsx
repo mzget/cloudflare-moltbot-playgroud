@@ -1248,8 +1248,8 @@ export default function DCFModel({ symbol }: DCFModelProps) {
                 '--TableCell-paddingX': '12px',
                 '--TableCell-paddingY': '10px',
                 '& thead th': {
-                  fontWeight: 700,
-                  fontSize: '0.7rem',
+                  fontSize: '0.8rem',
+                  fontWeight: 500,
                   textTransform: 'uppercase',
                   letterSpacing: '0.05em',
                   color: 'text.secondary',
@@ -1257,8 +1257,6 @@ export default function DCFModel({ symbol }: DCFModelProps) {
                   borderBottom: '1px solid',
                   borderColor: 'neutral.outlinedBorder',
                   fontFamily: 'monospace',
-                  fontSize: '0.8rem',
-                  fontWeight: 500,
                 },
               }}
             >

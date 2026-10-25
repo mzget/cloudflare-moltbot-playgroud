@@ -326,51 +326,43 @@ analysis.post('/api/analysis/dcf-save', async (c) => {
     const symbolUpper = symbol.toUpperCase();
     const finalScenarioName = scenarioName || 'Base Case';
 
-    // Delete existing calculation for this symbol and scenario_name to achieve overwrite persistence
-    await c.env.DB.prepare(
-      'DELETE FROM dcf_calculations WHERE symbol = ? AND scenario_name = ?'
-    ).bind(symbolUpper, finalScenarioName).run();
-
-    await c.env.DB.prepare(
-      `INSERT INTO dcf_calculations (
-        symbol, scenario_name, base_revenue, revenue_growth, base_gross_margin,
-        gross_margin_improvement, opex_margin, tax_rate, fcf_conversion,
-        wacc, terminal_growth, shares_outstanding, net_cash, exit_multiple, target_shares, implied_share_price,
-        mode, yearly_growth, yearly_op_margin, yearly_fcf_conv, rationale, source
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).bind(
-      symbolUpper,
-      finalScenarioName,
-      baseRevenue,
-      revenueGrowth,
-      baseGrossMargin,
-      grossMarginImprovement,
-      opexMargin,
-      taxRate,
-      fcfConversion,
-      wacc,
-      terminalGrowth,
-      sharesOutstanding,
-      netCash ?? 0,
-      exitMultiple ?? 20.0,
-      targetShares ?? sharesOutstanding ?? 0,
-      impliedSharePrice,
-      mode ?? 'detailed',
-      typeof yearlyGrowth === 'object' ? JSON.stringify(yearlyGrowth) : (yearlyGrowth ?? null),
-      typeof yearlyOpMargin === 'object' ? JSON.stringify(yearlyOpMargin) : (yearlyOpMargin ?? null),
-      typeof yearlyFcfConv === 'object' ? JSON.stringify(yearlyFcfConv) : (yearlyFcfConv ?? null),
-      rationale ?? null,
-      source ?? 'manual'
-    ).run();
-
-    // Invalidate cached overview_json in market_stats so Overview and Cockpit reflect updated DCF immediately
-    try {
-      await c.env.DB.prepare(
-        'UPDATE market_stats SET overview_updated_at = NULL WHERE symbol = ?'
-      ).bind(symbolUpper).run();
-    } catch (cacheErr) {
-      console.warn(`Failed to invalidate overview cache for ${symbolUpper}:`, cacheErr);
-    }
+    // Atomic delete and insert to achieve overwrite persistence (ADR-0004)
+    await c.env.DB.batch([
+      c.env.DB.prepare(
+        'DELETE FROM dcf_calculations WHERE symbol = ? AND scenario_name = ?'
+      ).bind(symbolUpper, finalScenarioName),
+      c.env.DB.prepare(
+        `INSERT INTO dcf_calculations (
+          symbol, scenario_name, base_revenue, revenue_growth, base_gross_margin,
+          gross_margin_improvement, opex_margin, tax_rate, fcf_conversion,
+          wacc, terminal_growth, shares_outstanding, net_cash, exit_multiple, target_shares, implied_share_price,
+          mode, yearly_growth, yearly_op_margin, yearly_fcf_conv, rationale, source
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ).bind(
+        symbolUpper,
+        finalScenarioName,
+        baseRevenue,
+        revenueGrowth,
+        baseGrossMargin,
+        grossMarginImprovement,
+        opexMargin,
+        taxRate,
+        fcfConversion,
+        wacc,
+        terminalGrowth,
+        sharesOutstanding,
+        netCash ?? 0,
+        exitMultiple ?? 20.0,
+        targetShares ?? sharesOutstanding ?? 0,
+        impliedSharePrice,
+        mode ?? 'detailed',
+        typeof yearlyGrowth === 'object' ? JSON.stringify(yearlyGrowth) : (yearlyGrowth ?? null),
+        typeof yearlyOpMargin === 'object' ? JSON.stringify(yearlyOpMargin) : (yearlyOpMargin ?? null),
+        typeof yearlyFcfConv === 'object' ? JSON.stringify(yearlyFcfConv) : (yearlyFcfConv ?? null),
+        rationale ?? null,
+        source ?? 'manual'
+      )
+    ]);
 
     // Keep persisted Margin of Safety in sync (ADR-0014). Non-fatal: the scenario is already saved.
     try {

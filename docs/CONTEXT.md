@@ -147,3 +147,25 @@
 
 - **Instant 0ms Client-Side Position Sizing Simulation (ADR-0015)**:
   การคำนวณวงเงินซื้อเพิ่มสูงสุด (`calculateFixedBasePositionSize`) และจำลองผลกระทบสัดส่วนพอร์ตก่อนเทรด (`simulatePreTradeImpact`) ใน `RiskSizingTab.tsx` ทำงานแบบ Synchronous (`0ms` ผ่าน `React.useMemo`) บนฝั่ง Frontend โดยใช้ Pure Functions จาก `@oaktree/shared` ร่วมกับ `themeMappings` ที่แนบมากับ `/api/portfolio/risk-audit` (พร้อมปุ่ม `Reset` สำหรับคืนค่าเริ่มต้น) โดยไม่ต้องยิง API รอบใหม่ทุกครั้งที่พิมพ์เปลี่ยนจำนวนหุ้นหรือราคา
+
+
+## Single Source of Truth (SSOT) & Domain Decoupling Subsystem (ADR-0017)
+
+### Terms & Concepts
+
+- **Clean Domain Ownership**:
+  หลักการแบ่งแยกความเป็นเจ้าของข้อมูลอย่างเด็ดขาดในระดับ D1 Database เพื่อกำจัดสภาวะ Split-Brain:
+  - `dcf_calculations`: เจ้าของข้อมูล Valuation และ DCF assumptions รายเดียว
+  - `market_stats`: เจ้าของข้อมูลราคาตลาดสด (`price`, `market_cap`) และงบการเงินย้อนหลัง
+  - `stock_fundamentals`: เจ้าของข้อมูลบทวิเคราะห์เชิงคุณภาพและ Dialectical Debate รายเดียว
+  - `holdings`: เจ้าของข้อมูลจำนวนหุ้นและต้นทุนในพอร์ตรายเดียว
+
+- **Payload Hygiene (No Stale Blobs)**:
+  ข้อกำหนดห้ามฝังข้อมูลที่มีการเปลี่ยนแปลงบ่อย (เช่น ราคาตลาดสด หรือ DCF Scenarios) ลงใน JSON แคชระยะยาวอย่าง `overview_json` โดย `overview_json` ได้รับอนุญาตให้เก็บเฉพาะงบการเงินประวัติศาสตร์ (Quarterly/Annual) ที่มาจากภายนอกเท่านั้น
+
+- **Handler-Level Dynamic Composition**:
+  รูปแบบการประกอบข้อมูลที่ระดับ API Controller (`GET /api/analysis/overview`) โดยดึงงบการเงินจากแคช `overview_json` แล้วประกอบข้อมูลสดจาก `dcf_calculations` (ผ่าน `resolveDcfScenarios`) และ `market_stats.price` แบบ Real-time ก่อนส่งกลับให้ Frontend ช่วยให้ UI ได้รับข้อมูลที่เป็นปัจจุบัน 100% โดยไม่ต้องเปลี่ยน Data Contract
+
+- **Single-Writer Projection for Margin of Safety (MoS %)**:
+  คอลัมน์ใน `market_stats` (`dcf_*`, `mos_base`, `price_zone`) ทำหน้าที่เป็น Read-only projection cache สำหรับ Watchlist/Portfolio โดยมี `refreshMarginOfSafety` เป็น Single Writer รายเดียวที่ใช้ `resolveDcfScenarios` ชุดเดียวกับ overview ส่วน UI รายละเอียดคำนวณสดด้วย `computeMarginOfSafety` จาก `@oaktree/shared` ตามสูตรเดียวกัน
+

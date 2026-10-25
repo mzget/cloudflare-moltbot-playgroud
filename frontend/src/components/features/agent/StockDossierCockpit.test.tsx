@@ -294,4 +294,155 @@ describe('StockDossierCockpit Component', () => {
     expect(html).toContain('Stage 5: Final Actionable Execution Advisory');
     expect(html).toContain('Approved for entry/accumulation up to');
   });
+
+  it('renders Quadrant A Valuation Anchor from overview dcfScenarios for RDDT', () => {
+    const rddtOverviewWithDcf = {
+      symbol: 'RDDT',
+      name: 'Reddit Inc',
+      exchange: 'NYSE',
+      sector: 'Ads, Data',
+      industry: 'Media',
+      currency: 'USD',
+      updatedAt: '2026-10-25',
+      annual: [],
+      quarterly: [],
+      dcfScenarios: {
+        price: 144.25,
+        base: 142.88,
+        bull: 205.5,
+        bear: 78.13,
+        wacc: 10.5,
+        terminalGrowth: 2.5,
+      },
+      companyStatistics: { profileMarginsReturns: [], valuationHealth: [], growthDividends: [] },
+    };
+
+    const html = renderToString(
+      <StockDossierCockpit
+        symbol="RDDT"
+        onNavigateTab={vi.fn()}
+        initialOverview={rddtOverviewWithDcf}
+        initialReport={{ symbol: 'RDDT', summary: '', conviction_level: 'High' }}
+        initialTheses={[]}
+        initialRiskAudit={mockRiskAudit}
+      />
+    );
+
+    expect(html).toContain('Quadrant A: Valuation Anchor');
+    expect(html).toContain('$142.88'); // Base Fair Value
+    expect(html).toContain('$205.50'); // Bull Case
+    expect(html).toContain('$78.13');  // Bear Case
+    expect(html).toContain('WACC:');
+    expect(html).toContain('10.5%');
+    expect(html).toContain('Terminal Growth:');
+    expect(html).toContain('2.5%');
+  });
+
+  it('renders 0% when WACC or terminalGrowth is 0 (does not treat 0 as falsy)', () => {
+    const rddtOverviewZeroRates = {
+      symbol: 'RDDT',
+      dcfScenarios: {
+        price: 100.0,
+        base: 120.0,
+        bull: 150.0,
+        bear: 80.0,
+        wacc: 0,
+        terminalGrowth: 0,
+      },
+    };
+
+    const html = renderToString(
+      <StockDossierCockpit
+        symbol="RDDT"
+        onNavigateTab={vi.fn()}
+        initialOverview={rddtOverviewZeroRates}
+        initialReport={{ symbol: 'RDDT' }}
+        initialTheses={[]}
+        initialRiskAudit={mockRiskAudit}
+      />
+    );
+
+    expect(html).toContain('WACC:');
+    expect(html).toContain('0%');
+    expect(html).toContain('Terminal Growth:');
+  });
+
+  it('correctly formats asymmetric upside/downside without +- when stock is overvalued across all cases', () => {
+    const overvaluedOverview = {
+      symbol: 'OVER',
+      dcfScenarios: {
+        price: 100.0,
+        base: 70.0,
+        bull: 90.0,
+        bear: 50.0,
+      },
+    };
+
+    const html = renderToString(
+      <StockDossierCockpit
+        symbol="OVER"
+        onNavigateTab={vi.fn()}
+        initialOverview={overvaluedOverview}
+        initialReport={{ symbol: 'OVER' }}
+        initialTheses={[]}
+        initialRiskAudit={mockRiskAudit}
+      />
+    );
+
+    // Bull is -10% and Bear is -50%: should be "-10.00% / -50.00%", NEVER "+-10.00%"
+    expect(html).toContain('-10.00% / -50.00%');
+    expect(html).not.toContain('+-10.00%');
+  });
+
+  it('correctly displays positive bear upside when stock is deeply undervalued even in bear case', () => {
+    const deepValueOverview = {
+      symbol: 'VALUE',
+      dcfScenarios: {
+        price: 100.0,
+        base: 150.0,
+        bull: 200.0,
+        bear: 120.0,
+      },
+    };
+
+    const html = renderToString(
+      <StockDossierCockpit
+        symbol="VALUE"
+        onNavigateTab={vi.fn()}
+        initialOverview={deepValueOverview}
+        initialReport={{ symbol: 'VALUE' }}
+        initialTheses={[]}
+        initialRiskAudit={mockRiskAudit}
+      />
+    );
+
+    // Bull is +100% and Bear is +20%: should be "+100.00% / +20.00%", NEVER "-20.00%"
+    expect(html).toContain('+100.00% / +20.00%');
+    expect(html).not.toContain('/ -20.00%');
+  });
+
+  it('renders partial single-scenario fallback cleanly', () => {
+    const singleBullOverview = {
+      symbol: 'BULLY',
+      dcfScenarios: {
+        price: 100.0,
+        base: null,
+        bull: 140.0,
+        bear: null,
+      },
+    };
+
+    const html = renderToString(
+      <StockDossierCockpit
+        symbol="BULLY"
+        onNavigateTab={vi.fn()}
+        initialOverview={singleBullOverview}
+        initialReport={{ symbol: 'BULLY' }}
+        initialTheses={[]}
+        initialRiskAudit={mockRiskAudit}
+      />
+    );
+
+    expect(html).toContain('+40.00% (Bull vs Current)');
+  });
 });

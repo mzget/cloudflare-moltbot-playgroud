@@ -1,4 +1,4 @@
-﻿import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   formatPeriodLabel,
   parseYahooTimeseries,
@@ -10,6 +10,7 @@ import {
   formatPercent,
   FinancialBarPeriod,
   fetchFinancialOverview,
+  attachLiveValuation,
 } from './stockOverview';
 
 describe('formatPeriodLabel', () => {
@@ -311,6 +312,7 @@ describe('fetchFinancialOverview', () => {
       prepare: (sql: string) => ({
         bind: (...args: any[]) => ({
           first: async () => mockRow,
+          all: async () => ({ results: [] }),
           run: async () => ({ success: true }),
         }),
       }),
@@ -323,4 +325,212 @@ describe('fetchFinancialOverview', () => {
     expect(result.quarterly).toHaveLength(1);
     expect(result.quarterly[0].totalRevenue).toBe(47516);
   });
+
+  it('dynamically attaches fresh dcfScenarios from dcf_calculations to cached overview_json and uses market_stats.price even if cache had stale price', async () => {
+    const cachedOverview = {
+      symbol: 'RDDT',
+      name: 'Reddit Inc',
+      quarterly: [{ period: "Q2 '25", totalRevenue: 281 }],
+      annual: [],
+      companyStatistics: { profileMarginsReturns: [], valuationHealth: [], growthDividends: [] },
+      dcfScenarios: { price: 99.99, base: 111.11 }, // Stale embedded price and base
+      updatedAt: new Date().toISOString(),
+    };
+
+    const mockRow = {
+      symbol: 'RDDT',
+      price: 144.25, // Live market price
+      overview_json: JSON.stringify(cachedOverview),
+      overview_updated_at: new Date(Date.now() - 3600 * 1000).toISOString(),
+    };
+
+    const mockDcfRows = [
+      { id: 41, scenario_name: 'Base Case', implied_share_price: 142.88, wacc: 10.5, terminal_growth: 2.5 },
+      { id: 42, scenario_name: 'Bull Case', implied_share_price: 205.5, wacc: 9.5, terminal_growth: 3.0 },
+      { id: 43, scenario_name: 'Bear Case', implied_share_price: 78.13, wacc: 11.5, terminal_growth: 2.0 },
+      { id: 14, scenario_name: 'Base Case - Reddit Q2 2026', implied_share_price: 175.98, wacc: 10.5, terminal_growth: 2.5 },
+    ];
+
+    const mockDb = {
+      prepare: (sql: string) => ({
+        bind: (...args: any[]) => ({
+          first: async () => mockRow,
+          all: async () => {
+            if (sql.includes('dcf_calculations')) {
+              return { results: mockDcfRows };
+            }
+            return { results: [] };
+          },
+          run: async () => ({ success: true }),
+        }),
+      }),
+    };
+
+    const env = { DB: mockDb };
+    const result = await fetchFinancialOverview(env, 'RDDT', false);
+
+    expect(result.symbol).toBe('RDDT');
+    expect(result.dcfScenarios).toBeDefined();
+    expect(result.dcfScenarios?.base).toBe(142.88); // Canonical Base Case, not legacy 175.98
+    expect(result.dcfScenarios?.bull).toBe(205.5);
+    expect(result.dcfScenarios?.bear).toBe(78.13);
+    expect(result.dcfScenarios?.price).toBe(144.25); // Fresh from market_stats.price, not stale 99.99
+    expect(result.dcfScenarios?.wacc).toBe(10.5);
+    expect(result.dcfScenarios?.terminalGrowth).toBe(2.5);
+  });
+
+  it('ignores legacy scenario names like Base Case - Reddit Q2 2026 (exact canonical match only)', async () => {
+    const cachedOverview = {
+      symbol: 'RDDT',
+      name: 'Reddit Inc',
+      quarterly: [{ period: "Q2 '25", totalRevenue: 281 }],
+      dcfScenarios: null,
+      updatedAt: new Date().toISOString(),
+    };
+
+    const mockRow = {
+      symbol: 'RDDT',
+      price: 150.0,
+      overview_json: JSON.stringify(cachedOverview),
+      overview_updated_at: new Date(Date.now() - 3600 * 1000).toISOString(),
+    };
+
+    const mockDcfRows = [
+      { id: 10, scenario_name: 'Base Case - Reddit Q2 2026', implied_share_price: 175.98, wacc: 10.5, terminal_growth: 2.5 },
+    ];
+
+    const mockDb = {
+      prepare: (sql: string) => ({
+        bind: (...args: any[]) => ({
+          first: async () => mockRow,
+          all: async () => ({ results: mockDcfRows }),
+          run: async () => ({ success: true }),
+        }),
+      }),
+    };
+
+    const env = { DB: mockDb };
+    const result = await fetchFinancialOverview(env, 'RDDT', false);
+
+    expect(result.dcfScenarios?.base).toBeNull();
+    expect(result.dcfScenarios?.wacc).toBeNull();
+    expect(result.dcfScenarios?.terminalGrowth).toBeNull();
+  });
+
+  it('persists overview_json without dcfScenarios on fresh fetch', async () => {
+    let savedOverviewJson: string | null = null;
+    const mockDb = {
+      prepare: (sql: string) => ({
+        bind: (...args: any[]) => {
+          if (sql.includes('UPDATE market_stats SET overview_json = ?')) {
+            savedOverviewJson = args[0];
+          } else if (sql.includes('INSERT INTO market_stats')) {
+            savedOverviewJson = args[1];
+          }
+          return {
+            first: async () => null, // No cached overview to force fresh fetch
+            all: async () => ({
+              results: [
+                { scenario_name: 'Base Case', implied_share_price: 142.88, wacc: 10.5, terminal_growth: 2.5 }
+              ]
+            }),
+            run: async () => ({ success: true }),
+          };
+        },
+      }),
+    };
+
+    // Mock global fetch for external endpoints
+    const originalFetch = global.fetch;
+    global.fetch = vi.fn().mockImplementation(async (url: string) => {
+      if (url.includes('quote')) {
+        return { ok: true, json: async () => ({ c: 145.0 }) };
+      }
+      return { ok: true, json: async () => ({}) };
+    }) as any;
+
+    try {
+      const env = { DB: mockDb, FINNHUB_API_KEY: 'test-key' };
+      const result = await fetchFinancialOverview(env, 'RDDT', true);
+
+      // Result returned to client has dcfScenarios attached
+      expect(result.dcfScenarios?.base).toBe(142.88);
+      expect(result.dcfScenarios?.price).toBe(145.0);
+
+      // But persisted JSON in D1 must NOT have dcfScenarios (payload hygiene)
+      expect(savedOverviewJson).not.toBeNull();
+      const parsedSaved = JSON.parse(savedOverviewJson!);
+      expect(parsedSaved.dcfScenarios).toBeUndefined();
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
 });
+
+describe('attachLiveValuation pure function', () => {
+  const basePayload = {
+    symbol: 'RDDT',
+    name: 'Reddit Inc',
+    logo: null,
+    sector: 'Technology',
+    industry: 'Internet Content & Information',
+    exchange: 'NYSE',
+    ipoDate: '2024-03-21',
+    currency: 'USD',
+    quarterly: [],
+    annual: [],
+    companyStatistics: { profileMarginsReturns: [], valuationHealth: [], growthDividends: [] },
+    updatedAt: '2026-10-25T00:00:00.000Z',
+  };
+
+  it('attaches live valuation and canonical presets', () => {
+    const rows = [
+      { scenario_name: 'Base Case', implied_share_price: 142.88, wacc: 10.5, terminal_growth: 2.5 },
+      { scenario_name: 'Bull Case', implied_share_price: 205.5, wacc: 9.5, terminal_growth: 3.0 },
+      { scenario_name: 'Bear Case', implied_share_price: 78.13, wacc: 11.5, terminal_growth: 2.0 },
+    ];
+    const result = attachLiveValuation(basePayload, rows, 144.25);
+    expect(result.dcfScenarios).toEqual({
+      bear: 78.13,
+      base: 142.88,
+      bull: 205.5,
+      price: 144.25,
+      wacc: 10.5,
+      terminalGrowth: 2.5,
+      scenarioName: 'Base Case',
+    });
+  });
+
+  it('attaches nulls when no canonical scenarios exist', () => {
+    const rows = [
+      { scenario_name: 'Base Case - Reddit Q2 2026', implied_share_price: 175.98 },
+    ];
+    const result = attachLiveValuation(basePayload, rows, 100);
+    expect(result.dcfScenarios).toEqual({
+      bear: null,
+      base: null,
+      bull: null,
+      price: 100,
+      wacc: null,
+      terminalGrowth: null,
+      scenarioName: null,
+    });
+  });
+
+  it('resolves scenarioName to Bull Case or Bear Case when Base Case is missing', () => {
+    const bullOnly = [
+      { scenario_name: 'Bull Case', implied_share_price: 210.0, wacc: 9.0, terminal_growth: 3.0 },
+    ];
+    const bullResult = attachLiveValuation(basePayload, bullOnly, 150);
+    expect(bullResult.dcfScenarios?.scenarioName).toBe('Bull Case');
+    expect(bullResult.dcfScenarios?.bull).toBe(210.0);
+
+    const bearOnly = [
+      { scenario_name: 'Bear Case', implied_share_price: 85.0, wacc: 12.0, terminal_growth: 1.5 },
+    ];
+    const bearResult = attachLiveValuation(basePayload, bearOnly, 150);
+    expect(bearResult.dcfScenarios?.scenarioName).toBe('Bear Case');
+    expect(bearResult.dcfScenarios?.bear).toBe(85.0);
+  });
+});
+
