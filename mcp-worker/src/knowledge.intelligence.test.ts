@@ -1,22 +1,43 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { saveMarketArticle, createFacebookDraft, getRecentArticles, getWatchlist, searchKnowledge } from "./knowledge";
+import {
+  saveMarketArticle,
+  createFacebookDraft,
+  getRecentArticles,
+  getWatchlist,
+  searchKnowledge,
+  saveValueInvestingReport,
+  getLatestAnalysisReport,
+} from "./knowledge";
 
 describe("Market Intelligence Knowledge Helpers", () => {
   let mockDb: any;
   let mockKnowledgeBucket: any;
   let mockEnv: any;
   let executedSql: { sql: string; binds: any[] }[];
+  let batchedStmts: any[];
 
   beforeEach(() => {
     vi.resetAllMocks();
     executedSql = [];
+    batchedStmts = [];
 
     mockDb = {
+      batch: vi.fn().mockImplementation(async (stmts: any[]) => {
+        batchedStmts = stmts;
+        for (const s of stmts) {
+          if (typeof s.run === "function") {
+            await s.run();
+          }
+        }
+        return stmts.map(() => ({ success: true }));
+      }),
       prepare: vi.fn().mockImplementation((sql: string) => {
         let currentBinds: any[] = [];
         const entry = { sql, binds: [] as any[] };
         executedSql.push(entry);
         const stmt = {
+          sql,
+          getBinds: () => currentBinds,
           bind: vi.fn().mockImplementation((...args: any[]) => {
             currentBinds = args;
             entry.binds = args;
@@ -26,6 +47,12 @@ describe("Market Intelligence Knowledge Helpers", () => {
           first: vi.fn().mockImplementation(async () => {
             if (sql.includes("SELECT id FROM notebook_articles")) {
               return { id: 77 };
+            }
+            if (sql.includes("SELECT framework_results FROM analysis_results")) {
+              return null;
+            }
+            if (sql.includes("SELECT debate_json FROM stock_fundamentals")) {
+              return null;
             }
             return null;
           }),
@@ -215,5 +242,114 @@ describe("Market Intelligence Knowledge Helpers", () => {
       expect(watchlistResult.content).toContain("Watchlist contains 3 symbols");
     });
   });
-});
 
+  describe("saveValueInvestingReport", () => {
+    it("atomically overwrites analysis_results in D1 and writes OKF markdown to R2", async () => {
+      const res = await saveValueInvestingReport(mockEnv, {
+        symbol: " rmbs ",
+        summary: "# รายงานการวิเคราะห์การลงทุนเชิงลึก: RMBS\n\n## 1. บทสรุป",
+        conviction_level: "High",
+        source: "gemini_app",
+      });
+
+      expect(res.success).toBe(true);
+      expect(res.symbol).toBe("RMBS");
+      expect(res.conviction_level).toBe("High");
+      expect(res.source).toBe("gemini_app");
+      expect(res.d1_saved).toBe(true);
+      expect(res.r2_key).toBe("reports/RMBS.md");
+      expect(res.r2_written).toBe(true);
+
+      expect(mockDb.batch).toHaveBeenCalledTimes(1);
+      expect(batchedStmts.length).toBe(2);
+
+      const deleteEntry = executedSql.find((e) => e.sql.includes("DELETE FROM analysis_results WHERE symbol = ?"));
+      expect(deleteEntry).toBeDefined();
+      expect(deleteEntry?.binds).toEqual(["RMBS"]);
+
+      const insertEntry = executedSql.find((e) => e.sql.includes("INSERT INTO analysis_results"));
+      expect(insertEntry).toBeDefined();
+      expect(insertEntry?.binds[0]).toBe("RMBS");
+      expect(insertEntry?.binds[1]).toContain("# รายงานการวิเคราะห์การลงทุนเชิงลึก: RMBS");
+      expect(insertEntry?.binds[2]).toBe("High");
+
+      const fwJson = JSON.parse(insertEntry?.binds[3]);
+      expect(fwJson.source).toBe("gemini_app");
+
+      expect(mockKnowledgeBucket.put).toHaveBeenCalledWith(
+        "reports/RMBS.md",
+        expect.stringContaining("type: value_investing_report"),
+        expect.objectContaining({ httpMetadata: { contentType: "text/markdown" } })
+      );
+    });
+
+    it("preserves existing debate from analysis_results when overwriting report", async () => {
+      const mockDebate = {
+        symbol: "RMBS",
+        synthesis: { conviction_score: 6, conviction_label: "Moderate Bull", verdict_summary: "Strong IP moat" },
+      };
+
+      const origPrepare = mockDb.prepare;
+      mockDb.prepare = vi.fn().mockImplementation((sql: string) => {
+        const stmt = origPrepare(sql);
+        if (sql.includes("SELECT framework_results FROM analysis_results")) {
+          stmt.first = vi.fn().mockResolvedValue({
+            framework_results: JSON.stringify({ debate: mockDebate }),
+          });
+        }
+        return stmt;
+      });
+
+      const res = await saveValueInvestingReport(mockEnv, {
+        symbol: "RMBS",
+        summary: "# RMBS Report",
+        conviction_level: "Medium",
+      });
+
+      expect(res.success).toBe(true);
+      const insertEntry = executedSql.find((e) => e.sql.includes("INSERT INTO analysis_results"));
+      const fwJson = JSON.parse(insertEntry?.binds[3]);
+      expect(fwJson.debate).toEqual(mockDebate);
+      expect(fwJson.source).toBe("gemini_app");
+    });
+
+    it("returns validation error when symbol or summary is empty", async () => {
+      const resEmptySymbol = await saveValueInvestingReport(mockEnv, {
+        symbol: "   ",
+        summary: "# Valid Summary",
+        conviction_level: "High",
+      });
+      expect(resEmptySymbol.error).toContain("symbol");
+
+      const resEmptySummary = await saveValueInvestingReport(mockEnv, {
+        symbol: "RMBS",
+        summary: "   ",
+        conviction_level: "High",
+      });
+      expect(resEmptySummary.error).toContain("summary");
+    });
+
+    it("handles missing R2 bucket gracefully while still saving to D1", async () => {
+      const envNoR2 = { DB: mockDb };
+      const res = await saveValueInvestingReport(envNoR2, {
+        symbol: "RMBS",
+        summary: "# RMBS Report",
+        conviction_level: "Low",
+      });
+      expect(res.success).toBe(true);
+      expect(res.d1_saved).toBe(true);
+      expect(res.r2_written).toBe(false);
+      expect(res.r2_key).toBeNull();
+    });
+  });
+
+  describe("getLatestAnalysisReport", () => {
+    it("queries only non-empty summary reports for the given symbol", async () => {
+      await getLatestAnalysisReport(mockEnv, "rmbs");
+      const selectEntry = executedSql.find((e) => e.sql.includes("FROM analysis_results"));
+      expect(selectEntry).toBeDefined();
+      expect(selectEntry?.sql).toContain("summary IS NOT NULL AND summary != ''");
+      expect(selectEntry?.binds).toEqual(["RMBS"]);
+    });
+  });
+});

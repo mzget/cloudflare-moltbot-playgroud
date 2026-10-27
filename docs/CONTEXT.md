@@ -169,3 +169,16 @@
 - **Single-Writer Projection for Margin of Safety (MoS %)**:
   คอลัมน์ใน `market_stats` (`dcf_*`, `mos_base`, `price_zone`) ทำหน้าที่เป็น Read-only projection cache สำหรับ Watchlist/Portfolio โดยมี `refreshMarginOfSafety` เป็น Single Writer รายเดียวที่ใช้ `resolveDcfScenarios` ชุดเดียวกับ overview ส่วน UI รายละเอียดคำนวณสดด้วย `computeMarginOfSafety` จาก `@oaktree/shared` ตามสูตรเดียวกัน
 
+
+## Deep Value Investing Report & Portable Skill Subsystem (ADR-0018)
+
+### Terms & Concepts
+
+- **Value Investing Brainstormer Skill (`value-investing-brainstormer`)**:
+  ไฟล์ทักษะมาตรฐานแบบพกพา (`.agents/skills/value-investing-brainstormer/SKILL.md`) ที่ผสานกรอบการวิเคราะห์ธุรกิจของปรมาจารย์สายเน้นคุณค่าทั้ง 6 ท่าน (Hamilton Helmer 7 Powers [Statics & Dynamics], Howard Marks Second-Level Thinking & Cycles, Charlie Munger Inversion & Latticework of Mental Models, Warren Buffett Circle of Competence & Owner's Earnings, Peter Lynch 6 Categories & PEG, และ Joel Greenblatt Magic Formula ROC/EY) รองรับทั้งการระดมสมองวิเคราะห์หุ้นทั่วไป (Mode 1) และการสร้างรายงานภาษาไทยระดับนักวิเคราะห์สถาบันเพื่อส่งเข้า Oaktree ผ่าน MCP (Mode 2) โดยผู้ใช้สามารถดาวน์โหลดไฟล์ `SKILL.md` หรือคัดลอก Prompt จากหน้า UI ไปใช้ใน AI Agent อื่นๆ ได้ทันที
+
+- **Value Investing Report Ingestion (`save_value_investing_report`)**:
+  เครื่องมือ MCP (`mcp-worker`) สำหรับรับผลการวิเคราะห์เชิงลึกฉบับสมบูรณ์จาก Google Gemini App หรือ Gemini Spark เข้าสู่ระบบ Oaktree โดยรับเฉพาะพารามิเตอร์ที่กระชับ ได้แก่ `symbol`, `summary` (รายงาน Markdown ภาษาไทย 8 หัวข้อพร้อมตารางคะแนน 6 ปรมาจารย์), และ `conviction_level` (`'High' | 'Medium' | 'Low'`) เพื่อลดขนาด Payload และป้องกันปัญหาการตัดคำของ LLM
+
+- **Single-Report Overwrite Persistence (`analysis_results` & `reports/{symbol}.md`)**:
+  กลไกการบันทึกผลวิเคราะห์ใน `save_value_investing_report` ตามหลัก Single Source of Truth (ADR-0017) ที่ใช้ Atomic Batch (`DELETE` แถวเดิมของ `symbol` แล้ว `INSERT` แถวใหม่ใน `analysis_results`) โดยดึงข้อมูล `debate` ล่าสุดใน `framework_results` หรือ `stock_fundamentals` มาเก็บรักษาไว้ไม่ให้สูญหาย พร้อมเขียนไฟล์สำเนามาตรฐาน OKF Markdown ลงใน Cloudflare R2 (`KNOWLEDGE_BUCKET`) ที่คีย์ `reports/{symbol}.md`
