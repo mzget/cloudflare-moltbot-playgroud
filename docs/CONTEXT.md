@@ -142,7 +142,7 @@
   กรณีหุ้น 1 ตัวถูกผูกไว้กับหลาย Theme ใน `theme_symbol_mappings` ระบบจะนับน้ำหนักของหุ้นตัวนั้นเข้าทุก Theme ที่สังกัด และเมื่อคำนวณวงเงินซื้อเพิ่มสูงสุด (`maxAllowedBuyUsd`) จะใช้ Theme ที่มีสัดส่วนปัจจุบันสูงที่สุด (ใกล้เต็มเพดาน 30% ที่สุด) เป็นตัวล็อกเพดาน ส่วนหุ้นที่ยังไม่มี Theme (`Unassigned`) จะไม่ถูกจำกัดด้วยเพดาน Theme Cap
 
 - **Analysis Coverage Navigation Link**:
-  ชื่อหุ้น (`symbol`) ในตาราง `Holdings Risk Concentration & Sizing Capacity` แสดงเป็นลิงก์กดไปยังหน้า `/analysis?symbol=XYZ&tab=report` พร้อมป้าย `AnalysisCoverage` แสดงจำนวนบทวิเคราะห์ที่มีอยู่ (Report, DCF, Thesis) เหมือนกับตารางในแท็บ Holdings และ Fundamentals ทุกประการ
+  ชื่อหุ้น (`symbol`) ในตาราง `Holdings Risk Concentration & Sizing Capacity` แสดงเป็นลิงก์กดไปยังหน้า `/analysis?symbol=XYZ&tab=dossier` (เริ่มต้นที่หน้า Cockpit เป็นค่า Default) พร้อมป้าย `AnalysisCoverage` แสดงจำนวนบทวิเคราะห์ที่มีอยู่ (Report, DCF, Thesis) เหมือนกับตารางในแท็บ Holdings และ Fundamentals ทุกประการ
 
 
 - **Instant 0ms Client-Side Position Sizing Simulation (ADR-0015)**:

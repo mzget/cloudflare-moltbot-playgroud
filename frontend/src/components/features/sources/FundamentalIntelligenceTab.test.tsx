@@ -92,9 +92,9 @@ describe('FundamentalIntelligenceTab Component', () => {
     expect(html).not.toContain('>Analysis<');
 
     // Symbol analysis links
-    expect(html).toContain('/analysis?symbol=ARM&amp;tab=report');
-    expect(html).toContain('/analysis?symbol=INTC&amp;tab=report');
-    expect(html).toContain('/analysis?symbol=TSM&amp;tab=report');
+    expect(html).toContain('/analysis?symbol=ARM&amp;tab=dossier');
+    expect(html).toContain('/analysis?symbol=INTC&amp;tab=dossier');
+    expect(html).toContain('/analysis?symbol=TSM&amp;tab=dossier');
   });
 
   it('renders clean empty state when no items exist', () => {

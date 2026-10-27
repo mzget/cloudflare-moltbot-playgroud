@@ -1,4 +1,4 @@
-﻿import * as React from 'react';
+import * as React from 'react';
 import { CircularProgress, Box, Typography } from '@mui/joy';
 import { ThemeProvider } from './common/ThemeProvider';
 import {
@@ -70,9 +70,9 @@ if (typeof window !== 'undefined') {
 
 
 // 1. Define the Search Schema (Validation)
-const analysisSearchSchema = z.object({
+export const analysisSearchSchema = z.object({
   symbol: z.string().optional(),
-  tab: z.enum(['dossier', 'overview', 'report', 'dcf-model', 'stock-thesis']).catch('dossier'),
+  tab: z.enum(['dossier', 'overview', 'report', 'dcf-model', 'stock-thesis']).default('dossier').catch('dossier'),
 });
 
 const generalSearchSchema = z.object({

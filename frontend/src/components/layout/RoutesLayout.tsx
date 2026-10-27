@@ -1,4 +1,4 @@
-﻿import * as React from 'react';
+import * as React from 'react';
 import { Box, Typography, Divider, Drawer, Stack, Button, CircularProgress, Sheet } from '@mui/joy';
 import { useSearch, useNavigate, useLocation } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
@@ -49,7 +49,7 @@ export default function RoutesLayout() {
     if (tab === 'analysis') {
       navigate({
         to: '/analysis',
-        search: { symbol, tab: 'overview' },
+        search: { symbol, tab: 'dossier' },
       });
     } else {
       navigate({

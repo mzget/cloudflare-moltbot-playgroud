@@ -12,7 +12,7 @@ Phase 4 of the Oaktree Multi-Agent Roadmap introduces an institutional-grade **R
 
 1. **Portfolio Denominator & Sizing Math**: Determining whether concentration percentages and buyable room use the USD stock portfolio or total multi-currency assets, and whether new buy simulations use a fixed or expanding denominator.
 2. **Theme Concentration & Multi-Theme Binding**: Handling stocks mapped to multiple themes in `theme_symbol_mappings` as well as stocks without any assigned theme (`Unassigned`).
-3. **Cross-Module Navigation Consistency**: Allowing investors inspecting the `Holdings Risk Concentration & Sizing Capacity` table to jump directly into the stock's deep analysis report (`/analysis?symbol=XYZ&tab=report`) with visual visibility into existing analysis coverage (Report, DCF, Thesis count), matching the UX of `HoldingsTable` and `CompanyStatsTable`.
+3. **Cross-Module Navigation Consistency**: Allowing investors inspecting the `Holdings Risk Concentration & Sizing Capacity` table to jump directly into the stock's Cockpit dossier (`/analysis?symbol=XYZ&tab=dossier`) with visual visibility into existing analysis coverage (Report, DCF, Thesis count), matching the UX of `HoldingsTable` and `CompanyStatsTable`.
 
 ## Decision
 
@@ -29,7 +29,7 @@ Phase 4 of the Oaktree Multi-Agent Roadmap introduces an institutional-grade **R
    - Pairwise Pearson correlations ($r \ge 0.70$) and stock/portfolio Beta vs. `^GSPC` are computed from cached daily closes in `historical_prices` over a 252-trading-day window.
 
 4. **Symbol Link & Analysis Coverage Badge in Risk Concentration Table**:
-   - In `RiskSizingTab.tsx`, the `Symbol` column of the `Holdings Risk Concentration & Sizing Capacity` table renders an interactive MUI Joy UI `<Link component="button">` alongside the `useAnalysisCoverage` `<Chip>` badge (`<FileBarChart />`), navigating directly to `/analysis?symbol=XYZ&tab=report`.
+   - In `RiskSizingTab.tsx`, the `Symbol` column of the `Holdings Risk Concentration & Sizing Capacity` table renders an interactive MUI Joy UI `<Link component="button">` alongside the `useAnalysisCoverage` `<Chip>` badge (`<FileBarChart />`), navigating directly to `/analysis?symbol=XYZ&tab=dossier`.
 
 ## Consequences
 
