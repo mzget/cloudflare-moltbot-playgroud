@@ -411,7 +411,7 @@ export default function YahooPortfolio() {
             onNavigateToAnalysis={(symbol) =>
               navigate({
                 to: '/analysis',
-                search: { symbol, tab: 'report' },
+                search: { symbol, tab: 'dossier' },
               })
             }
           />

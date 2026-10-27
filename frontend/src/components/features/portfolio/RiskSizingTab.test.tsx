@@ -444,8 +444,8 @@ describe('RiskSizingTab Component', () => {
     // Symbol links rendered as anchor tags with href for right-click / open in new tab support
     expect(cleanHtml).toContain('aria-label="View analysis for MSFT"');
     expect(cleanHtml).toContain('aria-label="View analysis for AAPL"');
-    expect(cleanHtml).toContain('href="/analysis?symbol=MSFT&amp;tab=report"');
-    expect(cleanHtml).toContain('href="/analysis?symbol=AAPL&amp;tab=report"');
+    expect(cleanHtml).toContain('href="/analysis?symbol=MSFT&amp;tab=dossier"');
+    expect(cleanHtml).toContain('href="/analysis?symbol=AAPL&amp;tab=dossier"');
     expect(cleanHtml).toContain('MuiLink-root');
 
     // Coverage badge counts rendered next to symbols

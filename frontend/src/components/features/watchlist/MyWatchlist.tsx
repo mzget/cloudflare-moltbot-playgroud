@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useWatchlist, type WatchlistItem } from './hooks/useWatchlist';
 import { useAlertRules } from './hooks/useAlertRules';
 import { WatchlistCard } from './WatchlistCard';
@@ -35,7 +35,7 @@ export default function MyWatchlist() {
   const handleViewAnalysis = useCallback((symbol: string) => {
     navigate({
       to: '/analysis',
-      search: { symbol, tab: 'report' },
+      search: { symbol, tab: 'dossier' },
     });
   }, [navigate]);
 

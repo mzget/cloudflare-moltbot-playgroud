@@ -118,10 +118,10 @@ export const FundamentalIntelligenceTab: React.FC<FundamentalIntelligenceTabProp
     } else if (routerNavigate) {
       routerNavigate({
         to: '/analysis',
-        search: { symbol, tab: 'report' },
+        search: { symbol, tab: 'dossier' },
       });
     } else if (typeof window !== 'undefined') {
-      window.location.href = `/analysis?symbol=${encodeURIComponent(symbol)}&tab=report`;
+      window.location.href = `/analysis?symbol=${encodeURIComponent(symbol)}&tab=dossier`;
     }
   }, [onViewAnalysis, routerNavigate]);
 
@@ -484,7 +484,7 @@ export const FundamentalIntelligenceTab: React.FC<FundamentalIntelligenceTabProp
                   <td>
                     <Link
                       component="a"
-                      href={`/analysis?symbol=${encodeURIComponent(item.symbol)}&tab=report`}
+                      href={`/analysis?symbol=${encodeURIComponent(item.symbol)}&tab=dossier`}
                       level={activeDensity === 'compact' ? 'body-sm' : 'title-sm'}
                       onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
                         if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
@@ -606,7 +606,7 @@ export const FundamentalIntelligenceTab: React.FC<FundamentalIntelligenceTabProp
                       <Box sx={{ minWidth: 0 }}>
                         <Link
                           component="a"
-                          href={`/analysis?symbol=${encodeURIComponent(item.symbol)}&tab=report`}
+                          href={`/analysis?symbol=${encodeURIComponent(item.symbol)}&tab=dossier`}
                           onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
                             if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
                               e.preventDefault();

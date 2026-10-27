@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
 	Box,
 	Typography,
@@ -186,7 +186,7 @@ export default function MarketBreakouts() {
 	const handleViewAnalysis = (symbol: string) => {
 		navigate({
 			to: '/analysis',
-			search: { symbol, tab: 'report' },
+			search: { symbol, tab: 'dossier' },
 		});
 	};
 

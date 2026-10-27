@@ -139,7 +139,7 @@ export default function RiskSizingTab({
       if (onNavigateToAnalysis) {
         onNavigateToAnalysis(symbol);
       } else if (typeof window !== 'undefined') {
-        window.location.href = `/analysis?symbol=${encodeURIComponent(symbol)}&tab=report`;
+        window.location.href = `/analysis?symbol=${encodeURIComponent(symbol)}&tab=dossier`;
       }
     },
     [onNavigateToAnalysis]
@@ -1092,7 +1092,7 @@ export default function RiskSizingTab({
                   h.sizing?.roomToTargetUsd > 0 ? `Buy Room $${Math.round(h.sizing.roomToTargetUsd).toLocaleString()}` :
                   'Hold (At/Over Target)';
                 const coverage = analysisCoverage?.get(h.symbol);
-                const analysisHref = `/analysis?symbol=${encodeURIComponent(h.symbol)}&tab=report`;
+                const analysisHref = `/analysis?symbol=${encodeURIComponent(h.symbol)}&tab=dossier`;
 
                 return (
                   <tr key={h.symbol}>

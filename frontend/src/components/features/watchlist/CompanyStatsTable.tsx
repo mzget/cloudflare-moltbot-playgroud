@@ -470,7 +470,7 @@ export default function CompanyStatsTable({
                           e.preventDefault();
                           navigate({
                             to: '/analysis',
-                            search: { symbol: company.symbol, tab: 'report' },
+                            search: { symbol: company.symbol, tab: 'dossier' },
                           });
                         }}
                         sx={{
@@ -504,7 +504,7 @@ export default function CompanyStatsTable({
                             e.preventDefault();
                             navigate({
                               to: '/analysis',
-                              search: { symbol: company.symbol, tab: 'report' },
+                              search: { symbol: company.symbol, tab: 'dossier' },
                             });
                           }}
                           sx={{

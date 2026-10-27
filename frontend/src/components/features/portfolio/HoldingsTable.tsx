@@ -382,7 +382,7 @@ export default function HoldingsTable({
                             e.preventDefault();
                             navigate({
                               to: '/analysis',
-                              search: { symbol: h.symbol, tab: 'report' },
+                              search: { symbol: h.symbol, tab: 'dossier' },
                             });
                           }}
                           sx={{
@@ -416,7 +416,7 @@ export default function HoldingsTable({
                               e.preventDefault();
                               navigate({
                                 to: '/analysis',
-                                search: { symbol: h.symbol, tab: 'report' },
+                                search: { symbol: h.symbol, tab: 'dossier' },
                               });
                             }}
                             sx={{
