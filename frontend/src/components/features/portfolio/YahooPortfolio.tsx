@@ -5,7 +5,7 @@ import { Box, Typography, Sheet, Button, Input, Stack, Tabs, TabList, Tab, Divid
 import { API_BASE_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
 import type { Holding } from './HoldingsTable';
-import FundamentalDashboard from './FundamentalDashboard';
+import NotFoundPage from '../error/NotFoundPage';
 import SummaryTab from './SummaryTab';
 import HoldingsTab from './HoldingsTab';
 import RiskSizingTab from './RiskSizingTab';
@@ -136,17 +136,22 @@ export default function YahooPortfolio() {
   const navigate = useNavigate();
 
   const tabNameToIndex: Record<string, number> = {
-    fundamentals: 0,
-    holdings: 1,
-    summary: 2,
-    risk: 3,
+    holdings: 0,
+    summary: 1,
+    risk: 2,
   };
-  const tabIndexToName = ['fundamentals', 'holdings', 'summary', 'risk'];
+  const tabIndexToName = ['holdings', 'summary', 'risk'];
 
-  const activeTab = typeof search?.tab === 'string' && search.tab in tabNameToIndex
+  const hasTabParam = typeof search?.tab === 'string' && search.tab.trim().length > 0;
+  const isTabValid = !hasTabParam || search.tab in tabNameToIndex;
+
+  if (!isTabValid) {
+    return <NotFoundPage />;
+  }
+
+  const activeTab = hasTabParam && isTabValid
     ? tabNameToIndex[search.tab]
-    : 0; // Default to Fundamentals (0)
-
+    : 0; // Default to Holdings (0)
   const [optimisticTab, setOptimisticTab] = React.useState<number>(activeTab);
 
   React.useEffect(() => {
@@ -333,7 +338,6 @@ export default function YahooPortfolio() {
               }
             }}
           >
-            <Tab disableIndicator>Fundamentals</Tab>
             <Tab disableIndicator>Holdings</Tab>
             <Tab disableIndicator>Summary</Tab>
             <Tab disableIndicator>Risk & Sizing</Tab>
@@ -364,24 +368,8 @@ export default function YahooPortfolio() {
         </Button>
       </Box>
 
-      {/* Summary Tab */}
-      {optimisticTab === 2 && (
-        <Box className="tab-pane-active">
-          {summary ? (
-            <SummaryTab
-              summary={summary}
-              holdingsCount={holdings.length}
-              openPositionsCount={holdings.filter(h => h.status === 'Open').length}
-              holdings={holdings}
-            />
-          ) : (
-            <SummaryTabSkeleton />
-          )}
-        </Box>
-      )}
-
       {/* Holdings Tab */}
-      {optimisticTab === 1 && (
+      {optimisticTab === 0 && (
         <Box className="tab-pane-active">
           {loading && holdings.length === 0 ? (
             <HoldingsTabSkeleton />
@@ -396,18 +384,27 @@ export default function YahooPortfolio() {
         </Box>
       )}
 
-      {/* Fundamentals Tab */}
-      {optimisticTab === 0 && (
+      {/* Summary Tab */}
+      {optimisticTab === 1 && (
         <Box className="tab-pane-active">
-          <FundamentalDashboard />
+          {summary ? (
+            <SummaryTab
+              summary={summary}
+              holdingsCount={holdings.length}
+              openPositionsCount={holdings.filter(h => h.status === 'Open').length}
+              holdings={holdings}
+            />
+          ) : (
+            <SummaryTabSkeleton />
+          )}
         </Box>
       )}
 
       {/* Risk & Sizing Tab */}
-      {optimisticTab === 3 && (
+      {optimisticTab === 2 && (
         <Box className="tab-pane-active">
           <RiskSizingTab
-            onNavigateToHoldings={() => setActiveTab(1)}
+            onNavigateToHoldings={() => setActiveTab(0)}
             onNavigateToAnalysis={(symbol) =>
               navigate({
                 to: '/analysis',
