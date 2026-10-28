@@ -145,10 +145,6 @@ export default function YahooPortfolio() {
   const hasTabParam = typeof search?.tab === 'string' && search.tab.trim().length > 0;
   const isTabValid = !hasTabParam || search.tab in tabNameToIndex;
 
-  if (!isTabValid) {
-    return <NotFoundPage />;
-  }
-
   const activeTab = hasTabParam && isTabValid
     ? tabNameToIndex[search.tab]
     : 0; // Default to Holdings (0)
@@ -189,6 +185,10 @@ export default function YahooPortfolio() {
   });
 
   const [refreshingPrices, setRefreshingPrices] = useState(false);
+
+  if (!isTabValid) {
+    return <NotFoundPage />;
+  }
 
   const handleRefreshPrices = async () => {
     setRefreshingPrices(true);

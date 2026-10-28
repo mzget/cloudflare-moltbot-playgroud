@@ -17,10 +17,6 @@ export default function Watchlist() {
   const hasTabParam = typeof search?.tab === 'string' && search.tab.trim().length > 0;
   const isTabValid = !hasTabParam || VALID_TABS.includes(search.tab as WatchlistSubTab);
 
-  if (!isTabValid) {
-    return <NotFoundPage />;
-  }
-
   const activeSubTab: WatchlistSubTab = (hasTabParam && VALID_TABS.includes(search.tab))
     ? (search.tab as WatchlistSubTab)
     : 'my-watchlist';
@@ -30,6 +26,10 @@ export default function Watchlist() {
   useEffect(() => {
     setOptimisticTab(activeSubTab);
   }, [activeSubTab]);
+
+  if (!isTabValid) {
+    return <NotFoundPage />;
+  }
 
   const handleTabChange = (val: WatchlistSubTab) => {
     setOptimisticTab(val);

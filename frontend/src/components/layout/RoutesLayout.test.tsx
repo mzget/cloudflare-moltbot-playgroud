@@ -4,11 +4,13 @@ import { renderToString } from 'react-dom/server';
 import RoutesLayout from './RoutesLayout';
 
 let currentPathname = '/about';
+const mockNavigate = vi.fn();
+let capturedHeaderProps: any = null;
 
 vi.mock('@tanstack/react-router', () => ({
   useLocation: () => ({ pathname: currentPathname }),
   useSearch: () => ({ symbol: undefined, tab: undefined }),
-  useNavigate: () => vi.fn(),
+  useNavigate: () => mockNavigate,
 }));
 
 vi.mock('react-i18next', () => ({
@@ -37,7 +39,10 @@ vi.mock('../../store/intelligenceStore', () => ({
 }));
 
 vi.mock('./Header', () => ({
-  default: () => <div data-testid="header">Header</div>,
+  default: (props: any) => {
+    capturedHeaderProps = props;
+    return <div data-testid="header">Header</div>;
+  },
 }));
 
 vi.mock('./Sidebar', () => ({
@@ -72,5 +77,15 @@ describe('RoutesLayout - Route Rendering', () => {
     const html = renderToString(<RoutesLayout />);
     
     expect(html).toContain('กรุณาระบุสัญลักษณ์หุ้นที่ต้องการวิเคราะห์');
+  });
+  it('clears search parameters when switching to dashboard or other tabs', () => {
+    currentPathname = '/analysis';
+    renderToString(<RoutesLayout />);
+    expect(capturedHeaderProps).toBeDefined();
+    capturedHeaderProps.setActiveTab('dashboard');
+    expect(mockNavigate).toHaveBeenCalledWith({
+      to: '/dashboard',
+      search: {},
+    });
   });
 });
