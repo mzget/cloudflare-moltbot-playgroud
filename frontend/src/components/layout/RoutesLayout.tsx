@@ -54,6 +54,7 @@ export default function RoutesLayout() {
     } else {
       navigate({
         to: `/${tab}`,
+        search: {},
       });
     }
   };
