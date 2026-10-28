@@ -6,7 +6,7 @@ import AddSecurityBox from './AddSecurityBox';
 import { EditSecurityModal } from './EditSecurityModal';
 import { AlertsManagerModal } from './AlertsManagerModal';
 import type { FundamentalStatusItem, FundamentalStatusResponse } from '../sources/FundamentalIntelligenceTab';
-import { CopyPromptModal } from '../sources/CopyPromptModal';
+
 import {
   Typography,
   Select,
@@ -53,9 +53,6 @@ export default function MyWatchlist() {
   // Alert Modal State
   const [isAlertsModalOpen, setIsAlertsModalOpen] = useState(false);
   const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
-
-  // Copy Prompt Modal State
-  const [copyPromptItem, setCopyPromptItem] = useState<{ symbol: string; companyName?: string; asOfDate?: string | null } | null>(null);
 
   // Fundamental Intelligence Status State
   const [fundamentalMap, setFundamentalMap] = useState<Record<string, FundamentalStatusItem>>({});
@@ -229,20 +226,6 @@ export default function MyWatchlist() {
   const handleCloseAlertsModal = useCallback(() => {
     setIsAlertsModalOpen(false);
     setSelectedSymbol(null);
-  }, []);
-
-  const handleOpenCopyPrompt = useCallback((item: WatchlistItem) => {
-    const symUpper = item.symbol.toUpperCase();
-    const fund = fundamentalMap[symUpper];
-    setCopyPromptItem({
-      symbol: item.symbol,
-      companyName: item.name || fund?.company_name,
-      asOfDate: fund?.as_of_date,
-    });
-  }, [fundamentalMap]);
-
-  const handleCloseCopyPrompt = useCallback(() => {
-    setCopyPromptItem(null);
   }, []);
 
   const handleCreateRule = useCallback(
@@ -441,22 +424,13 @@ export default function MyWatchlist() {
               onEdit={handleOpenEditModal}
               onAlertsClick={handleOpenAlertsModal}
               onViewAnalysis={handleViewAnalysis}
-              onCopyPrompt={handleOpenCopyPrompt}
+              hideCopyPrompt={true}
               onToggleActive={handleToggleActive}
               onTogglePortfolio={handleTogglePortfolio}
             />
           </Grid>
         ))}
       </Grid>
-
-      {/* Copy Prompt Modal */}
-      <CopyPromptModal
-        open={!!copyPromptItem}
-        onClose={handleCloseCopyPrompt}
-        symbol={copyPromptItem?.symbol}
-        companyName={copyPromptItem?.companyName}
-        asOfDate={copyPromptItem?.asOfDate}
-      />
 
       {/* Alert Rules Manager Modal */}
       <AlertsManagerModal

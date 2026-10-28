@@ -19,6 +19,8 @@ import {
   Input,
   RadioGroup,
   Radio,
+  Badge,
+  Switch,
 } from '@mui/joy';
 import {
   TrendingUp,
@@ -37,6 +39,8 @@ import {
   LayoutDashboard,
   Sliders,
   ArrowRight,
+  Pencil,
+  Bell,
 } from 'lucide-react';
 import ScenarioRangeBar from '../../common/ScenarioRangeBar';
 import { API_BASE_URL } from '../../../config';
@@ -54,6 +58,12 @@ import {
   type PreTradeSimulationResult,
 } from '@oaktree/shared';
 import { formatMosLabel, zoneColor } from '../../../utils/marginOfSafety';
+import { FundamentalFreshnessBadge } from '../sources/FundamentalFreshnessBadge';
+import { EditSecurityModal } from '../watchlist/EditSecurityModal';
+import { AlertsManagerModal } from '../watchlist/AlertsManagerModal';
+import { useAlertRules } from '../watchlist/hooks/useAlertRules';
+import type { FundamentalStatusItem } from '../sources/FundamentalIntelligenceTab';
+import type { WatchlistItem } from '../watchlist/hooks/useWatchlist';
 
 export interface StockDossierCockpitProps {
   symbol: string;
@@ -62,6 +72,8 @@ export interface StockDossierCockpitProps {
   initialReport?: any;
   initialTheses?: any[] | null;
   initialRiskAudit?: any;
+  initialWatchlist?: WatchlistItem[] | null;
+  initialFundamental?: FundamentalStatusItem | null;
   initialViewMode?: 'cockpit' | 'trace';
 }
 
@@ -72,12 +84,26 @@ export default function StockDossierCockpit({
   initialReport = null,
   initialTheses = null,
   initialRiskAudit = null,
+  initialWatchlist = null,
+  initialFundamental = null,
   initialViewMode = 'cockpit',
 }: StockDossierCockpitProps) {
   const [overview, setOverview] = React.useState<any>(initialOverview);
   const [report, setReport] = React.useState<any>(initialReport);
   const [theses, setTheses] = React.useState<any[] | null>(initialTheses);
   const [riskAudit, setRiskAudit] = React.useState<any>(initialRiskAudit);
+  const [watchlistItem, setWatchlistItem] = React.useState<WatchlistItem | null>(() => {
+    if (Array.isArray(initialWatchlist)) {
+      return initialWatchlist.find((w: any) => w.symbol?.toUpperCase() === symbol.toUpperCase()) || null;
+    }
+    return null;
+  });
+  const [fundamental, setFundamental] = React.useState<FundamentalStatusItem | null>(initialFundamental);
+  const [todayEvents, setTodayEvents] = React.useState<any[]>([]);
+
+  // Watchlist Modals State
+  const [isEditModalOpen, setIsEditModalOpen] = React.useState(false);
+  const [isAlertsModalOpen, setIsAlertsModalOpen] = React.useState(false);
 
   const [loading, setLoading] = React.useState(
     !initialOverview || !initialReport || initialTheses === null || !initialRiskAudit
@@ -100,22 +126,42 @@ export default function StockDossierCockpit({
     setError(null);
 
     try {
-      const [overviewRes, reportRes, thesesRes, riskRes] = await Promise.all([
+      const [overviewRes, reportRes, thesesRes, riskRes, watchlistRes, fundRes, eventsRes] = await Promise.all([
         fetch(`${API_BASE_URL}/api/analysis/overview?symbol=${encodeURIComponent(symbol)}`),
         fetch(`${API_BASE_URL}/api/analysis/results?symbol=${encodeURIComponent(symbol)}`),
         fetch(`${API_BASE_URL}/api/analysis/theses?symbol=${encodeURIComponent(symbol)}`),
         fetch(`${API_BASE_URL}/api/portfolio/risk-audit`),
+        fetch(`${API_BASE_URL}/api/watchlist`),
+        fetch(`${API_BASE_URL}/api/fundamentals/status`),
+        fetch(`${API_BASE_URL}/api/market-events/today`),
       ]);
 
       const overviewData = overviewRes.ok ? await overviewRes.json().catch(() => null) : null;
       const reportData = reportRes.ok ? await reportRes.json().catch(() => null) : null;
       const thesesData = thesesRes.ok ? await thesesRes.json().catch(() => []) : [];
       const riskData = riskRes.ok ? await riskRes.json().catch(() => null) : null;
+      const watchlistData = watchlistRes.ok ? await watchlistRes.json().catch(() => []) : [];
+      const fundData: any = fundRes.ok ? await fundRes.json().catch(() => null) : null;
+      const eventsData = eventsRes.ok ? await eventsRes.json().catch(() => []) : [];
 
       setOverview(overviewData);
       setReport(reportData);
       setTheses(Array.isArray(thesesData) ? thesesData : []);
       setRiskAudit(riskData);
+
+      if (Array.isArray(watchlistData)) {
+        const found = watchlistData.find((w: any) => w.symbol?.toUpperCase() === symbol.toUpperCase());
+        if (found) setWatchlistItem(found);
+      }
+
+      if (fundData && Array.isArray(fundData.items)) {
+        const foundFund = fundData.items.find((f: any) => f.symbol?.toUpperCase() === symbol.toUpperCase());
+        if (foundFund) setFundamental(foundFund);
+      }
+
+      if (Array.isArray(eventsData)) {
+        setTodayEvents(eventsData.filter((e: any) => e.symbol?.toUpperCase() === symbol.toUpperCase()));
+      }
     } catch (e: any) {
       setError(e.message || 'Failed to fetch stock dossier data');
     } finally {
@@ -272,6 +318,126 @@ export default function StockDossierCockpit({
     });
   }, [auditObject, currentPrice, symbol, simOrderType, simShares, simPrice, resolvedThemeMappings]);
 
+  // Resolved WatchlistItem (falls back gracefully if not yet in database)
+  const resolvedWatchlistItem: WatchlistItem = React.useMemo(() => {
+    if (watchlistItem) return watchlistItem;
+    const inPortfolio = riskAudit?.concentration?.holdings?.some(
+      (h: any) => h.symbol?.toUpperCase() === symbol.toUpperCase()
+    ) ? 1 : 0;
+    return {
+      symbol,
+      name: overview?.name || symbol,
+      is_active: 1,
+      in_portfolio: inPortfolio,
+      type: 'stock',
+      sector_label: overview?.sector || null,
+      active_alerts_count: 0,
+    };
+  }, [watchlistItem, symbol, overview, riskAudit]);
+
+  const handleToggleActive = React.useCallback(async (sym: string, currentStatus: number) => {
+    const newStatus = !currentStatus ? 1 : 0;
+    try {
+      setWatchlistItem(prev => ({
+        ...(prev || resolvedWatchlistItem),
+        is_active: newStatus,
+      }));
+      await fetch(`${API_BASE_URL}/api/watchlist`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol: sym, is_active: newStatus }),
+      });
+    } catch (e) {
+      console.error('Failed to toggle active status', e);
+    }
+  }, [resolvedWatchlistItem]);
+
+  const handleTogglePortfolio = React.useCallback(async (sym: string, currentPortfolioStatus: number) => {
+    const newStatus = !currentPortfolioStatus ? 1 : 0;
+    try {
+      setWatchlistItem(prev => ({
+        ...(prev || resolvedWatchlistItem),
+        in_portfolio: newStatus,
+      }));
+      await fetch(`${API_BASE_URL}/api/watchlist`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ symbol: sym, in_portfolio: newStatus }),
+      });
+    } catch (e) {
+      console.error('Failed to toggle portfolio status', e);
+    }
+  }, [resolvedWatchlistItem]);
+
+  const handleSaveEdit = React.useCallback(async (
+    sym: string,
+    name: string,
+    type: string,
+    sectorLabel: string | null,
+    sectorLabelColor: string | null
+  ) => {
+    try {
+      await fetch(`${API_BASE_URL}/api/watchlist`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          symbol: sym,
+          name,
+          type,
+          sector_label: sectorLabel,
+          sector_label_color: sectorLabelColor,
+        }),
+      });
+      setWatchlistItem(prev => ({
+        ...(prev || resolvedWatchlistItem),
+        name,
+        type,
+        sector_label: sectorLabel,
+        sector_label_color: sectorLabelColor,
+      }));
+      setIsEditModalOpen(false);
+    } catch (e) {
+      console.error('Failed to save watchlist edit', e);
+    }
+  }, [resolvedWatchlistItem]);
+
+  const {
+    symbolRules,
+    isLoading: isRulesLoading,
+    createRule,
+    toggleRule,
+    deleteRule,
+  } = useAlertRules(symbol, fetchDossierData);
+
+  const activeAlertsCount = React.useMemo(() => {
+    const rulesCount = symbolRules.filter(r => r.is_active === 1).length;
+    return rulesCount || resolvedWatchlistItem.active_alerts_count || 0;
+  }, [symbolRules, resolvedWatchlistItem.active_alerts_count]);
+
+  const handleCreateRule = React.useCallback(
+    async (metric: string, condition: string, targetVal: number, note?: string) => {
+      if (!symbol) return;
+      await createRule(symbol, metric, condition, targetVal, note);
+    },
+    [symbol, createRule]
+  );
+
+  const handleToggleRule = React.useCallback(
+    async (ruleId: number, currentStatus: number) => {
+      if (!symbol) return;
+      await toggleRule(symbol, ruleId, currentStatus);
+    },
+    [symbol, toggleRule]
+  );
+
+  const handleDeleteRule = React.useCallback(
+    async (ruleId: number) => {
+      if (!symbol) return;
+      await deleteRule(symbol, ruleId);
+    },
+    [symbol, deleteRule]
+  );
+
   if (loading) {
     return (
       <Sheet
@@ -338,111 +504,267 @@ export default function StockDossierCockpit({
         }}
       >
         <Stack spacing={2.5}>
-          {/* Top Row: Symbol, Company Details, View Switcher & Refresh */}
-          <Stack
-            direction={{ xs: 'column', md: 'row' }}
-            justifyContent="space-between"
-            alignItems={{ xs: 'flex-start', md: 'center' }}
+          {/* Top Header Grid: Left (Identity & Metadata) vs Right (Grouped Controls) */}
+          <Grid
+            container
             spacing={2}
+            alignItems="center"
+            justifyContent="space-between"
+            data-testid="cockpit-header-grid"
           >
-            {/* Symbol & Name */}
-            <Box>
-              <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 0.5 }}>
-                <Chip
-                  size="lg"
-                  variant="solid"
-                  color="success"
-                  sx={{
-                    fontWeight: 900,
-                    fontSize: '1.25rem',
-                    letterSpacing: '0.05em',
-                    px: 1.5,
-                    bgcolor: '#10b981',
-                  }}
-                >
-                  {symbol}
-                </Chip>
-                <Typography level="h2" sx={{ fontWeight: 800, fontSize: { xs: '1.4rem', sm: '1.75rem' } }}>
-                  {overview?.name || symbol}
-                </Typography>
-                {overview?.exchange && (
-                  <Chip size="sm" variant="soft" color="neutral" sx={{ fontSize: '0.75rem' }}>
-                    {overview.exchange}
+            {/* Left Column: Symbol, Name, Chips & Fundamental Freshness */}
+            <Grid xs={12} lg={6}>
+              <Box>
+                <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" sx={{ mb: 0.5 }}>
+                  <Chip
+                    size="lg"
+                    variant="solid"
+                    color="success"
+                    sx={{
+                      fontWeight: 900,
+                      fontSize: '1.25rem',
+                      letterSpacing: '0.05em',
+                      px: 1.5,
+                      bgcolor: '#10b981',
+                    }}
+                  >
+                    {symbol}
                   </Chip>
-                )}
-                {overview?.sector && (
-                  <Chip size="sm" variant="outlined" color="primary" sx={{ fontSize: '0.75rem' }}>
-                    {overview.sector}
-                  </Chip>
-                )}
-              </Stack>
-              <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
-                {overview?.industry ? `${overview.industry} • ` : ''}
-                Currency: {overview?.currency || 'USD'} • Last Updated:{' '}
-                {overview?.updatedAt || 'Recent'}
-              </Typography>
-            </Box>
-
-            {/* Right Controls: View Switcher (Cockpit vs Trace) & Action Buttons */}
-            <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
-              {/* Dual Mode Switcher Toggle */}
-              <Box
-                sx={{
-                  display: 'inline-flex',
-                  p: 0.5,
-                  borderRadius: '14px',
-                  bgcolor: 'rgba(255, 255, 255, 0.05)',
-                  
-                }}
-              >
-                <Button
-                  size="sm"
-                  variant={viewMode === 'cockpit' ? 'solid' : 'plain'}
-                  color={viewMode === 'cockpit' ? 'success' : 'neutral'}
-                  startDecorator={<LayoutDashboard size={14} />}
-                  onClick={() => setViewMode('cockpit')}
-                  sx={{
-                    borderRadius: '10px',
-                    fontWeight: 700,
-                    fontSize: '0.8rem',
-                    px: 2,
-                    ...(viewMode === 'cockpit' ? { bgcolor: '#10b981' } : { color: 'text.secondary' }),
-                  }}
-                >
-                  Executive Cockpit
-                </Button>
-                <Button
-                  size="sm"
-                  variant={viewMode === 'trace' ? 'solid' : 'plain'}
-                  color={viewMode === 'trace' ? 'success' : 'neutral'}
-                  startDecorator={<GitBranch size={14} />}
-                  onClick={() => setViewMode('trace')}
-                  sx={{
-                    borderRadius: '10px',
-                    fontWeight: 700,
-                    fontSize: '0.8rem',
-                    px: 2,
-                    ...(viewMode === 'trace' ? { bgcolor: '#10b981' } : { color: 'text.secondary' }),
-                  }}
-                >
-                  Decision Trace
-                </Button>
+                  <Typography level="h2" sx={{ fontWeight: 800, fontSize: { xs: '1.4rem', sm: '1.75rem' } }}>
+                    {resolvedWatchlistItem?.name || overview?.name || symbol}
+                  </Typography>
+                  {resolvedWatchlistItem?.type && (
+                    <Chip size="sm" variant="soft" color="neutral" sx={{ fontSize: '0.75rem', fontWeight: 700 }}>
+                      {resolvedWatchlistItem.type}
+                    </Chip>
+                  )}
+                  {overview?.exchange && (
+                    <Chip size="sm" variant="soft" color="neutral" sx={{ fontSize: '0.75rem' }}>
+                      {overview.exchange}
+                    </Chip>
+                  )}
+                  {(resolvedWatchlistItem?.sector_label || overview?.sector) && (
+                    <Chip
+                      size="sm"
+                      variant="outlined"
+                      color="primary"
+                      sx={{
+                        fontSize: '0.75rem',
+                        borderColor: resolvedWatchlistItem?.sector_label_color || undefined,
+                        color: resolvedWatchlistItem?.sector_label_color || undefined,
+                      }}
+                    >
+                      {resolvedWatchlistItem?.sector_label || overview?.sector}
+                    </Chip>
+                  )}
+                </Stack>
+                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ mt: 0.5, gap: 0.75 }}>
+                  <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
+                    {overview?.industry ? `${overview.industry} • ` : ''}
+                    Currency: {overview?.currency || 'USD'} • Last Updated:{' '}
+                    {overview?.updatedAt || 'Recent'}
+                  </Typography>
+                  {fundamental && (
+                    <>
+                      <Divider orientation="vertical" sx={{ height: 12, opacity: 0.4 }} />
+                      <FundamentalFreshnessBadge
+                        status={fundamental.status || 'missing'}
+                        asOfDate={fundamental.as_of_date}
+                        size="sm"
+                        format="verbose"
+                      />
+                      {fundamental.as_of_date && (
+                        <Typography level="body-xs" sx={{ fontFamily: 'monospace', opacity: 0.7 }}>
+                          {fundamental.as_of_date}
+                        </Typography>
+                      )}
+                      <Chip size="sm" variant="soft" color="neutral" sx={{ fontSize: '0.7rem', fontWeight: 600 }}>
+                        {`${fundamental.source_count ?? 0} ${(fundamental.source_count === 1) ? 'src' : 'srcs'}`}
+                      </Chip>
+                    </>
+                  )}
+                </Stack>
               </Box>
+            </Grid>
 
-              <Tooltip title="Refresh Dossier Data" arrow>
-                <IconButton
-                  size="sm"
-                  variant="soft"
-                  color="neutral"
-                  loading={refreshing}
-                  onClick={() => fetchDossierData(true)}
-                  sx={{ borderRadius: '10px' }}
+            {/* Right Column: Grouped Action Controls & Toggles */}
+            <Grid xs={12} lg={6}>
+              <Stack
+                direction="row"
+                spacing={1.25}
+                alignItems="center"
+                justifyContent={{ xs: 'flex-start', lg: 'flex-end' }}
+                flexWrap="wrap"
+                sx={{ gap: 1 }}
+              >
+                {/* 1. Governance Switches Capsule */}
+                <Box
+                  sx={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 1.5,
+                    p: 0.5,
+                    px: 1.25,
+                    borderRadius: '12px',
+                    bgcolor: 'background.level1',
+                    border: '1px solid',
+                    borderColor: 'neutral.outlinedBorder',
+                    boxShadow: 'xs',
+                  }}
                 >
-                  <RotateCw size={15} />
-                </IconButton>
-              </Tooltip>
-            </Stack>
-          </Stack>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                    <Typography level="body-xs" sx={{ fontWeight: 600, color: 'text.secondary' }}>Active</Typography>
+                    <Switch
+                      size="sm"
+                      checked={!!resolvedWatchlistItem.is_active}
+                      onChange={() => handleToggleActive(symbol, resolvedWatchlistItem.is_active)}
+                      color={resolvedWatchlistItem.is_active ? 'success' : 'neutral'}
+                      data-testid="cockpit-active-switch"
+                    />
+                  </Box>
+                  <Divider orientation="vertical" sx={{ height: 16 }} />
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                    <Typography level="body-xs" sx={{ fontWeight: 600, color: 'text.secondary' }}>Portfolio</Typography>
+                    <Switch
+                      size="sm"
+                      checked={!!resolvedWatchlistItem.in_portfolio}
+                      onChange={() => handleTogglePortfolio(symbol, resolvedWatchlistItem.in_portfolio)}
+                      color={resolvedWatchlistItem.in_portfolio ? 'success' : 'neutral'}
+                      data-testid="cockpit-portfolio-switch"
+                    />
+                  </Box>
+                </Box>
+
+                {/* 2. View Mode Toggle Capsule */}
+                <Box
+                  sx={{
+                    display: 'inline-flex',
+                    p: 0.5,
+                    borderRadius: '14px',
+                    bgcolor: 'background.level1',
+                    border: '1px solid',
+                    borderColor: 'neutral.outlinedBorder',
+                    boxShadow: 'xs',
+                  }}
+                >
+                  <Button
+                    size="sm"
+                    variant={viewMode === 'cockpit' ? 'solid' : 'plain'}
+                    color={viewMode === 'cockpit' ? 'success' : 'neutral'}
+                    startDecorator={<LayoutDashboard size={14} />}
+                    onClick={() => setViewMode('cockpit')}
+                    sx={{
+                      borderRadius: '10px',
+                      fontWeight: 700,
+                      fontSize: '0.8rem',
+                      px: 2,
+                      ...(viewMode === 'cockpit' ? {} : { color: 'text.secondary' }),
+                    }}
+                  >
+                    Executive Cockpit
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={viewMode === 'trace' ? 'solid' : 'plain'}
+                    color={viewMode === 'trace' ? 'success' : 'neutral'}
+                    startDecorator={<GitBranch size={14} />}
+                    onClick={() => setViewMode('trace')}
+                    sx={{
+                      borderRadius: '10px',
+                      fontWeight: 700,
+                      fontSize: '0.8rem',
+                      px: 2,
+                      ...(viewMode === 'trace' ? {} : { color: 'text.secondary' }),
+                    }}
+                  >
+                    Decision Trace
+                  </Button>
+                </Box>
+
+                {/* 3. Action Toolbar Capsule (Edit, Alerts, Refresh) */}
+                <Box
+                  sx={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 0.5,
+                    p: 0.5,
+                    borderRadius: '12px',
+                    bgcolor: 'background.level1',
+                    border: '1px solid',
+                    borderColor: 'neutral.outlinedBorder',
+                    boxShadow: 'xs',
+                  }}
+                >
+                  {/* Edit Security Info Button */}
+                  <Tooltip title="Edit Security Info" arrow>
+                    <IconButton
+                      size="sm"
+                      variant="plain"
+                      color="neutral"
+                      onClick={() => setIsEditModalOpen(true)}
+                      data-testid="cockpit-edit-security-btn"
+                      sx={{
+                        borderRadius: '8px',
+                        '&:hover': { bgcolor: 'background.level2' },
+                      }}
+                    >
+                      <Pencil size={15} />
+                    </IconButton>
+                  </Tooltip>
+
+                  {/* Alert Rules Button */}
+                  <Tooltip title="Alert Rules" arrow>
+                    <Badge
+                      badgeContent={activeAlertsCount}
+                      invisible={!activeAlertsCount}
+                      color="warning"
+                      size="sm"
+                      variant="solid"
+                      sx={{
+                        '& .MuiBadge-badge': {
+                          right: 2,
+                          top: 2,
+                        },
+                      }}
+                    >
+                      <IconButton
+                        size="sm"
+                        variant="plain"
+                        color={activeAlertsCount ? 'warning' : 'neutral'}
+                        onClick={() => setIsAlertsModalOpen(true)}
+                        data-testid="cockpit-alerts-btn"
+                        sx={{
+                          borderRadius: '8px',
+                          '&:hover': { bgcolor: 'background.level2' },
+                        }}
+                      >
+                        <Bell size={15} />
+                      </IconButton>
+                    </Badge>
+                  </Tooltip>
+
+                  <Divider orientation="vertical" sx={{ height: 16 }} />
+
+                  {/* Refresh Dossier Data Button */}
+                  <Tooltip title="Refresh Dossier Data" arrow>
+                    <IconButton
+                      size="sm"
+                      variant="plain"
+                      color="neutral"
+                      loading={refreshing}
+                      onClick={() => fetchDossierData(true)}
+                      sx={{
+                        borderRadius: '8px',
+                        '&:hover': { bgcolor: 'background.level2' },
+                      }}
+                    >
+                      <RotateCw size={15} />
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+              </Stack>
+            </Grid>
+          </Grid>
 
           <Divider sx={{ opacity: 0.1 }} />
 
@@ -563,7 +885,7 @@ export default function StockDossierCockpit({
         </Stack>
       </Sheet>
 
-      {/* ── 2. View Mode Content ────────────────────────────────────────────── */}
+      {/* ── 3. View Mode Content ────────────────────────────────────────────── */}
       {viewMode === 'cockpit' ? (
         /* ── 2A. Executive Cockpit: 4-Quadrant High-Density Grid ───────────── */
         <Grid container spacing={2.5}>
@@ -1268,6 +1590,28 @@ export default function StockDossierCockpit({
           </DialogActions>
         </ModalDialog>
       </Modal>
+
+      {/* Edit Watchlist Security Modal */}
+      <EditSecurityModal
+        open={isEditModalOpen}
+        item={resolvedWatchlistItem}
+        onClose={() => setIsEditModalOpen(false)}
+        onSave={handleSaveEdit}
+        onDeleteClick={() => setIsEditModalOpen(false)}
+      />
+
+      {/* Alerts Manager Modal */}
+      <AlertsManagerModal
+        open={isAlertsModalOpen}
+        symbol={symbol}
+        symbolRules={symbolRules}
+        currentSymbolStats={{ price: currentPrice }}
+        isLoading={isRulesLoading}
+        onClose={() => setIsAlertsModalOpen(false)}
+        onCreateRule={handleCreateRule}
+        onToggleRule={handleToggleRule}
+        onDeleteRule={handleDeleteRule}
+      />
     </Box>
   );
 }

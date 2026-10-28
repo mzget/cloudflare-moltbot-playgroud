@@ -8,16 +8,18 @@ import { glassStyle } from '../../../styles/glass';
 import ScenarioRangeBar from '../../common/ScenarioRangeBar';
 import { formatMosLabel } from '../../../utils/marginOfSafety';
 
-interface WatchlistCardProps {
+export interface WatchlistCardProps {
   item: WatchlistItem;
   todayEvents?: { id: string; symbol: string; event_type: string; title: string; description?: string }[];
   fundamental?: FundamentalStatusItem | null;
-  onEdit: (item: WatchlistItem) => void;
-  onAlertsClick: (symbol: string) => void;
-  onViewAnalysis: (symbol: string) => void;
+  onEdit?: (item: WatchlistItem) => void;
+  onAlertsClick?: (symbol: string) => void;
+  onViewAnalysis?: (symbol: string) => void;
   onCopyPrompt?: (item: WatchlistItem) => void;
-  onToggleActive: (symbol: string, currentStatus: number) => Promise<void>;
-  onTogglePortfolio: (symbol: string, currentPortfolioStatus: number) => Promise<void>;
+  onToggleActive?: (symbol: string, currentStatus: number) => Promise<void> | void;
+  onTogglePortfolio?: (symbol: string, currentPortfolioStatus: number) => Promise<void> | void;
+  hideMos?: boolean;
+  hideCopyPrompt?: boolean;
 }
 
 function areWatchlistCardPropsEqual(
@@ -27,7 +29,9 @@ function areWatchlistCardPropsEqual(
   if (
     prevProps.item === nextProps.item &&
     prevProps.todayEvents === nextProps.todayEvents &&
-    prevProps.fundamental === nextProps.fundamental
+    prevProps.fundamental === nextProps.fundamental &&
+    prevProps.hideMos === nextProps.hideMos &&
+    prevProps.hideCopyPrompt === nextProps.hideCopyPrompt
   ) {
     return true;
   }
@@ -49,6 +53,13 @@ function areWatchlistCardPropsEqual(
     prevItem.dcf_bear !== nextItem.dcf_bear ||
     prevItem.dcf_base !== nextItem.dcf_base ||
     prevItem.dcf_bull !== nextItem.dcf_bull
+  ) {
+    return false;
+  }
+
+  if (
+    prevProps.hideMos !== nextProps.hideMos ||
+    prevProps.hideCopyPrompt !== nextProps.hideCopyPrompt
   ) {
     return false;
   }
@@ -93,9 +104,12 @@ export const WatchlistCard: React.FC<WatchlistCardProps> = React.memo(({
   onCopyPrompt,
   onToggleActive,
   onTogglePortfolio,
+  hideMos = false,
+  hideCopyPrompt = false,
 }) => {
   return (
     <Card 
+      data-testid="watchlist-card" 
       sx={{ 
         ...glassStyle, 
         border: item.in_portfolio ? '1.5px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(255, 255, 255, 0.08)',
@@ -183,7 +197,7 @@ export const WatchlistCard: React.FC<WatchlistCardProps> = React.memo(({
             <IconButton 
               color="neutral" 
               variant="plain" 
-              onClick={() => onEdit(item)}
+              onClick={() => onEdit?.(item)}
               sx={{ 
                 opacity: 0.6, 
                 transition: 'opacity 0.2s', 
@@ -209,7 +223,7 @@ export const WatchlistCard: React.FC<WatchlistCardProps> = React.memo(({
               <IconButton 
                 color={item.active_alerts_count ? "warning" : "neutral"} 
                 variant="plain" 
-                onClick={() => onAlertsClick(item.symbol)}
+                onClick={() => onAlertsClick?.(item.symbol)}
                 sx={{ 
                   opacity: item.active_alerts_count ? 1 : 0.7,
                   transition: 'all 0.2s', 
@@ -227,6 +241,7 @@ export const WatchlistCard: React.FC<WatchlistCardProps> = React.memo(({
         </Stack>
 
         {/* Margin of Safety (ADR-0014) */}
+        {!hideMos && (
         <Box sx={{ mt: 0.5 }} data-testid="mos-section">
           <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
             <Typography level="body-xs" sx={{ fontWeight: 600, opacity: 0.7 }}>Margin of Safety</Typography>
@@ -249,6 +264,8 @@ export const WatchlistCard: React.FC<WatchlistCardProps> = React.memo(({
             />
           )}
         </Box>
+
+        )}
 
         {/* Fundamental Intelligence Section */}
         <Box
@@ -321,21 +338,23 @@ export const WatchlistCard: React.FC<WatchlistCardProps> = React.memo(({
               variant="outlined"
               color="neutral"
               startDecorator={<FileText size={14} />}
-              onClick={() => onViewAnalysis(item.symbol)}
+              onClick={() => onViewAnalysis?.(item.symbol)}
               sx={{ fontSize: '0.8rem', py: 0.5 }}
             >
               Analysis
             </Button>
-            <Button
-              size="sm"
-              variant="soft"
-              color="primary"
-              startDecorator={<Copy size={13} />}
-              onClick={() => onCopyPrompt?.(item)}
-              sx={{ fontSize: '0.8rem', py: 0.5, borderRadius: '8px', fontWeight: 600 }}
-            >
-              Copy Prompt
-            </Button>
+            {!hideCopyPrompt && onCopyPrompt && (
+              <Button
+                size="sm"
+                variant="soft"
+                color="primary"
+                startDecorator={<Copy size={13} />}
+                onClick={() => onCopyPrompt?.(item)}
+                sx={{ fontSize: '0.8rem', py: 0.5, borderRadius: '8px', fontWeight: 600 }}
+              >
+                Copy Prompt
+              </Button>
+            )}
           </Stack>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -343,7 +362,7 @@ export const WatchlistCard: React.FC<WatchlistCardProps> = React.memo(({
               <Typography level="body-xs" sx={{ fontWeight: '600', opacity: 0.7 }}>Active</Typography>
               <Switch 
                 checked={!!item.is_active} 
-                onChange={() => onToggleActive(item.symbol, item.is_active)} 
+                onChange={() => onToggleActive?.(item.symbol, item.is_active)} 
                 color={item.is_active ? 'primary' : 'neutral'}
                 size="sm"
               />
@@ -352,7 +371,7 @@ export const WatchlistCard: React.FC<WatchlistCardProps> = React.memo(({
               <Typography level="body-xs" sx={{ fontWeight: '600', opacity: 0.7 }}>Portfolio</Typography>
               <Switch 
                 checked={!!item.in_portfolio} 
-                onChange={() => onTogglePortfolio(item.symbol, item.in_portfolio)} 
+                onChange={() => onTogglePortfolio?.(item.symbol, item.in_portfolio)} 
                 color={item.in_portfolio ? 'primary' : 'neutral'}
                 size="sm"
               />

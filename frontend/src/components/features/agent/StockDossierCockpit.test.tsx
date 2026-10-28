@@ -445,4 +445,66 @@ describe('StockDossierCockpit Component', () => {
 
     expect(html).toContain('+40.00% (Bull vs Current)');
   });
+  it('renders merged watchlist governance controls, edit, alerts, and freshness inside Cockpit Hero Header without separate watchlist card', () => {
+    const mockWatchlist = [
+      {
+        symbol: 'MSFT',
+        name: 'Microsoft Corporation',
+        is_active: 1,
+        in_portfolio: 1,
+        type: 'STOCK',
+        active_alerts_count: 2,
+        sector_label: 'Cloud Infrastructure & Enterprise AI',
+        sector_label_color: '#3b82f6',
+        mos_price: 420.0,
+        mos_base: 15.5,
+      },
+    ];
+
+    const mockFundamental = {
+      symbol: 'MSFT',
+      company_name: 'Microsoft Corporation',
+      as_of_date: '2026-10-25',
+      status: 'active' as const,
+      source_count: 6,
+      theme_tags: ['Enterprise Software', 'Hyperscaler AI'],
+      updated_at: '2026-10-25T12:00:00Z',
+    };
+
+    const html = renderToString(
+      <StockDossierCockpit
+        symbol="MSFT"
+        onNavigateTab={vi.fn()}
+        initialOverview={mockOverview}
+        initialReport={mockReport}
+        initialTheses={mockTheses}
+        initialRiskAudit={mockRiskAudit}
+        initialWatchlist={mockWatchlist}
+        initialFundamental={mockFundamental}
+      />
+    );
+
+    // 1. Header Grid layout is rendered and separate Watchlist Card section is removed
+    expect(html).toContain('data-testid="cockpit-header-grid"');
+    expect(html).not.toContain('data-testid="cockpit-watchlist-card-section"');
+    expect(html).not.toContain('data-testid="watchlist-card"');
+
+    // 2. Merged governance switches exist in Cockpit Hero Header
+    expect(html).toContain('data-testid="cockpit-active-switch"');
+    expect(html).toContain('data-testid="cockpit-portfolio-switch"');
+    expect(html).toContain('Active');
+    expect(html).toContain('Portfolio');
+
+    // 3. Merged action buttons: Edit and Alerts exist in Cockpit Hero Header
+    expect(html).toContain('data-testid="cockpit-edit-security-btn"');
+    expect(html).toContain('data-testid="cockpit-alerts-btn"');
+
+    // 4. Contains fundamental freshness and sector label
+    expect(html).toContain('Cloud Infrastructure &amp; Enterprise AI');
+    expect(html).toContain('6 srcs');
+    expect(html).toContain('2026-10-25');
+
+    // 5. Must NOT contain Copy Prompt button
+    expect(html).not.toContain('Copy Prompt');
+  });
 });
