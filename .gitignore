@@ -62,6 +62,8 @@ coverage/
 !.agents/skills/release/**
 !.agents/skills/oaktree-gemini-copilot/
 !.agents/skills/oaktree-gemini-copilot/**
+!.agents/skills/value-investing-brainstormer/
+!.agents/skills/value-investing-brainstormer/**
 .agent/workflows/
 trace-tool/check-color.js
 trace-tool/package-lock.json

@@ -88,11 +88,122 @@ export async function searchKnowledge(env: Env, query: string) {
 }
 
 export async function getLatestAnalysisReport(env: any, symbol: string) {
-  const symbolUpper = symbol.toUpperCase();
+  const symbolUpper = (symbol || '').trim().toUpperCase();
   const result = await env.DB.prepare(
-    'SELECT * FROM analysis_results WHERE symbol = ? ORDER BY created_at DESC LIMIT 1'
+    "SELECT * FROM analysis_results WHERE symbol = ? AND summary IS NOT NULL AND summary != '' ORDER BY created_at DESC LIMIT 1"
   ).bind(symbolUpper).first();
   return result;
+}
+
+export interface SaveValueInvestingReportInput {
+  symbol: string;
+  summary: string;
+  conviction_level: 'High' | 'Medium' | 'Low';
+  source?: string;
+}
+
+export async function saveValueInvestingReport(env: any, input: SaveValueInvestingReportInput) {
+  const symbol = (input.symbol || '').trim().toUpperCase();
+  const summary = (input.summary || '').trim();
+  const conviction_level = input.conviction_level || 'Medium';
+  const source = (input.source || '').trim() || 'gemini_app';
+
+  if (!symbol) {
+    return { error: 'symbol is required and cannot be empty' };
+  }
+  if (!summary) {
+    return { error: 'summary is required and cannot be empty' };
+  }
+
+  const currentUtc = new Date().toISOString().replace('T', ' ').slice(0, 19);
+
+  // Preserve any existing debate object from analysis_results or stock_fundamentals
+  let existingDebate: any = null;
+  try {
+    const existingRow = await env.DB.prepare(
+      'SELECT framework_results FROM analysis_results WHERE symbol = ? ORDER BY created_at DESC LIMIT 1'
+    ).bind(symbol).first() as { framework_results?: string } | null;
+
+    if (existingRow?.framework_results) {
+      const parsed = JSON.parse(existingRow.framework_results);
+      if (parsed && typeof parsed === 'object' && parsed.debate) {
+        existingDebate = parsed.debate;
+      }
+    }
+
+    if (!existingDebate) {
+      const fundRow = await env.DB.prepare(
+        'SELECT debate_json FROM stock_fundamentals WHERE symbol = ?'
+      ).bind(symbol).first() as { debate_json?: string } | null;
+      if (fundRow?.debate_json) {
+        existingDebate = JSON.parse(fundRow.debate_json);
+      }
+    }
+  } catch {
+    // Ignore parse/lookup errors and proceed with clean overwrite
+  }
+
+  const frameworkResultsObj: Record<string, any> = {
+    source,
+    updated_at: currentUtc,
+  };
+  if (existingDebate) {
+    frameworkResultsObj.debate = existingDebate;
+  }
+  const frameworkResultsJson = JSON.stringify(frameworkResultsObj);
+
+  const deleteStmt = env.DB.prepare('DELETE FROM analysis_results WHERE symbol = ?').bind(symbol);
+  const insertStmt = env.DB.prepare(
+    'INSERT INTO analysis_results (symbol, summary, conviction_level, framework_results, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)'
+  ).bind(symbol, summary, conviction_level, frameworkResultsJson, currentUtc, currentUtc);
+
+  if (typeof env.DB.batch === 'function') {
+    await env.DB.batch([deleteStmt, insertStmt]);
+  } else {
+    await deleteStmt.run();
+    await insertStmt.run();
+  }
+
+  // Write OKF Markdown to R2 (KNOWLEDGE_BUCKET or BUCKET fallback)
+  const targetBucket = env.KNOWLEDGE_BUCKET || env.BUCKET;
+  let r2Key: string | null = null;
+  let r2Written = false;
+  if (targetBucket) {
+    try {
+      r2Key = `reports/${symbol}.md`;
+      const okfContent = [
+        '---',
+        'type: value_investing_report',
+        `symbol: "${symbol}"`,
+        `conviction_level: "${conviction_level}"`,
+        `source: "${source}"`,
+        `timestamp: "${currentUtc}"`,
+        'tags: [value-investing, 6-gurus, deep-analysis]',
+        '---',
+        '',
+        summary,
+        '',
+      ].join('\n');
+
+      await targetBucket.put(r2Key, okfContent, {
+        httpMetadata: { contentType: 'text/markdown' },
+      });
+      r2Written = true;
+    } catch (e: any) {
+      console.warn(`Failed to write OKF report for "${symbol}":`, e.message);
+    }
+  }
+
+  return {
+    success: true,
+    symbol,
+    conviction_level,
+    source,
+    d1_saved: true,
+    r2_key: r2Key,
+    r2_written: r2Written,
+    updated_at: currentUtc,
+  };
 }
 
 export async function getWatchlist(env: Env, options?: { activeOnly?: boolean }) {

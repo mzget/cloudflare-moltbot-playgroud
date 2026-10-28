@@ -6,6 +6,7 @@ const m = vi.hoisted(() => ({
   getKnowledgeByCategory: vi.fn(),
   searchKnowledge: vi.fn(),
   getLatestAnalysisReport: vi.fn(),
+  saveValueInvestingReport: vi.fn(),
   getWatchlist: vi.fn(),
   saveMarketArticle: vi.fn(),
   createFacebookDraft: vi.fn(),
@@ -50,7 +51,7 @@ async function setup() {
 const textOf = (res: any) => JSON.parse(res.content[0].text);
 
 describe("OaktreeMCP", () => {
-  it("registers all twenty tools with descriptions", async () => {
+  it("registers all twenty-one tools with descriptions", async () => {
     const { tools } = await setup();
     expect([...tools.keys()]).toEqual([
       "get_portfolio",
@@ -58,6 +59,7 @@ describe("OaktreeMCP", () => {
       "get_knowledge",
       "search_knowledge",
       "get_analysis_report",
+      "save_value_investing_report",
       "get_watchlist",
       "save_market_intelligence",
       "create_facebook_post_draft",
@@ -93,6 +95,7 @@ describe("OaktreeMCP", () => {
     m.getKnowledgeByCategory.mockResolvedValue({ c: 1 });
     m.searchKnowledge.mockResolvedValue([]);
     m.getLatestAnalysisReport.mockResolvedValue(null);
+    m.saveValueInvestingReport.mockResolvedValue({ success: true, symbol: "RMBS", conviction_level: "High" });
     m.getWatchlist.mockResolvedValue([{ symbol: "AAPL" }, { symbol: "MSFT" }]);
     m.saveMarketArticle.mockResolvedValue({ success: true, id: 1 });
     m.createFacebookDraft.mockResolvedValue({ success: true });
@@ -104,6 +107,21 @@ describe("OaktreeMCP", () => {
     expect(m.searchKnowledge).toHaveBeenCalledWith(agent.env, "moat");
     expect(textOf(await tools.get("get_analysis_report")![3]({ symbol: "AAPL" }))).toBeNull();
     expect(m.getLatestAnalysisReport).toHaveBeenCalledWith(agent.env, "AAPL");
+
+    expect(
+      textOf(
+        await tools.get("save_value_investing_report")![3]({
+          symbol: "RMBS",
+          summary: "# RMBS Report",
+          conviction_level: "High",
+        })
+      )
+    ).toEqual({ success: true, symbol: "RMBS", conviction_level: "High" });
+    expect(m.saveValueInvestingReport).toHaveBeenCalledWith(agent.env, {
+      symbol: "RMBS",
+      summary: "# RMBS Report",
+      conviction_level: "High",
+    });
 
     expect(textOf(await tools.get("get_watchlist")![3]({ active_only: true }))).toEqual([
       { symbol: "AAPL" },

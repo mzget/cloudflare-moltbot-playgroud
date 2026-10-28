@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { Box, Button, Typography, Sheet, CircularProgress, Divider, Stack, Tabs, TabList, Tab, Select, Option } from '@mui/joy';
-import { ArrowLeft, RotateCw, CheckCircle, AlertTriangle, Play, FileText, Calculator, BookOpen, TrendingUp, BarChart3, LayoutDashboard } from 'lucide-react';
+import { RotateCw, AlertTriangle, Sparkles, FileText, Calculator, BookOpen, TrendingUp, BarChart3, LayoutDashboard } from 'lucide-react';
 import StockOverview from './StockOverview';
 import StockThesis from './StockThesis';
 import StockDossierCockpit from './StockDossierCockpit';
@@ -10,6 +10,7 @@ import { glassStyle } from '../../../styles/glass';
 import MarkdownRenderer from '../../common/MarkdownRenderer';
 import DCFModel from './DCFModel';
 import DebateCard from './DebateCard';
+import ValueInvestingSkillModal from './ValueInvestingSkillModal';
 
 const TAB_KEYS = ['dossier', 'overview', 'report', 'dcf-model', 'stock-thesis'] as const;
 
@@ -20,10 +21,11 @@ interface AnalysisReportProps {
   hospitality?: any; // Keep signature extensible if needed
 }
 
-export default function AnalysisReport({ symbol, onBack, subTab }: AnalysisReportProps) {
+export default function AnalysisReport({ symbol, subTab }: AnalysisReportProps) {
   const navigate = useNavigate();
   const [loading, setLoading] = React.useState(true);
-  const [analyzing, setAnalyzing] = React.useState(false);
+  const [refreshing, setRefreshing] = React.useState(false);
+  const [skillModalOpen, setSkillModalOpen] = React.useState(false);
   const [report, setReport] = React.useState<any>(null);
   const [error, setError] = React.useState<string | null>(null);
   const activeToolTab =
@@ -62,15 +64,19 @@ export default function AnalysisReport({ symbol, onBack, subTab }: AnalysisRepor
     return () => { cancelled = true; };
   }, [symbol]);
 
-  const fetchReport = async () => {
-    setLoading(true);
+  const fetchReport = async (isManualRefresh = false) => {
+    if (isManualRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     setError(null);
     try {
       const res = await fetch(`${API_BASE_URL}/api/analysis/results?symbol=${symbol}`);
       if (res.status === 404) {
         setReport(null);
       } else if (!res.ok) {
-        throw new Error('\u0e44\u0e21\u0e48\u0e2a\u0e32\u0e21\u0e32\u0e23\u0e16\u0e14\u0e36\u0e07\u0e1c\u0e25\u0e01\u0e32\u0e23\u0e27\u0e34\u0e40\u0e04\u0e23\u0e32\u0e30\u0e2b\u0e4c\u0e44\u0e14\u0e49');
+        throw new Error('ไม่สามารถดึงผลการวิเคราะห์ได้');
       } else {
         const data = await res.json();
         setReport(data);
@@ -79,37 +85,16 @@ export default function AnalysisReport({ symbol, onBack, subTab }: AnalysisRepor
       setError(e.message);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   };
 
   React.useEffect(() => {
-    fetchReport();
+    fetchReport(false);
   }, [symbol]);
 
-  const handleRunAnalysis = async () => {
-    setAnalyzing(true);
-    setError(null);
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/analysis/run`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbol })
-      });
-      if (!res.ok) {
-        const err = (await res.json().catch(() => ({}))) as any;
-        throw new Error(err.error || '\u0e01\u0e32\u0e23\u0e27\u0e34\u0e40\u0e04\u0e23\u0e32\u0e30\u0e2b\u0e4c\u0e25\u0e49\u0e21\u0e40\u0e2b\u0e25\u0e27');
-      }
-      const data = await res.json();
-      setReport(data);
-      navigate({
-        to: '/analysis',
-        search: { symbol, tab: 'report' }
-      }); // Switch to report tab after analysis completes
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setAnalyzing(false);
-    }
+  const handleRefreshReport = () => {
+    fetchReport(true);
   };
 
   // Render the report content (for the Report tab)
@@ -118,21 +103,7 @@ export default function AnalysisReport({ symbol, onBack, subTab }: AnalysisRepor
       return (
         <Sheet sx={{ ...glassStyle, p: 4, minHeight: '400px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
           <CircularProgress size="md" color="success" />
-          <Typography level="body-md" sx={{ color: 'text.secondary' }}>{'\u0e01\u0e33\u0e25\u0e31\u0e07\u0e42\u0e2b\u0e25\u0e14\u0e1c\u0e25\u0e01\u0e32\u0e23\u0e27\u0e34\u0e40\u0e04\u0e23\u0e32\u0e30\u0e2b\u0e4c\u0e02\u0e2d\u0e07'} {symbol}...</Typography>
-        </Sheet>
-      );
-    }
-
-    if (analyzing) {
-      return (
-        <Sheet sx={{ ...glassStyle, p: 4, minHeight: '400px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
-          <CircularProgress size="lg" color="success" />
-          <Box sx={{ textAlign: 'center' }}>
-            <Typography level="h3" sx={{ mb: 1 }}>{'\u0e01\u0e33\u0e25\u0e31\u0e07\u0e23\u0e31\u0e19\u0e01\u0e32\u0e23\u0e27\u0e34\u0e40\u0e04\u0e23\u0e32\u0e30\u0e2b\u0e4c\u0e40\u0e0a\u0e34\u0e07\u0e25\u0e36\u0e01'} Value Investing</Typography>
-            <Typography level="body-md" sx={{ color: 'text.secondary', maxWidth: '500px' }}>
-              {'\u0e23\u0e30\u0e1a\u0e1a\u0e01\u0e33\u0e25\u0e31\u0e07\u0e43\u0e0a\u0e49'} AI {'\u0e40\u0e1e\u0e37\u0e48\u0e2d\u0e27\u0e34\u0e40\u0e04\u0e23\u0e32\u0e30\u0e2b\u0e4c\u0e2b\u0e38\u0e49\u0e19'} {symbol} {'\u0e1c\u0e48\u0e32\u0e19\u0e01\u0e23\u0e2d\u0e1a\u0e04\u0e34\u0e14\u0e02\u0e2d\u0e07'} 6 {'\u0e19\u0e31\u0e01\u0e25\u0e07\u0e17\u0e38\u0e19'} (Howard Marks, Hamilton Helmer, Warren Buffett, Charlie Munger, Peter Lynch, Joel Greenblatt) {'\u0e42\u0e1b\u0e23\u0e14\u0e23\u0e2d\u0e2a\u0e31\u0e01\u0e04\u0e23\u0e39\u0e48'} ({'\u0e1b\u0e23\u0e30\u0e21\u0e32\u0e13'} 30-45 {'\u0e27\u0e34\u0e19\u0e32\u0e17\u0e35'})...
-            </Typography>
-          </Box>
+          <Typography level="body-md" sx={{ color: 'text.secondary' }}>กำลังโหลดผลการวิเคราะห์ของ {symbol}...</Typography>
         </Sheet>
       );
     }
@@ -141,9 +112,9 @@ export default function AnalysisReport({ symbol, onBack, subTab }: AnalysisRepor
       return (
         <Sheet sx={{ ...glassStyle, p: 4, minHeight: '300px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
           <AlertTriangle size={48} color="#e11d48" />
-          <Typography level="h4">{'\u0e40\u0e01\u0e34\u0e14\u0e02\u0e49\u0e2d\u0e1c\u0e34\u0e14\u0e1e\u0e25\u0e32\u0e14\u0e43\u0e19\u0e01\u0e32\u0e23\u0e14\u0e36\u0e07\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25'}</Typography>
+          <Typography level="h4">เกิดข้อผิดพลาดในการดึงข้อมูล</Typography>
           <Typography level="body-sm" sx={{ color: 'text.secondary', mb: 2 }}>{error}</Typography>
-          <Button variant="solid" color="primary" onClick={fetchReport}>{'\u0e25\u0e2d\u0e07\u0e43\u0e2b\u0e21\u0e48\u0e2d\u0e35\u0e01\u0e04\u0e23\u0e31\u0e49\u0e07'}</Button>
+          <Button variant="solid" color="primary" loading={refreshing} onClick={handleRefreshReport}>ลองใหม่อีกครั้ง</Button>
         </Sheet>
       );
     }
@@ -192,13 +163,33 @@ export default function AnalysisReport({ symbol, onBack, subTab }: AnalysisRepor
             onDebateUpdated={handleDebateUpdated}
           />
           <Sheet sx={{ ...glassStyle, p: 4, minHeight: '300px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2, textAlign: 'center' }}>
-            <Typography level="h3">{'ยังไม่มีผลการวิเคราะห์เชิงลึกของ'} {symbol}</Typography>
-            <Typography level="body-md" sx={{ color: 'text.secondary', mb: 3, maxWidth: '600px' }}>
-              {'คลิกปุ่มด้านล่างเพื่อเริ่มการวิเคราะห์เชิงลึกด้วย'} Value Investing {'แบบอัตโนมัติ'}
+            <Typography level="h3">ยังไม่มีรายงานการวิเคราะห์เชิงลึกของ {symbol}</Typography>
+            <Typography level="body-md" sx={{ color: 'text.secondary', mb: 2, maxWidth: '640px' }}>
+              คัดลอก Gemini Prompt หรือดาวน์โหลด Portable Skill (6 Gurus: 7 Powers, Howard Marks, Charlie Munger, Warren Buffett, Peter Lynch, Joel Greenblatt) เพื่อสั่งวิเคราะห์ใน Google Gemini App / Spark แล้วบันทึกกลับเข้า Oaktree ผ่าน MCP (<code>save_value_investing_report</code>)
             </Typography>
-            <Button size="lg" color="success" startDecorator={<Play size={18} />} loading={analyzing} onClick={handleRunAnalysis}>
-              {'เริ่มการวิเคราะห์เชิงลึก'}
-            </Button>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems="center">
+              <Button
+                size="lg"
+                variant="solid"
+                color="primary"
+                startDecorator={<Sparkles size={18} />}
+                onClick={() => setSkillModalOpen(true)}
+                sx={{ borderRadius: '12px', fontWeight: 700 }}
+              >
+                Skill & Gemini Prompt
+              </Button>
+              <Button
+                size="lg"
+                variant="soft"
+                color="neutral"
+                startDecorator={<RotateCw size={18} />}
+                loading={refreshing}
+                onClick={handleRefreshReport}
+                sx={{ borderRadius: '12px', fontWeight: 700 }}
+              >
+                ซิงค์ข้อมูลล่าสุด
+              </Button>
+            </Stack>
           </Sheet>
         </Box>
       );
@@ -221,16 +212,34 @@ export default function AnalysisReport({ symbol, onBack, subTab }: AnalysisRepor
                 🌳 {symbol} Deep Value Analysis
               </Typography>
               <Typography level="body-xs" sx={{ opacity: 0.5, mt: 0.5 }}>
-                {'วิเคราะห์ล่าสุดเมื่อ'}: {report.created_at}
+                วิเคราะห์ล่าสุดเมื่อ: {report.updated_at || report.created_at}
               </Typography>
             </Box>
-            <Stack direction="row" spacing={1.5} alignItems="center">
+            <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" useFlexGap>
               <Box sx={{ px: 2, py: 1, borderRadius: '8px', border: '1px solid', borderColor: 'divider', display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Typography level="body-sm" sx={{ opacity: 0.7 }}>{'ระดับความเชื่อมั่น'}:</Typography>
+                <Typography level="body-sm" sx={{ opacity: 0.7 }}>ระดับความเชื่อมั่น:</Typography>
                 <Typography level="title-sm" sx={{ color: convictionColor, fontWeight: 800 }}>{report.conviction_level}</Typography>
               </Box>
-              <Button size="sm" variant="soft" color="neutral" startDecorator={<RotateCw size={14} />} loading={analyzing} onClick={handleRunAnalysis}>
-                {'รันวิเคราะห์ใหม่'}
+              <Button
+                size="sm"
+                variant="outlined"
+                color="primary"
+                startDecorator={<Sparkles size={14} />}
+                onClick={() => setSkillModalOpen(true)}
+                sx={{ borderRadius: '8px', fontWeight: 700 }}
+              >
+                Skill & Gemini Prompt
+              </Button>
+              <Button
+                size="sm"
+                variant="soft"
+                color="neutral"
+                startDecorator={<RotateCw size={14} />}
+                loading={refreshing}
+                onClick={handleRefreshReport}
+                sx={{ borderRadius: '8px', fontWeight: 700 }}
+              >
+                ซิงค์ข้อมูลล่าสุด
               </Button>
             </Stack>
           </Stack>
@@ -270,8 +279,9 @@ export default function AnalysisReport({ symbol, onBack, subTab }: AnalysisRepor
             sx={{
               p: 0.5,
               borderRadius: '14px',
-              bgcolor: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.06)',
+              bgcolor: 'background.level1',
+              border: '1px solid',
+              borderColor: 'neutral.outlinedBorder',
               width: 'fit-content',
               '& .MuiTab-root': {
                 fontWeight: 700,
@@ -340,10 +350,10 @@ export default function AnalysisReport({ symbol, onBack, subTab }: AnalysisRepor
             borderRadius: '12px',
             px: 1.5,
             py: 0.8,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+            boxShadow: 'sm',
             '&:hover': {
-              bgcolor: 'rgba(37, 99, 235, 0.25)',
-              borderColor: 'rgba(37, 99, 235, 0.5)',
+              bgcolor: 'background.level2',
+              borderColor: 'primary.outlinedBorder',
             },
             '& .MuiSelect-indicator': {
               color: 'primary.300',
@@ -376,6 +386,12 @@ export default function AnalysisReport({ symbol, onBack, subTab }: AnalysisRepor
       {activeToolTab === 2 && renderReportContent()}
       {activeToolTab === 3 && <DCFModel symbol={symbol} />}
       {activeToolTab === 4 && <StockThesis symbol={symbol} />}
+
+      <ValueInvestingSkillModal
+        open={skillModalOpen}
+        onClose={() => setSkillModalOpen(false)}
+        symbol={symbol}
+      />
     </Box>
   );
 }
