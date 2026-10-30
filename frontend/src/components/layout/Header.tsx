@@ -2,31 +2,75 @@ import React, { useEffect, useRef, useState, useContext } from 'react';
 import { Box, Typography, Stack, Sheet, IconButton, Tooltip, Button, Dropdown, Menu as JoyMenu, MenuButton, MenuItem, Divider, Input, Chip } from '@mui/joy';
 import { 
   Bell, Settings, User, Menu, Moon, Sun, LogOut, Check,
-  LayoutDashboard, BarChart3, TrendingUp, Terminal, Bot, Database, Info 
+  LayoutDashboard, BarChart3, TrendingUp, Terminal, Bot, Database, Info,
+  Receipt, PiggyBank, Wallet, Sparkles, Upload, Plus, ChevronDown
 } from 'lucide-react';
 import { useColorScheme } from '@mui/joy/styles';
 import { useTranslation } from 'react-i18next';
+import { useLocation, useNavigate, useSearch } from '@tanstack/react-router';
 import gsap from 'gsap';
 import { API_BASE_URL } from '../../config';
 import { glassStyle } from '../../styles/glass';
 import { AuthContext } from '../common/AuthContext';
 import OaktreeIcon from '../common/OaktreeIcon';
 import { useSettingsStore, type DensityMode } from '../../store/settingsStore';
+import { useFinanceBridgeStore, dispatchFinanceAction } from '../../store/financeBridgeStore';
 
 interface HeaderProps {
   activeTab?: string;
   setActiveTab?: (tab: string) => void;
+  activeFinanceTab?: 'dashboard' | 'transactions' | 'budgets' | 'wallets';
+  onFinanceTabChange?: (tab: 'dashboard' | 'transactions' | 'budgets' | 'wallets') => void;
+  selectedWalletId?: string;
+  onFinanceWalletChange?: (walletId: string) => void;
   reportsCount?: number;
   onOpenSidebar?: () => void;
 }
 
-export default function Header({ activeTab, setActiveTab, reportsCount, onOpenSidebar }: HeaderProps) {
+export default function Header({
+  activeTab,
+  setActiveTab,
+  activeFinanceTab,
+  onFinanceTabChange,
+  selectedWalletId,
+  onFinanceWalletChange,
+  reportsCount,
+  onOpenSidebar
+}: HeaderProps) {
   const { t } = useTranslation();
   const { user, logout } = useContext(AuthContext);
   const { mode, setMode } = useColorScheme();
   const [mounted, setMounted] = React.useState(false);
   const headerRef = useRef<HTMLDivElement>(null);
   const logoRef = useRef<HTMLDivElement>(null);
+
+  const location = useLocation();
+  const navigate = useNavigate();
+  const search = useSearch({ strict: false }) as any;
+
+  // Determine active app mode
+  const isSimplicity = activeTab === 'finance' || location.pathname.startsWith('/finance');
+  const currentFinanceTab = (activeFinanceTab || search?.tab || 'dashboard') as 'dashboard' | 'transactions' | 'budgets' | 'wallets';
+  const currentWalletId = (selectedWalletId || search?.wallet || 'all') as string;
+
+  // Bridge store
+  const { wallets, setLastFinanceState, setLastFinanceUrl, lastFinanceTab, lastFinanceWallet } = useFinanceBridgeStore();
+
+  // Keep last visited finance URL / state updated
+  useEffect(() => {
+    if (isSimplicity) {
+      setLastFinanceState(currentFinanceTab, currentWalletId);
+      setLastFinanceUrl(location.href || `/finance?tab=${currentFinanceTab}&wallet=${currentWalletId}`);
+    }
+  }, [isSimplicity, currentFinanceTab, currentWalletId, location.href, setLastFinanceState, setLastFinanceUrl]);
+
+  // Simplicity Tabs Definition
+  const simplicityTabs = [
+    { id: 'dashboard' as const, label: 'Dashboard', icon: <LayoutDashboard size={18} /> },
+    { id: 'transactions' as const, label: 'Transactions', icon: <Receipt size={18} /> },
+    { id: 'budgets' as const, label: 'Budgets', icon: <PiggyBank size={18} /> },
+    { id: 'wallets' as const, label: 'Wallets', icon: <Wallet size={18} /> },
+  ];
 
   interface Notification {
     id: number;
@@ -402,6 +446,90 @@ export default function Header({ activeTab, setActiveTab, reportsCount, onOpenSi
               </Typography>
             </Stack>
           </Box>
+
+          {/* Segmented Pill App Switcher */}
+          <Box
+            role="tablist"
+            aria-label="Application Switcher"
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
+              p: '3px',
+              borderRadius: '24px',
+              bgcolor: mode === 'dark' ? 'rgba(0, 0, 0, 0.4)' : 'rgba(0, 0, 0, 0.06)',
+              border: mode === 'dark' ? '1px solid rgba(255, 255, 255, 0.08)' : '1px solid rgba(0, 0, 0, 0.06)',
+              ml: { xs: 1, sm: 2 },
+            }}
+          >
+            {/* Oaktree Pill */}
+            <Button
+              size="sm"
+              variant="plain"
+              role="tab"
+              aria-selected={!isSimplicity}
+              data-testid="app-switcher-oaktree"
+              onClick={() => {
+                if (!isSimplicity) return; // No-op if already on Oaktree
+                setActiveTab?.('dashboard');
+                navigate({ to: '/dashboard', search: {} });
+              }}
+              sx={{
+                borderRadius: '20px',
+                px: { xs: 1, sm: 1.5 },
+                py: 0.5,
+                minHeight: 28,
+                fontSize: '0.75rem',
+                fontWeight: !isSimplicity ? 700 : 500,
+                color: !isSimplicity ? (mode === 'dark' ? '#34d399' : '#059669') : 'text.secondary',
+                bgcolor: !isSimplicity ? (mode === 'dark' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.12)') : 'transparent',
+                boxShadow: !isSimplicity ? '0 1px 4px rgba(16, 185, 129, 0.2)' : 'none',
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                '&:hover': {
+                  color: 'text.primary',
+                  bgcolor: !isSimplicity ? (mode === 'dark' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(16, 185, 129, 0.18)') : 'rgba(0, 0, 0, 0.04)',
+                },
+              }}
+            >
+              🌳 Oaktree
+            </Button>
+
+            {/* Simplicity Pill */}
+            <Button
+              size="sm"
+              variant="plain"
+              role="tab"
+              aria-selected={isSimplicity}
+              data-testid="app-switcher-simplicity"
+              onClick={() => {
+                if (isSimplicity) return; // No-op if already on Simplicity
+                setActiveTab?.('finance');
+                const targetTab = lastFinanceTab || 'dashboard';
+                const targetWallet = lastFinanceWallet || 'all';
+                navigate({
+                  to: '/finance',
+                  search: { tab: targetTab, wallet: targetWallet },
+                });
+              }}
+              sx={{
+                borderRadius: '20px',
+                px: { xs: 1, sm: 1.5 },
+                py: 0.5,
+                minHeight: 28,
+                fontSize: '0.75rem',
+                fontWeight: isSimplicity ? 700 : 500,
+                color: isSimplicity ? (mode === 'dark' ? '#34d399' : '#059669') : 'text.secondary',
+                bgcolor: isSimplicity ? (mode === 'dark' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.12)') : 'transparent',
+                boxShadow: isSimplicity ? '0 1px 4px rgba(16, 185, 129, 0.2)' : 'none',
+                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                '&:hover': {
+                  color: 'text.primary',
+                  bgcolor: isSimplicity ? (mode === 'dark' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(16, 185, 129, 0.18)') : 'rgba(0, 0, 0, 0.04)',
+                },
+              }}
+            >
+              💳 Simplicity
+            </Button>
+          </Box>
         </Stack>
 
         {/* RIGHT: Notifications, Theme, Settings & User Profile */}
@@ -772,95 +900,364 @@ export default function Header({ activeTab, setActiveTab, reportsCount, onOpenSi
           '&::-webkit-scrollbar': { display: 'none' },
         }}
       >
-        <Stack
-          direction="row"
-          spacing={{ md: 1.5, lg: 2.5 }}
-          alignItems="center"
-        >
-          {menuItems.map((item) => {
-            const isSelected = activeTab === item.id;
-            return (
-              <Box
-                key={item.id}
-                component="a"
-                href={`/${item.id}`}
-                onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
-                  if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
-                    e.preventDefault();
-                    setActiveTab?.(item.id);
-                  }
-                }}
-                sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 0.85,
-                  py: 0.85,
-                  px: 0.75,
-                  position: 'relative',
-                  textDecoration: 'none',
-                  cursor: 'pointer',
-                  color: isSelected ? 'primary.plainColor' : 'text.secondary',
-                  fontWeight: isSelected ? 700 : 500,
-                  fontSize: '0.84rem',
-                  whiteSpace: 'nowrap',
-                  transition: 'color 0.2s ease-out',
-                  '&:hover': {
-                    color: 'text.primary',
-                    textDecoration: 'none',
-                  },
-                  '&::after': {
-                    content: '""',
-                    position: 'absolute',
-                    bottom: 0,
-                    left: 4,
-                    right: 4,
-                    height: '2px',
-                    borderRadius: '2px 2px 0 0',
-                    bgcolor: isSelected ? '#10b981' : 'transparent',
-                    boxShadow: isSelected ? '0 -1px 6px rgba(16, 185, 129, 0.5)' : 'none',
-                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                  }
-                }}
-              >
-                <Box sx={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  color: isSelected ? '#10b981' : 'inherit',
-                  transition: 'color 0.2s ease-out'
-                }}>
-                  {item.icon}
-                </Box>
-                <Typography
-                  level="body-sm"
-                  sx={{
-                    fontWeight: 'inherit',
-                    color: 'inherit',
-                    fontSize: 'inherit',
-                  }}
-                >
-                  {item.label}
-                </Typography>
-                {item.id === 'market' && reportsCount !== undefined && reportsCount > 0 && (
-                  <Chip
-                    variant={isSelected ? 'solid' : 'soft'}
-                    color="primary"
-                    size="sm"
+        {isSimplicity ? (
+          /* SIMPLICITY FINANCE NAVIGATION & CONTROLS */
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', py: 0.5 }}>
+            {/* LEFT: 4 Finance Tabs */}
+            <Stack direction="row" spacing={{ md: 1.5, lg: 2.5 }} alignItems="center">
+              {simplicityTabs.map((tab) => {
+                const isSelected = currentFinanceTab === tab.id;
+                return (
+                  <Box
+                    key={tab.id}
+                    component="a"
+                    href={`/finance?tab=${tab.id}&wallet=${currentWalletId}`}
+                    onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                      if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
+                        e.preventDefault();
+                        if (currentFinanceTab !== tab.id) {
+                          if (onFinanceTabChange) {
+                            onFinanceTabChange(tab.id);
+                          } else {
+                            navigate({
+                              to: '/finance',
+                              search: { tab: tab.id, wallet: currentWalletId },
+                            });
+                          }
+                        }
+                      }
+                    }}
                     sx={{
-                      ml: 0.5,
-                      height: 18,
-                      minWidth: 18,
-                      fontSize: '0.68rem',
-                      fontWeight: 700,
-                      px: 0.5,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 0.85,
+                      py: 0.85,
+                      px: 0.75,
+                      position: 'relative',
+                      textDecoration: 'none',
+                      cursor: 'pointer',
+                      color: isSelected ? 'primary.plainColor' : 'text.secondary',
+                      fontWeight: isSelected ? 700 : 500,
+                      fontSize: '0.84rem',
+                      whiteSpace: 'nowrap',
+                      transition: 'color 0.2s ease-out',
+                      '&:hover': {
+                        color: 'text.primary',
+                        textDecoration: 'none',
+                      },
+                      '&::after': {
+                        content: '""',
+                        position: 'absolute',
+                        bottom: 0,
+                        left: 4,
+                        right: 4,
+                        height: '2px',
+                        borderRadius: '2px 2px 0 0',
+                        bgcolor: isSelected ? '#10b981' : 'transparent',
+                        boxShadow: isSelected ? '0 -1px 6px rgba(16, 185, 129, 0.5)' : 'none',
+                        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                      }
                     }}
                   >
-                    {reportsCount}
-                  </Chip>
-                )}
-              </Box>
-            );
-          })}
-        </Stack>
+                    <Box sx={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      color: isSelected ? '#10b981' : 'inherit',
+                      transition: 'color 0.2s ease-out'
+                    }}>
+                      {tab.icon}
+                    </Box>
+                    <Typography
+                      level="body-sm"
+                      sx={{
+                        fontWeight: 'inherit',
+                        color: 'inherit',
+                        fontSize: 'inherit',
+                      }}
+                    >
+                      {tab.label}
+                    </Typography>
+                  </Box>
+                );
+              })}
+            </Stack>
+
+            {/* RIGHT: Simplicity Action Controls */}
+            <Stack direction="row" spacing={1} alignItems="center">
+              {/* 1. Wallet Switcher Dropdown */}
+              <Dropdown>
+                <MenuButton
+                  size="sm"
+                  variant="soft"
+                  color="neutral"
+                  data-testid="wallet-switcher-btn"
+                  sx={{
+                    borderRadius: '10px',
+                    px: 1.25,
+                    py: 0.5,
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    gap: 0.75,
+                    bgcolor: mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)',
+                    border: '1px solid',
+                    borderColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+                  }}
+                >
+                  <Wallet size={15} color="#10b981" />
+                  <Typography level="body-xs" sx={{ fontWeight: 600 }}>
+                    {currentWalletId === 'all'
+                      ? 'All Wallets'
+                      : (wallets.find(w => w.id === currentWalletId)?.name || 'All Wallets')}
+                  </Typography>
+                  <ChevronDown size={14} style={{ opacity: 0.7 }} />
+                </MenuButton>
+                <JoyMenu
+                  placement="bottom-end"
+                  sx={{
+                    ...glassStyle,
+                    background: mode === 'dark' ? 'rgba(15, 20, 28, 0.95)' : 'rgba(255, 255, 255, 0.98)',
+                    border: mode === 'dark' ? '1px solid rgba(255, 255, 255, 0.12)' : '1px solid rgba(0, 0, 0, 0.08)',
+                    backdropFilter: 'blur(20px)',
+                    minWidth: 200,
+                    zIndex: 1200,
+                    p: 0.75,
+                    borderRadius: '14px',
+                  }}
+                >
+                  <MenuItem
+                    selected={currentWalletId === 'all'}
+                    onClick={() => {
+                      if (onFinanceWalletChange) {
+                        onFinanceWalletChange('all');
+                      } else {
+                        navigate({
+                          to: '/finance',
+                          search: { tab: currentFinanceTab, wallet: 'all' },
+                        });
+                      }
+                    }}
+                    sx={{ borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600 }}
+                  >
+                    <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#10b981', mr: 1 }} />
+                    All Wallets
+                  </MenuItem>
+                  <Divider sx={{ my: 0.5 }} />
+                  {wallets.length === 0 ? (
+                    <MenuItem disabled sx={{ borderRadius: '8px', fontSize: '0.75rem', opacity: 0.6 }}>
+                      No Wallets Found
+                    </MenuItem>
+                  ) : (
+                    wallets.map((w) => (
+                      <MenuItem
+                        key={w.id}
+                        selected={currentWalletId === w.id}
+                        onClick={() => {
+                          if (onFinanceWalletChange) {
+                            onFinanceWalletChange(w.id);
+                          } else {
+                            navigate({
+                              to: '/finance',
+                              search: { tab: currentFinanceTab, wallet: w.id },
+                            });
+                          }
+                        }}
+                        sx={{
+                          borderRadius: '8px',
+                          fontSize: '0.8rem',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          gap: 2,
+                        }}
+                      >
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: w.color || '#10b981' }} />
+                          <Typography level="body-xs" sx={{ fontWeight: 600 }}>{w.name}</Typography>
+                        </Box>
+                        <Typography level="body-xs" sx={{ opacity: 0.6, fontFamily: 'monospace' }}>
+                          {(w.balance ?? w.currentBalance ?? 0).toLocaleString()} {w.currency}
+                        </Typography>
+                      </MenuItem>
+                    ))
+                  )}
+                </JoyMenu>
+              </Dropdown>
+
+              {/* 2. AI Scanner Button */}
+              <Tooltip title="Scan receipt or statement with AI" placement="bottom">
+                <Button
+                  size="sm"
+                  variant="soft"
+                  color="neutral"
+                  data-testid="btn-ai-scan"
+                  onClick={() => dispatchFinanceAction('ai-scan')}
+                  sx={{
+                    borderRadius: '10px',
+                    px: 1.25,
+                    py: 0.5,
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    gap: 0.75,
+                    bgcolor: mode === 'dark' ? 'rgba(168, 85, 247, 0.12)' : 'rgba(168, 85, 247, 0.08)',
+                    color: mode === 'dark' ? '#c084fc' : '#9333ea',
+                    border: '1px solid',
+                    borderColor: mode === 'dark' ? 'rgba(168, 85, 247, 0.25)' : 'rgba(168, 85, 247, 0.15)',
+                    '&:hover': {
+                      bgcolor: mode === 'dark' ? 'rgba(168, 85, 247, 0.2)' : 'rgba(168, 85, 247, 0.15)',
+                    }
+                  }}
+                >
+                  <Sparkles size={15} />
+                  <Typography level="body-xs" sx={{ fontWeight: 600, color: 'inherit' }}>
+                    AI Scanner
+                  </Typography>
+                </Button>
+              </Tooltip>
+
+              {/* 3. CSV Import Button */}
+              <Tooltip title="Import transactions from CSV" placement="bottom">
+                <Button
+                  size="sm"
+                  variant="soft"
+                  color="neutral"
+                  data-testid="btn-csv-import"
+                  onClick={() => dispatchFinanceAction('csv-import')}
+                  sx={{
+                    borderRadius: '10px',
+                    px: 1.25,
+                    py: 0.5,
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    gap: 0.75,
+                    bgcolor: mode === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.04)',
+                    border: '1px solid',
+                    borderColor: mode === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)',
+                  }}
+                >
+                  <Upload size={15} />
+                  <Typography level="body-xs" sx={{ fontWeight: 600, color: 'inherit' }}>
+                    CSV Import
+                  </Typography>
+                </Button>
+              </Tooltip>
+
+              {/* 4. + Add Button */}
+              <Button
+                size="sm"
+                variant="solid"
+                color="primary"
+                data-testid="btn-add-tx"
+                onClick={() => dispatchFinanceAction('add-tx')}
+                sx={{
+                  borderRadius: '10px',
+                  px: 1.5,
+                  py: 0.5,
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
+                  gap: 0.5,
+                  bgcolor: '#10b981',
+                  '&:hover': {
+                    bgcolor: '#059669',
+                  },
+                  boxShadow: '0 2px 8px rgba(16, 185, 129, 0.3)',
+                }}
+              >
+                <Plus size={16} />
+                + Add
+              </Button>
+            </Stack>
+          </Box>
+        ) : (
+          /* OAKTREE STANDARD LINK NAVIGATION */
+          <Stack
+            direction="row"
+            spacing={{ md: 1.5, lg: 2.5 }}
+            alignItems="center"
+          >
+            {menuItems.map((item) => {
+              const isSelected = activeTab === item.id;
+              return (
+                <Box
+                  key={item.id}
+                  component="a"
+                  href={`/${item.id}`}
+                  onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                    if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
+                      e.preventDefault();
+                      setActiveTab?.(item.id);
+                    }
+                  }}
+                  sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0.85,
+                    py: 0.85,
+                    px: 0.75,
+                    position: 'relative',
+                    textDecoration: 'none',
+                    cursor: 'pointer',
+                    color: isSelected ? 'primary.plainColor' : 'text.secondary',
+                    fontWeight: isSelected ? 700 : 500,
+                    fontSize: '0.84rem',
+                    whiteSpace: 'nowrap',
+                    transition: 'color 0.2s ease-out',
+                    '&:hover': {
+                      color: 'text.primary',
+                      textDecoration: 'none',
+                    },
+                    '&::after': {
+                      content: '""',
+                      position: 'absolute',
+                      bottom: 0,
+                      left: 4,
+                      right: 4,
+                      height: '2px',
+                      borderRadius: '2px 2px 0 0',
+                      bgcolor: isSelected ? '#10b981' : 'transparent',
+                      boxShadow: isSelected ? '0 -1px 6px rgba(16, 185, 129, 0.5)' : 'none',
+                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                    }
+                  }}
+                >
+                  <Box sx={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    color: isSelected ? '#10b981' : 'inherit',
+                    transition: 'color 0.2s ease-out'
+                  }}>
+                    {item.icon}
+                  </Box>
+                  <Typography
+                    level="body-sm"
+                    sx={{
+                      fontWeight: 'inherit',
+                      color: 'inherit',
+                      fontSize: 'inherit',
+                    }}
+                  >
+                    {item.label}
+                  </Typography>
+                  {item.id === 'market' && reportsCount !== undefined && reportsCount > 0 && (
+                    <Chip
+                      variant={isSelected ? 'solid' : 'soft'}
+                      color="primary"
+                      size="sm"
+                      sx={{
+                        ml: 0.5,
+                        height: 18,
+                        minWidth: 18,
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        px: 0.5,
+                      }}
+                    >
+                      {reportsCount}
+                    </Chip>
+                  )}
+                </Box>
+              );
+            })}
+          </Stack>
+        )}
       </Box>
       </Sheet>
     </Box>

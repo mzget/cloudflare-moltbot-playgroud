@@ -5,8 +5,8 @@ const resources = {
   en: {
     translation: {
       app: {
-        title: "Oaktree Agent",
-        subtitle: "Investment Intelligence",
+        title: "Oaktree Platform",
+        subtitle: "Unified Intelligence for Investment & Finance",
         exchanging_token: "Exchanging Google token...",
         verifying_session: "Verifying session...",
       },
@@ -17,7 +17,7 @@ const resources = {
         authorized_only: "Authorized email addresses only.",
       },
       header: {
-        intelligence_active: "Intelligence Active",
+        intelligence_active: "Wealth Intelligence",
         notifications: "Notifications",
         mark_all_read: "Mark all as read",
         clear_read: "Clear read",
@@ -50,7 +50,7 @@ const resources = {
         hide_sidebar: "Hide Sidebar",
       },
       about: {
-        title: "About Oaktree Agent",
+        title: "About Oaktree Platform",
         description: "Inspired by the investment philosophy of Howard Marks (Oaktree Capital), this agent goes beyond raw data. It synthesizes news into cohesive narratives, focusing on market cycles, risk assessment, and long-term value.",
         footer: "Powered by Cloudflare Workers, AI (Llama 3), and Browser Rendering.",
       },
@@ -64,8 +64,8 @@ const resources = {
   es: {
     translation: {
       app: {
-        title: "Agente Oaktree",
-        subtitle: "Inteligencia de Inversión",
+        title: "Plataforma Oaktree",
+        subtitle: "Inteligencia Unificada de Inversión y Finanzas",
         exchanging_token: "Intercambiando token de Google...",
         verifying_session: "Verificando sesión...",
       },
@@ -76,7 +76,7 @@ const resources = {
         authorized_only: "Solo direcciones de correo electrónico autorizadas.",
       },
       header: {
-        intelligence_active: "Inteligencia Activa",
+        intelligence_active: "Inteligencia Patrimonial",
         notifications: "Notificaciones",
         mark_all_read: "Marcar todas como leídas",
         clear_read: "Borrar leídas",
@@ -109,7 +109,7 @@ const resources = {
         hide_sidebar: "Ocultar barra lateral",
       },
       about: {
-        title: "Acerca del Agente Oaktree",
+        title: "Acerca de la Plataforma Oaktree",
         description: "Inspirado en la filosofía de inversión de Howard Marks (Oaktree Capital), este agente va más allá de los datos brutos. Sintetiza las noticias en narrativas coherivas, centrándose en los ciclos de mercado, la evaluación de riesgos y el valor a largo plazo.",
         footer: "Desarrollado por Cloudflare Workers, AI (Llama 3) y Renderizado de Navegador.",
       },

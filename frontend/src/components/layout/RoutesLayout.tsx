@@ -16,6 +16,8 @@ const DatabaseChat = React.lazy(() => import('../features/agent/DatabaseChat'));
 const AnalysisReport = React.lazy(() => import('../features/agent/AnalysisReport'));
 const MarketIntelligence = React.lazy(() => import("../features/market/MarketIntelligence"));
 const MarketEventsTimeline = React.lazy(() => import('../features/market/MarketEventsTimeline'));
+const RemoteFinanceContainer = React.lazy(() => import('../finance/RemoteFinanceContainer'));
+import type { FinanceTab } from '../App';
 
 const LoadingFallback = (
   <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
@@ -32,8 +34,79 @@ export default function RoutesLayout() {
   const { t } = useTranslation();
   const location = useLocation();
   const activeTab = location.pathname.replace(/^\/|\/$/g, '') || 'dashboard';
-  const { symbol, tab: subTab } = useSearch({ strict: false });
+  const search = useSearch({ strict: false }) as any;
+  const { symbol, tab: subTab } = search || {};
   const navigate = useNavigate();
+
+  // Finance search parameters with safe fallback defaults
+  const validFinanceTabs: readonly FinanceTab[] = ['dashboard', 'transactions', 'budgets', 'wallets'] as const;
+  const financeTab: FinanceTab = (search?.tab && validFinanceTabs.includes(search.tab))
+    ? (search.tab as FinanceTab)
+    : 'dashboard';
+  const financeWallet: string = (typeof search?.wallet === 'string' && search.wallet.trim().length > 0)
+    ? search.wallet.trim()
+    : 'all';
+
+  // Commanded-Transition Guards to eliminate bidirectional echo loops
+  const lastCommandedTabRef = React.useRef<FinanceTab | null>(null);
+  const lastCommandedWalletRef = React.useRef<string | null>(null);
+
+  // Clear transition lock once URL search parameters have synchronized
+  React.useEffect(() => {
+    if (lastCommandedTabRef.current === financeTab) {
+      lastCommandedTabRef.current = null;
+    }
+  }, [financeTab]);
+
+  React.useEffect(() => {
+    if (lastCommandedWalletRef.current === financeWallet) {
+      lastCommandedWalletRef.current = null;
+    }
+  }, [financeWallet]);
+
+  const handleFinanceTabChange = React.useCallback(
+    (newTab: FinanceTab) => {
+      // 1. Guard against redundant navigation
+      if (newTab === financeTab) return;
+
+      // 2. Drop stale echoes if host recently commanded a different transition
+      if (lastCommandedTabRef.current !== null && newTab !== lastCommandedTabRef.current) {
+        return;
+      }
+
+      lastCommandedTabRef.current = newTab;
+      navigate({
+        search: ((old: any) => ({
+          ...old,
+          tab: newTab,
+        })) as any,
+      });
+    },
+    [financeTab, navigate]
+  );
+
+  const handleFinanceWalletChange = React.useCallback(
+    (newWalletId: string) => {
+      const normalizedWallet = newWalletId?.trim() || 'all';
+      // 1. Guard against redundant navigation
+      if (normalizedWallet === financeWallet) return;
+
+      // 2. Drop stale echoes if host recently commanded a different transition
+      if (lastCommandedWalletRef.current !== null && normalizedWallet !== lastCommandedWalletRef.current) {
+        return;
+      }
+
+      lastCommandedWalletRef.current = normalizedWallet;
+      navigate({
+        search: ((old: any) => ({
+          ...old,
+          wallet: normalizedWallet,
+        })) as any,
+      });
+    },
+    [financeWallet, navigate]
+  );
+
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const { user, logout } = React.useContext(AuthContext);
   const theme = useSettingsStore(state => state.theme);
@@ -51,11 +124,16 @@ export default function RoutesLayout() {
         to: '/analysis',
         search: { symbol, tab: 'dossier' },
       });
+    } else if (tab === 'finance') {
+      navigate({
+        to: '/finance',
+        search: { tab: 'dashboard', wallet: 'all' },
+      });
     } else {
       navigate({
         to: `/${tab}`,
         search: {},
-      });
+      } as any);
     }
   };
 
@@ -125,6 +203,10 @@ export default function RoutesLayout() {
       <Header 
         activeTab={activeTab}
         setActiveTab={setActiveTab}
+        activeFinanceTab={financeTab}
+        onFinanceTabChange={handleFinanceTabChange}
+        selectedWalletId={financeWallet}
+        onFinanceWalletChange={handleFinanceWalletChange}
         reportsCount={reports.length + digests.length}
         onOpenSidebar={() => setMobileOpen(true)}
       />
@@ -240,6 +322,14 @@ export default function RoutesLayout() {
             {activeTab === 'analysis' && !symbol && <Box sx={{ py: 4, textAlign: 'center' }}><Typography level="h3">กรุณาระบุสัญลักษณ์หุ้นที่ต้องการวิเคราะห์</Typography></Box>}
             {activeTab === 'db-agent' && <DatabaseChat />}
             {activeTab === 'command-center' && <SourceManager />}
+            {activeTab === 'finance' && (
+              <RemoteFinanceContainer
+                activeTab={financeTab}
+                selectedWalletId={financeWallet}
+                onTabChange={handleFinanceTabChange}
+                onWalletChange={handleFinanceWalletChange}
+              />
+            )}
             {activeTab === 'about' && (
               <Sheet sx={{ ...glassStyle, p: 4, borderRadius: '18px' }}>
                 <Typography level="h2" sx={{ mb: 2 }}>{t('about.title')}</Typography>

@@ -1,5 +1,6 @@
 import { defineConfig } from 'astro/config';
 import react from '@astrojs/react';
+import federation from '@originjs/vite-plugin-federation';
 
 // https://astro.build/config
 export default defineConfig({
@@ -9,6 +10,24 @@ export default defineConfig({
     enabled: false
   },
   vite: {
+    plugins: [
+      {
+        ...federation({
+          name: 'oaktree_host',
+          remotes: {
+            simplicity_finance: 'http://localhost:5173/assets/remoteEntry.js',
+          },
+          shared: ['react', 'react-dom', 'zustand'],
+        }),
+        apply(config, env) {
+          return !env.isSsrBuild && !config.build?.ssr;
+        },
+      },
+    ],
+    build: {
+      target: 'esnext',
+      modulePreload: false,
+    },
     optimizeDeps: {
       include: ['@ai-sdk/react', 'ai'],
     },
