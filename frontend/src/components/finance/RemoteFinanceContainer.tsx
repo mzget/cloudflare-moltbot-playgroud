@@ -1,4 +1,6 @@
 import * as React from 'react';
+import * as ReactDOM from 'react-dom';
+import * as Zustand from 'zustand';
 import { Box, CircularProgress, Typography } from '@mui/joy';
 import { useSearch, useNavigate } from '@tanstack/react-router';
 import { useColorScheme } from '@mui/joy/styles';
@@ -7,6 +9,64 @@ import { useSettingsStore } from '../../store/settingsStore';
 import { useFinanceBridgeStore, type Wallet } from '../../store/financeBridgeStore';
 import { FederatedErrorBoundary } from './FederatedErrorBoundary';
 import type { FederatedFinanceProps } from 'simplicity_finance/FinanceApp';
+
+const DEFAULT_REMOTE_ENTRY_URL =
+  (typeof import.meta !== 'undefined' && (import.meta as any).env?.PUBLIC_SIMPLICITY_REMOTE_URL) ||
+  'http://localhost:5173/assets/remoteEntry.js';
+
+/**
+ * Loads the Federated FinanceApp module from remoteEntry.js at runtime.
+ * Appends a cache-busting query parameter on retry so the browser re-fetches
+ * remoteEntry.js after a transient network outage (e.g. when the remote server restarts).
+ */
+async function loadFederatedFinanceModule(retryAttempt: number): Promise<{ default: React.ComponentType<FederatedFinanceProps> }> {
+  const separator = DEFAULT_REMOTE_ENTRY_URL.includes('?') ? '&' : '?';
+  const entryUrl =
+    retryAttempt > 0
+      ? `${DEFAULT_REMOTE_ENTRY_URL}${separator}t=${Date.now()}_${retryAttempt}`
+      : DEFAULT_REMOTE_ENTRY_URL;
+
+  const container: any = await import(/* @vite-ignore */ entryUrl);
+  if (!container || typeof container.get !== 'function') {
+    throw new Error(`Invalid federation container returned from ${DEFAULT_REMOTE_ENTRY_URL}`);
+  }
+
+  if (typeof container.init === 'function') {
+    await container.init({
+      react: {
+        '19.3.0': {
+          get: () => Promise.resolve(() => React),
+          loaded: true,
+          from: 'oaktree_host',
+        },
+      },
+      'react-dom': {
+        '19.3.0': {
+          get: () => Promise.resolve(() => ReactDOM),
+          loaded: true,
+          from: 'oaktree_host',
+        },
+      },
+      zustand: {
+        '5.0.15': {
+          get: () => Promise.resolve(() => Zustand),
+          loaded: true,
+          from: 'oaktree_host',
+        },
+      },
+    });
+  }
+
+  const factory = await container.get('./FinanceApp');
+  const mod = typeof factory === 'function' ? factory() : factory;
+  const ResolvedComponent = mod?.default || mod?.FederatedFinanceApp || mod;
+
+  if (!ResolvedComponent) {
+    throw new Error('Remote FinanceApp component export not found');
+  }
+
+  return { default: ResolvedComponent };
+}
 
 export interface RemoteFinanceContainerProps extends Partial<FederatedFinanceProps> {}
 
@@ -42,8 +102,7 @@ export const RemoteFinanceContainer: React.FC<RemoteFinanceContainerProps> = (pr
       if (typeof window === 'undefined') {
         return Promise.resolve({ default: () => null as any });
       }
-      const remote = 'simplicity_finance/FinanceApp';
-      return import(/* @vite-ignore */ remote);
+      return loadFederatedFinanceModule(retryKey);
     });
   }, [retryKey]);
 
