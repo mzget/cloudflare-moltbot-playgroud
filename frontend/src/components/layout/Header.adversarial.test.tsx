@@ -70,7 +70,7 @@ describe('Adversarial Verification: Header Navigation & Action Controls', () => 
     useFinanceBridgeStore.getState().reset();
   });
 
-  it('renders Segmented Pill Switcher with Oaktree and Simplicity buttons', () => {
+  it('renders Segmented Pill Switcher with Oaktree and Simplicity buttons with native href links for open-in-new-tab capability', () => {
     currentPathname = '/finance';
     const html = renderToString(
       <Header activeTab="finance" />
@@ -78,6 +78,8 @@ describe('Adversarial Verification: Header Navigation & Action Controls', () => 
 
     expect(html).toContain('data-testid="app-switcher-oaktree"');
     expect(html).toContain('data-testid="app-switcher-simplicity"');
+    expect(html).toContain('href="/dashboard"');
+    expect(html).toContain('href="/finance?tab=dashboard&amp;wallet=all"');
     expect(html).toContain('🌳 Oaktree');
     expect(html).toContain('💳 Simplicity');
   });

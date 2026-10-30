@@ -4,15 +4,40 @@ import * as Zustand from 'zustand';
 import { Box, CircularProgress, Typography } from '@mui/joy';
 import { useSearch, useNavigate } from '@tanstack/react-router';
 import { useColorScheme } from '@mui/joy/styles';
-import { AuthContext } from '../common/AuthContext';
-import { useSettingsStore } from '../../store/settingsStore';
-import { useFinanceBridgeStore, type Wallet } from '../../store/financeBridgeStore';
-import { FederatedErrorBoundary } from './FederatedErrorBoundary';
+import { AuthContext } from '../../../common/AuthContext';
+import { useSettingsStore } from '../../../../store/settingsStore';
+import { useFinanceBridgeStore, type Wallet } from '../../../../store/financeBridgeStore';
+import { FederatedErrorBoundary } from '../../core/FederatedErrorBoundary';
 import type { FederatedFinanceProps } from 'simplicity_finance/FinanceApp';
 
-const DEFAULT_REMOTE_ENTRY_URL =
-  (typeof import.meta !== 'undefined' && (import.meta as any).env?.PUBLIC_SIMPLICITY_REMOTE_URL) ||
-  'http://localhost:5173/assets/remoteEntry.js';
+const PROD_SIMPLICITY_ORIGIN = 'https://simplicity-3c9.pages.dev';
+const LOCAL_SIMPLICITY_ORIGIN = 'http://localhost:5173';
+
+export function isLocalEnvironment(): boolean {
+  if (typeof window !== 'undefined') {
+    const h = window.location.hostname;
+    return h === 'localhost' || h === '127.0.0.1' || h === '0.0.0.0';
+  }
+  return typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production';
+}
+
+export function getSimplicityRemoteUrl(): string {
+  if (typeof import.meta !== 'undefined' && (import.meta as any).env?.PUBLIC_SIMPLICITY_REMOTE_URL) {
+    return (import.meta as any).env.PUBLIC_SIMPLICITY_REMOTE_URL;
+  }
+  return isLocalEnvironment()
+    ? `${LOCAL_SIMPLICITY_ORIGIN}/assets/remoteEntry.js`
+    : `${PROD_SIMPLICITY_ORIGIN}/assets/remoteEntry.js`;
+}
+
+export function getSimplicityApiBaseUrl(): string {
+  if (typeof import.meta !== 'undefined' && (import.meta as any).env?.PUBLIC_SIMPLICITY_API_URL) {
+    return (import.meta as any).env.PUBLIC_SIMPLICITY_API_URL;
+  }
+  return isLocalEnvironment()
+    ? `${LOCAL_SIMPLICITY_ORIGIN}/api`
+    : `${PROD_SIMPLICITY_ORIGIN}/api`;
+}
 
 /**
  * Loads the Federated FinanceApp module from remoteEntry.js at runtime.
@@ -20,15 +45,16 @@ const DEFAULT_REMOTE_ENTRY_URL =
  * remoteEntry.js after a transient network outage (e.g. when the remote server restarts).
  */
 async function loadFederatedFinanceModule(retryAttempt: number): Promise<{ default: React.ComponentType<FederatedFinanceProps> }> {
-  const separator = DEFAULT_REMOTE_ENTRY_URL.includes('?') ? '&' : '?';
+  const remoteUrl = getSimplicityRemoteUrl();
+  const separator = remoteUrl.includes('?') ? '&' : '?';
   const entryUrl =
     retryAttempt > 0
-      ? `${DEFAULT_REMOTE_ENTRY_URL}${separator}t=${Date.now()}_${retryAttempt}`
-      : DEFAULT_REMOTE_ENTRY_URL;
+      ? `${remoteUrl}${separator}t=${Date.now()}_${retryAttempt}`
+      : remoteUrl;
 
   const container: any = await import(/* @vite-ignore */ entryUrl);
   if (!container || typeof container.get !== 'function') {
-    throw new Error(`Invalid federation container returned from ${DEFAULT_REMOTE_ENTRY_URL}`);
+    throw new Error(`Invalid federation container returned from ${remoteUrl}`);
   }
 
   if (typeof container.init === 'function') {
@@ -212,7 +238,7 @@ export const RemoteFinanceContainer: React.FC<RemoteFinanceContainerProps> = (pr
           onTabChange={handleTabChange}
           onWalletChange={handleWalletChange}
           onWalletsSync={handleWalletsSync}
-          apiBaseUrl={props.apiBaseUrl}
+          apiBaseUrl={props.apiBaseUrl || getSimplicityApiBaseUrl()}
         />
       </React.Suspense>
     </FederatedErrorBoundary>
@@ -220,3 +246,4 @@ export const RemoteFinanceContainer: React.FC<RemoteFinanceContainerProps> = (pr
 };
 
 export default RemoteFinanceContainer;
+

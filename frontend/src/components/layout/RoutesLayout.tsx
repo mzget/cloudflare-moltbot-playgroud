@@ -16,7 +16,7 @@ const DatabaseChat = React.lazy(() => import('../features/agent/DatabaseChat'));
 const AnalysisReport = React.lazy(() => import('../features/agent/AnalysisReport'));
 const MarketIntelligence = React.lazy(() => import("../features/market/MarketIntelligence"));
 const MarketEventsTimeline = React.lazy(() => import('../features/market/MarketEventsTimeline'));
-const RemoteFinanceContainer = React.lazy(() => import('../finance/RemoteFinanceContainer'));
+const RemoteFinanceContainer = React.lazy(() => import('../federation/remotes/finance/RemoteFinanceContainer'));
 import type { FinanceTab } from '../App';
 
 const LoadingFallback = (

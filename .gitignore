@@ -77,3 +77,4 @@ frontend/test-results/
 tmp.md
 .gemini
 .agents/teamwork/
+*.code-workspace
