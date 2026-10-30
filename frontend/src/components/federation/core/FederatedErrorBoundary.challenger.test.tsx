@@ -2,7 +2,7 @@ import * as React from 'react';
 import { describe, it, expect, vi } from 'vitest';
 import { renderToString } from 'react-dom/server';
 import { FederatedErrorBoundary } from './FederatedErrorBoundary';
-import { RemoteFinanceContainer } from './RemoteFinanceContainer';
+import { RemoteFinanceContainer } from '../remotes/finance/RemoteFinanceContainer';
 
 describe('Empirical Adversarial Verification: FederatedErrorBoundary & Remote Loader', () => {
   it('1. verifies normal rendering when no error occurs', () => {
@@ -35,7 +35,6 @@ describe('Empirical Adversarial Verification: FederatedErrorBoundary & Remote Lo
     // Verify fallback UI elements
     expect(html).toContain('Simplicity Finance Unavailable');
     expect(html).toContain('Unable to connect to the Simplicity Finance remote application');
-    expect(html).toContain('http://localhost:5173');
     expect(html).toContain('Failed to fetch dynamically imported module');
     expect(html).toContain('Retry Connection');
     expect(html).not.toContain('Should not render');
@@ -108,3 +107,4 @@ describe('Empirical Adversarial Verification: FederatedErrorBoundary & Remote Lo
     }
   });
 });
+

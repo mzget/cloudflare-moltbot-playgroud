@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { Box, Button, Sheet, Typography, Stack } from '@mui/joy';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
-import { glassStyle } from '../../styles/glass';
+import { glassStyle } from '../../../styles/glass';
 
 interface Props {
   children: React.ReactNode;
@@ -83,11 +83,7 @@ export class FederatedErrorBoundary extends React.Component<Props, State> {
 
             <Typography level="body-sm" sx={{ mb: 3, opacity: 0.8, lineHeight: 1.6 }}>
               Unable to connect to the Simplicity Finance remote application.
-              Please ensure the remote service is running on{' '}
-              <Typography sx={{ fontFamily: 'monospace', fontWeight: 600 }}>
-                http://localhost:5173
-              </Typography>{' '}
-              and retry.
+              Please ensure the remote service is reachable and retry.
             </Typography>
 
             {this.state.error && (
@@ -133,4 +129,6 @@ export class FederatedErrorBoundary extends React.Component<Props, State> {
     return this.props.children;
   }
 }
+
 export default FederatedErrorBoundary;
+

@@ -463,15 +463,20 @@ export default function Header({
           >
             {/* Oaktree Pill */}
             <Button
+              component="a"
+              href="/dashboard"
               size="sm"
               variant="plain"
               role="tab"
               aria-selected={!isSimplicity}
               data-testid="app-switcher-oaktree"
-              onClick={() => {
-                if (!isSimplicity) return; // No-op if already on Oaktree
-                setActiveTab?.('dashboard');
-                navigate({ to: '/dashboard', search: {} });
+              onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
+                  e.preventDefault();
+                  if (!isSimplicity) return; // No-op if already on Oaktree
+                  setActiveTab?.('dashboard');
+                  navigate({ to: '/dashboard', search: {} });
+                }
               }}
               sx={{
                 borderRadius: '20px',
@@ -483,9 +488,11 @@ export default function Header({
                 color: !isSimplicity ? (mode === 'dark' ? '#34d399' : '#059669') : 'text.secondary',
                 bgcolor: !isSimplicity ? (mode === 'dark' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.12)') : 'transparent',
                 boxShadow: !isSimplicity ? '0 1px 4px rgba(16, 185, 129, 0.2)' : 'none',
+                textDecoration: 'none',
                 transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                 '&:hover': {
                   color: 'text.primary',
+                  textDecoration: 'none',
                   bgcolor: !isSimplicity ? (mode === 'dark' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(16, 185, 129, 0.18)') : 'rgba(0, 0, 0, 0.04)',
                 },
               }}
@@ -495,20 +502,25 @@ export default function Header({
 
             {/* Simplicity Pill */}
             <Button
+              component="a"
+              href={`/finance?tab=${lastFinanceTab || 'dashboard'}&wallet=${lastFinanceWallet || 'all'}`}
               size="sm"
               variant="plain"
               role="tab"
               aria-selected={isSimplicity}
               data-testid="app-switcher-simplicity"
-              onClick={() => {
-                if (isSimplicity) return; // No-op if already on Simplicity
-                setActiveTab?.('finance');
-                const targetTab = lastFinanceTab || 'dashboard';
-                const targetWallet = lastFinanceWallet || 'all';
-                navigate({
-                  to: '/finance',
-                  search: { tab: targetTab, wallet: targetWallet },
-                });
+              onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
+                  e.preventDefault();
+                  if (isSimplicity) return; // No-op if already on Simplicity
+                  setActiveTab?.('finance');
+                  const targetTab = lastFinanceTab || 'dashboard';
+                  const targetWallet = lastFinanceWallet || 'all';
+                  navigate({
+                    to: '/finance',
+                    search: { tab: targetTab, wallet: targetWallet },
+                  });
+                }
               }}
               sx={{
                 borderRadius: '20px',
@@ -520,9 +532,11 @@ export default function Header({
                 color: isSimplicity ? (mode === 'dark' ? '#34d399' : '#059669') : 'text.secondary',
                 bgcolor: isSimplicity ? (mode === 'dark' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(16, 185, 129, 0.12)') : 'transparent',
                 boxShadow: isSimplicity ? '0 1px 4px rgba(16, 185, 129, 0.2)' : 'none',
+                textDecoration: 'none',
                 transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                 '&:hover': {
                   color: 'text.primary',
+                  textDecoration: 'none',
                   bgcolor: isSimplicity ? (mode === 'dark' ? 'rgba(16, 185, 129, 0.25)' : 'rgba(16, 185, 129, 0.18)') : 'rgba(0, 0, 0, 0.04)',
                 },
               }}

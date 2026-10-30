@@ -15,7 +15,10 @@ export default defineConfig({
         ...federation({
           name: 'oaktree_host',
           remotes: {
-            simplicity_finance: 'http://localhost:5173/assets/remoteEntry.js',
+            simplicity_finance: process.env.PUBLIC_SIMPLICITY_REMOTE_URL ||
+              (process.env.NODE_ENV === 'production'
+                ? 'https://simplicity-3c9.pages.dev/assets/remoteEntry.js'
+                : 'http://localhost:5173/assets/remoteEntry.js'),
           },
           shared: ['react', 'react-dom', 'zustand'],
         }),
