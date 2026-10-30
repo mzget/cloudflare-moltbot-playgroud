@@ -9,6 +9,7 @@ export function getStaticPaths() {
     { params: { route: 'command-center' }, props: { title: 'Command Center' } },
     { params: { route: 'about' }, props: { title: 'About Oaktree' } },
     { params: { route: 'analysis' }, props: { title: 'Analysis' } },
+    { params: { route: 'finance' }, props: { title: 'Simplicity Finance' } },
   ];
 }
 
@@ -17,7 +18,7 @@ import Layout from '../layouts/Layout.astro';
 import Dashboard from '../components/App';
 ---
 
-<Layout title={`Oaktree Agent - ${title}`}>
+<Layout title={`Oaktree Platform - ${title}`}>
 	<main>
 		<Dashboard client:only="react" />
 	</main>
