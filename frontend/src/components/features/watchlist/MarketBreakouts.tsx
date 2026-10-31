@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
+	Link,
 	Box,
 	Typography,
 	Sheet,
@@ -35,6 +36,7 @@ import { useNavigate } from '@tanstack/react-router';
 import DebouncedInput from '../../common/DebouncedInput';
 import { glassStyle } from '../../../styles/glass';
 import { API_BASE_URL } from '../../../config';
+import { useSettingsStore } from '../../../store/settingsStore';
 
 export interface BreakoutItem {
 	symbol: string;
@@ -182,6 +184,13 @@ export default function MarketBreakouts() {
 			setScanning(false);
 		}
 	};
+
+	const density = useSettingsStore(s => s.density);
+	const ds = useMemo(() => ({
+		compact: { paddingX: '6px', paddingY: '4px', fontSize: '0.75rem', headerSize: '0.7rem', nameSize: '10px' },
+		cozy: { paddingX: '8px', paddingY: '6px', fontSize: '0.8rem', headerSize: '0.75rem', nameSize: '11px' },
+		comfort: { paddingX: '12px', paddingY: '10px', fontSize: '0.88rem', headerSize: '0.85rem', nameSize: '12px' }
+	})[density], [density]);
 
 	const handleViewAnalysis = (symbol: string) => {
 		navigate({
@@ -779,8 +788,10 @@ export default function MarketBreakouts() {
 						stripe="odd"
 						borderAxis="xBetween"
 						sx={{
-							'& th': { fontWeight: 'bold', fontSize: '0.85rem' },
-							'& td': { fontSize: '0.875rem' }
+							'--TableCell-paddingX': ds.paddingX,
+							'--TableCell-paddingY': ds.paddingY,
+							'& th': { fontWeight: 'bold', fontSize: ds.headerSize },
+							'& td': { fontSize: ds.fontSize }
 						}}
 					>
 						<thead>
@@ -792,14 +803,13 @@ export default function MarketBreakouts() {
 								<th style={{ textAlign: 'right' }}>{renderSortHeader('% From 52W High', 'distance52wHigh', 'right')}</th>
 								<th style={{ textAlign: 'right' }}>{renderSortHeader('% From ATH', 'distanceAth', 'right')}</th>
 								<th style={{ textAlign: 'right' }}>{renderSortHeader('% From 52W Low', 'distance52wLow', 'right')}</th>
-								<th style={{ textAlign: 'center' }}>Action</th>
 							</tr>
 						</thead>
 						<tbody>
 							{filteredMatrix.length === 0 ? (
 								<tr>
-									<td colSpan={8} style={{ textAlign: 'center', padding: '24px' }}>
-										<Typography level="body-sm" sx={{ color: 'text.secondary' }}>
+									<td colSpan={7} style={{ textAlign: 'center', padding: '24px' }}>
+										<Typography level="body-sm" sx={{ fontSize: ds.fontSize, color: 'text.secondary' }}>
 											No stocks found matching the criteria.
 										</Typography>
 									</td>
@@ -814,10 +824,22 @@ export default function MarketBreakouts() {
 											<td>
 												<Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
 													<Box>
-														<Typography level="title-sm" sx={{ fontWeight: 'bold' }}>
-															{m.symbol}
-														</Typography>
-														<Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
+						<Link
+							component="button"
+							level="title-sm"
+							onClick={() => handleViewAnalysis(m.symbol)}
+							sx={{
+								fontWeight: 'bold',
+								color: 'primary.plainColor',
+								textDecoration: 'none',
+								textAlign: 'left',
+								display: 'block',
+								'&:hover': { color: 'primary.hoverColor', textDecoration: 'underline' }
+							}}
+						>
+							{m.symbol}
+						</Link>
+														<Typography level="body-xs" sx={{ color: 'text.tertiary' , fontSize: ds.nameSize }}>
 															{m.name}
 														</Typography>
 													</Box>
@@ -850,14 +872,14 @@ export default function MarketBreakouts() {
 												</Box>
 											</td>
 											<td style={{ textAlign: 'right' }}>
-												<Typography level="body-sm" sx={{ fontWeight: 600 }}>
+												<Typography level="body-sm" sx={{ fontSize: ds.fontSize, fontWeight: 600 }}>
 													${m.price > 0 ? m.price.toFixed(2) : '—'}
 												</Typography>
 											</td>
 											<td style={{ textAlign: 'right' }}>
 												<Typography
 													level="body-sm"
-													sx={{
+													sx={{ fontSize: ds.fontSize,
 														fontWeight: 600,
 														color: m.percentChange >= 0 ? 'success.plainColor' : 'danger.plainColor'
 													}}
@@ -873,7 +895,7 @@ export default function MarketBreakouts() {
 												{m.distance52wHigh !== null ? (
 													<Typography
 														level="body-sm"
-														sx={{
+														sx={{ fontSize: ds.fontSize,
 															fontWeight: isNearHigh ? 700 : 500,
 															color: isNearHigh
 																? 'warning.plainColor'
@@ -893,7 +915,7 @@ export default function MarketBreakouts() {
 												{m.distanceAth !== null ? (
 													<Typography
 														level="body-sm"
-														sx={{
+														sx={{ fontSize: ds.fontSize,
 															fontWeight: m.status === 'near_ath' ? 700 : 500,
 															color: m.status === 'near_ath'
 																? 'warning.plainColor'
@@ -913,7 +935,7 @@ export default function MarketBreakouts() {
 												{m.distance52wLow !== null ? (
 													<Typography
 														level="body-sm"
-														sx={{
+														sx={{ fontSize: ds.fontSize,
 															fontWeight: isNearLow ? 700 : 500,
 															color: isNearLow
 																? 'warning.plainColor'
@@ -928,18 +950,6 @@ export default function MarketBreakouts() {
 												) : (
 													<Typography level="body-xs" sx={{ color: 'text.tertiary' }}>—</Typography>
 												)}
-											</td>
-											<td style={{ textAlign: 'center' }}>
-												<Tooltip title="View Detailed Analysis" size="sm">
-													<IconButton
-														size="sm"
-														variant="plain"
-														color="neutral"
-														onClick={() => handleViewAnalysis(m.symbol)}
-													>
-														<FileText size={16} />
-													</IconButton>
-												</Tooltip>
 											</td>
 										</tr>
 									);
