@@ -108,8 +108,13 @@ export default function ScenarioRangeBar({ price, bear, base, bull, compact = fa
       </Box>
 
       {!compact && (
-        <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: 'wrap', rowGap: 0.75 }} alignItems="center">
-          <Chip size="sm" variant="solid" color={zoneColor(mos.zone)} sx={{ fontWeight: 700 }}>
+        <Stack direction="row" spacing={0.75} sx={{ mt: 1, flexWrap: 'wrap', rowGap: 0.5 }} alignItems="center">
+          <Chip
+            size="sm"
+            variant="solid"
+            color={zoneColor(mos.zone)}
+            sx={{ fontWeight: 700, fontSize: '0.72rem', borderRadius: '8px' }}
+          >
             Price {fmtPrice(price as number)}
             {mos.zone ? ` · ${ZONE_LABEL[mos.zone]}` : ''}
           </Chip>
@@ -119,8 +124,8 @@ export default function ScenarioRangeBar({ price, bear, base, bull, compact = fa
               size="sm"
               variant="soft"
               color={m.mos !== null && m.mos >= 0 ? 'success' : m.mos !== null ? 'danger' : 'neutral'}
-              startDecorator={<Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: m.color }} />}
-              sx={{ fontWeight: 600 }}
+              startDecorator={<Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: m.color }} />}
+              sx={{ fontWeight: 600, fontSize: '0.72rem', borderRadius: '8px' }}
             >
               {m.label} {fmtPrice(m.value as number)} · MoS {formatMosLabel(m.mos, true)}
             </Chip>
