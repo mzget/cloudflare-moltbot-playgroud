@@ -106,6 +106,15 @@ const dashboardRoute = createRoute({
   component: RoutesLayout,
 });
 
+const portfolioRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/portfolio',
+  validateSearch: generalSearchSchema,
+  beforeLoad: ({ navigate, search }) => {
+    throw navigate({ to: '/dashboard', search, replace: true });
+  },
+});
+
 const marketRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/market',
@@ -165,6 +174,7 @@ const financeRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   indexRoute,
   dashboardRoute,
+  portfolioRoute,
   marketRoute,
   watchlistRoute,
   agentRoute,

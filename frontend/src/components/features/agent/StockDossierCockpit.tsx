@@ -43,6 +43,7 @@ import {
   Bell,
 } from 'lucide-react';
 import ScenarioRangeBar from '../../common/ScenarioRangeBar';
+import { useNavigate } from '@tanstack/react-router';
 import { API_BASE_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
 import {
@@ -64,6 +65,29 @@ import { AlertsManagerModal } from '../watchlist/AlertsManagerModal';
 import { useAlertRules } from '../watchlist/hooks/useAlertRules';
 import type { FundamentalStatusItem } from '../sources/FundamentalIntelligenceTab';
 import type { WatchlistItem } from '../watchlist/hooks/useWatchlist';
+
+function formatCockpitTimestamp(ts?: string | null): string {
+  if (!ts) return 'Recent';
+  try {
+    const d = new Date(ts);
+    if (isNaN(d.getTime())) return ts;
+    return d.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  } catch {
+    return ts;
+  }
+}
+
+function formatExchangeDisplay(exchange?: string | null): string | null {
+  if (!exchange) return null;
+  const upper = exchange.toUpperCase();
+  if (upper.includes('NEW YORK STOCK EXCHANGE') || upper === 'NYSE') return 'NYSE';
+  if (upper.includes('NASDAQ')) return 'NASDAQ';
+  return exchange;
+}
 
 export interface StockDossierCockpitProps {
   symbol: string;
@@ -88,6 +112,7 @@ export default function StockDossierCockpit({
   initialFundamental = null,
   initialViewMode = 'cockpit',
 }: StockDossierCockpitProps) {
+  const navigate = useNavigate();
   const [overview, setOverview] = React.useState<any>(initialOverview);
   const [report, setReport] = React.useState<any>(initialReport);
   const [theses, setTheses] = React.useState<any[] | null>(initialTheses);
@@ -513,129 +538,146 @@ export default function StockDossierCockpit({
             data-testid="cockpit-header-grid"
           >
             {/* Left Column: Symbol, Name, Chips & Fundamental Freshness */}
-            <Grid xs={12} lg={6}>
-              <Box>
-                <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap" sx={{ mb: 0.5 }}>
+            <Grid xs={12} lg={7}>
+              <Stack spacing={1}>
+                {/* Row 1: Symbol Badge, Company Name, Type, Sector, Exchange */}
+                <Stack direction="row" spacing={1.25} alignItems="center" flexWrap="wrap">
                   <Chip
-                    size="lg"
+                    size="md"
                     variant="solid"
                     color="success"
                     sx={{
-                      fontWeight: 900,
-                      fontSize: '1.25rem',
-                      letterSpacing: '0.05em',
+                      fontWeight: 800,
+                      fontSize: '1.15rem',
+                      letterSpacing: '0.04em',
                       px: 1.5,
+                      py: 0.5,
+                      borderRadius: '10px',
                       bgcolor: '#10b981',
+                      boxShadow: '0 2px 10px rgba(16, 185, 129, 0.25)',
                     }}
                   >
                     {symbol}
                   </Chip>
-                  <Typography level="h2" sx={{ fontWeight: 800, fontSize: { xs: '1.4rem', sm: '1.75rem' } }}>
+                  <Typography
+                    level="h2"
+                    sx={{
+                      fontWeight: 800,
+                      fontSize: { xs: '1.35rem', sm: '1.65rem' },
+                      letterSpacing: '-0.02em',
+                      lineHeight: 1.2,
+                    }}
+                  >
                     {resolvedWatchlistItem?.name || overview?.name || symbol}
                   </Typography>
                   {resolvedWatchlistItem?.type && (
-                    <Chip size="sm" variant="soft" color="neutral" sx={{ fontSize: '0.75rem', fontWeight: 700 }}>
+                    <Chip
+                      size="sm"
+                      variant="soft"
+                      color="neutral"
+                      sx={{
+                        fontSize: '0.72rem',
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        borderRadius: '8px',
+                      }}
+                    >
                       {resolvedWatchlistItem.type}
-                    </Chip>
-                  )}
-                  {overview?.exchange && (
-                    <Chip size="sm" variant="soft" color="neutral" sx={{ fontSize: '0.75rem' }}>
-                      {overview.exchange}
                     </Chip>
                   )}
                   {(resolvedWatchlistItem?.sector_label || overview?.sector) && (
                     <Chip
                       size="sm"
-                      variant="outlined"
-                      color="primary"
+                      variant="soft"
                       sx={{
                         fontSize: '0.75rem',
-                        borderColor: resolvedWatchlistItem?.sector_label_color || undefined,
-                        color: resolvedWatchlistItem?.sector_label_color || undefined,
+                        fontWeight: 600,
+                        borderRadius: '8px',
+                        bgcolor: resolvedWatchlistItem?.sector_label_color
+                          ? `${resolvedWatchlistItem.sector_label_color}18`
+                          : 'primary.softBg',
+                        color: resolvedWatchlistItem?.sector_label_color || 'primary.plainColor',
+                        border: '1px solid',
+                        borderColor: resolvedWatchlistItem?.sector_label_color
+                          ? `${resolvedWatchlistItem.sector_label_color}40`
+                          : 'primary.outlinedBorder',
                       }}
                     >
                       {resolvedWatchlistItem?.sector_label || overview?.sector}
                     </Chip>
                   )}
+                  {overview?.exchange && (
+                    <Tooltip title={overview.exchange} arrow placement="top">
+                      <Chip
+                        size="sm"
+                        variant="soft"
+                        color="neutral"
+                        sx={{
+                          fontSize: '0.72rem',
+                          fontWeight: 600,
+                          borderRadius: '8px',
+                          color: 'text.secondary',
+                        }}
+                      >
+                        {formatExchangeDisplay(overview.exchange)}
+                      </Chip>
+                    </Tooltip>
+                  )}
                 </Stack>
-                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ mt: 0.5, gap: 0.75 }}>
-                  <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
+
+                {/* Row 2: Secondary Meta Bar & Fundamental Freshness */}
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  alignItems="center"
+                  flexWrap="wrap"
+                  sx={{ gap: 0.75, color: 'text.secondary' }}
+                >
+                  <Typography level="body-xs" sx={{ color: 'text.secondary', fontWeight: 500 }}>
                     {overview?.industry ? `${overview.industry} • ` : ''}
-                    Currency: {overview?.currency || 'USD'} • Last Updated:{' '}
-                    {overview?.updatedAt || 'Recent'}
+                    Currency: <Typography component="span" sx={{ fontWeight: 600, color: 'text.primary' }}>{overview?.currency || 'USD'}</Typography>
+                    {' • '}
+                    Last Updated: {formatCockpitTimestamp(overview?.updatedAt)}
                   </Typography>
+
                   {fundamental && (
                     <>
-                      <Divider orientation="vertical" sx={{ height: 12, opacity: 0.4 }} />
-                      <FundamentalFreshnessBadge
-                        status={fundamental.status || 'missing'}
-                        asOfDate={fundamental.as_of_date}
-                        size="sm"
-                        format="verbose"
-                      />
-                      {fundamental.as_of_date && (
-                        <Typography level="body-xs" sx={{ fontFamily: 'monospace', opacity: 0.7 }}>
-                          {fundamental.as_of_date}
-                        </Typography>
-                      )}
-                      <Chip size="sm" variant="soft" color="neutral" sx={{ fontSize: '0.7rem', fontWeight: 600 }}>
-                        {`${fundamental.source_count ?? 0} ${(fundamental.source_count === 1) ? 'src' : 'srcs'}`}
-                      </Chip>
+                      <Divider orientation="vertical" sx={{ height: 12, opacity: 0.5 }} />
+                      <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.75 }}>
+                        <FundamentalFreshnessBadge
+                          status={fundamental.status || 'missing'}
+                          asOfDate={fundamental.as_of_date}
+                          size="sm"
+                          format="verbose"
+                        />
+                        {fundamental.as_of_date && (
+                          <Typography level="body-xs" sx={{ fontFamily: 'monospace', opacity: 0.8, fontWeight: 500 }}>
+                            {fundamental.as_of_date}
+                          </Typography>
+                        )}
+                        <Chip
+                          size="sm"
+                          variant="soft"
+                          color="neutral"
+                          sx={{ fontSize: '0.7rem', fontWeight: 600, borderRadius: '6px' }}
+                        >
+                          {`${fundamental.source_count ?? 0} ${(fundamental.source_count === 1) ? 'src' : 'srcs'}`}
+                        </Chip>
+                      </Box>
                     </>
                   )}
                 </Stack>
-              </Box>
+              </Stack>
             </Grid>
 
-            {/* Right Column: Grouped Action Controls & Toggles */}
-            <Grid xs={12} lg={6}>
+            {/* Right Column: Coordinated Navigation & Action Toolbar */}
+            <Grid xs={12} lg={5}>
               <Stack
-                direction="row"
                 spacing={1.25}
-                alignItems="center"
-                justifyContent={{ xs: 'flex-start', lg: 'flex-end' }}
-                flexWrap="wrap"
-                sx={{ gap: 1 }}
+                alignItems={{ xs: 'flex-start', lg: 'flex-end' }}
+                justifyContent="center"
               >
-                {/* 1. Governance Switches Capsule */}
-                <Box
-                  sx={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 1.5,
-                    p: 0.5,
-                    px: 1.25,
-                    borderRadius: '12px',
-                    bgcolor: 'background.level1',
-                    border: '1px solid',
-                    borderColor: 'neutral.outlinedBorder',
-                    boxShadow: 'xs',
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                    <Typography level="body-xs" sx={{ fontWeight: 600, color: 'text.secondary' }}>Active</Typography>
-                    <Switch
-                      size="sm"
-                      checked={!!resolvedWatchlistItem.is_active}
-                      onChange={() => handleToggleActive(symbol, resolvedWatchlistItem.is_active)}
-                      color={resolvedWatchlistItem.is_active ? 'success' : 'neutral'}
-                      data-testid="cockpit-active-switch"
-                    />
-                  </Box>
-                  <Divider orientation="vertical" sx={{ height: 16 }} />
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
-                    <Typography level="body-xs" sx={{ fontWeight: 600, color: 'text.secondary' }}>Portfolio</Typography>
-                    <Switch
-                      size="sm"
-                      checked={!!resolvedWatchlistItem.in_portfolio}
-                      onChange={() => handleTogglePortfolio(symbol, resolvedWatchlistItem.in_portfolio)}
-                      color={resolvedWatchlistItem.in_portfolio ? 'success' : 'neutral'}
-                      data-testid="cockpit-portfolio-switch"
-                    />
-                  </Box>
-                </Box>
-
-                {/* 2. View Mode Toggle Capsule */}
+                {/* Row 1: Primary View Mode Switcher */}
                 <Box
                   sx={{
                     display: 'inline-flex',
@@ -658,6 +700,7 @@ export default function StockDossierCockpit({
                       fontWeight: 700,
                       fontSize: '0.8rem',
                       px: 2,
+                      py: 0.4,
                       ...(viewMode === 'cockpit' ? {} : { color: 'text.secondary' }),
                     }}
                   >
@@ -674,6 +717,7 @@ export default function StockDossierCockpit({
                       fontWeight: 700,
                       fontSize: '0.8rem',
                       px: 2,
+                      py: 0.4,
                       ...(viewMode === 'trace' ? {} : { color: 'text.secondary' }),
                     }}
                   >
@@ -681,87 +725,128 @@ export default function StockDossierCockpit({
                   </Button>
                 </Box>
 
-                {/* 3. Action Toolbar Capsule (Edit, Alerts, Refresh) */}
-                <Box
-                  sx={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: 0.5,
-                    p: 0.5,
-                    borderRadius: '12px',
-                    bgcolor: 'background.level1',
-                    border: '1px solid',
-                    borderColor: 'neutral.outlinedBorder',
-                    boxShadow: 'xs',
-                  }}
-                >
-                  {/* Edit Security Info Button */}
-                  <Tooltip title="Edit Security Info" arrow>
-                    <IconButton
-                      size="sm"
-                      variant="plain"
-                      color="neutral"
-                      onClick={() => setIsEditModalOpen(true)}
-                      data-testid="cockpit-edit-security-btn"
-                      sx={{
-                        borderRadius: '8px',
-                        '&:hover': { bgcolor: 'background.level2' },
-                      }}
-                    >
-                      <Pencil size={15} />
-                    </IconButton>
-                  </Tooltip>
+                {/* Row 2: Governance Switches + Quick Action Toolbar */}
+                <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+                  {/* Governance Switches Capsule */}
+                  <Box
+                    sx={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 1.25,
+                      p: 0.5,
+                      px: 1.25,
+                      borderRadius: '12px',
+                      bgcolor: 'background.level1',
+                      border: '1px solid',
+                      borderColor: 'neutral.outlinedBorder',
+                      boxShadow: 'xs',
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                      <Typography level="body-xs" sx={{ fontWeight: 600, color: 'text.secondary' }}>Active</Typography>
+                      <Switch
+                        size="sm"
+                        checked={!!resolvedWatchlistItem.is_active}
+                        onChange={() => handleToggleActive(symbol, resolvedWatchlistItem.is_active)}
+                        color={resolvedWatchlistItem.is_active ? 'success' : 'neutral'}
+                        data-testid="cockpit-active-switch"
+                      />
+                    </Box>
+                    <Divider orientation="vertical" sx={{ height: 16 }} />
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75 }}>
+                      <Typography level="body-xs" sx={{ fontWeight: 600, color: 'text.secondary' }}>Portfolio</Typography>
+                      <Switch
+                        size="sm"
+                        checked={!!resolvedWatchlistItem.in_portfolio}
+                        onChange={() => handleTogglePortfolio(symbol, resolvedWatchlistItem.in_portfolio)}
+                        color={resolvedWatchlistItem.in_portfolio ? 'success' : 'neutral'}
+                        data-testid="cockpit-portfolio-switch"
+                      />
+                    </Box>
+                  </Box>
 
-                  {/* Alert Rules Button */}
-                  <Tooltip title="Alert Rules" arrow>
-                    <Badge
-                      badgeContent={activeAlertsCount}
-                      invisible={!activeAlertsCount}
-                      color="warning"
-                      size="sm"
-                      variant="solid"
-                      sx={{
-                        '& .MuiBadge-badge': {
-                          right: 2,
-                          top: 2,
-                        },
-                      }}
-                    >
+                  {/* Action Toolbar Capsule (Edit, Alerts, Refresh) */}
+                  <Box
+                    sx={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 0.5,
+                      p: 0.5,
+                      borderRadius: '12px',
+                      bgcolor: 'background.level1',
+                      border: '1px solid',
+                      borderColor: 'neutral.outlinedBorder',
+                      boxShadow: 'xs',
+                    }}
+                  >
+                    {/* Edit Security Info Button */}
+                    <Tooltip title="Edit Security Info" arrow>
                       <IconButton
                         size="sm"
                         variant="plain"
-                        color={activeAlertsCount ? 'warning' : 'neutral'}
-                        onClick={() => setIsAlertsModalOpen(true)}
-                        data-testid="cockpit-alerts-btn"
+                        color="neutral"
+                        onClick={() => setIsEditModalOpen(true)}
+                        data-testid="cockpit-edit-security-btn"
                         sx={{
                           borderRadius: '8px',
                           '&:hover': { bgcolor: 'background.level2' },
                         }}
                       >
-                        <Bell size={15} />
+                        <Pencil size={15} />
                       </IconButton>
-                    </Badge>
-                  </Tooltip>
+                    </Tooltip>
 
-                  <Divider orientation="vertical" sx={{ height: 16 }} />
+                    {/* Alert Rules Button */}
+                    <Tooltip title="Alert Rules" arrow>
+                      <Badge
+                        badgeContent={activeAlertsCount}
+                        invisible={!activeAlertsCount}
+                        color="warning"
+                        size="sm"
+                        variant="solid"
+                        sx={{
+                          '& .MuiBadge-badge': {
+                            right: 2,
+                            top: 2,
+                          },
+                        }}
+                      >
+                        <IconButton
+                          size="sm"
+                          variant="plain"
+                          color={activeAlertsCount ? 'warning' : 'neutral'}
+                          onClick={() => setIsAlertsModalOpen(true)}
+                          data-testid="cockpit-alerts-btn"
+                          sx={{
+                            borderRadius: '8px',
+                            '&:hover': { bgcolor: 'background.level2' },
+                          }}
+                        >
+                          <Bell size={15} />
+                        </IconButton>
+                      </Badge>
+                    </Tooltip>
 
-                  {/* Refresh Dossier Data Button */}
-                  <Tooltip title="Refresh Dossier Data" arrow>
-                    <IconButton
-                      size="sm"
-                      variant="plain"
-                      color="neutral"
-                      loading={refreshing}
-                      onClick={() => fetchDossierData(true)}
-                      sx={{
-                        borderRadius: '8px',
-                        '&:hover': { bgcolor: 'background.level2' },
-                      }}
-                    >
-                      <RotateCw size={15} />
-                    </IconButton>
-                  </Tooltip>
-                </Box>
+                    <Divider orientation="vertical" sx={{ height: 16 }} />
+
+                    {/* Refresh Dossier Data Button */}
+                    <Tooltip title="Refresh Dossier Data" arrow>
+                      <IconButton
+                        size="sm"
+                        variant="plain"
+                        color="neutral"
+                        loading={refreshing}
+                        onClick={() => fetchDossierData(true)}
+                        sx={{
+                          borderRadius: '8px',
+                          '&:hover': { bgcolor: 'background.level2' },
+                        }}
+                      >
+                        <RotateCw size={15} />
+                      </IconButton>
+                    </Tooltip>
+                  </Box>
+                </Stack>
               </Stack>
             </Grid>
           </Grid>
@@ -769,30 +854,98 @@ export default function StockDossierCockpit({
           <Divider sx={{ opacity: 0.1 }} />
 
           {/* Actionability Telemetry: Price, MoS Scenario Range Bar, and Sizing Capacity */}
-          <Grid container spacing={2} alignItems="center">
+          <Grid container spacing={2} alignItems="stretch">
             {/* Price & Conviction */}
             <Grid xs={12} sm={6} md={3}>
-              <Box sx={{ p: 1.5, borderRadius: '16px', bgcolor: 'background.level1', border: '1px solid', borderColor: 'neutral.outlinedBorder', boxShadow: 'sm' }}>
-                <Typography level="body-xs" sx={{ color: 'text.tertiary', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Current Market Price
-                </Typography>
-                <Typography level="h3" sx={{ fontWeight: 900, my: 0.5 }}>
-                  {currentPrice ? formatCurrency(currentPrice) : '—'}
-                </Typography>
-                <Stack direction="row" spacing={1} alignItems="center">
-                  <Typography level="body-xs" sx={{ color: 'text.secondary' }}>Conviction:</Typography>
-                  <Chip size="sm" variant="soft" sx={{ color: convictionColor, fontWeight: 800, fontSize: '0.75rem' }}>
-                    {conviction}
-                  </Chip>
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: '18px',
+                  bgcolor: 'background.level1',
+                  border: '1px solid',
+                  borderColor: 'neutral.outlinedBorder',
+                  boxShadow: 'sm',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  gap: 1.25,
+                  transition: 'all 0.25s ease-out',
+                  '&:hover': {
+                    borderColor: 'neutral.outlinedHoverBorder',
+                    transform: 'translateY(-2px)',
+                    boxShadow: 'md',
+                  },
+                }}
+              >
+                <Box>
+                  <Typography level="body-xs" sx={{ color: 'text.tertiary', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>
+                    Current Market Price
+                  </Typography>
+                  <Typography
+                    level="h2"
+                    sx={{
+                      fontWeight: 900,
+                      fontSize: { xs: '1.65rem', sm: '1.95rem' },
+                      letterSpacing: '-0.03em',
+                      my: 0.5,
+                      color: 'text.primary',
+                    }}
+                  >
+                    {currentPrice ? formatCurrency(currentPrice) : '—'}
+                  </Typography>
+                </Box>
+                <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                  <Stack direction="row" spacing={0.75} alignItems="center">
+                    <Typography level="body-xs" sx={{ color: 'text.secondary', fontWeight: 600 }}>Conviction:</Typography>
+                    <Chip
+                      size="sm"
+                      variant="soft"
+                      sx={{
+                        color: convictionColor,
+                        fontWeight: 800,
+                        fontSize: '0.75rem',
+                        bgcolor: `${convictionColor}15`,
+                        border: '1px solid',
+                        borderColor: `${convictionColor}35`,
+                        borderRadius: '8px',
+                      }}
+                    >
+                      {conviction}
+                    </Chip>
+                  </Stack>
+                  <Typography level="body-xs" sx={{ color: 'text.tertiary', fontSize: '0.7rem', fontWeight: 600 }}>
+                    {overview?.currency || 'USD'}
+                  </Typography>
                 </Stack>
               </Box>
             </Grid>
 
             {/* Scenario Range Bar (Bear - Base - Bull) */}
             <Grid xs={12} sm={6} md={5}>
-              <Box sx={{ p: 1.5, borderRadius: '16px', bgcolor: 'background.level1', border: '1px solid', borderColor: 'neutral.outlinedBorder', boxShadow: 'sm' }}>
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-                  <Typography level="body-xs" sx={{ color: 'text.tertiary', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              <Box
+                sx={{
+                  p: 2,
+                  borderRadius: '18px',
+                  bgcolor: 'background.level1',
+                  border: '1px solid',
+                  borderColor: 'neutral.outlinedBorder',
+                  boxShadow: 'sm',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  gap: 1.25,
+                  transition: 'all 0.25s ease-out',
+                  '&:hover': {
+                    borderColor: 'neutral.outlinedHoverBorder',
+                    transform: 'translateY(-2px)',
+                    boxShadow: 'md',
+                  },
+                }}
+              >
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <Typography level="body-xs" sx={{ color: 'text.tertiary', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>
                     DCF Valuation & MoS Range
                   </Typography>
                   {mosResult.mosBase !== null && (
@@ -804,6 +957,8 @@ export default function StockDossierCockpit({
                         fontWeight: 800,
                         fontSize: '0.75rem',
                         color: '#050505',
+                        borderRadius: '8px',
+                        boxShadow: '0 2px 6px rgba(0,0,0,0.12)',
                       }}
                     >
                       MoS: {mosLabel}
@@ -823,17 +978,28 @@ export default function StockDossierCockpit({
             <Grid xs={12} md={4}>
               <Box
                 sx={{
-                  p: 1.5,
-                  borderRadius: '16px',
+                  p: 2,
+                  borderRadius: '18px',
                   bgcolor: 'background.level1',
                   border: '1px solid',
                   borderColor: 'neutral.outlinedBorder',
                   boxShadow: 'sm',
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  gap: 1.25,
                   position: 'relative',
+                  transition: 'all 0.25s ease-out',
+                  '&:hover': {
+                    borderColor: 'neutral.outlinedHoverBorder',
+                    transform: 'translateY(-2px)',
+                    boxShadow: 'md',
+                  },
                 }}
               >
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
-                  <Typography level="body-xs" sx={{ color: 'text.tertiary', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <Typography level="body-xs" sx={{ color: 'text.tertiary', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: 700 }}>
                     Position Sizing Room
                   </Typography>
                   <Button
@@ -842,36 +1008,71 @@ export default function StockDossierCockpit({
                     color="primary"
                     startDecorator={<Sliders size={13} />}
                     onClick={() => setSimModalOpen(true)}
-                    sx={{ fontSize: '0.75rem', py: 0.2, px: 1, borderRadius: '8px' }}
+                    sx={{
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      py: 0.3,
+                      px: 1.2,
+                      borderRadius: '8px',
+                    }}
                   >
                     Quick Sim
                   </Button>
                 </Stack>
 
                 {sizingResult ? (
-                  <Stack spacing={0.5}>
+                  <Stack spacing={1}>
                     <Stack direction="row" justifyContent="space-between" alignItems="baseline">
-                      <Typography level="title-sm" sx={{ fontWeight: 800 }}>
+                      <Typography
+                        level="title-md"
+                        sx={{
+                          fontWeight: 900,
+                          fontSize: '1.25rem',
+                          color: sizingResult.maxAllowedBuyUsd > 0 ? 'success.plainColor' : 'warning.plainColor',
+                        }}
+                      >
                         {sizingResult.maxAllowedBuyUsd > 0
                           ? `Up to ${formatCurrency(sizingResult.maxAllowedBuyUsd)}`
                           : '$0.00 (Cap Reached)'}
                       </Typography>
-                      <Typography level="body-xs" sx={{ color: 'text.secondary' }}>
+                      <Typography level="body-xs" sx={{ color: 'text.secondary', fontWeight: 600 }}>
                         ~{sizingResult.maxAllowedBuyShares.toLocaleString()} shares
                       </Typography>
                     </Stack>
-                    <Stack direction="row" spacing={1} alignItems="center">
+                    <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                      <Tooltip title={sizingResult.bindingCapReason} arrow placement="top">
+                        <Chip
+                          size="sm"
+                          variant="soft"
+                          color={sizingResult.maxAllowedBuyUsd > 0 ? 'success' : 'warning'}
+                          sx={{
+                            fontSize: '0.7rem',
+                            fontWeight: 700,
+                            maxWidth: '72%',
+                            borderRadius: '8px',
+                            '& .MuiChip-label': {
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                            },
+                          }}
+                        >
+                          Bound by: {sizingResult.bindingCapReason}
+                        </Chip>
+                      </Tooltip>
                       <Chip
                         size="sm"
-                        variant="soft"
-                        color={sizingResult.maxAllowedBuyUsd > 0 ? 'success' : 'warning'}
-                        sx={{ fontSize: '0.7rem', fontWeight: 700 }}
+                        variant="outlined"
+                        color="neutral"
+                        sx={{
+                          fontSize: '0.7rem',
+                          fontWeight: 600,
+                          borderRadius: '8px',
+                          color: 'text.secondary',
+                        }}
                       >
-                        Bound by: {sizingResult.bindingCapReason}
-                      </Chip>
-                      <Typography level="body-xs" sx={{ color: 'text.tertiary' }}>
                         Weight: {formatPercent(sizingResult.currentWeightPct)}
-                      </Typography>
+                      </Chip>
                     </Stack>
                   </Stack>
                 ) : (
@@ -1116,9 +1317,13 @@ export default function StockDossierCockpit({
                     size="sm"
                     variant="plain"
                     color="primary"
+                    data-testid="cockpit-risk-tab-btn"
                     endDecorator={<ArrowRight size={14} />}
                     onClick={() => {
-                      window.location.href = '/portfolio?tab=risk';
+                      navigate({
+                        to: '/dashboard',
+                        search: { tab: 'risk' },
+                      });
                     }}
                     sx={{ fontSize: '0.8rem', fontWeight: 700 }}
                   >

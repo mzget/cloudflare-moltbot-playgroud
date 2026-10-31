@@ -21,8 +21,6 @@ import {
 import { useSettingsStore } from '../../../store/settingsStore';
 import { useNavigate } from '@tanstack/react-router';
 import type { AnalysisCoverageMap } from '../../../types/analysisCoverage';
-import ScenarioRangeBar from '../../common/ScenarioRangeBar';
-import { formatMosLabel } from '../../../utils/marginOfSafety';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -89,7 +87,6 @@ const COLUMNS: Column[] = [
   { key: 'tot_gain_amt', label: 'Tot Gain ($)', align: 'right' },
   { key: 'realized_gain_pct', label: 'Realized (%)', align: 'right' },
   { key: 'realized_gain_amt', label: 'Realized ($)', align: 'right' },
-  { key: 'mos_base', label: 'MoS', align: 'right' },
 ];
 
 const TOTAL_COL_SPAN = COLUMNS.length + 1; // +1 for chevron column
@@ -152,34 +149,34 @@ export default function HoldingsTable({
   const densityStyles = React.useMemo(() => {
     const config = {
       compact: {
-        paddingX: '8px',
-        paddingY: '5px',
+        paddingX: '6px',
+        paddingY: '4px',
         fontSize: '0.75rem',
         headerSize: '0.65rem',
         chevronSize: 14,
         nameSize: '10px',
         symbolSize: 'body-xs' as const,
-        minWidth: 140,
+        minWidth: 120,
       },
       cozy: {
-        paddingX: '12px',
-        paddingY: '9px',
+        paddingX: '8px',
+        paddingY: '6px',
         fontSize: '0.8rem',
         headerSize: '0.7rem',
         chevronSize: 16,
         nameSize: '11px',
         symbolSize: 'title-sm' as const,
-        minWidth: 160,
+        minWidth: 130,
       },
       comfort: {
-        paddingX: '18px',
-        paddingY: '14px',
+        paddingX: '12px',
+        paddingY: '10px',
         fontSize: '0.88rem',
         headerSize: '0.75rem',
         chevronSize: 18,
         nameSize: '12px',
         symbolSize: 'title-sm' as const,
-        minWidth: 180,
+        minWidth: 150,
       },
     };
     return config[density];
@@ -246,7 +243,10 @@ export default function HoldingsTable({
           '--TableCell-paddingX': densityStyles.paddingX,
           '--TableCell-paddingY': densityStyles.paddingY,
           tableLayout: 'auto',
-          minWidth: 1100,
+          width: '100%',
+          '& th, & td': {
+            whiteSpace: 'nowrap',
+          },
           '& thead th': {
             background: '#ffffff',
             borderBottom: '2px solid var(--joy-palette-neutral-outlinedBorder, var(--joy-palette-divider))',
@@ -298,6 +298,8 @@ export default function HoldingsTable({
                 onClick={() => onSort(col.key)}
                 style={{
                   textAlign: col.align === 'left' ? 'left' : 'right',
+                  width: col.key === 'symbol' ? 'auto' : '1%',
+                  whiteSpace: 'nowrap',
                   ...(col.key === 'symbol'
                     ? {
                         position: 'sticky',
@@ -563,24 +565,6 @@ export default function HoldingsTable({
                       {displayNum(h.realized_gain_amt)}
                     </Typography>
                   </td>
-
-                  {/* Margin of Safety (ADR-0014): n/a when not in Watchlist */}
-                  <td style={{ textAlign: 'right', minWidth: 110 }}>
-                    <Typography
-                      level="body-sm"
-                      sx={{
-                        fontVariantNumeric: 'tabular-nums',
-                        fontSize: densityStyles.fontSize,
-                        fontWeight: 600,
-                        color: h.mos_base == null ? 'text.secondary' : h.mos_base >= 0 ? 'success.plainColor' : 'danger.plainColor',
-                      }}
-                    >
-                      {formatMosLabel(h.mos_base, h.in_watchlist !== false)}
-                    </Typography>
-                    {h.in_watchlist !== false && h.mos_base != null && (
-                      <ScenarioRangeBar compact price={h.last_price} bear={h.dcf_bear} base={h.dcf_base} bull={h.dcf_bull} />
-                    )}
-                  </td>
                 </tr>
 
                 {/* Expanded sub-section */}
@@ -746,9 +730,6 @@ export default function HoldingsTable({
                   {displayNum(totals.totalRealizedAmt)}
                 </Typography>
               </td>
-
-              {/* MoS (no aggregate) */}
-              <td />
             </tr>
           </tfoot>
         )}

@@ -238,6 +238,8 @@ describe('StockDossierCockpit Component', () => {
 
     // Quadrant C: Portfolio Fit & Risk Governance
     expect(html).toContain('Quadrant C: Portfolio Governance');
+    expect(html).toContain('Risk Tab');
+    expect(html).toContain('data-testid="cockpit-risk-tab-btn"');
     expect(html).toContain('Howard Marks Governance:');
     expect(html).toContain('8% Target • 15% Stock • 30% Theme');
     expect(html).toContain('Room to 8% Target:');
