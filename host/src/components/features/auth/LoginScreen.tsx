@@ -1,11 +1,11 @@
 import * as React from 'react';
 import { Box, Button, Typography, Sheet, Stack, Alert } from '@mui/joy';
-import { ShieldAlert, Info, Newspaper } from 'lucide-react';
+import { ShieldAlert, Info } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { glassStyle } from '../../../styles/glass';
 import OaktreeIcon from '../../common/OaktreeIcon';
 
-interface LoginScreenProps {
+export interface LoginScreenProps {
   onLoginClick: () => void;
   loading: boolean;
   error: string | null;
@@ -240,3 +240,4 @@ export default function LoginScreen({ onLoginClick, loading, error }: LoginScree
     </Box>
   );
 }
+

@@ -182,3 +182,22 @@
 
 - **Single-Report Overwrite Persistence (`analysis_results` & `reports/{symbol}.md`)**:
   กลไกการบันทึกผลวิเคราะห์ใน `save_value_investing_report` ตามหลัก Single Source of Truth (ADR-0017) ที่ใช้ Atomic Batch (`DELETE` แถวเดิมของ `symbol` แล้ว `INSERT` แถวใหม่ใน `analysis_results`) โดยดึงข้อมูล `debate` ล่าสุดใน `framework_results` หรือ `stock_fundamentals` มาเก็บรักษาไว้ไม่ให้สูญหาย พร้อมเขียนไฟล์สำเนามาตรฐาน OKF Markdown ลงใน Cloudflare R2 (`KNOWLEDGE_BUCKET`) ที่คีย์ `reports/{symbol}.md`
+
+
+## Module Federation Host & App Shell Subsystem (ADR-0019)
+
+### Terms & Concepts
+
+- **Dual-Role Host Workspace (`host/` / `@oaktree/host`)**:
+  แพ็กเกจพื้นที่ทำงานแบบควบคู่สองบทบาทภายใน Monorepo:
+  1. ทำหน้าที่เป็นแอปพลิเคชัน Standalone Vite + React SPA เพื่อสตาร์ท Host App และ Header UI ขึ้นมาพัฒนาหรือทดสอบ Module Federation (`simplicity_finance`) ได้อย่างรวดเร็วระดับมิลลิวินาที
+  2. ทำหน้าที่เป็น Shared Shell Library ผ่าน Direct Source Export (`./src/index.ts`) ให้กับ `frontend` (Astro Platform) เรียกใช้โดยตรง ปราศจากการทำสำเนาโค้ดซ้ำซ้อน
+
+- **Host App Shell (`HostAppShell` & View Slot Injection)**:
+  แกนกลางของแอปพลิเคชันที่รวบรวม Auth Logic (Idempotent Fetch Interceptor, JWT Token Injection, Google OAuth Callback, Mock User), Global Theme Provider, Responsive Header & Sidebar, และ TanStack Router Tree แบบ Single Source of Truth พร้อมเปิดรับ `views` สำหรับฉีด (inject) หน้าฟีเจอร์โดเมนของ Oaktree เข้ามาในแต่ละ Route
+
+- **Standalone Host Inspector Mode (`npm run dev:host`)**:
+  โหมดการรัน Host App แบบน้ำหนักเบาโดยไม่ต้องโหลดโมดูลหรือ Dependencies ฝั่งหุ้นของ `frontend` เมื่อผู้ใช้เปิดเข้า Route ของ Oaktree (เช่น `/dashboard`, `/market`, `/watchlist`) ระบบจะแสดงการ์ด Glassmorphism สรุปสถานะการทำงานของ Host พร้อมปุ่มลัดสลับไปยัง `💳 Simplicity Finance` ทันที
+
+- **Commanded-Transition Echo Guard & Finance Bridge Store (`useFinanceBridgeStore`)**:
+  กลไกป้องกันการวนลูปของเหตุการณ์นำทาง (Bidirectional Echo Loops) ระหว่าง Host App และ Remote Micro-Frontend ผ่าน Ref Locks (`lastCommandedTabRef`, `lastCommandedWalletRef`) พร้อมระบบแคชและบัฟเฟอร์คำสั่ง (`pendingAction`) เพื่อเล่นซ้ำ (replay) เมื่อคอนเทนเนอร์ของโมดูลรีโมทเริ่มทำงาน

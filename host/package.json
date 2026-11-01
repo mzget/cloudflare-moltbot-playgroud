@@ -1,0 +1,69 @@
+{
+  "name": "@oaktree/host",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./store/*": {
+      "types": "./src/store/*",
+      "default": "./src/store/*"
+    },
+    "./components/*": {
+      "types": "./src/components/*",
+      "default": "./src/components/*"
+    },
+    "./styles/*": {
+      "types": "./src/styles/*",
+      "default": "./src/styles/*"
+    },
+    "./router/*": {
+      "types": "./src/router/*",
+      "default": "./src/router/*"
+    },
+    "./config": {
+      "types": "./src/config.ts",
+      "default": "./src/config.ts"
+    },
+    "./i18n": {
+      "types": "./src/i18n.ts",
+      "default": "./src/i18n.ts"
+    }
+  },
+  "scripts": {
+    "dev": "vite --port 4321",
+    "build": "vite build",
+    "preview": "vite preview --port 4321",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/joy": "^5.0.0-beta.52",
+    "@tanstack/react-router": "^1.170.41",
+    "gsap": "^3.15.0",
+    "i18next": "^26.4.2",
+    "lucide-react": "^1.52.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-i18next": "^17.0.15",
+    "zod": "^4.6.5",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@originjs/vite-plugin-federation": "^1.4.1",
+    "@types/node": "^26.6.4",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^4.3.4",
+    "typescript": "^6.0.3",
+    "vite": "^6.2.0",
+    "vitest": "^4.1.12"
+  }
+}

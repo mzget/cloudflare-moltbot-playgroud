@@ -187,7 +187,7 @@ const theme = extendTheme({
   },
 });
 
-interface ThemeProviderProps {
+export interface ThemeProviderProps {
   children: React.ReactNode;
 }
 
@@ -225,3 +225,6 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
     </StyledEngineProvider>
   );
 }
+
+export default ThemeProvider;
+

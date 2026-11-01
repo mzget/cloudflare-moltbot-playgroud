@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { financeSearchSchema } from '../../../App';
+import { financeSearchSchema } from '../../../../router/schemas';
 
 describe('financeSearchSchema - Tab & Wallet Routing / Direct URL Handling', () => {
   it('defaults to dashboard when tab parameter is omitted', () => {

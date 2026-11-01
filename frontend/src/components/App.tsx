@@ -1,372 +1,80 @@
 import * as React from 'react';
-import { CircularProgress, Box, Typography } from '@mui/joy';
-import { ThemeProvider } from './common/ThemeProvider';
 import {
-  createRootRoute,
-  createRoute,
-  createRouter,
-  RouterProvider,
-} from '@tanstack/react-router';
-import { z } from 'zod';
-import { useTranslation } from 'react-i18next';
-import '../i18n';
-import RoutesLayout from './layout/RoutesLayout';
-import NotFoundPage from './features/error/NotFoundPage';
-import LoginScreen from './features/auth/LoginScreen';
-import { API_BASE_URL, MCP_WORKER_URL } from '../config';
-import { AuthContext } from './common/AuthContext';
-import type { User } from './common/AuthContext';
-import { useSettingsStore } from '../store/settingsStore';
+  HostAppShell,
+  analysisSearchSchema,
+  financeSearchSchema,
+  generalSearchSchema,
+  type FinanceSearch,
+  type FinanceTab,
+} from '@oaktree/host';
+import { useIntelligenceStore } from '../store/intelligenceStore';
 
-// Global Fetch Interceptor to inject JWT token
-if (typeof window !== 'undefined') {
-  const originalFetch = window.fetch;
-  window.fetch = async function (input, init) {
-    const url = typeof input === 'string'
-      ? input
-      : (input instanceof URL ? input.toString() : (input as Request).url);
+// Re-export schemas and types for backwards compatibility with tests and consumers
+export {
+  analysisSearchSchema,
+  financeSearchSchema,
+  generalSearchSchema,
+  type FinanceSearch,
+  type FinanceTab,
+};
 
-    const isBackend = url.startsWith(API_BASE_URL) ||
-      url.startsWith('http://localhost:8787') ||
-      url.startsWith('http://127.0.0.1:8787') ||
-      url.startsWith('/api/');
+// Lazy loaded Oaktree domain views
+const YahooPortfolio = React.lazy(() => import('./features/portfolio/YahooPortfolio'));
+const MarketIntelligence = React.lazy(() => import('./features/market/MarketIntelligence'));
+const MarketEventsTimeline = React.lazy(() => import('./features/market/MarketEventsTimeline'));
+const Watchlist = React.lazy(() => import('./features/watchlist/Watchlist'));
+const KnowledgeChat = React.lazy(() => import('./features/agent/KnowledgeChat'));
+const AnalysisReport = React.lazy(() => import('./features/agent/AnalysisReport'));
+const DatabaseChat = React.lazy(() => import('./features/agent/DatabaseChat'));
+const SourceManager = React.lazy(() => import('./features/sources/SourceManager'));
 
-    const isMcpWorker = url.startsWith(MCP_WORKER_URL) ||
-      url.startsWith('http://localhost:8789') ||
-      url.startsWith('http://127.0.0.1:8789');
-
-    const token = localStorage.getItem('auth_token');
-    if (token && (isBackend || isMcpWorker)) {
-      init = init || {};
-      const headers = new Headers(init.headers);
-      if (!headers.has('Authorization')) {
-        headers.set('Authorization', `Bearer ${token}`);
-      }
-      init.headers = headers;
-    }
-
-    const response = await originalFetch(input, init);
-
-    if (response.status === 401 && isBackend && !url.includes('/api/auth/user/')) {
-      // Instead of clearing token immediately (which causes logouts on transient/reload errors),
-      // verify if the session is truly invalid by checking the auth status endpoint.
-      fetch(`${API_BASE_URL}/api/auth/user/me`).then(res => {
-        if (res.status === 401) {
-          console.warn("Session expired or invalid (confirmed by /api/auth/user/me). Logging out.");
-          localStorage.removeItem('auth_token');
-          window.dispatchEvent(new CustomEvent('auth-expired'));
-        } else {
-          console.log("Ignored transient 401 error. Session is still valid.");
-        }
-      }).catch(err => {
-        console.error('Failed to verify session status after 401:', err);
-      });
-    }
-
-    return response;
-  };
-}
-
-
-
-// 1. Define the Search Schema (Validation)
-export const analysisSearchSchema = z.object({
-  symbol: z.string().optional(),
-  tab: z.enum(['dossier', 'overview', 'report', 'dcf-model', 'stock-thesis']).default('dossier').catch('dossier'),
-});
-
-export const financeSearchSchema = z.object({
-  tab: z.enum(['dashboard', 'transactions', 'budgets', 'wallets']).default('dashboard').catch('dashboard'),
-  wallet: z.string().transform((v) => (typeof v === 'string' && v.trim().length > 0 ? v.trim() : 'all')).default('all').catch('all'),
-});
-
-export type FinanceSearch = z.infer<typeof financeSearchSchema>;
-export type FinanceTab = FinanceSearch['tab'];
-
-const generalSearchSchema = z.object({
-  symbol: z.string().optional(),
-  tab: z.string().optional(),
-});
-
-// 2. Define the Route Tree
-const rootRoute = createRootRoute();
-
-const indexRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/',
-  beforeLoad: ({ navigate }) => {
-    throw navigate({ to: '/dashboard', replace: true });
-  },
-});
-
-const dashboardRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/dashboard',
-  validateSearch: generalSearchSchema,
-  component: RoutesLayout,
-});
-
-const portfolioRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/portfolio',
-  validateSearch: generalSearchSchema,
-  beforeLoad: ({ navigate, search }) => {
-    throw navigate({ to: '/dashboard', search, replace: true });
-  },
-});
-
-const marketRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/market',
-  validateSearch: generalSearchSchema,
-  component: RoutesLayout,
-});
-
-const watchlistRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/watchlist',
-  validateSearch: generalSearchSchema,
-  component: RoutesLayout,
-});
-
-const agentRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/agent',
-  validateSearch: generalSearchSchema,
-  component: RoutesLayout,
-});
-
-const dbAgentRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/db-agent',
-  validateSearch: generalSearchSchema,
-  component: RoutesLayout,
-});
-
-const commandCenterRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/command-center',
-  validateSearch: generalSearchSchema,
-  component: RoutesLayout,
-});
-
-const aboutRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/about',
-  validateSearch: generalSearchSchema,
-  component: RoutesLayout,
-});
-
-const analysisRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/analysis',
-  validateSearch: analysisSearchSchema,
-  component: RoutesLayout,
-});
-
-const financeRoute = createRoute({
-  getParentRoute: () => rootRoute,
-  path: '/finance',
-  validateSearch: financeSearchSchema,
-  component: RoutesLayout,
-});
-
-const routeTree = rootRoute.addChildren([
-  indexRoute,
-  dashboardRoute,
-  portfolioRoute,
-  marketRoute,
-  watchlistRoute,
-  agentRoute,
-  dbAgentRoute,
-  commandCenterRoute,
-  aboutRoute,
-  analysisRoute,
-  financeRoute,
-]);
-
-const router = createRouter({
-  routeTree,
-  defaultPreload: 'intent',
-  trailingSlash: 'never',
-  defaultNotFoundComponent: NotFoundPage,
-});
-
-// Register the router instance for type safety
-declare module '@tanstack/react-router' {
-  interface Register {
-    router: typeof router;
-  }
-}
-
-
+const oaktreeViews = {
+  dashboard: YahooPortfolio,
+  market: MarketIntelligence,
+  marketSidebar: MarketEventsTimeline,
+  watchlist: Watchlist,
+  agent: KnowledgeChat,
+  analysis: AnalysisReport,
+  dbAgent: DatabaseChat,
+  commandCenter: SourceManager,
+};
 
 export default function App() {
-  const { t } = useTranslation();
-  const [user, setUser] = React.useState<User | null>(null);
-  const [checkingAuth, setCheckingAuth] = React.useState(true);
-  const [authError, setAuthError] = React.useState<string | null>(null);
-  const [exchangingCode, setExchangingCode] = React.useState(false);
-
-  const logout = React.useCallback(() => {
-    console.log("logout function called in App.tsx - clearing auth_token");
-    localStorage.removeItem('auth_token');
-    setUser(null);
-    if (typeof window !== 'undefined') {
-      window.location.href = window.location.origin + '/';
-    }
-  }, []);
+  const { reports, digests, fetchReports } = useIntelligenceStore();
 
   React.useEffect(() => {
-    const isLocalhost = typeof window !== 'undefined' &&
-      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+    fetchReports();
 
-    const shouldMockUser = isLocalhost && import.meta.env.PUBLIC_CONNECT_TO_PROD !== 'true';
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        fetchReports();
+      }
+    }, 180000); // Poll every 3 minutes
 
-    if (shouldMockUser) {
-      setUser({
-        email: 'local@example.com',
-        name: 'Local User',
-        picture: ''
-      });
-      setCheckingAuth(false);
-      // Fetch user preferences
-      useSettingsStore.getState().fetchPreferences().catch(console.error);
-      return;
+    const handleVisibilityChange = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        fetchReports();
+      }
+    };
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
     }
-
-    const checkCurrentSession = async () => {
-      const token = localStorage.getItem('auth_token');
-      if (!token) {
-        setCheckingAuth(false);
-        return;
-      }
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/auth/user/me`);
-        if (res.ok) {
-          const data = (await res.json()) as any;
-          setUser(data.user);
-          // Fetch user preferences
-          useSettingsStore.getState().fetchPreferences().catch(console.error);
-        } else {
-          localStorage.removeItem('auth_token');
-        }
-      } catch (e) {
-        console.error('Failed to verify session:', e);
-      } finally {
-        setCheckingAuth(false);
-      }
-    };
-
-    const handleOAuthCallback = async () => {
-      const searchParams = new URLSearchParams(window.location.search);
-      const code = searchParams.get('code');
-      const state = searchParams.get('state');
-
-      if (code && state === 'user-login') {
-        setExchangingCode(true);
-        // Clear query parameters
-        const newUrl = window.location.pathname;
-        window.history.replaceState({}, document.title, newUrl);
-
-        try {
-          const res = await fetch(`${API_BASE_URL}/api/auth/user/callback`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              code,
-              redirect_uri: window.location.origin + '/'
-            })
-          });
-
-          if (res.ok) {
-            const data = (await res.json()) as any;
-            localStorage.setItem('auth_token', data.token);
-            setUser(data.user);
-            setAuthError(null);
-            // Fetch user preferences
-            useSettingsStore.getState().fetchPreferences().catch(console.error);
-          } else {
-            const errText = await res.text();
-            setAuthError(errText || 'Failed to authenticate with Google');
-          }
-        } catch (e) {
-          console.error('OAuth exchange error:', e);
-          setAuthError('Connection failed when authenticating');
-        } finally {
-          setExchangingCode(false);
-          setCheckingAuth(false);
-        }
-      } else {
-        checkCurrentSession();
-      }
-    };
-
-    const handleAuthExpired = () => {
-      setUser(null);
-    };
-
-    window.addEventListener('auth-expired', handleAuthExpired);
-    handleOAuthCallback();
 
     return () => {
-      window.removeEventListener('auth-expired', handleAuthExpired);
-    };
-  }, []);
-
-  const handleLoginClick = async () => {
-    setCheckingAuth(true);
-    try {
-      const redirectUri = window.location.origin + '/';
-      const res = await fetch(`${API_BASE_URL}/api/auth/user/login-url?redirect_uri=${encodeURIComponent(redirectUri)}`);
-      if (res.ok) {
-        const data = (await res.json()) as any;
-        window.location.href = data.url;
-      } else {
-        const errText = await res.text();
-        setAuthError(errText || 'Failed to initiate login');
-        setCheckingAuth(false);
+      clearInterval(interval);
+      if (typeof document !== 'undefined') {
+        document.removeEventListener('visibilitychange', handleVisibilityChange);
       }
-    } catch (e) {
-      console.error('Login redirect error:', e);
-      setAuthError('Failed to connect to authentication server');
-      setCheckingAuth(false);
-    }
-  };
+    };
+  }, [fetchReports]);
 
-  const renderContent = () => {
-    if (checkingAuth || exchangingCode) {
-      return (
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '100vh', gap: 2 }}>
-          <CircularProgress color="primary" variant="soft" size="lg" />
-          <Typography level="body-sm" sx={{ opacity: 0.7 }}>
-            {exchangingCode ? t('app.exchanging_token') : t('app.verifying_session')}
-          </Typography>
-        </Box>
-      );
-    }
-
-    if (!user) {
-      return (
-        <LoginScreen
-          onLoginClick={handleLoginClick}
-          loading={checkingAuth || exchangingCode}
-          error={authError}
-        />
-      );
-    }
-
-    return (
-      <AuthContext.Provider value={{ user, logout }}>
-        <RouterProvider router={router} />
-      </AuthContext.Provider>
-    );
-  };
+  const reportsCount = (reports?.length || 0) + (digests?.length || 0);
 
   return (
-    <ThemeProvider>
-      {renderContent()}
-    </ThemeProvider>
+    <HostAppShell
+      views={oaktreeViews}
+      reportsCount={reportsCount}
+    />
   );
 }
-

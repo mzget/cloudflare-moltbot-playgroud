@@ -27,6 +27,19 @@ export default defineConfig({
         },
       },
     ],
+    resolve: {
+      dedupe: [
+        'react',
+        'react-dom',
+        'zustand',
+        '@tanstack/react-router',
+        '@mui/joy',
+        '@emotion/react',
+        '@emotion/styled',
+        'i18next',
+        'react-i18next',
+      ],
+    },
     build: {
       target: 'esnext',
       modulePreload: false,

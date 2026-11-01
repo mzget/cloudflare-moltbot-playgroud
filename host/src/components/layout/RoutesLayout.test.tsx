@@ -30,14 +30,6 @@ vi.mock('../../store/settingsStore', () => ({
   useSettingsStore: (selector: (state: any) => any) => selector({ theme: 'dark' }),
 }));
 
-vi.mock('../../store/intelligenceStore', () => ({
-  useIntelligenceStore: () => ({
-    reports: [],
-    digests: [],
-    fetchReports: vi.fn(),
-  }),
-}));
-
 vi.mock('./Header', () => ({
   default: (props: any) => {
     capturedHeaderProps = props;
@@ -49,7 +41,7 @@ vi.mock('./Sidebar', () => ({
   default: () => <div data-testid="sidebar">Sidebar</div>,
 }));
 
-describe('RoutesLayout - Route Rendering', () => {
+describe('RoutesLayout - Route Rendering in Host', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -58,18 +50,17 @@ describe('RoutesLayout - Route Rendering', () => {
     currentPathname = '/about';
     const html = renderToString(<RoutesLayout />);
     
-    // Check that about content (title, description, footer) is rendered
     expect(html).toContain('i18n:about.title');
     expect(html).toContain('i18n:about.description');
     expect(html).toContain('i18n:about.footer');
   });
 
-  it('renders dashboard by default when on root / route', () => {
+  it('renders standalone inspector by default when on root / route in standalone host', () => {
     currentPathname = '/';
     const html = renderToString(<RoutesLayout />);
     
-    // Should not render about content
     expect(html).not.toContain('i18n:about.title');
+    expect(html).toContain('Standalone Host Mode');
   });
 
   it('renders prompt when on /analysis without symbol', () => {
@@ -78,6 +69,7 @@ describe('RoutesLayout - Route Rendering', () => {
     
     expect(html).toContain('กรุณาระบุสัญลักษณ์หุ้นที่ต้องการวิเคราะห์');
   });
+
   it('clears search parameters when switching to dashboard or other tabs', () => {
     currentPathname = '/analysis';
     renderToString(<RoutesLayout />);
@@ -89,3 +81,4 @@ describe('RoutesLayout - Route Rendering', () => {
     });
   });
 });
+
