@@ -8,7 +8,19 @@ import { AuthContext } from '../../../common/AuthContext';
 import { useSettingsStore } from '../../../../store/settingsStore';
 import { useFinanceBridgeStore, type Wallet } from '../../../../store/financeBridgeStore';
 import { FederatedErrorBoundary } from '../../core/FederatedErrorBoundary';
-import type { FederatedFinanceProps } from 'simplicity_finance/FinanceApp';
+
+export interface FederatedFinanceProps {
+  user?: any;
+  token?: any;
+  theme?: 'light' | 'dark';
+  usdThbRate?: number;
+  activeTab?: 'dashboard' | 'transactions' | 'budgets' | 'wallets';
+  selectedWalletId?: string;
+  onTabChange?: (tab: 'dashboard' | 'transactions' | 'budgets' | 'wallets') => void;
+  onWalletChange?: (walletId: string) => void;
+  onWalletsSync?: (wallets: any[]) => void;
+  apiBaseUrl?: string;
+}
 
 const PROD_SIMPLICITY_ORIGIN = 'https://simplicity-3c9.pages.dev';
 const LOCAL_SIMPLICITY_ORIGIN = 'http://localhost:5173';
@@ -18,7 +30,8 @@ export function isLocalEnvironment(): boolean {
     const h = window.location.hostname;
     return h === 'localhost' || h === '127.0.0.1' || h === '0.0.0.0';
   }
-  return typeof process !== 'undefined' && process.env?.NODE_ENV !== 'production';
+  const proc = typeof globalThis !== 'undefined' ? (globalThis as any).process : undefined;
+  return typeof proc !== 'undefined' && proc?.env?.NODE_ENV !== 'production';
 }
 
 export function getSimplicityRemoteUrl(): string {

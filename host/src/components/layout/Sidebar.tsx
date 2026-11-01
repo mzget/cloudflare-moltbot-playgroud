@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { useSearch, useNavigate } from '@tanstack/react-router';
 import { dispatchFinanceAction } from '../../store/financeBridgeStore';
 
-interface SidebarProps {
+export interface SidebarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
   reportsCount?: number;
@@ -72,7 +72,7 @@ export default function Sidebar({ activeTab, setActiveTab, reportsCount }: Sideb
             onClick={() => {
               if (!isSimplicity) return;
               setActiveTab('dashboard');
-              navigate({ to: '/dashboard', search: {} });
+              navigate({ to: '/dashboard', search: {} } as any);
             }}
             sx={{
               borderRadius: '20px',
@@ -97,7 +97,7 @@ export default function Sidebar({ activeTab, setActiveTab, reportsCount }: Sideb
               navigate({
                 to: '/finance',
                 search: { tab: 'dashboard', wallet: 'all' },
-              });
+              } as any);
             }}
             sx={{
               borderRadius: '20px',
@@ -141,7 +141,7 @@ export default function Sidebar({ activeTab, setActiveTab, reportsCount }: Sideb
                         navigate({
                           to: '/finance',
                           search: { tab: item.id as any, wallet: currentWalletId },
-                        });
+                        } as any);
                         setActiveTab('finance');
                       }}
                       sx={{
@@ -292,3 +292,4 @@ export default function Sidebar({ activeTab, setActiveTab, reportsCount }: Sideb
     </Box>
   );
 }
+

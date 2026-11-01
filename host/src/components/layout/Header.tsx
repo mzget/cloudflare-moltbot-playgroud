@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useContext } from 'react';
+﻿import React, { useEffect, useRef, useState, useContext } from 'react';
 import { Box, Typography, Stack, Sheet, IconButton, Tooltip, Button, Dropdown, Menu as JoyMenu, MenuButton, MenuItem, Divider, Input, Chip } from '@mui/joy';
 import { 
   Bell, Settings, User, Menu, Moon, Sun, LogOut, Check,
@@ -16,7 +16,7 @@ import OaktreeIcon from '../common/OaktreeIcon';
 import { useSettingsStore, type DensityMode } from '../../store/settingsStore';
 import { useFinanceBridgeStore, dispatchFinanceAction } from '../../store/financeBridgeStore';
 
-interface HeaderProps {
+export interface HeaderProps {
   activeTab?: string;
   setActiveTab?: (tab: string) => void;
   activeFinanceTab?: 'dashboard' | 'transactions' | 'budgets' | 'wallets';
@@ -475,7 +475,7 @@ export default function Header({
                   e.preventDefault();
                   if (!isSimplicity) return; // No-op if already on Oaktree
                   setActiveTab?.('dashboard');
-                  navigate({ to: '/dashboard', search: {} });
+                  navigate({ to: '/dashboard', search: {} } as any);
                 }
               }}
               sx={{
@@ -516,10 +516,7 @@ export default function Header({
                   setActiveTab?.('finance');
                   const targetTab = lastFinanceTab || 'dashboard';
                   const targetWallet = lastFinanceWallet || 'all';
-                  navigate({
-                    to: '/finance',
-                    search: { tab: targetTab, wallet: targetWallet },
-                  });
+                  navigate({ to: '/finance', search: { tab: targetTab, wallet: targetWallet } } as any);
                 }
               }}
               sx={{
@@ -933,10 +930,7 @@ export default function Header({
                           if (onFinanceTabChange) {
                             onFinanceTabChange(tab.id);
                           } else {
-                            navigate({
-                              to: '/finance',
-                              search: { tab: tab.id, wallet: currentWalletId },
-                            });
+                            navigate({ to: '/finance', search: { tab: tab.id, wallet: currentWalletId } } as any);
                           }
                         }
                       }
@@ -1044,10 +1038,7 @@ export default function Header({
                       if (onFinanceWalletChange) {
                         onFinanceWalletChange('all');
                       } else {
-                        navigate({
-                          to: '/finance',
-                          search: { tab: currentFinanceTab, wallet: 'all' },
-                        });
+                        navigate({ to: '/finance', search: { tab: currentFinanceTab, wallet: 'all' } } as any);
                       }
                     }}
                     sx={{ borderRadius: '8px', fontSize: '0.8rem', fontWeight: 600 }}
@@ -1069,10 +1060,7 @@ export default function Header({
                           if (onFinanceWalletChange) {
                             onFinanceWalletChange(w.id);
                           } else {
-                            navigate({
-                              to: '/finance',
-                              search: { tab: currentFinanceTab, wallet: w.id },
-                            });
+                            navigate({ to: '/finance', search: { tab: currentFinanceTab, wallet: w.id } } as any);
                           }
                         }}
                         sx={{

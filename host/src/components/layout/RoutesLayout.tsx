@@ -3,32 +3,40 @@ import { Box, Typography, Divider, Drawer, Stack, Button, CircularProgress, Shee
 import { useSearch, useNavigate, useLocation } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { useColorScheme } from '@mui/joy/styles';
+import { LogOut, User, Layers, ArrowRight } from 'lucide-react';
 import Header from './Header';
 import Sidebar from './Sidebar';
 import { glassStyle } from '../../styles/glass';
 import { API_BASE_URL } from '../../config';
+import OaktreeIcon from '../common/OaktreeIcon';
+import { AuthContext } from '../common/AuthContext';
+import { useSettingsStore } from '../../store/settingsStore';
+import RemoteFinanceContainer from '../federation/remotes/finance/RemoteFinanceContainer';
+import type { FinanceTab } from '../../router/schemas';
 
-const SourceManager = React.lazy(() => import('../features/sources/SourceManager'));
-const Watchlist = React.lazy(() => import('../features/watchlist/Watchlist'));
-const YahooPortfolio = React.lazy(() => import('../features/portfolio/YahooPortfolio'));
-const KnowledgeChat = React.lazy(() => import('../features/agent/KnowledgeChat'));
-const DatabaseChat = React.lazy(() => import('../features/agent/DatabaseChat'));
-const AnalysisReport = React.lazy(() => import('../features/agent/AnalysisReport'));
-const MarketIntelligence = React.lazy(() => import("../features/market/MarketIntelligence"));
-const MarketEventsTimeline = React.lazy(() => import('../features/market/MarketEventsTimeline'));
-const RemoteFinanceContainer = React.lazy(() => import('../federation/remotes/finance/RemoteFinanceContainer'));
-import type { FinanceTab } from '../App';
+export interface OaktreeFeatureViews {
+  dashboard?: React.ComponentType<any>;
+  market?: React.ComponentType<any>;
+  marketSidebar?: React.ComponentType<{ inSidebar?: boolean }>;
+  watchlist?: React.ComponentType<any>;
+  agent?: React.ComponentType<any>;
+  analysis?: React.ComponentType<{ symbol: string; subTab?: string; hospitality?: any }>;
+  dbAgent?: React.ComponentType<any>;
+  commandCenter?: React.ComponentType<any>;
+}
+
+export interface HostShellContextValue {
+  views?: OaktreeFeatureViews;
+  reportsCount?: number;
+}
+
+export const HostShellContext = React.createContext<HostShellContextValue>({});
 
 const LoadingFallback = (
   <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
     <CircularProgress size="md" variant="soft" />
   </Box>
 );
-import OaktreeIcon from '../common/OaktreeIcon';
-import { LogOut, User } from 'lucide-react';
-import { AuthContext } from '../common/AuthContext';
-import { useSettingsStore } from '../../store/settingsStore';
-import { useIntelligenceStore } from '../../store/intelligenceStore';
 
 export default function RoutesLayout() {
   const { t } = useTranslation();
@@ -37,6 +45,8 @@ export default function RoutesLayout() {
   const search = useSearch({ strict: false }) as any;
   const { symbol, tab: subTab } = search || {};
   const navigate = useNavigate();
+
+  const { views = {}, reportsCount = 0 } = React.useContext(HostShellContext);
 
   // Finance search parameters with safe fallback defaults
   const validFinanceTabs: readonly FinanceTab[] = ['dashboard', 'transactions', 'budgets', 'wallets'] as const;
@@ -66,14 +76,10 @@ export default function RoutesLayout() {
 
   const handleFinanceTabChange = React.useCallback(
     (newTab: FinanceTab) => {
-      // 1. Guard against redundant navigation
       if (newTab === financeTab) return;
-
-      // 2. Drop stale echoes if host recently commanded a different transition
       if (lastCommandedTabRef.current !== null && newTab !== lastCommandedTabRef.current) {
         return;
       }
-
       lastCommandedTabRef.current = newTab;
       navigate({
         search: ((old: any) => ({
@@ -88,14 +94,10 @@ export default function RoutesLayout() {
   const handleFinanceWalletChange = React.useCallback(
     (newWalletId: string) => {
       const normalizedWallet = newWalletId?.trim() || 'all';
-      // 1. Guard against redundant navigation
       if (normalizedWallet === financeWallet) return;
-
-      // 2. Drop stale echoes if host recently commanded a different transition
       if (lastCommandedWalletRef.current !== null && normalizedWallet !== lastCommandedWalletRef.current) {
         return;
       }
-
       lastCommandedWalletRef.current = normalizedWallet;
       navigate({
         search: ((old: any) => ({
@@ -109,7 +111,7 @@ export default function RoutesLayout() {
 
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const { user, logout } = React.useContext(AuthContext);
-  const theme = useSettingsStore(state => state.theme);
+  const theme = useSettingsStore((state) => state.theme);
   const { mode, setMode } = useColorScheme();
 
   React.useEffect(() => {
@@ -123,12 +125,12 @@ export default function RoutesLayout() {
       navigate({
         to: '/analysis',
         search: { symbol, tab: 'dossier' },
-      });
+      } as any);
     } else if (tab === 'finance') {
       navigate({
         to: '/finance',
         search: { tab: 'dashboard', wallet: 'all' },
-      });
+      } as any);
     } else {
       navigate({
         to: `/${tab}`,
@@ -137,15 +139,12 @@ export default function RoutesLayout() {
     }
   };
 
-  const { reports, digests, fetchReports } = useIntelligenceStore();
-
   React.useEffect(() => {
     // Intercept Google OAuth callback
     if (typeof window !== 'undefined') {
       const searchParams = new URLSearchParams(window.location.search);
       const code = searchParams.get('code');
       if (code) {
-        // Clear parameters immediately to avoid double execution on reload
         const newUrl = window.location.origin + '/command-center';
         window.history.replaceState({}, document.title, newUrl);
 
@@ -171,32 +170,106 @@ export default function RoutesLayout() {
         exchangeOAuth();
       }
     }
-
-    fetchReports();
-
-    const interval = setInterval(() => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        fetchReports();
-      }
-    }, 180000); // Poll every 3 minutes instead of 30s
-
-    const handleVisibilityChange = () => {
-      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-        fetchReports();
-      }
-    };
-
-    if (typeof document !== 'undefined') {
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-    }
-
-    return () => {
-      clearInterval(interval);
-      if (typeof document !== 'undefined') {
-        document.removeEventListener('visibilitychange', handleVisibilityChange);
-      }
-    };
   }, []);
+
+  const DashboardView = views.dashboard;
+  const MarketView = views.market;
+  const MarketSidebarView = views.marketSidebar;
+  const WatchlistView = views.watchlist;
+  const AgentView = views.agent;
+  const AnalysisView = views.analysis;
+  const DbAgentView = views.dbAgent;
+  const CommandCenterView = views.commandCenter;
+
+  const renderOaktreeTabContent = () => {
+    if (activeTab === 'dashboard') {
+      return DashboardView ? <DashboardView /> : renderStandaloneInspector('Dashboard', 'Stock Portfolio & Holdings');
+    }
+    if (activeTab === 'market') {
+      return MarketView ? <MarketView /> : renderStandaloneInspector('Market Intelligence', 'Daily News & Synthesis');
+    }
+    if (activeTab === 'watchlist') {
+      return WatchlistView ? <WatchlistView /> : renderStandaloneInspector('Watchlist', 'Monitored Assets');
+    }
+    if (activeTab === 'agent') {
+      return AgentView ? <AgentView /> : renderStandaloneInspector('Agent Chat', 'Howard Marks AI Advisor');
+    }
+    if (activeTab === 'analysis') {
+      if (!symbol) {
+        return (
+          <Box sx={{ py: 4, textAlign: 'center' }}>
+            <Typography level="h3">กรุณาระบุสัญลักษณ์หุ้นที่ต้องการวิเคราะห์</Typography>
+          </Box>
+        );
+      }
+      return AnalysisView ? <AnalysisView symbol={symbol} subTab={subTab} /> : renderStandaloneInspector('Analysis', `Stock Dossier: ${symbol}`);
+    }
+    if (activeTab === 'db-agent') {
+      return DbAgentView ? <DbAgentView /> : renderStandaloneInspector('Database Agent', 'D1 Natural Language Chat');
+    }
+    if (activeTab === 'command-center') {
+      return CommandCenterView ? <CommandCenterView /> : renderStandaloneInspector('Command Center', 'Sources & Ingestion');
+    }
+    return null;
+  };
+
+  const renderStandaloneInspector = (title: string, subtitle: string) => (
+    <Sheet
+      sx={{
+        ...glassStyle,
+        p: { xs: 3, md: 5 },
+        borderRadius: '20px',
+        textAlign: 'center',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 2,
+        maxWidth: 600,
+        mx: 'auto',
+        my: 4,
+      }}
+    >
+      <Box
+        sx={{
+          width: 56,
+          height: 56,
+          borderRadius: '16px',
+          bgcolor: 'rgba(16, 185, 129, 0.1)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: '#10b981',
+        }}
+      >
+        <Layers size={28} />
+      </Box>
+      <Typography level="h3" sx={{ fontWeight: 800 }}>
+        {title}
+      </Typography>
+      <Typography level="body-sm" sx={{ opacity: 0.7 }}>
+        {subtitle}
+      </Typography>
+      <Divider sx={{ my: 1, width: '100%', opacity: 0.1 }} />
+      <Typography level="body-xs" sx={{ opacity: 0.6, maxWidth: 440, lineHeight: 1.6 }}>
+        You are currently running in <b>Standalone Host Mode</b> (<code>npm run dev:host</code>).
+        The Header UI, Auth, and Module Federation bridge are fully functional.
+      </Typography>
+      <Button
+        variant="solid"
+        color="primary"
+        endDecorator={<ArrowRight size={16} />}
+        onClick={() => {
+          navigate({
+            to: '/finance',
+            search: { tab: 'dashboard', wallet: 'all' },
+          } as any);
+        }}
+        sx={{ borderRadius: '12px', mt: 1, fontWeight: 700 }}
+      >
+        Open 💳 Simplicity Finance
+      </Button>
+    </Sheet>
+  );
 
   return (
     <Box sx={{ px: { xs: 1.5, sm: 2.5, md: 3.5, lg: 4 }, py: { xs: 1.5, md: 2.5 }, width: '100%', minHeight: '100vh', boxSizing: 'border-box' }}>
@@ -207,7 +280,7 @@ export default function RoutesLayout() {
         onFinanceTabChange={handleFinanceTabChange}
         selectedWalletId={financeWallet}
         onFinanceWalletChange={handleFinanceWalletChange}
-        reportsCount={reports.length + digests.length}
+        reportsCount={reportsCount}
         onOpenSidebar={() => setMobileOpen(true)}
       />
 
@@ -251,7 +324,7 @@ export default function RoutesLayout() {
               setActiveTab(tab);
               setMobileOpen(false);
             }}
-            reportsCount={reports.length + digests.length}
+            reportsCount={reportsCount}
             collapsed={false}
           />
         </Box>
@@ -299,7 +372,6 @@ export default function RoutesLayout() {
             fullWidth
             startDecorator={<LogOut size={16} />}
             onClick={() => {
-              console.log("Sign Out Button clicked in mobile Drawer, calling logout...", logout);
               setMobileOpen(false);
               logout();
             }}
@@ -314,14 +386,6 @@ export default function RoutesLayout() {
         {/* Main Content Area */}
         <Box sx={{ flexGrow: 1, minWidth: 0, width: '100%' }}>
           <React.Suspense fallback={LoadingFallback}>
-            {activeTab === 'dashboard' && <YahooPortfolio />}
-            {activeTab === 'market' && <MarketIntelligence />}
-            {activeTab === 'watchlist' && <Watchlist />}
-            {activeTab === 'agent' && <KnowledgeChat />}
-            {activeTab === 'analysis' && symbol && <AnalysisReport symbol={symbol} subTab={subTab} hospitality={undefined} />}
-            {activeTab === 'analysis' && !symbol && <Box sx={{ py: 4, textAlign: 'center' }}><Typography level="h3">กรุณาระบุสัญลักษณ์หุ้นที่ต้องการวิเคราะห์</Typography></Box>}
-            {activeTab === 'db-agent' && <DatabaseChat />}
-            {activeTab === 'command-center' && <SourceManager />}
             {activeTab === 'finance' && (
               <RemoteFinanceContainer
                 activeTab={financeTab}
@@ -342,11 +406,12 @@ export default function RoutesLayout() {
                 </Typography>
               </Sheet>
             )}
+            {activeTab !== 'finance' && activeTab !== 'about' && renderOaktreeTabContent()}
           </React.Suspense>
         </Box>
 
         {/* Right Sidebar Container */}
-        {activeTab === 'market' && (
+        {activeTab === 'market' && MarketSidebarView && (
           <Box 
             sx={{ 
               width: { lg: '340px', xl: '380px' },
@@ -356,7 +421,7 @@ export default function RoutesLayout() {
           >
             <Box sx={{ position: 'sticky', top: 72 }}>
               <React.Suspense fallback={LoadingFallback}>
-                <MarketEventsTimeline inSidebar />
+                <MarketSidebarView inSidebar />
               </React.Suspense>
             </Box>
           </Box>
@@ -365,3 +430,4 @@ export default function RoutesLayout() {
     </Box>
   );
 }
+

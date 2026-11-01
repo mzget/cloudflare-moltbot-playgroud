@@ -3,24 +3,24 @@ import { Box, Button, Sheet, Typography, Stack } from '@mui/joy';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { glassStyle } from '../../../styles/glass';
 
-interface Props {
+export interface FederatedErrorBoundaryProps {
   children: React.ReactNode;
   fallback?: React.ReactNode;
   onRetry?: () => void;
 }
 
-interface State {
+export interface FederatedErrorBoundaryState {
   hasError: boolean;
   error: Error | null;
 }
 
-export class FederatedErrorBoundary extends React.Component<Props, State> {
-  constructor(props: Props) {
+export class FederatedErrorBoundary extends React.Component<FederatedErrorBoundaryProps, FederatedErrorBoundaryState> {
+  constructor(props: FederatedErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false, error: null };
   }
 
-  static getDerivedStateFromError(error: Error): State {
+  static getDerivedStateFromError(error: Error): FederatedErrorBoundaryState {
     return { hasError: true, error };
   }
 

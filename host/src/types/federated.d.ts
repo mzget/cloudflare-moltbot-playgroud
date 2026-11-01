@@ -17,3 +17,4 @@ declare module 'simplicity_finance/FinanceApp' {
   const FederatedFinanceApp: ComponentType<FederatedFinanceProps>;
   export default FederatedFinanceApp;
 }
+

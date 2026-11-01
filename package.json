@@ -6,6 +6,7 @@
   "workspaces": [
     "backend",
     "frontend",
+    "host",
     "mcp-worker",
     "packages/*"
   ],
@@ -15,6 +16,7 @@
     "test": "turbo run test",
     "test:backend": "turbo run test --filter=oaktree-backend",
     "test:frontend": "turbo run test --filter=frontend",
+    "test:host": "turbo run test --filter=@oaktree/host",
     "test:mcp": "turbo run test --filter=oaktree-mcp",
     "test:shared": "turbo run test --filter=@oaktree/shared",
     "type-check": "turbo run type-check",
@@ -22,6 +24,7 @@
     "cf-typegen": "turbo run cf-typegen",
     "dev": "turbo run dev",
     "dev:frontend": "turbo run dev --filter=frontend",
+    "dev:host": "turbo run dev --filter=@oaktree/host",
     "dev:backend": "turbo run dev --filter=oaktree-backend",
     "dev:mcp": "turbo run dev --filter=oaktree-mcp",
     "dev:app": "turbo run dev --filter=oaktree-backend --filter=frontend",

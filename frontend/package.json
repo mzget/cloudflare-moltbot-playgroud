@@ -27,6 +27,7 @@
     "@emotion/styled": "^11.14.1",
     "@mui/joy": "^5.0.0-beta.52",
     "@napi-rs/wasm-runtime": "^1.2.4",
+    "@oaktree/host": "*",
     "@oaktree/shared": "*",
     "@tanstack/react-router": "^1.170.41",
     "agents": "^0.26.0",
