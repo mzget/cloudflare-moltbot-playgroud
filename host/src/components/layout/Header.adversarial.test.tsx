@@ -76,6 +76,7 @@ describe('Adversarial Verification: Header Navigation & Action Controls', () => 
       <Header activeTab="finance" />
     );
 
+    expect(html).toContain('data-testid="app-switcher-container"');
     expect(html).toContain('data-testid="app-switcher-oaktree"');
     expect(html).toContain('data-testid="app-switcher-simplicity"');
     expect(html).toContain('href="/dashboard"');

@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useSearch, useNavigate } from '@tanstack/react-router';
-import { dispatchFinanceAction } from '../../store/financeBridgeStore';
+import { useFinanceBridgeStore, dispatchFinanceAction } from '../../store/financeBridgeStore';
 
 export interface SidebarProps {
   activeTab: string;
@@ -21,6 +21,7 @@ export default function Sidebar({ activeTab, setActiveTab, reportsCount }: Sideb
   const search = useSearch({ strict: false }) as any;
   const currentFinanceTab = (search?.tab as string) || 'dashboard';
   const currentWalletId = (search?.wallet as string) || 'all';
+  const { lastFinanceTab, lastFinanceWallet } = useFinanceBridgeStore();
 
   const isSimplicity = activeTab === 'finance' || (typeof window !== 'undefined' && window.location.pathname.startsWith('/finance'));
 
@@ -67,16 +68,21 @@ export default function Sidebar({ activeTab, setActiveTab, reportsCount }: Sideb
           }}
         >
           <Button
+            component="a"
+            href="/dashboard"
             size="sm"
             variant="plain"
             fullWidth
             role="tab"
             aria-selected={!isSimplicity}
             data-testid="sidebar-switcher-oaktree"
-            onClick={() => {
-              if (!isSimplicity) return;
-              setActiveTab('dashboard');
-              navigate({ to: '/dashboard', search: {} } as any);
+            onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
+              if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
+                e.preventDefault();
+                if (!isSimplicity) return;
+                setActiveTab('dashboard');
+                navigate({ to: '/dashboard', search: {} } as any);
+              }
             }}
             sx={{
               borderRadius: '20px',
@@ -84,24 +90,35 @@ export default function Sidebar({ activeTab, setActiveTab, reportsCount }: Sideb
               fontWeight: !isSimplicity ? 700 : 500,
               color: !isSimplicity ? '#10b981' : 'text.secondary',
               bgcolor: !isSimplicity ? 'rgba(16, 185, 129, 0.15)' : 'transparent',
+              textDecoration: 'none',
+              '&:hover': {
+                textDecoration: 'none',
+              },
             }}
           >
             🌳 Oaktree
           </Button>
           <Button
+            component="a"
+            href={`/finance?tab=${lastFinanceTab || 'dashboard'}&wallet=${lastFinanceWallet || 'all'}`}
             size="sm"
             variant="plain"
             fullWidth
             role="tab"
             aria-selected={isSimplicity}
             data-testid="sidebar-switcher-simplicity"
-            onClick={() => {
-              if (isSimplicity) return;
-              setActiveTab('finance');
-              navigate({
-                to: '/finance',
-                search: { tab: 'dashboard', wallet: 'all' },
-              } as any);
+            onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
+              if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
+                e.preventDefault();
+                if (isSimplicity) return;
+                setActiveTab('finance');
+                const targetTab = lastFinanceTab || 'dashboard';
+                const targetWallet = lastFinanceWallet || 'all';
+                navigate({
+                  to: '/finance',
+                  search: { tab: targetTab, wallet: targetWallet },
+                } as any);
+              }
             }}
             sx={{
               borderRadius: '20px',
@@ -109,6 +126,10 @@ export default function Sidebar({ activeTab, setActiveTab, reportsCount }: Sideb
               fontWeight: isSimplicity ? 700 : 500,
               color: isSimplicity ? '#10b981' : 'text.secondary',
               bgcolor: isSimplicity ? 'rgba(16, 185, 129, 0.15)' : 'transparent',
+              textDecoration: 'none',
+              '&:hover': {
+                textDecoration: 'none',
+              },
             }}
           >
             💳 Simplicity
