@@ -110,6 +110,17 @@ export default function RoutesLayout() {
   );
 
   const [mobileOpen, setMobileOpen] = React.useState(false);
+
+  // Automatically close mobile drawer when any finance action is triggered to prevent focus-trap collision
+  React.useEffect(() => {
+    const handleFinanceAction = () => {
+      setMobileOpen(false);
+    };
+    window.addEventListener('oaktree:finance-action', handleFinanceAction);
+    return () => {
+      window.removeEventListener('oaktree:finance-action', handleFinanceAction);
+    };
+  }, []);
   const { user, logout } = React.useContext(AuthContext);
   const theme = useSettingsStore((state) => state.theme);
   const { mode, setMode } = useColorScheme();
