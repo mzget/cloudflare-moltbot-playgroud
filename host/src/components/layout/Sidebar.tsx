@@ -42,6 +42,10 @@ export default function Sidebar({ activeTab, setActiveTab, reportsCount }: Sideb
   ];
 
   const handleAction = (action: 'add-tx' | 'ai-scan' | 'csv-import') => {
+    if (!isSimplicity) {
+      setActiveTab('finance');
+      navigate({ to: '/finance', search: { tab: 'dashboard', wallet: 'all' } } as any);
+    }
     dispatchFinanceAction(action);
   };
 
