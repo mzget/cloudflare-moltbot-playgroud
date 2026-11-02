@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef, useState, useContext } from 'react';
+import React, { useEffect, useRef, useState, useContext } from 'react';
 import { Box, Typography, Stack, Sheet, IconButton, Tooltip, Button, Dropdown, Menu as JoyMenu, MenuButton, MenuItem, Divider, Input, Chip } from '@mui/joy';
 import { 
   Bell, Settings, User, Menu, Moon, Sun, LogOut, Check,
@@ -451,8 +451,9 @@ export default function Header({
           <Box
             role="tablist"
             aria-label="Application Switcher"
+            data-testid="app-switcher-container"
             sx={{
-              display: 'flex',
+              display: { xs: 'none', md: 'flex' },
               alignItems: 'center',
               p: '3px',
               borderRadius: '24px',
