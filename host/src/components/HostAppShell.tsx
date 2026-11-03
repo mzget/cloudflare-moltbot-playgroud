@@ -238,6 +238,25 @@ export function HostAppShell({ views = {}, reportsCount = 0 }: HostAppShellProps
     const shouldMockUser = isLocalhost && import.meta.env.PUBLIC_CONNECT_TO_PROD !== 'true';
 
     if (shouldMockUser) {
+      const searchParams = new URLSearchParams(window.location.search);
+      const code = searchParams.get('code');
+      const state = searchParams.get('state');
+      if (code && state !== 'user-login') {
+        const newUrl = window.location.origin + '/command-center';
+        window.history.replaceState({}, document.title, newUrl);
+        fetch(`${API_BASE_URL}/api/auth/google/callback`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            code,
+            redirect_uri: window.location.origin + '/'
+          })
+        }).then(res => {
+          if (res.ok) {
+            window.dispatchEvent(new CustomEvent('gmail-connected'));
+          }
+        }).catch(console.error);
+      }
       setUser({
         email: 'local@example.com',
         name: 'Local User',
@@ -308,7 +327,42 @@ export function HostAppShell({ views = {}, reportsCount = 0 }: HostAppShellProps
           setCheckingAuth(false);
         }
       } else {
-        checkCurrentSession();
+      if (code && state !== 'user-login') {
+        setExchangingCode(true);
+        const newUrl = window.location.origin + '/command-center';
+        window.history.replaceState({}, document.title, newUrl);
+
+        try {
+          await checkCurrentSession();
+          const res = await fetch(`${API_BASE_URL}/api/auth/google/callback`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              code,
+              redirect_uri: window.location.origin + '/'
+            })
+          });
+          if (res.ok) {
+            window.dispatchEvent(new CustomEvent('gmail-connected'));
+          } else {
+            console.error('Failed to exchange Google OAuth code:', await res.text());
+          }
+        } catch (e) {
+          console.error('Failed to exchange Google OAuth code', e);
+        } finally {
+          setExchangingCode(false);
+          setCheckingAuth(false);
+          if (cachedRouter?.navigate) {
+            try {
+              cachedRouter.navigate({ to: '/command-center', replace: true });
+            } catch {
+              // ignore
+            }
+          }
+        }
+        return;
+      }
+      checkCurrentSession();
       }
     };
 

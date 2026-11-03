@@ -22,7 +22,7 @@ const GMAIL_STATUS_KEY = 'gmail-status';
 export function useGmailSubscriptions() {
 
   // Gmail connection status — not mutated locally, so plain useQuery is fine.
-  const { data: gmailStatus, isLoading: checkingGmail } = useQuery<{ connected: boolean }>(
+  const { data: gmailStatus, isLoading: checkingGmail, refetch: refetchGmailStatus } = useQuery<{ connected: boolean }>(
     GMAIL_STATUS_KEY,
     async () => {
       const res = await fetch(`${API_BASE_URL}/api/auth/google/status`);
@@ -103,7 +103,8 @@ export function useGmailSubscriptions() {
 
   const checkGmailStatus = useCallback(() => {
     invalidateQueries(GMAIL_STATUS_KEY);
-  }, []);
+    return refetchGmailStatus();
+  }, [refetchGmailStatus]);
 
   const connectGmail = useCallback(async () => {
     const redirectUri = window.location.origin + '/';
