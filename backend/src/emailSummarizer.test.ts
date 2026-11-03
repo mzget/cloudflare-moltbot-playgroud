@@ -92,7 +92,21 @@ describe('emailSummarizer', () => {
       expect(count).toBe(0);
     });
 
-    it('builds query with newer_than:2d and without is:unread for standard subscriptions', async () => {
+    it('returns 0 and sends OAuth alert email when token refresh invalidates credentials', async () => {
+      vi.mocked(gmailModule.getOrRefreshAccessToken).mockImplementation(
+        async (_db, _clientId, _clientSecret, _jwtSecret, onAuthInvalidated) => {
+          if (onAuthInvalidated) {
+            await onAuthInvalidated('Google token refresh failed: Bad Request - invalid_grant');
+          }
+          return null;
+        }
+      );
+      const count = await syncAndIngestEmails(mockEnv);
+      expect(count).toBe(0);
+      expect(mockEnv.EMAIL.send).toHaveBeenCalledTimes(1);
+    });
+
+    it('builds query with newer_than:7d and without is:unread for standard subscriptions', async () => {
       vi.mocked(gmailModule.getOrRefreshAccessToken).mockResolvedValue('valid-token');
 
       // Mock subscriptions query
@@ -118,7 +132,7 @@ describe('emailSummarizer', () => {
       const existsStmt = {
         bind: vi.fn().mockReturnThis(),
         first: vi.fn().mockResolvedValue(null),
-        all: vi.fn(),
+        all: vi.fn().mockResolvedValue({ results: [] }),
         run: vi.fn(),
       };
 
@@ -126,7 +140,7 @@ describe('emailSummarizer', () => {
       const insertStmt = {
         bind: vi.fn().mockReturnThis(),
         run: vi.fn().mockResolvedValue({ success: true }),
-        all: vi.fn(),
+        all: vi.fn().mockResolvedValue({ results: [] }),
         first: vi.fn(),
       };
 
@@ -154,7 +168,7 @@ describe('emailSummarizer', () => {
 
       expect(gmailModule.fetchGmailMessages).toHaveBeenCalledWith(
         'valid-token',
-        'from:newsletter@example.com subject:(Daily Update) newer_than:2d'
+        'from:newsletter@example.com subject:(Daily Update) newer_than:7d'
       );
       expect(count).toBe(1);
       expect(insertStmt.run).toHaveBeenCalled();
@@ -207,6 +221,7 @@ describe('emailSummarizer', () => {
       const existsStmt = {
         bind: vi.fn().mockReturnThis(),
         first: vi.fn().mockResolvedValue({ 1: 1 }), // Exists
+        all: vi.fn().mockResolvedValue({ results: [{ id: 'msg-already-exists' }] }),
       };
 
       mockDb.prepare.mockImplementation((sql: string) => {

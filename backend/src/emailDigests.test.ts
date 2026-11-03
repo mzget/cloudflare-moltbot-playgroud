@@ -227,4 +227,30 @@ describe('Email Digests API', () => {
       expect(data.error).toBe('D1 write failure');
     });
   });
+
+  describe('Gmail OAuth & Sync Routes', () => {
+    it('supports DELETE /api/auth/google/disconnect', async () => {
+      const req = new Request('http://localhost/api/auth/google/disconnect', {
+        method: 'DELETE',
+      });
+      const res = await worker.fetch(req, mockEnv, {} as any);
+      expect(res.status).toBe(200);
+      expect(await res.text()).toBe('Disconnected');
+    });
+
+    it('supports POST /api/email-sync', async () => {
+      const envWithWorkflow = {
+        ...mockEnv,
+        OAKTREE_SYNC_WORKFLOW: {
+          create: vi.fn().mockResolvedValue({ id: 'manual-email-sync-123' }),
+        },
+      };
+      const req = new Request('http://localhost/api/email-sync', {
+        method: 'POST',
+      });
+      const res = await worker.fetch(req, envWithWorkflow, {} as any);
+      expect(res.status).toBe(200);
+      expect(await res.text()).toContain('Email sync started via Workflow: manual-email-sync-123');
+    });
+  });
 });

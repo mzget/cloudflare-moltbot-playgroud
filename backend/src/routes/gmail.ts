@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { AppEnv } from '../env';
-import { getAuthUrl, exchangeCodeForTokens } from '../gmail';
+import { getAuthUrl, exchangeCodeForTokens, getOrRefreshAccessToken } from '../gmail';
 import { generateEmailDigests } from '../emailSummarizer';
 import { encryptToken } from '../auth';
 import { syncAndProcessFacebookPosts } from '../facebook';
@@ -46,15 +46,24 @@ gmail.post('/api/auth/google/callback', async (c) => {
 
 // API: Get Google Auth Status
 gmail.get('/api/auth/google/status', async (c) => {
+  const clientId = c.env.GOOGLE_CLIENT_ID;
+  const clientSecret = c.env.GOOGLE_CLIENT_SECRET;
+  if (clientId && clientSecret) {
+    const jwtSecret = c.env.JWT_SECRET || 'dev-secret-key-123456';
+    const token = await getOrRefreshAccessToken(c.env.DB, clientId, clientSecret, jwtSecret);
+    return c.json({ connected: !!token });
+  }
   const row = await c.env.DB.prepare('SELECT 1 FROM gmail_oauth WHERE id = ?').bind('default').first();
   return c.json({ connected: !!row });
 });
 
 // API: Google Disconnect
-gmail.post('/api/auth/google/disconnect', async (c) => {
+const handleGoogleDisconnect = async (c: any) => {
   await c.env.DB.prepare('DELETE FROM gmail_oauth WHERE id = ?').bind('default').run();
   return c.text('Disconnected');
-});
+};
+gmail.post('/api/auth/google/disconnect', handleGoogleDisconnect);
+gmail.delete('/api/auth/google/disconnect', handleGoogleDisconnect);
 
 // API: Subscriptions CRUD
 gmail.get('/api/subscriptions', async (c) => {
@@ -100,7 +109,7 @@ gmail.delete('/api/subscriptions', async (c) => {
 });
 
 // API: Manual Sync & Summarize
-gmail.get('/api/email-sync', async (c) => {
+const handleManualEmailSync = async (c: any) => {
   try {
     const instance = await c.env.OAKTREE_SYNC_WORKFLOW.create({
       id: `manual-email-sync-${Date.now()}`,
@@ -115,7 +124,9 @@ gmail.get('/api/email-sync', async (c) => {
   } catch (e) {
     return c.text(`Failed to start email sync workflow: ${(e as any).message}`, 500);
   }
-});
+};
+gmail.get('/api/email-sync', handleManualEmailSync);
+gmail.post('/api/email-sync', handleManualEmailSync);
 
 // API: Test Email Sync & Digest (Synchronous)
 gmail.get('/api/test-email-digest', async (c) => {
