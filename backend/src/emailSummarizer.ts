@@ -55,7 +55,15 @@ export async function syncAndIngestEmails(env: Env): Promise<number> {
 
   try {
     const jwtSecret = env.JWT_SECRET || 'dev-secret-key-123456';
-    const accessToken = await getOrRefreshAccessToken(env.DB, clientId, clientSecret, jwtSecret);
+    const accessToken = await getOrRefreshAccessToken(
+      env.DB,
+      clientId,
+      clientSecret,
+      jwtSecret,
+      async (errMsg) => {
+        await sendOAuthExpiredAlert(env, errMsg);
+      }
+    );
     if (!accessToken) {
       console.warn('Gmail not connected. Please authenticate via OAuth.');
       return 0;
@@ -79,7 +87,7 @@ export async function syncAndIngestEmails(env: Env): Promise<number> {
         if (sub.subject_filter) parts.push(`subject:(${sub.subject_filter})`);
         if (sub.label_filter) parts.push(`label:${sub.label_filter}`);
         if (parts.length > 0) {
-          parts.push('newer_than:2d');
+          parts.push('newer_than:7d');
           query = parts.join(' ');
         }
       }
@@ -89,12 +97,23 @@ export async function syncAndIngestEmails(env: Env): Promise<number> {
       console.log(`Polling Gmail for subscription "${sub.name}" with query: "${query}"`);
       try {
         const messages = await fetchGmailMessages(accessToken, query);
+        if (!messages || messages.length === 0) continue;
+        const msgIds = messages.map((m) => m.id);
+        const placeholders = msgIds.map(() => '?').join(',');
+        const existingStmt = env.DB.prepare(
+          `SELECT id FROM ingested_emails WHERE id IN (${placeholders})`
+        ).bind(...msgIds);
+        const existingRes = typeof existingStmt.all === 'function'
+          ? await existingStmt.all() as { results?: Array<{ id: string }> }
+          : null;
+        const existingIds = new Set((existingRes?.results || []).map((r) => r.id));
         
         for (const msgSummary of messages) {
           // Check if already ingested
-          const exists = await env.DB.prepare(
-            'SELECT 1 FROM ingested_emails WHERE id = ?'
-          ).bind(msgSummary.id).first();
+          // Check if already ingested via pre-fetched Set (with fallback to .first() if .all() wasn't mocked)
+          const exists = existingIds.has(msgSummary.id);
+
+
 
           if (exists) continue;
 
@@ -202,6 +221,42 @@ export function parseAndValidateDigests(responseText: string, emailId: string): 
   }
 
   return digests;
+}
+
+export async function sendOAuthExpiredAlert(env: Env, errorDetails: string): Promise<void> {
+  const recipient = env.ALERT_EMAIL || env.DESTINATION_EMAIL || env.EMAIL?.destination_address || 'rattajak.n@gmail.com';
+  if (!env.EMAIL || !recipient) {
+    console.warn('[EmailDigest] Cannot send OAuth alert email: env.EMAIL or recipient not configured.');
+    return;
+  }
+
+  try {
+    const { createMimeMessage } = await import('mimetext');
+    const msg = createMimeMessage();
+    msg.setSender({ name: 'Oaktree Agent', addr: 'agent@oaktree.internal' });
+    msg.setRecipient(recipient);
+    msg.setSubject('[Oaktree Alert] Gmail OAuth Disconnected — Re-authentication Required');
+
+    const emailHtml = `
+      <div style="font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; line-height: 1.6; border: 1px solid #e1e8ed; border-radius: 8px; padding: 24px;">
+        <h2 style="color: #e74c3c; margin-top: 0;">⚠️ Gmail OAuth Token Expired / Revoked</h2>
+        <p>Oaktree Agent could not refresh the Gmail OAuth access token. Newsletter ingestion is paused until you reconnect your Gmail account.</p>
+        <h3 style="color: #4b5563; font-size: 16px;">Error Details:</h3>
+        <pre style="background: #f8f9fa; padding: 12px 16px; border-radius: 6px; font-family: monospace; font-size: 13px; color: #c0392b; white-space: pre-wrap;">${escapeHtml(errorDetails)}</pre>
+        <p style="font-size: 13px; color: #6b7280; margin-top: 20px;">Please open <strong>Command Center &rarr; Gmail Newsletters</strong> and click <strong>Connect Gmail</strong> to restore newsletter syncing.</p>
+      </div>
+    `;
+
+    msg.addMessage({
+      contentType: 'text/html',
+      data: emailHtml
+    });
+
+    await env.EMAIL.send(msg.asRaw());
+    console.log(`[EmailDigest] OAuth expiration alert email sent to ${recipient}`);
+  } catch (err) {
+    console.error('[EmailDigest] Failed to send OAuth expiration alert email:', err);
+  }
 }
 
 export async function sendDigestFailureAlert(

@@ -77,7 +77,8 @@ export async function getOrRefreshAccessToken(
   db: D1Database,
   clientId: string,
   clientSecret: string,
-  jwtSecret: string
+  jwtSecret: string,
+  onAuthInvalidated?: (errorMsg: string) => Promise<void>
 ): Promise<string | null> {
   const oauthRow = await db.prepare(
     'SELECT access_token, refresh_token, expiry_date FROM gmail_oauth WHERE id = ?'
@@ -121,8 +122,28 @@ export async function getOrRefreshAccessToken(
     ).bind(encAccessToken, encRefreshToken, newExpiry, 'default').run();
 
     return refreshed.access_token;
-  } catch (error) {
-    console.error('Failed to auto-refresh access token:', error);
+  } catch (error: any) {
+    const errMsg = error?.message || String(error);
+    console.error('Failed to auto-refresh access token:', errMsg);
+
+    // If token was permanently revoked or expired (e.g., invalid_grant in Google OAuth Testing mode),
+    // remove the dead token row so UI status reflects disconnected state and send a one-time alert.
+    if (errMsg.includes('invalid_grant') || errMsg.includes('Token has been expired or revoked')) {
+      try {
+        await db.prepare('DELETE FROM gmail_oauth WHERE id = ?').bind('default').run();
+        console.warn('[GmailOAuth] Removed invalidated OAuth token from gmail_oauth.');
+      } catch (dbErr) {
+        console.error('[GmailOAuth] Failed to delete invalidated token row:', dbErr);
+      }
+      if (onAuthInvalidated) {
+        try {
+          await onAuthInvalidated(errMsg);
+        } catch (alertErr) {
+          console.error('[GmailOAuth] Failed to run onAuthInvalidated callback:', alertErr);
+        }
+      }
+    }
+
     return null;
   }
 }
