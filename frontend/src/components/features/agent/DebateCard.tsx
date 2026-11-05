@@ -71,6 +71,7 @@ export interface DialecticalDebateData {
   };
   model_used?: string;
   created_at?: string;
+  updated_at?: string;
 }
 
 interface DebateCardProps {
