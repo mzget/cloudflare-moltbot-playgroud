@@ -130,6 +130,12 @@ export default function AnalysisReport({ symbol, subTab }: AnalysisReportProps) 
         initialDebate = null;
       }
     }
+    if (initialDebate && !initialDebate.updated_at && (report?.updated_at || report?.created_at)) {
+      initialDebate = {
+        ...initialDebate,
+        updated_at: report?.updated_at || report?.created_at,
+      };
+    }
 
     const handleDebateUpdated = (updatedDebate: any) => {
       setReport((prev: any) => {

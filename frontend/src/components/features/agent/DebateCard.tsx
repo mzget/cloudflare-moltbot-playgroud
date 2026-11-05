@@ -256,6 +256,11 @@ export default function DebateCard({ symbol, initialDebate, onDebateUpdated }: D
           <Typography level="body-xs" sx={{ opacity: 0.6, mt: 0.5 }}>
             การประลองวิทยานิพนธ์ 2 ขั้วตรงข้ามด้วย Google Gemini App จากเอกสารปฐมภูมิใน Notebook
           </Typography>
+          {(debate.updated_at || debate.created_at) && (
+            <Typography level="body-xs" sx={{ opacity: 0.5, mt: 0.3 }}>
+              วิเคราะห์ล่าสุดเมื่อ: {debate.updated_at || debate.created_at}
+            </Typography>
+          )}
         </Box>
 
         <Stack direction="row" alignItems="center" spacing={1}>

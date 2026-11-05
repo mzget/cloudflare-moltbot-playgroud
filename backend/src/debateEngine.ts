@@ -79,6 +79,7 @@ export interface DialecticalDebateResult {
   readonly synthesis: ArbiterSynthesisOutput;
   readonly model_used: string;
   readonly created_at: string;
+  readonly updated_at?: string;
 }
 
 /**
@@ -446,25 +447,34 @@ export async function getStoredDebate(
   try {
     // 1. Primary: stock_fundamentals.debate_json
     const row = await db.prepare(
-      'SELECT debate_json FROM stock_fundamentals WHERE symbol = ?'
-    ).bind(symbolUpper).first<{ debate_json: string | null }>();
+      'SELECT debate_json, updated_at FROM stock_fundamentals WHERE symbol = ?'
+    ).bind(symbolUpper).first<{ debate_json: string | null; updated_at: string | null }>();
 
     if (row && row.debate_json) {
       const parsed = parseDebateAIJson<DialecticalDebateResult | null>(row.debate_json, null);
       if (parsed && parsed.synthesis) {
-        return parsed;
+        return {
+          ...parsed,
+          symbol: parsed.symbol || symbolUpper,
+          updated_at: parsed.updated_at || row.updated_at || undefined,
+        };
       }
     }
 
     // 2. Fallback: analysis_results.framework_results.debate
     const analysisRow = await db.prepare(
-      "SELECT framework_results FROM analysis_results WHERE symbol = ? AND framework_results LIKE '%\"debate\"%' ORDER BY created_at DESC LIMIT 1"
-    ).bind(symbolUpper).first<{ framework_results: string }>();
+      "SELECT framework_results, created_at, updated_at FROM analysis_results WHERE symbol = ? AND framework_results LIKE '%\"debate\"%' ORDER BY created_at DESC LIMIT 1"
+    ).bind(symbolUpper).first<{ framework_results: string; created_at: string; updated_at: string }>();
 
     if (analysisRow && analysisRow.framework_results) {
       const fw = parseDebateAIJson<any>(analysisRow.framework_results, null);
       if (fw && fw.debate && fw.debate.synthesis) {
-        return fw.debate as DialecticalDebateResult;
+        return {
+          ...fw.debate,
+          symbol: fw.debate.symbol || symbolUpper,
+          created_at: fw.debate.created_at || analysisRow.created_at || undefined,
+          updated_at: fw.debate.updated_at || analysisRow.updated_at || analysisRow.created_at || undefined,
+        } as DialecticalDebateResult;
       }
     }
   } catch (err) {

@@ -851,25 +851,38 @@ export async function getBullBearDebate(env: any, symbolOrArgs: string | { symbo
 
   // 1. Query stock_fundamentals
   const row = await env.DB.prepare(
-    'SELECT debate_json FROM stock_fundamentals WHERE symbol = ?'
+    'SELECT debate_json, updated_at FROM stock_fundamentals WHERE symbol = ?'
   ).bind(symbolUpper).first();
 
   if (row && row.debate_json) {
     const parsed = safeJsonParse<any>(row.debate_json, null);
     if (parsed) {
-      return { symbol: symbolUpper, debate: parsed };
+      return {
+        symbol: symbolUpper,
+        debate: {
+          ...parsed,
+          updated_at: parsed.updated_at || row.updated_at || undefined,
+        },
+      };
     }
   }
 
   // 2. Fallback to analysis_results
   const analysisRow = await env.DB.prepare(
-    "SELECT framework_results FROM analysis_results WHERE symbol = ? AND framework_results LIKE '%\"debate\"%' ORDER BY created_at DESC LIMIT 1"
+    "SELECT framework_results, created_at, updated_at FROM analysis_results WHERE symbol = ? AND framework_results LIKE '%\"debate\"%' ORDER BY created_at DESC LIMIT 1"
   ).bind(symbolUpper).first();
 
   if (analysisRow && analysisRow.framework_results) {
     const fw = safeJsonParse<any>(analysisRow.framework_results, null);
     if (fw && fw.debate) {
-      return { symbol: symbolUpper, debate: fw.debate };
+      return {
+        symbol: symbolUpper,
+        debate: {
+          ...fw.debate,
+          created_at: fw.debate.created_at || analysisRow.created_at || undefined,
+          updated_at: fw.debate.updated_at || analysisRow.updated_at || analysisRow.created_at || undefined,
+        },
+      };
     }
   }
 
