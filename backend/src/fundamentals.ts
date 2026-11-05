@@ -37,6 +37,7 @@ export interface StockFundamentalDbRow {
   key_risks: string | null;   // JSON string: string[]
   thesis_kpis: string | null; // JSON string: string[]
   debate_json?: string | null; // JSON string: DialecticalDebateResult
+  unit_economics_json?: string | null;
   as_of_date: string;
   notebook_id: string | null;
   source_count: number | null;
@@ -63,6 +64,8 @@ export interface StockFundamental {
   thesis_kpis?: string[] | string | null;
   /** Stored Bull vs. Bear Dialectical Debate from Gemini Notebook */
   debate?: any | null;
+  /** Structured Business Model & Unit Economics Matrix (ADR-0020) */
+  unit_economics?: any | null;
   /** Freshness date derived from newest filing/source timestamp (ISO YYYY-MM-DD) */
   as_of_date: string;
   /** UUID of the source Google Gemini Notebook */
@@ -242,6 +245,7 @@ export function deserializeStockFundamental(row: StockFundamentalDbRow): StockFu
     key_risks: safeJsonParse<string[]>(row.key_risks, []),
     thesis_kpis: safeJsonParse<string[]>(row.thesis_kpis, []),
     debate: safeJsonParse<any | null>(row.debate_json, null),
+    unit_economics: safeJsonParse<any | null>(row.unit_economics_json, null),
     as_of_date: row.as_of_date,
     notebook_id: row.notebook_id ?? null,
     source_count: Number(row.source_count ?? 1),

@@ -14,6 +14,9 @@ import {
 import { RotateCw, AlertTriangle, Layers, Building, Globe, ExternalLink, Info } from 'lucide-react';
 import { API_BASE_URL } from '../../../config';
 import { glassStyle } from '../../../styles/glass';
+import BusinessModelUnitEconomicsCard, {
+  type BusinessModelMatrix,
+} from './BusinessModelUnitEconomicsCard';
 
 export interface FinancialBarPeriod {
   period: string;
@@ -59,6 +62,7 @@ export interface CompanyOverviewPayload {
     bull: number | null;
     price: number | null;
   } | null;
+  businessModelMatrix?: BusinessModelMatrix | null;
   updatedAt: string;
 }
 
@@ -719,6 +723,17 @@ export default function StockOverview({ symbol, initialData = null }: StockOverv
           </Sheet>
         </Grid>
       </Grid>
+
+      {/* Business Model & Unit Economics Section */}
+      <Box sx={{ mt: 2.5 }}>
+        <BusinessModelUnitEconomicsCard
+          symbol={symbol}
+          initialMatrix={data?.businessModelMatrix}
+          onMatrixUpdated={(newMatrix) => {
+            setData((prev) => (prev ? { ...prev, businessModelMatrix: newMatrix } : null));
+          }}
+        />
+      </Box>
     </Box>
   );
 }

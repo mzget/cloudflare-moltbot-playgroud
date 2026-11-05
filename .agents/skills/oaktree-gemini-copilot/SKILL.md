@@ -1,6 +1,6 @@
 ---
 name: oaktree-gemini-copilot
-description: Orchestration skill and system instructions for Google Gemini App and external AI agents interfacing with Oaktree MCP Server (`oaktree-mcp`). Categorizes all 21 MCP tools into 4 operational workflows (Portfolio Risk, DCF Valuation, Fundamental Debate & Deep Value Report, Market Intelligence) with strict unit rules, parameter schemas, and ready-to-use Custom Gem instructions.
+description: Orchestration skill and system instructions for Google Gemini App and external AI agents interfacing with Oaktree MCP Server (`oaktree-mcp`). Categorizes all 21 MCP tools into 4 operational workflows (Portfolio Risk, DCF Valuation, Fundamental Debate & Deep Value Report, Market Intelligence) with strict unit rules, parameter schemas, ADR-0020 Business Model & Unit Economics support, and ready-to-use Custom Gem extraction instructions.
 ---
 
 # 🌳 Oaktree Gemini Copilot Skill
@@ -13,7 +13,7 @@ This skill defines the complete operational specification and orchestration work
 
 The Oaktree MCP server exposes 21 discrete tools to allow external LLMs (specifically Google Gemini with NotebookLM or Custom Gems) to act as an autonomous **Senior Investment & Risk Officer**:
 - **Read Operations**: Query portfolio composition, risk health metrics, stock fundamentals, themes, and DCF models from Cloudflare D1 and R2.
-- **Write Operations**: Persist valuations, dialectical debates, 6-Guru deep value reports, risk officer advisories, and market intelligence directly into D1, which instantly surface on the Oaktree Web UI.
+- **Write Operations**: Persist valuations, dialectical debates, unit economics matrices, 6-Guru deep value reports, risk officer advisories, and market intelligence directly into D1, which instantly surface on the Oaktree Web UI.
 
 ---
 
@@ -34,7 +34,7 @@ Oaktree MCP Server (21 Tools)
 │   └── list_dcf_symbols            -> List all symbols evaluated with DCF in the system
 │
 ├── 3. Fundamental Intelligence, Debate & 6-Guru Deep Value Report
-│   ├── save_fundamental_brief      -> All-in-one company profile + 3-round debate + R2 OKF
+│   ├── save_fundamental_brief      -> All-in-one company profile + 3-round debate + unit economics (ADR-0020) + R2 OKF
 │   ├── save_bull_bear_debate       -> 3-round Bull vs. Bear debate & conviction balance (-10 to +10)
 │   ├── get_bull_bear_debate        -> Retrieve stored debate & conviction score
 │   ├── save_theme_sector_context   -> Theme dynamics, supply chain bottlenecks, macro trends
@@ -125,21 +125,45 @@ Oaktree MCP Server (21 Tools)
 
 ### Mode 3: Fundamental Intelligence, Dialectical Debate & 6-Guru Deep Value Report
 
-#### 9. `save_fundamental_brief`
-- **Description**: Atomic all-in-one save for qualitative company profile + 3-round debate + R2 OKF Markdown file.
+#### 9. `save_fundamental_brief` (All-in-One Atomic Push)
+- **Description**: Atomic single-call save for company profile, 3-round Bull vs. Bear debate, Business Model & Unit Economics matrix (ADR-0020), and R2 OKF Markdown file. Feeds both the **Overview Tab** (`unit_economics`) and the **Report Tab** (`debate`) simultaneously.
 - **Parameters**:
-  - `symbol` (*string*).
-  - `business_model` (*string*).
-  - `moat` (*string*).
-  - `competitors` (*string[]*).
-  - `guidance` (*object*: `revenue_target`, `margin_target`, `timeframe`, `key_assumptions`).
-  - `key_risks` (*string[]*).
-  - `thesis_kpis` (*string[]*).
-  - `as_of_date` (*string*, YYYY-MM-DD).
-  - `debate` (*object*, optional): Complete 3-round debate synthesis with `conviction_score` (-10 to +10).
+  - `symbol` (*string*): Ticker symbol in uppercase (e.g. `"SHOP"`).
+  - `business_model` (*string*): Qualitative business model, value generation mechanisms, and unit economics summary (in Institutional Thai).
+  - `moat` (*string*): Economic moat analysis (Network Effects, Switching Costs, Cost Advantages, Intangibles/IP) with empirical metrics.
+  - `competitors` (*string[]*): Major competitors or alternative architectures.
+  - `guidance` (*object*): `{ revenue_target, margin_target, timeframe, key_assumptions }`.
+  - `key_risks` (*string[]*): Array of structural risks or technological hurdles.
+  - `thesis_kpis` (*string[]*): Array of quantitative thesis tracking KPIs (e.g. ASP, Penetration Rate %, ARR).
+  - `as_of_date` (*string*, `YYYY-MM-DD`): Filing or earnings release date derived from the primary source.
+  - `source_count` (*number*, optional): Number of uploaded source documents (defaults to 1).
+  - `notebook_id` (*string*, optional): Notebook identifier.
+  - `unit_economics` (*object*, optional) - **ADR-0020 Matrix Structure**:
+    - `archetype` (*string*, optional): Business archetype (e.g. `"Unified Commerce Operating System"`, `"Pure-play Semiconductor IP"`).
+    - `period_label` (*string*, optional): Reporting period (e.g. `"Q2 2026"`).
+    - `segments` (*array of objects*, optional): Revenue segment breakdown:
+      - `name` (*string*): Segment name (e.g. `"Subscription Solutions"`, `"Merchant Solutions"`).
+      - `share_pct` (*number*, optional): Revenue share percentage (e.g. `22.4` for 22.4%).
+      - `revenue_display` (*string*, optional): Formatted revenue string (e.g. `"$836M"`).
+      - `yoy_growth_pct` (*number*, optional): YoY growth rate (e.g. `19.6` for +19.6%).
+      - `margin_pct` (*number*, optional): Segment margin percentage (e.g. `79.7`).
+      - `margin_type` (*enum*, optional): `'Gross Margin' | 'Operating Margin' | 'EBITDA Margin'`.
+      - `drivers` (*string*, optional): Key growth, volume, or pricing drivers.
+    - `unit_economics` (*array of objects*, optional): Company-specific hero KPIs:
+      - `label` (*string*): Metric name (e.g. `"Gross Merchandise Volume (GMV)"`, `"Attach Rate"`).
+      - `value` (*string*): Formatted metric value (e.g. `"$115.6B"`, `"3.45%"`).
+      - `change_display` (*string*, optional): Growth/change badge text (e.g. `"+32% YoY"`).
+      - `change_direction` (*enum*, optional): `'up' | 'down' | 'neutral'`.
+      - `progress_pct` (*number*, optional): Visual gauge fill 0-100 (e.g. `68`).
+      - `category` (*enum*, optional): `'volume' | 'monetization' | 'retention' | 'efficiency'`.
+      - `context` (*string*, optional): Contextual benchmark or risk threshold.
+  - `debate` (*object*, optional): Full 3-round dialectical debate structure:
+    - `round1`: `{ bull: { bull_thesis, growth_catalysts[], competitive_advantages[], valuation_upside }, bear: { bear_thesis, downside_risks[], structural_headwinds[], valuation_stretch } }`.
+    - `round2_rebuttal`: `{ bull_rebuttal: { rebuttal_arguments[], mitigating_factors[] }, bear_rebuttal: { rebuttal_arguments[], skeptical_counters[] } }`.
+    - `synthesis`: `{ key_tensions: [{ topic, bull_argument, bear_argument, decisive_factor }], consensus_points[], conviction_score (-10 to +10), conviction_label, verdict_summary }`.
 
 #### 10. `save_bull_bear_debate` & `get_bull_bear_debate`
-- **Description**: Save or retrieve a 3-round Bull vs. Bear debate (Round 1 Opening Theses, Round 2 Rebuttals, Round 3 Arbiter Synthesis).
+- **Description**: Save or retrieve a standalone 3-round Bull vs. Bear debate (Round 1 Opening Theses, Round 2 Rebuttals, Round 3 Arbiter Synthesis).
 - **Conviction Score Scale**:
   - `+7 to +10`: Strong Bull
   - `+2 to +6`: Moderate Bull
@@ -178,6 +202,116 @@ Oaktree MCP Server (21 Tools)
 
 ---
 
+## 📋 Canonical Gemini Extraction Prompt Template (`save_fundamental_brief`)
+
+This is the exact prompt template used in the Oaktree Web UI (`CopyPromptModal.tsx`) across both the **Overview** and **Report** tabs. Users can paste this prompt directly into Google Gemini App (with NotebookLM sources attached):
+
+```markdown
+# Fundamental Intelligence & Bull vs. Bear Debate Extraction: {SYMBOL}
+
+You are a Senior Equity Research Analyst conducting a comprehensive fundamental deep-dive using all primary documents uploaded in this notebook (10-K, 10-Q, Earnings Call Transcripts, Investor Presentation Slides, and Thesis Notes).
+
+## Mandatory Instructions:
+1. **Language**: Write all qualitative explanations, arguments, and summaries in **Institutional-Grade Thai (ภาษาไทยระดับนักวิเคราะห์สถาบัน)**. Professional technical/financial terms may be transliterated in English where appropriate.
+2. **Evidence Grounding**: Every single claim, catalyst, risk, and rebuttal **MUST** cite real figures, growth percentages, margins, or KPIs disclosed in the notebook sources. Never generalize without numbers.
+3. **Dialectical Debate**: Conduct a rigorous 3-Round Bull vs. Bear debate (Opening Theses -> Cross-Examination Rebuttals -> Dialectical Arbiter Synthesis with conviction score from -10 to +10).
+4. **Single Atomic Tool Call**: Invoke the MCP tool `save_fundamental_brief` **once** with both the fundamental research profile, the unit economics matrix, and the full `debate` object:
+
+```json
+{
+  "symbol": "{SYMBOL}",
+  "business_model": "สรุปโครงสร้างรายได้ กลไกการสร้างมูลค่า และหน่วยเศรษฐกิจ (Unit Economics) 2-3 ประโยคในภาษาไทยระดับนักวิเคราะห์",
+  "moat": "วิเคราะห์ปราการทางเศรษฐกิจ (Network Effects, Switching Costs, Cost Advantages, Intangibles/IP) พร้อมตัวเลขและข้อเท็จจริงสนับสนุน",
+  "competitors": ["ชื่อคู่แข่ง/สถาปัตยกรรม A", "ชื่อคู่แข่ง B"],
+  "guidance": {
+    "revenue_target": "เป้าหมายการเติบโตของรายได้ (เช่น 20-25% YoY หรือ $1.2B ใน FY27)",
+    "margin_target": "เป้าหมายอัตรากำไรขั้นต้นหรืออัตรากำไรจากการดำเนินงาน",
+    "timeframe": "กรอบเวลาของ Guidance (เช่น FY27 หรือ Q2 FY27)",
+    "key_assumptions": "สมมติฐานหลักที่ผู้บริหารเปิดเผยในการประชุมผลประกอบการ"
+  },
+  "key_risks": [
+    "ความเสี่ยงเชิงโครงสร้างหรืออุปสรรคทางเทคโนโลยี พร้อมผลกระทบต่อผลการดำเนินงาน",
+    "ความเสี่ยงด้านการกระจุกตัวของลูกค้า หรือความไม่แน่นอนทางกฎระเบียบและเศรษฐกิจมหภาค"
+  ],
+  "thesis_kpis": [
+    "ตัวชี้วัดเชิงปริมาณหลักในการติดตามวิทยานิพนธ์การลงทุน (เช่น ASP, Penetration Rate %, Volume Adoption, ARR)",
+    "ตัวชี้วัดรอง (เช่น Gross Retention %, Net Expansion Rate)"
+  ],
+  "unit_economics": {
+    "archetype": "เช่น Unified Commerce Operating System หรือ Pure-play Semiconductor IP",
+    "period_label": "เช่น Q2 2026 หรือ Q3 2026",
+    "segments": [
+      {
+        "name": "ชื่อกลุ่มธุรกิจ เช่น Subscription Solutions",
+        "share_pct": 22.4,
+        "revenue_display": "$836M",
+        "yoy_growth_pct": 19.6,
+        "margin_pct": 79.7,
+        "margin_type": "Gross Margin",
+        "drivers": "เช่น Basic $29/mo ถึง Plus $2,300/mo"
+      }
+    ],
+    "unit_economics": [
+      {
+        "label": "ชื่อ KPI เช่น Gross Merchandise Volume (GMV)",
+        "value": "$115.6B",
+        "change_display": "+32% YoY",
+        "change_direction": "up",
+        "progress_pct": 68,
+        "category": "volume",
+        "context": "คำอธิบายบริบทและเกณฑ์เฝ้าระวัง"
+      }
+    ]
+  },
+  "debate": {
+    "round1": {
+      "bull": {
+        "bull_thesis": "วิทยานิพนธ์ฝั่งกระทิง 2-3 ประโยค เน้นศักยภาพการเติบโตและการขยาย Moat",
+        "growth_catalysts": ["ปัจจัยเร่งการเติบโตข้อ 1 พร้อมตัวเลขจริงจากเอกสาร", "ปัจจัยเร่งข้อ 2"],
+        "competitive_advantages": ["ความได้เปรียบทางการแข่งขันเชิงโครงสร้างข้อ 1", "ข้อ 2"],
+        "valuation_upside": "การประเมินส่วนต่างราคาและโอกาสปรับเพิ่มประมาณการกำไร"
+      },
+      "bear": {
+        "bear_thesis": "วิทยานิพนธ์ฝั่งหมี 2-3 ประโยค เน้นจุดตาย ความเสี่ยงขาลง และ Inversion Thinking",
+        "downside_risks": ["ความเสี่ยงขาลงข้อ 1 พร้อมตัวเลขชี้วัดความเปราะบาง", "ความเสี่ยงข้อ 2"],
+        "structural_headwinds": ["อุปสรรคเชิงโครงสร้างและการแข่งขันที่รุนแรงขึ้น", "ข้อ 2"],
+        "valuation_stretch": "ความตึงตัวของ Valuation และความเสี่ยงในการถูก Multiple Compression"
+      }
+    },
+    "round2_rebuttal": {
+      "bull_rebuttal": {
+        "rebuttal_arguments": ["ข้อโต้แย้งหักล้างความเสี่ยงของฝั่ง Bear ด้วยหลักฐานและงบการเงิน"],
+        "mitigating_factors": ["ปัจจัยบรรเทาความเสี่ยงและสภาพคล่องรองรับ"]
+      },
+      "bear_rebuttal": {
+        "rebuttal_arguments": ["การชี้จุดบกพร่องในมุมมองฝั่ง Bull ว่ามองโลกในแง่ดีเกินจริง"],
+        "skeptical_counters": ["ข้อสังเกตและสมมติฐานที่ฝั่ง Bull มองข้าม"]
+      }
+    },
+    "synthesis": {
+      "key_tensions": [
+        {
+          "topic": "ประเด็นข้อถกเถียงชี้ขาด (เช่น อัตราการนำเทคโนโลยีไปใช้ vs. การถูกแทนที่)",
+          "bull_argument": "ข้ออ้างฝั่ง Bull พร้อมตัวเลขสนับสนุน",
+          "bear_argument": "ข้ออ้างฝั่ง Bear พร้อมตัวเลขความเสี่ยง",
+          "decisive_factor": "ตัวชี้วัดหรือรายงานที่จะเป็นจุดตัดสินในอนาคต"
+        }
+      ],
+      "consensus_points": ["จุดที่ทั้งฝ่าย Bull และ Bear เห็นพ้องตรงกัน"],
+      "conviction_score": 4,
+      "conviction_label": "Moderate Bull",
+      "verdict_summary": "บทสรุปดุลยภาพความเสี่ยงและผลตอบแทน 3-4 ประโยคเป็นภาษาไทยระดับนักวิเคราะห์"
+    }
+  },
+  "as_of_date": "YYYY-MM-DD (MUST be derived from the filing or earnings release date, e.g. 2026-07-29)"
+}
+```
+
+**Strict Requirement**: Derive `as_of_date` strictly from the document publication date. Do NOT invent dates.
+```
+
+---
+
 ## 📏 Mandatory Unit & Numerical Rules (Do Not Violate)
 
 1. **Revenues & Cash**: ALWAYS provide in **Billions USD ($B)** (e.g. `27.0` for \$27 Billion, NOT `27000000000`).
@@ -188,3 +322,4 @@ Oaktree MCP Server (21 Tools)
 6. **Health Score**: Scale is strictly from `0` to `100`.
 7. **Risk Level**: Must be exactly one of: `'Low'`, `'Moderate'`, `'Elevated'`, `'High'`.
 8. **Report Conviction Level**: Must be exactly one of: `'High'`, `'Medium'`, `'Low'`.
+9. **Unit Economics & Segments (ADR-0020)**: `share_pct`, `yoy_growth_pct`, and `margin_pct` MUST be standard percentages (e.g. `22.4` for 22.4%, NOT `0.224`). Dollar amounts should be formatted in `revenue_display` (e.g. `"$836M"`, `"$2.9B"`).

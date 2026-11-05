@@ -42,6 +42,13 @@ function createRealSqliteD1() {
   const migration0042Sql = fs.readFileSync(migration0042Path, "utf-8");
   db.exec(migration0042Sql);
 
+  const migration0047Path = path.resolve(
+    process.cwd(),
+    "../backend/migrations/0047_add_unit_economics_to_stock_fundamentals.sql"
+  );
+  const migration0047Sql = fs.readFileSync(migration0047Path, "utf-8");
+  db.exec(migration0047Sql);
+
 
   const d1Shim = {
     _rawDb: db,
