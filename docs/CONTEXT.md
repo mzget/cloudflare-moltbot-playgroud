@@ -125,6 +125,15 @@
 - **Millions USD Unit Normalization**:
   มาตรฐานการแปลงหน่วยข้อมูลตัวเลขทางการเงินให้อยู่ในหน่วยล้านดอลลาร์สหรัฐ ($M) ในฝั่ง Backend ก่อนส่งให้ Frontend และก่อนบันทึกลง D1 เพื่อกำจัดข้อผิดพลาดความไม่สอดคล้องของสเกลตัวเลข (1,000x / 1,000,000x) ระหว่าง Yahoo Finance (Raw USD) และ Finnhub (Millions USD)
 
+- **Business Model & Unit Economics Matrix (`BusinessModelMatrix`) (ADR-0020)**:
+  โครงสร้างข้อมูลแสดงการแบ่งสัดส่วนรายได้ตามโมเดลธุรกิจ (100% Proportional Stacked Bar & Segment Cards) พร้อมตัวชี้วัดประสิทธิภาพต่อหน่วย (Unit Economics Bento Grid) เช่น GMV, Attach Rate, MRR, RPO, Take Rate ซึ่งปรับแต่งตาม Business Archetype ของแต่ละบริษัท
+
+- **Hybrid Unit Economics Extraction (ADR-0020)**:
+  สถาปัตยกรรมการดึงข้อมูลสองระดับ: Deterministic Regex Parser สำหรับแปลงข้อมูลจาก `business_model` และ `management_focus_and_kpis` เดิมขึ้นแสดงผลทันที (`0ms`) และ Workers AI Extraction Endpoint (`POST /api/analysis/unit-economics/extract` ผ่านโมเดล Gemma) พร้อม MCP `save_fundamental_brief` สำหรับการสกัดโครงสร้างอย่างแม่นยำและบันทึกลง `stock_fundamentals.unit_economics_json`
+
+- **Implied Segment Revenue Calculation**:
+  การคำนวณมูลค่ารายได้ประเมินของแต่ละ Segment ในหน่วยล้านดอลลาร์ ($M) โดยอัตโนมัติจากสัดส่วนร้อยละ (%) คูณด้วยรายได้รวมไตรมาสล่าสุด ในกรณีที่บทวิเคราะห์ระบุเฉพาะสัดส่วนเปอร์เซ็นต์แต่ไม่ได้ระบุมูลค่าเงินสด พร้อมแสดงป้าย Implied เพื่อความโปร่งใส
+
 ## Risk Manager & Position Sizing Subsystem
 
 ### Terms & Concepts

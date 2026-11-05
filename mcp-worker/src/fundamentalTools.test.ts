@@ -157,9 +157,10 @@ describe("fundamentalTools", () => {
       expect(upsert?.binds[5]).toBe(JSON.stringify(["China JV risk", "Hyperscaler internal silicon"]));
       expect(upsert?.binds[6]).toBe(JSON.stringify(["v9 adoption rate", "CSS unit volume"]));
       expect(upsert?.binds[7]).toBeNull(); // debate_json (omitted)
-      expect(upsert?.binds[8]).toBe("2026-10-01"); // as_of_date
-      expect(upsert?.binds[9]).toBe("nb-1234"); // notebook_id
-      expect(upsert?.binds[10]).toBe(5); // source_count
+      expect(upsert?.binds[8]).toBeNull(); // unit_economics_json (omitted)
+      expect(upsert?.binds[9]).toBe("2026-10-01"); // as_of_date
+      expect(upsert?.binds[10]).toBe("nb-1234"); // notebook_id
+      expect(upsert?.binds[11]).toBe(5); // source_count
 
       // Verify R2 Put
       expect(mockKnowledgeBucket.put).toHaveBeenCalledTimes(1);
@@ -189,7 +190,7 @@ describe("fundamentalTools", () => {
 
       expect(result.success).toBe(true);
       const upsert = executedSql.find((e) => e.sql.includes("INSERT INTO stock_fundamentals"));
-      expect(upsert?.binds[10]).toBe(1); // default source_count
+      expect(upsert?.binds[11]).toBe(1); // default source_count
     });
 
     it("handles optional and empty fields gracefully with nulls and placeholders", async () => {
@@ -209,9 +210,10 @@ describe("fundamentalTools", () => {
       expect(upsert?.binds[5]).toBeNull(); // key_risks
       expect(upsert?.binds[6]).toBeNull(); // thesis_kpis
       expect(upsert?.binds[7]).toBeNull(); // debate_json
-      expect(upsert?.binds[8]).toBe("2026-08-01"); // as_of_date
-      expect(upsert?.binds[9]).toBeNull(); // notebook_id
-      expect(upsert?.binds[10]).toBe(1); // source_count
+      expect(upsert?.binds[8]).toBeNull(); // unit_economics_json
+      expect(upsert?.binds[9]).toBe("2026-08-01"); // as_of_date
+      expect(upsert?.binds[10]).toBeNull(); // notebook_id
+      expect(upsert?.binds[11]).toBe(1); // source_count
 
       // Verify R2 put uses standard placeholders
       const [, r2Body] = mockKnowledgeBucket.put.mock.calls[0];
