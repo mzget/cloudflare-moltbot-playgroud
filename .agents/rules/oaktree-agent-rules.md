@@ -23,7 +23,7 @@ These rules govern the core behavior of the Oaktree Agent in this repository.
 
 The agent is explicitly authorized and encouraged to:
 - **Activate Cloudflare Skills**: Load and reference `cloudflare` and `wrangler` skills whenever investigating Cloudflare services, architecture, or CLI syntax.
-- **Execute Cloudflare CLI (`wrangler` / `cf`)**: Run CLI commands (e.g. `npx wrangler d1 execute`, `wrangler tail`, `wrangler kv`, inspecting deployments or bindings) via `run_command` whenever needed to inspect live state, query data, or gather relevant information without seeking redundant permission.
+- **Execute Cloudflare CLI (`wrangler` / `cf`)**: Run CLI commands (e.g. `npx wrangler d1 execute` for data queries/inspections, `wrangler tail`, `wrangler kv`, inspecting deployments or bindings) via `run_command` whenever needed to inspect live state, query data, or gather relevant information without seeking redundant permission. *(Note: Strictly NO direct DDL schema changes via `d1 execute`; follow the D1 Migration rules in `oaktree-backend/SKILL.md`)*
 - **CLI Preference**: When interacting with Cloudflare, use the `cf` CLI unless the project has a Wrangler configuration file.
 
 ---
@@ -39,7 +39,8 @@ Do NOT load domain-specific guidelines or all skills at the start of every turn.
      - [stitch/SKILL.md](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/.agents/skills/stitch/SKILL.md)
      - [@antigravity-design-expert/SKILL.md](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/.agents/skills/@antigravity-design-expert/SKILL.md)
 2. **Backend & Cloudflare Database Guidelines**:
-   - *Condition*: Working on backend Workers, API routes, database schemas (D1, KV, R2), Worker AI models, or batch queries.
+   - *Condition*: Working on backend Workers, API routes, database schemas (D1, KV, R2), D1 migrations (`backend/migrations/`), Worker AI models, or batch queries.
+   - *Mandatory D1 Migration Rule*: When adding or altering database schemas, you MUST load and strictly adhere to the `Cloudflare D1 Database Migration Rules` in `oaktree-backend/SKILL.md`. Never run manual DDL schema changes (`ALTER`/`CREATE`) via `wrangler d1 execute` directly; all changes must use versioned migration files in `backend/migrations/` and be applied via `wrangler d1 migrations apply` to avoid breaking CI/CD deployment pipelines.
    - *Path*: [oaktree-backend/SKILL.md](file:///c:/Users/natta/Documents/antigravity/oaktree-agent/.agents/skills/oaktree-backend/SKILL.md)
 3. **Core Coding Principles & Karpathy Guidelines (Mandatory Pair)**:
    - *Condition*: Writing, modifying, reviewing, refactoring, or debugging any code. Must ALWAYS load both skills together.

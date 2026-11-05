@@ -1,11 +1,48 @@
 ---
 name: oaktree-backend
-description: Backend guidelines for Cloudflare Workers, D1 database batching/formatting, Workers AI model specifications, and ad-blocker resilient API naming. Load when working on backend Workers, API routes, or database operations.
+description: Backend guidelines for Cloudflare Workers, D1 database schema migrations, batching/formatting, Workers AI model specifications, and ad-blocker resilient API naming. Load when working on backend Workers, API routes, database schemas, or migrations.
 ---
 
 # Oaktree Backend Guidelines
 
 Guidelines and standards for backend development on Cloudflare Workers, Hono, Workers AI, and D1 Database.
+
+---
+
+## 🗄️ Cloudflare D1 Database Migration Rules & Guidelines (Strict)
+
+When adding or modifying database schemas (tables, columns, indexes) on Cloudflare D1 (`moltbot-db`):
+
+### 1. Strictly NO Direct DDL via `wrangler d1 execute`
+- **NEVER** run schema alterations (`ALTER TABLE`, `CREATE TABLE`, `DROP TABLE`) against the remote database using `wrangler d1 execute --command="..."`.
+- **Reasoning**: `wrangler d1 execute` executes raw SQL without updating Cloudflare's internal `d1_migrations` tracking table. When code merges to `main`, GitHub Actions CI/CD automatically runs `wrangler d1 migrations apply moltbot-db --remote`. If the migration file is not recorded in `d1_migrations`, Wrangler will attempt to execute it again, crashing the deployment pipeline with `duplicate column/table name: SQLITE_ERROR [code: 7500]`.
+
+### 2. Standard Migration Workflow
+1. **Create Migration File**:
+   - Create a versioned SQL file in `backend/migrations/` using the sequential 4-digit prefix following the latest migration (e.g. `0048_<feature_description>.sql`).
+2. **Apply Migrations Locally (Optional / Testing)**:
+   ```bash
+   cd backend
+   npx wrangler d1 migrations apply moltbot-db --local
+   ```
+3. **Apply Migrations to Remote**:
+   - Always run the command from the `backend/` directory where `wrangler.toml` is located:
+   ```bash
+   cd backend
+   npx wrangler d1 migrations apply moltbot-db --remote
+   ```
+4. **Verify Pending Migrations**:
+   - Check that all migrations are synchronized before triggering a release or merge:
+   ```bash
+   cd backend
+   npx wrangler d1 migrations list moltbot-db --remote
+   ```
+
+### 3. Emergency / Out-of-band Hotfix Sync
+If a schema DDL was ever applied out-of-band in an emergency via direct SQL execution, you MUST immediately record the corresponding migration file in the remote `d1_migrations` table before CI/CD runs:
+```sql
+INSERT INTO d1_migrations (name, applied_at) VALUES ('00XX_<migration_name>.sql', datetime('now'));
+```
 
 ---
 
