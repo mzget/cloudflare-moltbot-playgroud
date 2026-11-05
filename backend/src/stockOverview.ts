@@ -1,4 +1,5 @@
 import { resolveDcfScenarios, DcfRow } from '@oaktree/shared';
+import { BusinessModelMatrix, resolveBusinessModelMatrix } from './unitEconomics';
 
 export interface FinancialBarPeriod {
   readonly period: string;
@@ -55,20 +56,31 @@ export interface CompanyOverviewPayload {
     readonly terminalGrowth?: number | null;
     readonly scenarioName?: string | null;
   } | null;
+  readonly businessModelMatrix?: BusinessModelMatrix | null;
   readonly updatedAt: string;
 }
 
 export const attachLiveValuation = (
-  payload: Omit<CompanyOverviewPayload, 'dcfScenarios'>,
+  payload: Omit<CompanyOverviewPayload, 'dcfScenarios' | 'businessModelMatrix'>,
   dcfRows: ReadonlyArray<DcfRow>,
   price: number | null,
+  fundamentalRow?: any | null,
 ): CompanyOverviewPayload => {
   const r = resolveDcfScenarios(dcfRows);
   const scenarioName =
     r.base !== null ? 'Base Case' : r.bull !== null ? 'Bull Case' : r.bear !== null ? 'Bear Case' : null;
+
+  const latestQ = (payload.quarterly && payload.quarterly.length > 0)
+    ? payload.quarterly[payload.quarterly.length - 1]
+    : null;
+  const latestRev = latestQ?.totalRevenue ?? null;
+  const latestPeriod = latestQ?.period ?? null;
+  const businessModelMatrix = resolveBusinessModelMatrix(fundamentalRow, latestRev, latestPeriod);
+
   return {
     ...payload,
     dcfScenarios: { ...r, price, scenarioName },
+    businessModelMatrix,
   };
 };
 
@@ -577,17 +589,24 @@ export async function fetchFinancialOverview(
         const cached = JSON.parse(existingRow.overview_json);
         if (cached && Array.isArray(cached.quarterly)) {
           let dcfRows: DcfRow[] = [];
+          let fundamentalRow: any = null;
           try {
-            const dcfRowsRes = await env.DB.prepare(
-              'SELECT scenario_name, implied_share_price, wacc, terminal_growth FROM dcf_calculations WHERE symbol = ? ORDER BY created_at DESC, id DESC'
-            ).bind(symbol).all();
+            const [dcfRowsRes, fundRowRes] = await Promise.all([
+              env.DB.prepare(
+                'SELECT scenario_name, implied_share_price, wacc, terminal_growth FROM dcf_calculations WHERE symbol = ? ORDER BY created_at DESC, id DESC'
+              ).bind(symbol).all().catch(() => ({ results: [] })),
+              env.DB.prepare(
+                'SELECT symbol, business_model, thesis_kpis, unit_economics_json, as_of_date FROM stock_fundamentals WHERE symbol = ?'
+              ).bind(symbol).first().catch(() => null),
+            ]);
             dcfRows = Array.isArray(dcfRowsRes?.results) ? dcfRowsRes.results : (dcfRowsRes ? [dcfRowsRes] : []);
+            fundamentalRow = fundRowRes;
           } catch (dcfErr) {
-            console.warn(`[fetchFinancialOverview] Error querying dcf_calculations for cached ${symbol}:`, dcfErr);
+            console.warn(`[fetchFinancialOverview] Error querying dcf/fundamentals for cached ${symbol}:`, dcfErr);
           }
-          const { dcfScenarios: _ignoredDcf, ...cachedWithoutDcf } = cached;
+          const { dcfScenarios: _ignoredDcf, businessModelMatrix: _ignoredBM, ...cachedWithoutDcf } = cached;
           const livePrice = existingRow?.price ?? _ignoredDcf?.price ?? null;
-          return attachLiveValuation(cachedWithoutDcf, dcfRows, livePrice);
+          return attachLiveValuation(cachedWithoutDcf, dcfRows, livePrice, fundamentalRow);
         }
       } catch (err) {
         console.warn(`[fetchFinancialOverview] Corrupt overview_json cache for ${symbol}, refetching:`, err);
@@ -635,6 +654,10 @@ export async function fetchFinancialOverview(
     'SELECT sector_label FROM watchlist WHERE symbol = ? LIMIT 1'
   ).bind(symbol).first().catch((e: any) => { console.warn(`Watchlist query failed for ${symbol}:`, e); return null; });
 
+  const fetchFundamental = env.DB.prepare(
+    'SELECT symbol, business_model, thesis_kpis, unit_economics_json, as_of_date FROM stock_fundamentals WHERE symbol = ?'
+  ).bind(symbol).first().catch((e: any) => { console.warn(`Fundamental query failed for ${symbol}:`, e); return null; });
+
   const [
     finnhubMetricRes,
     finnhubProfileRes,
@@ -643,6 +666,7 @@ export async function fetchFinancialOverview(
     yfAnnualRes,
     dcfRes,
     watchlistRes,
+    fundamentalRes,
   ] = await Promise.all([
     fetchFinnhubMetric,
     fetchFinnhubProfile,
@@ -651,6 +675,7 @@ export async function fetchFinancialOverview(
     fetchYfAnnual,
     fetchDcf,
     fetchWatchlist,
+    fetchFundamental,
   ]);
 
   // Read previous periods from existing cached overview if any
@@ -719,5 +744,5 @@ export async function fetchFinancialOverview(
     console.warn(`[fetchFinancialOverview] Error saving overview cache to D1 for ${symbol}:`, err);
   }
 
-  return attachLiveValuation(basePayload, dcfRows, currentPrice ?? existingRow?.price ?? null);
+  return attachLiveValuation(basePayload, dcfRows, currentPrice ?? existingRow?.price ?? null, fundamentalRes);
 }

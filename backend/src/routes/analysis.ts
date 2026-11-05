@@ -6,6 +6,7 @@ import { formatMetricsForPrompt } from '../analysisPrompts';
 import { refreshMarginOfSafety, calculateDCF } from '@oaktree/shared';
 
 import { fetchFinancialOverview } from '../stockOverview';
+import { extractBusinessModelMatrixWithAI } from '../unitEconomics';
 
 const analysis = new Hono<AppEnv>();
 
@@ -30,6 +31,25 @@ const getFinancialOverviewHandler = async (c: any) => {
 
 analysis.get('/api/analysis/overview', getFinancialOverviewHandler);
 analysis.get('/api/stocks/:symbol/overview', getFinancialOverviewHandler);
+
+// POST /api/analysis/unit-economics/extract
+// Extracts Business Model & Unit Economics Matrix using Workers AI and caches to D1
+analysis.post('/api/analysis/unit-economics/extract', async (c) => {
+  const body = await c.req.json().catch(() => ({})) as any;
+  const symbol = body.symbol || c.req.query('symbol');
+  if (!symbol || !symbol.trim()) {
+    return c.json({ error: 'symbol is required' }, 400);
+  }
+  const symbolUpper = symbol.trim().toUpperCase();
+  try {
+    const matrix = await extractBusinessModelMatrixWithAI(c.env, symbolUpper);
+    return c.json({ symbol: symbolUpper, businessModelMatrix: matrix });
+  } catch (e: any) {
+    const errorMsg = e?.message || String(e || 'Extraction error');
+    console.error(`AI Extraction failed for ${symbolUpper}: ${errorMsg}`, e?.stack || e);
+    return c.json({ error: errorMsg }, 500);
+  }
+});
 
 
 // API: Value Investor Deep Analysis

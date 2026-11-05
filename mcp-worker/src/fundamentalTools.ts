@@ -191,6 +191,7 @@ export const saveFundamentalBriefShape = {
   debate: debatePayloadSchema
     .optional()
     .describe("Optional 3-round Bull vs. Bear Dialectical Debate (round1, round2_rebuttal, synthesis)"),
+  unit_economics: z.any().optional().describe("Structured Business Model & Unit Economics Matrix (archetype, segments, unitEconomics)"),
   as_of_date: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, "as_of_date must be in YYYY-MM-DD format")
@@ -634,12 +635,13 @@ export async function saveFundamentalBrief(
       key_risks,
       thesis_kpis,
       debate_json,
+      unit_economics_json,
       as_of_date,
       notebook_id,
       source_count,
       updated_at
     ) VALUES (
-      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now')
+      ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now')
     )
     ON CONFLICT(symbol) DO UPDATE SET
       business_model = excluded.business_model,
@@ -649,6 +651,7 @@ export async function saveFundamentalBrief(
       key_risks = excluded.key_risks,
       thesis_kpis = excluded.thesis_kpis,
       debate_json = COALESCE(excluded.debate_json, stock_fundamentals.debate_json),
+      unit_economics_json = excluded.unit_economics_json,
       as_of_date = excluded.as_of_date,
       notebook_id = excluded.notebook_id,
       source_count = excluded.source_count,
@@ -664,6 +667,7 @@ export async function saveFundamentalBrief(
     key_risks && key_risks.length > 0 ? JSON.stringify(key_risks) : null,
     thesis_kpis && thesis_kpis.length > 0 ? JSON.stringify(thesis_kpis) : null,
     debateJsonStr,
+    parsed.data.unit_economics ? JSON.stringify(parsed.data.unit_economics) : null,
     as_of_date,
     notebook_id?.trim() || null,
     source_count ?? 1
