@@ -5,6 +5,7 @@ import {
   parseUnitEconomicsFromKpis,
   enrichSegmentsWithImpliedRevenue,
   resolveBusinessModelMatrix,
+  normalizeBusinessModelMatrix,
   formatMillionsCurrency,
   extractArchetype,
 } from './unitEconomics';
@@ -257,6 +258,98 @@ describe('unitEconomics Domain & Parser', () => {
       expect(enriched.segments[0].revenueDisplay).toBe('$838M');
       expect(enriched.segments[0].isImpliedRevenue).toBe(true);
       expect(enriched.periodLabel).toBe("Q3 '26");
+    });
+
+    it('correctly normalizes and resolves snake_case unit_economics_json from Gemini MCP save_fundamental_brief', () => {
+      const geminiMcpJson = {
+        archetype: 'Pure-play Semiconductor IP',
+        period_label: 'Q3 2026',
+        as_of_date: '2026-11-05',
+        segments: [
+          {
+            name: 'License and Other Revenue',
+            share_pct: 53.6,
+            revenue_display: '$773M',
+            yoy_growth_pct: 50,
+            margin_pct: 98.5,
+            margin_type: 'Gross Margin',
+            drivers: 'Arm Total Access (>60 contracts) and SoftBank deal',
+          },
+          {
+            name: 'Royalty Revenue',
+            share_pct: 46.4,
+            revenue_display: '$670M',
+            yoy_growth_pct: 23,
+            margin_pct: 97.2,
+            margin_type: 'Gross Margin',
+            drivers: 'Data Center Royalty doubling (>100% YoY)',
+          },
+        ],
+        unit_economics: [
+          {
+            label: 'Total Architecture Chips Shipped',
+            value: '8.2B units',
+            change_display: '+12% YoY',
+            change_direction: 'up',
+            progress_pct: 82,
+            category: 'volume',
+            context: 'Compounding per-chip royalty engine',
+          },
+        ],
+      };
+
+      const row = {
+        symbol: 'ARM',
+        business_model: 'Some model text',
+        thesis_kpis: ['KPI 1'],
+        as_of_date: '2026-11-05',
+        unit_economics_json: JSON.stringify(geminiMcpJson),
+      };
+
+      const resolved = resolveBusinessModelMatrix(row, 1443, "Q3 '26");
+      expect(resolved).not.toBeNull();
+      expect(resolved?.archetype).toBe('Pure-play Semiconductor IP');
+      expect(resolved?.periodLabel).toBe('Q3 2026');
+      expect(resolved?.source).toBe('mcp');
+
+      // Verify segments normalized to camelCase
+      expect(resolved?.segments).toHaveLength(2);
+      expect(resolved?.segments[0].sharePct).toBe(53.6);
+      expect(resolved?.segments[0].marginPct).toBe(98.5);
+      expect(resolved?.segments[0].marginType).toBe('Gross Margin');
+      expect(resolved?.segments[0].yoyGrowthPct).toBe(50);
+      expect(resolved?.segments[0].revenueDisplay).toBe('$773M');
+
+      expect(resolved?.segments[1].sharePct).toBe(46.4);
+      expect(resolved?.segments[1].marginPct).toBe(97.2);
+
+      // Verify unitEconomics normalized to camelCase
+      expect(resolved?.unitEconomics).toHaveLength(1);
+      expect(resolved?.unitEconomics[0].label).toBe('Total Architecture Chips Shipped');
+      expect(resolved?.unitEconomics[0].value).toBe('8.2B units');
+      expect(resolved?.unitEconomics[0].changeDisplay).toBe('+12% YoY');
+      expect(resolved?.unitEconomics[0].changeDirection).toBe('up');
+      expect(resolved?.unitEconomics[0].progressPct).toBe(82);
+      expect(resolved?.unitEconomics[0].category).toBe('volume');
+      expect(resolved?.unitEconomics[0].context).toBe('Compounding per-chip royalty engine');
+    });
+
+    it('normalizeBusinessModelMatrix handles null and edge-case inputs gracefully', () => {
+      expect(normalizeBusinessModelMatrix(null)).toBeNull();
+      expect(normalizeBusinessModelMatrix(undefined)).toBeNull();
+      expect(normalizeBusinessModelMatrix({})).toBeNull();
+      expect(normalizeBusinessModelMatrix({ segments: [], unit_economics: [] })).toBeNull();
+
+      const partial = normalizeBusinessModelMatrix({
+        segments: [{ name: 'Test', share_pct: 'not-a-number', margin_pct: null }],
+        unit_economics: [{ label: 'Metric', value: 123 }],
+      });
+      expect(partial).not.toBeNull();
+      expect(partial?.segments[0].name).toBe('Test');
+      expect(partial?.segments[0].sharePct).toBeNull();
+      expect(partial?.segments[0].marginPct).toBeNull();
+      expect(partial?.unitEconomics[0].label).toBe('Metric');
+      expect(partial?.unitEconomics[0].value).toBe('123');
     });
   });
 });
