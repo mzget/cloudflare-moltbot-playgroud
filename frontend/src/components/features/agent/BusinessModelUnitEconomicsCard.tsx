@@ -113,14 +113,21 @@ export default function BusinessModelUnitEconomicsCard({
     }
   };
 
-  const hasSegments = matrix?.segments && matrix.segments.length > 0;
-  const hasKpis = matrix?.unitEconomics && matrix.unitEconomics.length > 0;
+  const unitEconomicsList = React.useMemo(() => {
+    return matrix?.unitEconomics || (matrix as any)?.unit_economics || [];
+  }, [matrix]);
+
+  const hasSegments = Boolean(matrix?.segments && matrix.segments.length > 0);
+  const hasKpis = unitEconomicsList.length > 0;
   const hasData = hasSegments || hasKpis;
 
   // Calculate sum of shares for proportional bar scaling
   const totalShare = React.useMemo(() => {
     if (!matrix?.segments) return 100;
-    const sum = matrix.segments.reduce((acc, s) => acc + (s.sharePct || 0), 0);
+    const sum = matrix.segments.reduce((acc, s) => {
+      const share = typeof s.sharePct === 'number' ? s.sharePct : (s as any).share_pct;
+      return acc + (typeof share === 'number' ? share : 0);
+    }, 0);
     return sum > 0 ? sum : 100;
   }, [matrix?.segments]);
 
@@ -157,8 +164,8 @@ export default function BusinessModelUnitEconomicsCard({
           </Stack>
           <Typography level="body-xs" sx={{ color: 'text.tertiary', fontSize: '11px', mt: 0.3 }}>
             Monetization Engines, Segment Revenue Mix &amp; Core Unit Drivers
-            {matrix?.periodLabel ? ` • ${matrix.periodLabel}` : ''}
-            {matrix?.asOfDate ? ` • As of ${matrix.asOfDate}` : ''}
+            {(matrix?.periodLabel || (matrix as any)?.period_label) ? ` • ${matrix?.periodLabel || (matrix as any)?.period_label}` : ''}
+            {(matrix?.asOfDate || (matrix as any)?.as_of_date) ? ` • As of ${matrix?.asOfDate || (matrix as any)?.as_of_date}` : ''}
             {matrix?.source === 'ai_extracted' ? ' • AI Synthesized' : ''}
           </Typography>
         </Box>
@@ -273,14 +280,26 @@ export default function BusinessModelUnitEconomicsCard({
                     }}
                   >
                     {matrix!.segments.map((seg, idx) => {
-                      const share = seg.sharePct || (100 / matrix!.segments.length);
-                      const widthPct = Math.max(8, (share / totalShare) * 100);
+                      const share = typeof seg.sharePct === 'number'
+                        ? seg.sharePct
+                        : typeof (seg as any).share_pct === 'number'
+                          ? (seg as any).share_pct
+                          : null;
+                      const validShare = typeof share === 'number' ? share : (100 / matrix!.segments.length);
+                      const widthPct = Math.max(8, (validShare / totalShare) * 100);
                       const palette = SEGMENT_PALETTES[idx % SEGMENT_PALETTES.length];
+                      const revDisplay = seg.revenueDisplay || (seg as any).revenue_display || '';
+                      const marginPct = typeof seg.marginPct === 'number'
+                        ? seg.marginPct
+                        : typeof (seg as any).margin_pct === 'number'
+                          ? (seg as any).margin_pct
+                          : null;
+                      const marginType = seg.marginType || (seg as any).margin_type || 'Margin';
 
                       return (
                         <Tooltip
                           key={idx}
-                          title={`${seg.name}: ${seg.sharePct !== null ? `${seg.sharePct}%` : '—'} ${seg.revenueDisplay ? `(${seg.revenueDisplay})` : ''} ${seg.marginPct !== null ? `• ${seg.marginType || 'Margin'}: ${seg.marginPct}%` : ''}`}
+                          title={`${seg.name}: ${typeof share === 'number' ? `${share}%` : '—'} ${revDisplay ? `(${revDisplay})` : ''} ${typeof marginPct === 'number' ? `• ${marginType}: ${marginPct}%` : ''}`}
                           variant="soft"
                           size="sm"
                         >
@@ -311,7 +330,7 @@ export default function BusinessModelUnitEconomicsCard({
                                 whiteSpace: 'nowrap',
                               }}
                             >
-                              {seg.sharePct !== null ? `${seg.sharePct}%` : seg.name}
+                              {typeof share === 'number' ? `${share}%` : seg.name}
                             </Typography>
                           </Box>
                         </Tooltip>
@@ -328,8 +347,26 @@ export default function BusinessModelUnitEconomicsCard({
               <Stack spacing={1.5} sx={{ flex: 1 }}>
                 {matrix?.segments?.map((seg, idx) => {
                   const palette = SEGMENT_PALETTES[idx % SEGMENT_PALETTES.length];
-                  const hasGrowth = typeof seg.yoyGrowthPct === 'number';
-                  const isGrowthPositive = (seg.yoyGrowthPct ?? 0) >= 0;
+                  const yoyGrowth = typeof seg.yoyGrowthPct === 'number'
+                    ? seg.yoyGrowthPct
+                    : typeof (seg as any).yoy_growth_pct === 'number'
+                      ? (seg as any).yoy_growth_pct
+                      : null;
+                  const hasGrowth = typeof yoyGrowth === 'number';
+                  const isGrowthPositive = (yoyGrowth ?? 0) >= 0;
+                  const sharePct = typeof seg.sharePct === 'number'
+                    ? seg.sharePct
+                    : typeof (seg as any).share_pct === 'number'
+                      ? (seg as any).share_pct
+                      : null;
+                  const marginPct = typeof seg.marginPct === 'number'
+                    ? seg.marginPct
+                    : typeof (seg as any).margin_pct === 'number'
+                      ? (seg as any).margin_pct
+                      : null;
+                  const marginType = seg.marginType || (seg as any).margin_type || 'Margin';
+                  const revenueDisplay = seg.revenueDisplay || (seg as any).revenue_display || null;
+                  const isImpliedRevenue = Boolean(seg.isImpliedRevenue ?? (seg as any).is_implied_revenue);
 
                   return (
                     <Box
@@ -362,15 +399,15 @@ export default function BusinessModelUnitEconomicsCard({
                         </Stack>
 
                         <Stack direction="row" alignItems="center" spacing={1}>
-                          {seg.sharePct !== null && (
+                          {typeof sharePct === 'number' && (
                             <Chip size="sm" variant="soft" color="neutral" sx={{ fontWeight: 800, fontSize: '11px' }}>
-                              {seg.sharePct}% Mix
+                              {sharePct}% Mix
                             </Chip>
                           )}
-                          {seg.revenueDisplay && (
+                          {revenueDisplay && (
                             <Typography level="body-xs" sx={{ fontWeight: 800, color: 'text.primary', fontSize: '12px' }}>
-                              {seg.revenueDisplay}
-                              {seg.isImpliedRevenue && (
+                              {revenueDisplay}
+                              {isImpliedRevenue && (
                                 <Tooltip title="Calculated from segment % and latest total quarterly revenue" size="sm">
                                   <span style={{ fontSize: '9.5px', color: 'var(--joy-palette-text-tertiary)', marginLeft: 4 }}>
                                     (Est.)
@@ -392,18 +429,18 @@ export default function BusinessModelUnitEconomicsCard({
                             startDecorator={isGrowthPositive ? <TrendingUp size={12} /> : <TrendingDown size={12} />}
                             sx={{ fontWeight: 700, fontSize: '11px' }}
                           >
-                            {isGrowthPositive ? `+${seg.yoyGrowthPct}%` : `${seg.yoyGrowthPct}%`} YoY
+                            {isGrowthPositive ? `+${yoyGrowth}%` : `${yoyGrowth}%`} YoY
                           </Chip>
                         )}
 
-                        {seg.marginPct !== null && (
+                        {typeof marginPct === 'number' && (
                           <Chip
                             size="sm"
                             variant="outlined"
                             color="neutral"
                             sx={{ fontWeight: 600, fontSize: '11px' }}
                           >
-                            {seg.marginType || 'Margin'}: <b style={{ marginLeft: 4, color: palette.barColor }}>{seg.marginPct}%</b>
+                            {marginType}: <b style={{ marginLeft: 4, color: palette.barColor }}>{marginPct}%</b>
                           </Chip>
                         )}
                       </Stack>
@@ -442,17 +479,24 @@ export default function BusinessModelUnitEconomicsCard({
                   Unit Economics Matrix
                 </Typography>
                 <Chip size="sm" variant="plain" sx={{ fontSize: '11px', color: 'text.tertiary' }}>
-                  {matrix?.unitEconomics?.length || 0} Core Metrics
+                  {unitEconomicsList.length} Core Metrics
                 </Chip>
               </Stack>
 
               {/* Bento Grid of KPIs */}
               <Grid container spacing={1.5} sx={{ flex: 1 }}>
-                {matrix?.unitEconomics?.map((kpi, idx) => {
-                  const isPositive = kpi.changeDirection === 'up';
-                  const isNegative = kpi.changeDirection === 'down';
-                  const hasChange = Boolean(kpi.changeDisplay);
-                  const isRateOrProgress = typeof kpi.progressPct === 'number';
+                {unitEconomicsList.map((kpi: any, idx: number) => {
+                  const changeDirection = kpi.changeDirection || kpi.change_direction;
+                  const isPositive = changeDirection === 'up';
+                  const isNegative = changeDirection === 'down';
+                  const changeDisplay = kpi.changeDisplay || kpi.change_display;
+                  const hasChange = Boolean(changeDisplay);
+                  const progressPct = typeof kpi.progressPct === 'number'
+                    ? kpi.progressPct
+                    : typeof kpi.progress_pct === 'number'
+                      ? kpi.progress_pct
+                      : null;
+                  const isRateOrProgress = typeof progressPct === 'number';
 
                   return (
                     <Grid key={idx} xs={12} sm={6}>
@@ -508,7 +552,7 @@ export default function BusinessModelUnitEconomicsCard({
                                 color={isPositive ? 'success' : isNegative ? 'danger' : 'neutral'}
                                 sx={{ fontWeight: 800, fontSize: '10.5px', py: 0 }}
                               >
-                                {kpi.changeDisplay}
+                                {changeDisplay}
                               </Chip>
                             )}
                           </Stack>
@@ -519,7 +563,7 @@ export default function BusinessModelUnitEconomicsCard({
                           <Box sx={{ width: '100%', mt: 0.5 }}>
                             <LinearProgress
                               determinate
-                              value={Math.min(100, Math.max(0, kpi.progressPct!))}
+                              value={Math.min(100, Math.max(0, progressPct))}
                               color="primary"
                               size="sm"
                               sx={{ borderRadius: '4px', bgcolor: 'background.level2' }}

@@ -457,6 +457,117 @@ export function enrichSegmentsWithImpliedRevenue(
 }
 
 /**
+ * Normalizes raw matrix payload into canonical BusinessModelMatrix.
+ * Handles both snake_case (e.g. from Gemini MCP save_fundamental_brief)
+ * and camelCase (e.g. from AI deep extract / internal types).
+ */
+export function normalizeBusinessModelMatrix(
+  raw: any,
+  fallbackPeriodLabel?: string | null
+): BusinessModelMatrix | null {
+  if (!raw || typeof raw !== 'object') return null;
+
+  const rawSegments = Array.isArray(raw.segments) ? raw.segments : [];
+  const rawKpis = Array.isArray(raw.unitEconomics)
+    ? raw.unitEconomics
+    : Array.isArray(raw.unit_economics)
+      ? raw.unit_economics
+      : [];
+
+  if (rawSegments.length === 0 && rawKpis.length === 0) {
+    return null;
+  }
+
+  const segments: RevenueSegmentItem[] = rawSegments.map((seg: any) => {
+    const name = typeof seg?.name === 'string' ? seg.name.trim() : 'Segment';
+    const sharePct = typeof seg?.sharePct === 'number'
+      ? seg.sharePct
+      : typeof seg?.share_pct === 'number'
+        ? seg.share_pct
+        : null;
+    const revenueMillions = typeof seg?.revenueMillions === 'number'
+      ? seg.revenueMillions
+      : typeof seg?.revenue_millions === 'number'
+        ? seg.revenue_millions
+        : null;
+    const revenueDisplay = typeof seg?.revenueDisplay === 'string'
+      ? seg.revenueDisplay
+      : typeof seg?.revenue_display === 'string'
+        ? seg.revenue_display
+        : formatMillionsCurrency(revenueMillions);
+    const yoyGrowthPct = typeof seg?.yoyGrowthPct === 'number'
+      ? seg.yoyGrowthPct
+      : typeof seg?.yoy_growth_pct === 'number'
+        ? seg.yoy_growth_pct
+        : null;
+    const marginPct = typeof seg?.marginPct === 'number'
+      ? seg.marginPct
+      : typeof seg?.margin_pct === 'number'
+        ? seg.margin_pct
+        : null;
+    const marginType = seg?.marginType || seg?.margin_type || null;
+    const drivers = seg?.drivers ? String(seg.drivers).trim() : null;
+    const isImpliedRevenue = Boolean(seg?.isImpliedRevenue ?? seg?.is_implied_revenue);
+
+    return {
+      name,
+      sharePct,
+      revenueMillions,
+      revenueDisplay,
+      isImpliedRevenue,
+      yoyGrowthPct,
+      marginPct,
+      marginType,
+      drivers,
+    };
+  });
+
+  const unitEconomics: UnitEconomicMetricItem[] = rawKpis.map((kpi: any) => {
+    const label = typeof kpi?.label === 'string' ? kpi.label.trim() : '';
+    const value = typeof kpi?.value === 'string' ? kpi.value.trim() : String(kpi?.value ?? '');
+    const changeDisplay = typeof kpi?.changeDisplay === 'string'
+      ? kpi.changeDisplay
+      : typeof kpi?.change_display === 'string'
+        ? kpi.change_display
+        : null;
+    const changeDirection = kpi?.changeDirection || kpi?.change_direction || undefined;
+    const progressPct = typeof kpi?.progressPct === 'number'
+      ? kpi.progressPct
+      : typeof kpi?.progress_pct === 'number'
+        ? kpi.progress_pct
+        : null;
+    const category = kpi?.category || undefined;
+    const context = kpi?.context ? String(kpi.context).trim() : null;
+
+    return {
+      label,
+      value,
+      changeDisplay,
+      changeDirection,
+      progressPct,
+      category,
+      context,
+    };
+  });
+
+  const archetype = raw.archetype ? String(raw.archetype).trim() : null;
+  const summary = raw.summary ? String(raw.summary).trim() : null;
+  const periodLabel = raw.periodLabel || raw.period_label || fallbackPeriodLabel || null;
+  const asOfDate = raw.asOfDate || raw.as_of_date || null;
+  const source = raw.source === 'ai_extracted' || raw.source === 'parsed' ? raw.source : 'mcp';
+
+  return {
+    archetype,
+    summary,
+    periodLabel,
+    asOfDate,
+    segments,
+    unitEconomics,
+    source,
+  };
+}
+
+/**
  * Resolves BusinessModelMatrix from stock_fundamentals row:
  * Prioritizes unit_economics_json (from MCP / AI), falling back to deterministic parser.
  */
@@ -473,8 +584,9 @@ export function resolveBusinessModelMatrix(
         ? JSON.parse(fundamentalRow.unit_economics_json)
         : fundamentalRow.unit_economics_json;
 
-      if (cached && (Array.isArray(cached.segments) || Array.isArray(cached.unitEconomics))) {
-        return enrichSegmentsWithImpliedRevenue(cached, latestQuarterlyRevenueMillions, latestPeriodLabel);
+      const normalized = normalizeBusinessModelMatrix(cached, latestPeriodLabel);
+      if (normalized) {
+        return enrichSegmentsWithImpliedRevenue(normalized, latestQuarterlyRevenueMillions, latestPeriodLabel);
       }
     } catch (err) {
       console.warn(`[resolveBusinessModelMatrix] Corrupt unit_economics_json for ${fundamentalRow.symbol}:`, err);
