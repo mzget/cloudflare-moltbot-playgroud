@@ -29,6 +29,8 @@ const resources = {
         light_mode: "Light Mode",
         dark_mode: "Dark Mode",
         settings: "Settings",
+        install_app: "Install App",
+        app_installed: "App Installed",
         sign_out: "Sign Out",
         operator: "Operator",
         pro_account: "Pro Account",
@@ -88,6 +90,8 @@ const resources = {
         light_mode: "Modo Claro",
         dark_mode: "Modo Oscuro",
         settings: "Ajustes",
+        install_app: "Instalar App",
+        app_installed: "App Instalada",
         sign_out: "Cerrar sesión",
         operator: "Operador",
         pro_account: "Cuenta Pro",
@@ -115,8 +119,69 @@ const resources = {
       },
       not_found: {
         title: "Página No Encontrada",
-        description: "La página que buscas no existe o ha sido movida. Verifica la URL e intenta de nuevo.",
+        description: "La page que buscas no existe o ha sido movida. Verifica la URL e intenta de nuevo.",
         go_home: "Ir al Panel",
+      }
+    }
+  },
+  th: {
+    translation: {
+      app: {
+        title: "Oaktree Platform",
+        subtitle: "ระบบข่าวกรองการลงทุนและการเงินครบวงจร",
+        exchanging_token: "กำลังแลกเปลี่ยนโทเคน Google...",
+        verifying_session: "กำลังตรวจสอบเซสชัน...",
+      },
+      login: {
+        description: "เข้าถึงการวิเคราะห์รอบวัฏจักรตลาด การประเมินความเสี่ยง และสังเคราะห์ข่าวตามปรัชญาของ Howard Marks",
+        access_denied: "ปฏิเสธการเข้าถึง",
+        sign_in: "เข้าสู่ระบบด้วย Google",
+        authorized_only: "เฉพาะอีเมลที่ได้รับอนุญาตเท่านั้น",
+      },
+      header: {
+        intelligence_active: "ระบบข่าวกรองความมั่งคั่ง",
+        notifications: "การแจ้งเตือน",
+        mark_all_read: "อ่านทั้งหมดแล้ว",
+        clear_read: "ล้างรายการที่อ่านแล้ว",
+        no_notifications: "ยังไม่มีการแจ้งเตือน",
+        just_now: "เมื่อสักครู่",
+        mins_ago: "{{count}} นาทีที่แล้ว",
+        hours_ago: "{{count}} ชม. ที่แล้ว",
+        days_ago: "{{count}} วันที่แล้ว",
+        light_mode: "โหมดสว่าง",
+        dark_mode: "โหมดมืด",
+        settings: "การตั้งค่า",
+        install_app: "ติดตั้งแอป (PWA)",
+        app_installed: "ติดตั้งแอปแล้ว",
+        sign_out: "ออกจากระบบ",
+        operator: "ผู้ใช้งาน",
+        pro_account: "บัญชี Pro",
+        menu: "เมนู",
+        expand_sidebar: "ขยายแถบข้าง",
+        collapse_sidebar: "ย่อแถบข้าง",
+        show_sidebar: "แสดงแถบข้าง",
+      },
+      sidebar: {
+        command_center: "ศูนย์บัญชาการ",
+        dashboard: "แดชบอร์ด",
+        market_intelligence: "ข่าวกรองตลาด",
+        watchlist: "รายการเฝ้าดู",
+        news_sources: "แหล่งข่าว",
+        agent_chat: "แชทกับ AI Agent",
+        db_agent: "Agent ฐานข้อมูล",
+        about_oaktree: "เกี่ยวกับ Oaktree",
+        oaktree_command: "คำสั่ง Oaktree",
+        hide_sidebar: "ซ่อนแถบข้าง",
+      },
+      about: {
+        title: "เกี่ยวกับ Oaktree Platform",
+        description: "ได้รับแรงบันดาลใจจากปรัชญาการลงทุนของ Howard Marks (Oaktree Capital) มุ่งเน้นการวิเคราะห์รอบวัฏจักรตลาด การควบคุมความเสี่ยง และมูลค่าระยะยาว",
+        footer: "ขับเคลื่อนโดย Cloudflare Workers, AI และ Browser Rendering",
+      },
+      not_found: {
+        title: "ไม่พบหน้าที่ต้องการ",
+        description: "หน้าที่คุณกำลังค้นหาไม่มีอยู่หรือถูกย้ายแล้ว",
+        go_home: "กลับไปแดชบอร์ด",
       }
     }
   }
@@ -134,4 +199,3 @@ i18n
   });
 
 export default i18n;
-

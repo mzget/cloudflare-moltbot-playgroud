@@ -1,0 +1,19 @@
+{
+  "name": "Oaktree Platform",
+  "short_name": "Oaktree",
+  "description": "Unified Intelligence for Investment & Finance",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#050505",
+  "theme_color": "#050505",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
