@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useContext } from 'react';
 import { Box, Typography, Stack, Sheet, IconButton, Tooltip, Button, Dropdown, Menu as JoyMenu, MenuButton, MenuItem, Divider, Input, Chip } from '@mui/joy';
 import { 
-  Bell, Settings, User, Menu, Moon, Sun, LogOut, Check,
+  Bell, Settings, User, Menu, Moon, Sun, LogOut, Check, Download,
   LayoutDashboard, BarChart3, TrendingUp, Terminal, Bot, Database, Info,
   Receipt, PiggyBank, Wallet, Sparkles, Upload, Plus, ChevronDown
 } from 'lucide-react';
@@ -13,6 +13,8 @@ import { API_BASE_URL } from '../../config';
 import { glassStyle } from '../../styles/glass';
 import { AuthContext } from '../common/AuthContext';
 import OaktreeIcon from '../common/OaktreeIcon';
+import PWAInstallModal from '../common/PWAInstallModal';
+import { usePWAInstall } from '../../hooks/usePWAInstall';
 import { useSettingsStore, type DensityMode } from '../../store/settingsStore';
 import { useFinanceBridgeStore, dispatchFinanceAction } from '../../store/financeBridgeStore';
 
@@ -40,6 +42,15 @@ export default function Header({
   const { t } = useTranslation();
   const { user, logout } = useContext(AuthContext);
   const { mode, setMode } = useColorScheme();
+  const {
+    canInstall,
+    isStandalone,
+    isInstalled,
+    isIOS,
+    showGuideModal,
+    setShowGuideModal,
+    promptInstall,
+  } = usePWAInstall();
   const [mounted, setMounted] = React.useState(false);
   const headerRef = useRef<HTMLDivElement>(null);
   const logoRef = useRef<HTMLDivElement>(null);
@@ -795,6 +806,49 @@ export default function Header({
                     Save
                   </Button>
                 </Box>
+                <Divider sx={{ my: 1.5, opacity: 0.15 }} />
+                <Typography level="body-xs" sx={{ px: 1, py: 0.5, fontWeight: 700, color: 'text.tertiary', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  Application
+                </Typography>
+                <MenuItem
+                  id="header-pwa-install-btn"
+                  data-testid="header-pwa-install-btn"
+                  onClick={async () => {
+                    if (isStandalone || isInstalled) return;
+                    await promptInstall();
+                  }}
+                  disabled={isStandalone || isInstalled}
+                  sx={{
+                    borderRadius: '10px',
+                    fontWeight: 600,
+                    fontSize: '0.85rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 1.25,
+                    py: 1,
+                    my: 0.25,
+                    color: (isStandalone || isInstalled) ? 'text.tertiary' : 'primary.plainColor',
+                    '&:hover': {
+                      bgcolor: (isStandalone || isInstalled) ? 'transparent' : 'var(--joy-palette-primary-softBg)',
+                    }
+                  }}
+                >
+                  {isStandalone || isInstalled ? (
+                    <>
+                      <Check size={16} />
+                      <Typography level="body-sm" sx={{ fontWeight: 600, color: 'inherit' }}>
+                        {t('header.app_installed')}
+                      </Typography>
+                    </>
+                  ) : (
+                    <>
+                      <Download size={16} />
+                      <Typography level="body-sm" sx={{ fontWeight: 600, color: 'inherit' }}>
+                        {t('header.install_app')}
+                      </Typography>
+                    </>
+                  )}
+                </MenuItem>
               </JoyMenu>
             </Dropdown>
 
@@ -1261,6 +1315,12 @@ export default function Header({
         )}
       </Box>
       </Sheet>
+      <PWAInstallModal
+        isOpen={showGuideModal}
+        onClose={() => setShowGuideModal(false)}
+        onInstall={promptInstall}
+        isIOS={isIOS}
+      />
     </Box>
   );
 }

@@ -13,6 +13,11 @@ const { title } = Astro.props;
 		<meta name="description" content="Oaktree Platform - Unified Intelligence for Investment & Finance" />
 		<meta name="viewport" content="width=device-width" />
 		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<link rel="manifest" href="/manifest.webmanifest" />
+		<meta name="theme-color" content="#050505" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+		<meta name="apple-mobile-web-app-title" content="Oaktree" />
 		<meta name="generator" content={Astro.generator} />
 		<title>{title}</title>
 		<link rel="preconnect" href="https://fonts.googleapis.com">
@@ -21,6 +26,15 @@ const { title } = Astro.props;
 	</head>
 	<body>
 		<slot />
+		<script is:inline>
+			if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost')) {
+				window.addEventListener('load', () => {
+					navigator.serviceWorker.register('/sw.js').catch((err) => {
+						console.warn('[PWA] Service worker registration failed:', err);
+					});
+				});
+			}
+		</script>
 	</body>
 </html>
 <style is:global>
