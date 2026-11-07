@@ -6,7 +6,7 @@ import { useSearch, useNavigate } from '@tanstack/react-router';
 import { useColorScheme } from '@mui/joy/styles';
 import { AuthContext } from '../../../common/AuthContext';
 import { useSettingsStore } from '../../../../store/settingsStore';
-import { useFinanceBridgeStore, type Wallet } from '../../../../store/financeBridgeStore';
+import { useFinanceBridgeStore, type Wallet, type FinanceActionType } from '../../../../store/financeBridgeStore';
 import { FederatedErrorBoundary } from '../../core/FederatedErrorBoundary';
 
 export interface FederatedFinanceProps {
@@ -14,8 +14,24 @@ export interface FederatedFinanceProps {
   token?: any;
   theme?: 'light' | 'dark';
   usdThbRate?: number;
+  /**
+   * ADR-0021: When true, Simplicity runs in Host-Controlled Embedded Mode
+   * (disables direct window.history.pushState/back mutations and delegates routing to Host).
+   * When false or undefined, Simplicity operates in Standalone Mode.
+   */
+  isEmbedded?: boolean;
+  /**
+   * ADR-0021: Controls whether Simplicity is permitted to fall back to localStorage / IndexedDB
+   * when API requests fail. Enabled in Local Dev (true), disabled in Production (false).
+   */
+  allowLocalFallback?: boolean;
   activeTab?: 'dashboard' | 'transactions' | 'budgets' | 'wallets';
   selectedWalletId?: string;
+  /**
+   * ADR-0021: Typed Action Contract replacing global window CustomEvents.
+   */
+  pendingAction?: FinanceActionType | null;
+  onActionConsumed?: () => void;
   onTabChange?: (tab: 'dashboard' | 'transactions' | 'budgets' | 'wallets') => void;
   onWalletChange?: (walletId: string) => void;
   onWalletsSync?: (wallets: any[]) => void;
@@ -123,15 +139,40 @@ export const RemoteFinanceContainer: React.FC<RemoteFinanceContainerProps> = (pr
   const navigate = useNavigate();
 
   const setBridgeWallets = useFinanceBridgeStore((s) => s.setWallets);
+  const storePendingAction = useFinanceBridgeStore((s) => s.pendingAction);
   const consumePendingAction = useFinanceBridgeStore((s) => s.consumePendingAction);
 
-  // Replay any pending action once mounted
+  const isLocal = isLocalEnvironment();
+  const resolvedAllowLocalFallback = props.allowLocalFallback !== undefined ? props.allowLocalFallback : isLocal;
+
+  // Seed default wallet in localStorage only when local fallback is permitted (Local Dev)
   React.useEffect(() => {
-    const pending = consumePendingAction();
-    if (pending && typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('oaktree:finance-action', { detail: { action: pending } }));
+    if (typeof window === 'undefined' || !resolvedAllowLocalFallback) return;
+    try {
+      const existing = localStorage.getItem('simplicity_wallets');
+      if (!existing || existing === '[]') {
+        const defaultWallet = [
+          {
+            id: 'wal_cash',
+            name: 'Cash',
+            type: 'cash',
+            currency: 'THB',
+            startingBalance: 0,
+            currentBalance: 0,
+            computed_balance: 0,
+            color: '#10b981',
+            icon: 'Wallet',
+            orderIndex: 0,
+            status: 'active',
+            createdAt: new Date().toISOString(),
+          },
+        ];
+        localStorage.setItem('simplicity_wallets', JSON.stringify(defaultWallet));
+      }
+    } catch {
+      // Ignore storage access errors
     }
-  }, [consumePendingAction]);
+  }, [resolvedAllowLocalFallback]);
 
   // 3. Retry state: incrementing retryKey creates a fresh React.lazy instance
   const [retryKey, setRetryKey] = React.useState(0);
@@ -154,6 +195,8 @@ export const RemoteFinanceContainer: React.FC<RemoteFinanceContainerProps> = (pr
   const resolvedToken = props.token !== undefined ? props.token : (typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null);
   const resolvedTheme = props.theme !== undefined ? props.theme : (mode === 'light' ? 'light' : 'dark');
   const resolvedUsdThbRate = props.usdThbRate !== undefined ? props.usdThbRate : storeUsdThbRate;
+  const resolvedIsEmbedded = props.isEmbedded !== undefined ? props.isEmbedded : true;
+  const resolvedPendingAction = props.pendingAction !== undefined ? props.pendingAction : storePendingAction;
 
   const searchTab = (search?.tab as 'dashboard' | 'transactions' | 'budgets' | 'wallets') || 'dashboard';
   const resolvedActiveTab = props.activeTab || searchTab;
@@ -173,7 +216,12 @@ export const RemoteFinanceContainer: React.FC<RemoteFinanceContainerProps> = (pr
     lastDispatchedWalletRef.current = searchWallet;
   }, [searchWallet]);
 
-  // 6. Callback handlers
+  // 6. Callback handlers (ADR-0021 Pure Typed Props Contract)
+  const handleActionConsumed = React.useCallback(() => {
+    consumePendingAction();
+    props.onActionConsumed?.();
+  }, [consumePendingAction, props.onActionConsumed]);
+
   const handleTabChange = React.useCallback(
     (tab: 'dashboard' | 'transactions' | 'budgets' | 'wallets') => {
       if (tab === lastDispatchedTabRef.current) {
@@ -213,9 +261,6 @@ export const RemoteFinanceContainer: React.FC<RemoteFinanceContainerProps> = (pr
       if (props.onWalletsSync) {
         props.onWalletsSync(wallets);
       }
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('oaktree:wallets-synced', { detail: { wallets } }));
-      }
     },
     [props.onWalletsSync, setBridgeWallets]
   );
@@ -246,8 +291,12 @@ export const RemoteFinanceContainer: React.FC<RemoteFinanceContainerProps> = (pr
           token={resolvedToken}
           theme={resolvedTheme}
           usdThbRate={resolvedUsdThbRate}
+          isEmbedded={resolvedIsEmbedded}
+          allowLocalFallback={resolvedAllowLocalFallback}
           activeTab={resolvedActiveTab}
           selectedWalletId={resolvedSelectedWalletId}
+          pendingAction={resolvedPendingAction}
+          onActionConsumed={handleActionConsumed}
           onTabChange={handleTabChange}
           onWalletChange={handleWalletChange}
           onWalletsSync={handleWalletsSync}
@@ -259,4 +308,3 @@ export const RemoteFinanceContainer: React.FC<RemoteFinanceContainerProps> = (pr
 };
 
 export default RemoteFinanceContainer;
-

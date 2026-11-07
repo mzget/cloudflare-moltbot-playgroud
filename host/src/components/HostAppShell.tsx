@@ -1,4 +1,4 @@
-import * as React from 'react';
+﻿import * as React from 'react';
 import { CircularProgress, Box, Typography } from '@mui/joy';
 import * as TanStackRouter from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
@@ -74,6 +74,63 @@ export function installAuthFetchInterceptor() {
 }
 
 installAuthFetchInterceptor();
+
+/**
+ * Creates an isolated browser history for TanStack Router that prevents infinite
+ * pushState/popstate re-render loops when federated micro-frontends (such as Simplicity)
+ * mount mobile full-screen modal views.
+ */
+export function createIsolatedBrowserHistory() {
+  if (typeof window === 'undefined') return undefined;
+
+  const createBrowserHistory = (TanStackRouter as any).createBrowserHistory;
+  if (typeof createBrowserHistory !== 'function') return undefined;
+
+  const baseHistory = createBrowserHistory();
+  let lastHref = window.location.pathname + window.location.search + window.location.hash;
+  let hadInternalModal = false;
+
+  // Intercept window.history.pushState to avoid duplicate consecutive simplicityView states
+  const anyWindow = window as any;
+  if (!anyWindow.__oaktreeHistoryIntercepted) {
+    anyWindow.__oaktreeHistoryIntercepted = true;
+    const rawPushState = window.history.pushState;
+    window.history.pushState = function (state: any, title: string, url?: string | URL | null) {
+      if (state?.simplicityView && window.history.state?.simplicityView === state.simplicityView) {
+        return;
+      }
+      return rawPushState.apply(this, [state, title, url] as any);
+    };
+  }
+
+  const origSubscribe = baseHistory.subscribe.bind(baseHistory);
+  baseHistory.subscribe = (cb: (event: any) => void) => {
+    return origSubscribe((event: any) => {
+      const nextHref = window.location.pathname + window.location.search + window.location.hash;
+      const isSameHref = nextHref === lastHref;
+      const isInternalModal = Boolean(
+        event.location?.state?.simplicityView ||
+        (window.history.state && (window.history.state as any).simplicityView)
+      );
+
+      if (isSameHref && isInternalModal) {
+        hadInternalModal = true;
+        return;
+      }
+
+      if (isSameHref && hadInternalModal) {
+        hadInternalModal = false;
+        return;
+      }
+
+      hadInternalModal = isInternalModal;
+      lastHref = nextHref;
+      cb(event);
+    });
+  };
+
+  return baseHistory;
+}
 
 // 1. Define the Route Tree
 export function createHostRouter() {
@@ -182,6 +239,7 @@ export function createHostRouter() {
 
   return createRouter({
     routeTree,
+    history: createIsolatedBrowserHistory(),
     defaultPreload: 'intent',
     trailingSlash: 'never',
     defaultNotFoundComponent: NotFoundPage,

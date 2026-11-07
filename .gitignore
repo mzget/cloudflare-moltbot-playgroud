@@ -1,13 +1,12 @@
 # Dependencies
 node_modules/
 
-# Build outputs
+# Build & Turborepo outputs
 dist/
 .astro/
 .wrangler/
 .cloudflare/
 .turbo/
-.turbo
 
 # Environment variables and secrets
 .env
@@ -30,25 +29,35 @@ pnpm-debug.log*
 Thumbs.db
 Desktop.ini
 
-# IDE configurations
+# IDE & Editor configurations
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
+*.code-workspace
 
-# Wrangler logs
-.wrangler/logs/
-
-# Test coverage
+# Test coverage & Playwright artifacts
 coverage/
 .nyc_output/
+test-results/
+frontend/test-results/
 
-# Temporary files
+# Temporary & Scratch files
 *.tmp
 *.temp
 .cache/
+scratch/
+tmp.md
 
+# Agent & AI configurations
+.gemini
+.agents/teamwork/
+.agent/workflows/
+.clinerules
+.cursorrules
+
+# Agent Skills whitelist
 .agents/skills/**
 !.agents/skills/grill-with-docs/
 !.agents/skills/grill-with-docs/**
@@ -64,17 +73,6 @@ coverage/
 !.agents/skills/oaktree-gemini-copilot/**
 !.agents/skills/value-investing-brainstormer/
 !.agents/skills/value-investing-brainstormer/**
-.agent/workflows/
-trace-tool/check-color.js
-trace-tool/package-lock.json
-trace-tool/package.json
-trace-tool/trace.js
-.clinerules
-.cursorrules
+
+# Prototypes
 prototype/**
-test-results/
-frontend/test-results/
-tmp.md
-.gemini
-.agents/teamwork/
-*.code-workspace

@@ -6,7 +6,7 @@ import {
   type FinanceActionType
 } from './financeBridgeStore';
 
-describe('Adversarial Verification: Modal Triggers, Wallet Sync, Action Replay & Fallback', () => {
+describe('Adversarial Verification: ADR-0021 Typed Props Contract, Wallet Sync & Fallback', () => {
   let mockWindow: EventTarget & Record<string, any>;
   const originalWindow = (globalThis as any).window;
 
@@ -32,10 +32,10 @@ describe('Adversarial Verification: Modal Triggers, Wallet Sync, Action Replay &
   });
 
   // ==========================================================================
-  // TASK 1.1: Verify Header action buttons dispatch CustomEvent 'oaktree:finance-action'
+  // TASK 1.1: Verify ADR-0021 Typed Props Action Contract (No CustomEvents)
   // ==========================================================================
-  describe('1.1 Modal Triggers via CustomEvent dispatch', () => {
-    it('dispatches CustomEvent "oaktree:finance-action" with { action: "add-tx" }', () => {
+  describe('1.1 Modal Triggers via Typed Props Action Contract (ADR-0021)', () => {
+    it('queues "add-tx" in pendingAction state without firing global window CustomEvents', () => {
       const receivedEvents: any[] = [];
       const handler = (e: Event) => {
         receivedEvents.push((e as CustomEvent).detail);
@@ -46,61 +46,34 @@ describe('Adversarial Verification: Modal Triggers, Wallet Sync, Action Replay &
       // Trigger Add Transaction
       dispatchFinanceAction('add-tx');
 
-      expect(receivedEvents).toHaveLength(1);
-      expect(receivedEvents[0]).toEqual({ action: 'add-tx' });
+      expect(useFinanceBridgeStore.getState().pendingAction).toBe('add-tx');
+      expect(receivedEvents).toHaveLength(0);
 
       window.removeEventListener('oaktree:finance-action', handler);
     });
 
-    it('dispatches CustomEvent "oaktree:finance-action" with { action: "ai-scan" }', () => {
-      const receivedEvents: any[] = [];
-      const handler = (e: Event) => {
-        receivedEvents.push((e as CustomEvent).detail);
-      };
-
-      window.addEventListener('oaktree:finance-action', handler);
-
-      // Trigger AI Scanner
+    it('queues "ai-scan" in pendingAction state for Typed Props consumption', () => {
       dispatchFinanceAction('ai-scan');
-
-      expect(receivedEvents).toHaveLength(1);
-      expect(receivedEvents[0]).toEqual({ action: 'ai-scan' });
-
-      window.removeEventListener('oaktree:finance-action', handler);
+      expect(useFinanceBridgeStore.getState().pendingAction).toBe('ai-scan');
     });
 
-    it('dispatches CustomEvent "oaktree:finance-action" with { action: "csv-import" }', () => {
-      const receivedEvents: any[] = [];
-      const handler = (e: Event) => {
-        receivedEvents.push((e as CustomEvent).detail);
-      };
-
-      window.addEventListener('oaktree:finance-action', handler);
-
-      // Trigger CSV Import
+    it('queues "csv-import" in pendingAction state for Typed Props consumption', () => {
       dispatchFinanceAction('csv-import');
-
-      expect(receivedEvents).toHaveLength(1);
-      expect(receivedEvents[0]).toEqual({ action: 'csv-import' });
-
-      window.removeEventListener('oaktree:finance-action', handler);
+      expect(useFinanceBridgeStore.getState().pendingAction).toBe('csv-import');
     });
 
-    it('handles multiple sequential action button clicks cleanly without dropped events', () => {
+    it('handles sequential action dispatches and consumption via onActionConsumed cleanly', () => {
       const actions: FinanceActionType[] = ['add-tx', 'ai-scan', 'csv-import', 'add-tx'];
-      const receivedActions: string[] = [];
+      const consumedActions: (FinanceActionType | null)[] = [];
 
-      const handler = (e: Event) => {
-        receivedActions.push((e as CustomEvent).detail?.action);
-      };
+      actions.forEach((act) => {
+        dispatchFinanceAction(act);
+        expect(useFinanceBridgeStore.getState().pendingAction).toBe(act);
+        consumedActions.push(useFinanceBridgeStore.getState().consumePendingAction());
+        expect(useFinanceBridgeStore.getState().pendingAction).toBeNull();
+      });
 
-      window.addEventListener('oaktree:finance-action', handler);
-
-      actions.forEach((act) => dispatchFinanceAction(act));
-
-      expect(receivedActions).toEqual(actions);
-
-      window.removeEventListener('oaktree:finance-action', handler);
+      expect(consumedActions).toEqual(actions);
     });
 
     it('SSR safe guard: returns cleanly when window is undefined without throwing', () => {
@@ -115,9 +88,9 @@ describe('Adversarial Verification: Modal Triggers, Wallet Sync, Action Replay &
   });
 
   // ==========================================================================
-  // TASK 1.2: Action Buffering & Unmounted Queue Replay
+  // TASK 1.2: Action Buffering & Typed Props Consumption
   // ==========================================================================
-  describe('1.2 Action Buffering & Unmounted Queue Replay', () => {
+  describe('1.2 Action Buffering & Typed Props Consumption', () => {
     it('buffers action in store when remote is unmounted', () => {
       // Prior to remote mount, user clicks "+ Add"
       dispatchFinanceAction('add-tx');
@@ -126,51 +99,25 @@ describe('Adversarial Verification: Modal Triggers, Wallet Sync, Action Replay &
       expect(useFinanceBridgeStore.getState().pendingAction).toBe('add-tx');
     });
 
-    it('replays pending action when remote container mounts and consumes it', () => {
+    it('delivers pendingAction via store and clears it on consumePendingAction()', () => {
       // 1. User clicks "+ Add" before remote is mounted
       dispatchFinanceAction('add-tx');
       expect(useFinanceBridgeStore.getState().pendingAction).toBe('add-tx');
 
-      // 2. Remote mounts and attaches listener
-      const replayedEvents: any[] = [];
-      const remoteListener = (e: Event) => {
-        replayedEvents.push((e as CustomEvent).detail);
-      };
-      window.addEventListener('oaktree:finance-action', remoteListener);
-
-      // 3. Simulate RemoteFinanceContainer mount effect:
+      // 2. Remote consumes pendingAction via onActionConsumed callback
       const pending = useFinanceBridgeStore.getState().consumePendingAction();
       expect(pending).toBe('add-tx');
       // Verify pendingAction is cleared immediately to prevent duplicate replay
       expect(useFinanceBridgeStore.getState().pendingAction).toBeNull();
 
-      if (pending) {
-        window.dispatchEvent(new CustomEvent('oaktree:finance-action', { detail: { action: pending } }));
-      }
-
-      // 4. Remote listener receives the replayed action
-      expect(replayedEvents).toHaveLength(1);
-      expect(replayedEvents[0]).toEqual({ action: 'add-tx' });
-
-      // 5. Subsequent consume returns null
+      // 3. Subsequent consume returns null
       const secondConsume = useFinanceBridgeStore.getState().consumePendingAction();
       expect(secondConsume).toBeNull();
-
-      window.removeEventListener('oaktree:finance-action', remoteListener);
     });
 
-    it('returns null and dispatches nothing when no pending action was queued', () => {
-      const events: any[] = [];
-      const listener = (e: Event) => {
-        events.push((e as CustomEvent).detail);
-      };
-      window.addEventListener('oaktree:finance-action', listener);
-
+    it('returns null when no pending action was queued', () => {
       const pending = useFinanceBridgeStore.getState().consumePendingAction();
       expect(pending).toBeNull();
-      expect(events).toHaveLength(0);
-
-      window.removeEventListener('oaktree:finance-action', listener);
     });
 
     it('buffers latest action if user clicks multiple buttons before remote mounts', () => {
@@ -292,4 +239,3 @@ describe('Adversarial Verification: Modal Triggers, Wallet Sync, Action Replay &
     });
   });
 });
-

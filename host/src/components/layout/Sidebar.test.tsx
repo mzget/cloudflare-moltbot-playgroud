@@ -94,7 +94,7 @@ describe('Sidebar Component & Drawer App Switcher', () => {
     expect(html).toContain('sidebar.command_center');
   });
 
-  it('renders Simplicity navigation tabs and action buttons in Simplicity mode', () => {
+  it('renders Simplicity navigation tabs and action buttons in Simplicity mode with testids and valid hrefs', () => {
     currentPathname = '/finance';
     const html = renderToString(
       <Sidebar activeTab="finance" setActiveTab={mockSetActiveTab} />
@@ -104,6 +104,14 @@ describe('Sidebar Component & Drawer App Switcher', () => {
     expect(html).toContain('Transactions');
     expect(html).toContain('Budgets');
     expect(html).toContain('Wallets');
+    expect(html).toContain('data-testid="sidebar-simplicity-dashboard"');
+    expect(html).toContain('data-testid="sidebar-simplicity-transactions"');
+    expect(html).toContain('data-testid="sidebar-simplicity-budgets"');
+    expect(html).toContain('data-testid="sidebar-simplicity-wallets"');
+    expect(html).toContain('href="/finance?tab=transactions&amp;wallet=all"');
+    expect(html).toContain('href="/finance?tab=budgets&amp;wallet=all"');
+    expect(html).toContain('href="/finance?tab=wallets&amp;wallet=all"');
+    expect(html).toContain('data-testid="sidebar-action-add-tx"');
     expect(html).toContain('+ Add Transaction');
   });
 });

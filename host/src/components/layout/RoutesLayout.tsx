@@ -283,7 +283,19 @@ export default function RoutesLayout() {
   );
 
   return (
-    <Box sx={{ px: { xs: 1.5, sm: 2.5, md: 3.5, lg: 4 }, py: { xs: 1.5, md: 2.5 }, width: '100%', minHeight: '100vh', boxSizing: 'border-box' }}>
+    <Box
+      sx={{
+        '--oaktree-z-header': 1100,
+        '--oaktree-z-drawer': 1300,
+        '--oaktree-z-host-modal': 1350,
+        '--oaktree-z-remote-modal': 1400,
+        px: { xs: 1.5, sm: 2.5, md: 3.5, lg: 4 },
+        py: { xs: 1.5, md: 2.5 },
+        width: '100%',
+        minHeight: '100vh',
+        boxSizing: 'border-box',
+      }}
+    >
       <Header 
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -298,16 +310,30 @@ export default function RoutesLayout() {
       <Drawer
         open={mobileOpen}
         onClose={() => setMobileOpen(false)}
+        disableRestoreFocus
+        disableAutoFocus
+        disableEnforceFocus
+        slotProps={{
+          backdrop: {
+            sx: {
+              pointerEvents: mobileOpen ? 'auto' : 'none',
+            },
+          },
+        }}
         sx={{
           display: { xs: 'block', md: 'none' },
+          zIndex: 'var(--oaktree-z-drawer, 1300)',
           '& .MuiDrawer-content': {
             ...glassStyle,
             p: 3,
             width: 280,
-            borderRight: '1px solid rgba(255, 255, 255, 0.1)',
+            borderRight: '1px solid',
+            borderColor: 'divider',
             display: 'flex',
             flexDirection: 'column',
             justifyContent: 'space-between',
+            pointerEvents: 'auto',
+            zIndex: 'calc(var(--oaktree-z-drawer, 1300) + 1)',
           }
         }}
       >
@@ -331,10 +357,9 @@ export default function RoutesLayout() {
           
           <Sidebar 
             activeTab={activeTab} 
-            setActiveTab={(tab) => {
-              setActiveTab(tab);
-              setMobileOpen(false);
-            }}
+            setActiveTab={setActiveTab}
+            onClose={() => setMobileOpen(false)}
+            onFinanceTabChange={handleFinanceTabChange}
             reportsCount={reportsCount}
             collapsed={false}
           />
