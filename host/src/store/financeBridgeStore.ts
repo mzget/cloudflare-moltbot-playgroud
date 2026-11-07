@@ -109,16 +109,9 @@ export const useFinanceBridgeStore = create<FinanceBridgeState>((set, get) => ({
 export function dispatchFinanceAction(action: FinanceActionType) {
   if (typeof window === 'undefined') return;
 
-  // 1. Buffer action in store in case remote is mounting
+  // ADR-0021: Pure Typed Props Contract — store pendingAction in Zustand
+  // so RemoteFinanceContainer passes it directly via props to FederatedFinanceApp.
   useFinanceBridgeStore.getState().setPendingAction(action);
-
-  // 2. Dispatch CustomEvent for active remote listener
-  window.dispatchEvent(
-    new CustomEvent('oaktree:finance-action', {
-      detail: { action },
-    })
-  );
 }
 
 export default useFinanceBridgeStore;
-

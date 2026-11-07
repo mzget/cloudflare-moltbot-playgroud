@@ -472,11 +472,10 @@ export default function Header({
               aria-selected={!isSimplicity}
               data-testid="app-switcher-oaktree"
               onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
-                if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
+                if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && (e.button === 0 || e.button === undefined)) {
                   e.preventDefault();
                   if (!isSimplicity) return; // No-op if already on Oaktree
                   setActiveTab?.('dashboard');
-                  navigate({ to: '/dashboard', search: {} } as any);
                 }
               }}
               sx={{
@@ -511,10 +510,9 @@ export default function Header({
               aria-selected={isSimplicity}
               data-testid="app-switcher-simplicity"
               onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
-                if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
+                if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && (e.button === 0 || e.button === undefined)) {
                   e.preventDefault();
                   if (isSimplicity) return; // No-op if already on Simplicity
-                  setActiveTab?.('finance');
                   const targetTab = lastFinanceTab || 'dashboard';
                   const targetWallet = lastFinanceWallet || 'all';
                   navigate({ to: '/finance', search: { tab: targetTab, wallet: targetWallet } } as any);
@@ -925,7 +923,7 @@ export default function Header({
                     component="a"
                     href={`/finance?tab=${tab.id}&wallet=${currentWalletId}`}
                     onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
-                      if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
+                      if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && (e.button === 0 || e.button === undefined)) {
                         e.preventDefault();
                         if (currentFinanceTab !== tab.id) {
                           if (onFinanceTabChange) {
@@ -1184,7 +1182,7 @@ export default function Header({
                   component="a"
                   href={`/${item.id}`}
                   onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
-                    if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
+                    if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && (e.button === 0 || e.button === undefined)) {
                       e.preventDefault();
                       setActiveTab?.(item.id);
                     }

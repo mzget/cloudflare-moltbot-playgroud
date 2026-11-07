@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { List, ListItem, ListItemButton, ListItemContent, ListItemDecorator, Typography, Box, Chip, Button, Divider } from '@mui/joy';
 import { 
   BarChart3, TrendingUp, Terminal, Info, Bot, LayoutDashboard, Database,
@@ -7,15 +7,18 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useSearch, useNavigate } from '@tanstack/react-router';
 import { useFinanceBridgeStore, dispatchFinanceAction } from '../../store/financeBridgeStore';
+import type { FinanceTab } from '../../router/schemas';
 
 export interface SidebarProps {
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  onClose?: () => void;
+  onFinanceTabChange?: (tab: FinanceTab) => void;
   reportsCount?: number;
   collapsed?: boolean;
 }
 
-export default function Sidebar({ activeTab, setActiveTab, reportsCount }: SidebarProps) {
+export default function Sidebar({ activeTab, setActiveTab, onClose, onFinanceTabChange, reportsCount }: SidebarProps) {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const search = useSearch({ strict: false }) as any;
@@ -24,6 +27,11 @@ export default function Sidebar({ activeTab, setActiveTab, reportsCount }: Sideb
   const { lastFinanceTab, lastFinanceWallet } = useFinanceBridgeStore();
 
   const isSimplicity = activeTab === 'finance' || (typeof window !== 'undefined' && window.location.pathname.startsWith('/finance'));
+
+  const isModifiedEvent = (e: React.MouseEvent) => {
+    return e.ctrlKey || e.metaKey || e.shiftKey || e.altKey || (e.button !== undefined && e.button !== 0);
+  };
+
 
   const menuItems = [
     { id: 'dashboard', label: t('sidebar.dashboard'), icon: <LayoutDashboard size={20} /> },
@@ -43,11 +51,13 @@ export default function Sidebar({ activeTab, setActiveTab, reportsCount }: Sideb
   ];
 
   const handleAction = (action: 'add-tx' | 'ai-scan' | 'csv-import') => {
+    onClose?.();
     if (!isSimplicity) {
       setActiveTab('finance');
-      navigate({ to: '/finance', search: { tab: 'dashboard', wallet: 'all' } } as any);
     }
-    dispatchFinanceAction(action);
+    setTimeout(() => {
+      dispatchFinanceAction(action);
+    }, 16);
   };
 
   return (
@@ -77,12 +87,11 @@ export default function Sidebar({ activeTab, setActiveTab, reportsCount }: Sideb
             aria-selected={!isSimplicity}
             data-testid="sidebar-switcher-oaktree"
             onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
-              if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
-                e.preventDefault();
-                if (!isSimplicity) return;
-                setActiveTab('dashboard');
-                navigate({ to: '/dashboard', search: {} } as any);
-              }
+              if (isModifiedEvent(e)) return;
+              e.preventDefault();
+              onClose?.();
+              if (!isSimplicity) return;
+              setActiveTab('dashboard');
             }}
             sx={{
               borderRadius: '20px',
@@ -108,17 +117,16 @@ export default function Sidebar({ activeTab, setActiveTab, reportsCount }: Sideb
             aria-selected={isSimplicity}
             data-testid="sidebar-switcher-simplicity"
             onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
-              if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
-                e.preventDefault();
-                if (isSimplicity) return;
-                setActiveTab('finance');
-                const targetTab = lastFinanceTab || 'dashboard';
-                const targetWallet = lastFinanceWallet || 'all';
-                navigate({
-                  to: '/finance',
-                  search: { tab: targetTab, wallet: targetWallet },
-                } as any);
-              }
+              if (isModifiedEvent(e)) return;
+              e.preventDefault();
+              onClose?.();
+              if (isSimplicity) return;
+              const targetTab = lastFinanceTab || 'dashboard';
+              const targetWallet = lastFinanceWallet || 'all';
+              navigate({
+                to: '/finance',
+                search: { tab: targetTab, wallet: targetWallet },
+              } as any);
             }}
             sx={{
               borderRadius: '20px',
@@ -161,20 +169,34 @@ export default function Sidebar({ activeTab, setActiveTab, reportsCount }: Sideb
                 return (
                   <ListItem key={item.id}>
                     <ListItemButton
+                      component="a"
+                      href={`/finance?tab=${item.id}&wallet=${currentWalletId}`}
                       selected={isSelected}
-                      onClick={() => {
-                        navigate({
-                          to: '/finance',
-                          search: { tab: item.id as any, wallet: currentWalletId },
-                        } as any);
-                        setActiveTab('finance');
+                      data-testid={`sidebar-simplicity-${item.id}`}
+                      onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
+                        if (isModifiedEvent(e)) return;
+                        e.preventDefault();
+                        onClose?.();
+                        if (currentFinanceTab === item.id) return;
+                        if (onFinanceTabChange) {
+                          onFinanceTabChange(item.id as any);
+                        } else {
+                          navigate({
+                            to: '/finance',
+                            search: { tab: item.id as any, wallet: currentWalletId },
+                          } as any);
+                        }
                       }}
                       sx={{
                         px: 1.75,
                         py: 1.25,
                         borderRadius: '12px',
+                        textDecoration: 'none',
                         color: isSelected ? 'primary.plainColor' : 'text.secondary',
                         bgcolor: isSelected ? 'var(--joy-palette-primary-softBg)' : 'transparent',
+                        '&:hover': {
+                          textDecoration: 'none',
+                        },
                         '&.Mui-selected': {
                           borderLeft: '3px solid var(--joy-palette-primary-solidBg)',
                         }
@@ -212,6 +234,7 @@ export default function Sidebar({ activeTab, setActiveTab, reportsCount }: Sideb
             <List sx={{ '--ListItem-radius': '12px', gap: 0.75 }}>
               <ListItem>
                 <ListItemButton
+                  data-testid="sidebar-action-add-tx"
                   onClick={() => handleAction('add-tx')}
                   sx={{ px: 1.75, py: 1.25, borderRadius: '12px', bgcolor: 'rgba(16, 185, 129, 0.1)' }}
                 >
@@ -227,7 +250,7 @@ export default function Sidebar({ activeTab, setActiveTab, reportsCount }: Sideb
               </ListItem>
               <ListItem>
                 <ListItemButton
-                  onClick={() => handleAction('ai-scan')}
+                  data-testid="sidebar-action-ai-scan" onClick={() => handleAction('ai-scan')}
                   sx={{ px: 1.75, py: 1.25, borderRadius: '12px' }}
                 >
                   <ListItemDecorator sx={{ color: '#a855f7', minInlineSize: '2.25rem' }}>
@@ -242,7 +265,7 @@ export default function Sidebar({ activeTab, setActiveTab, reportsCount }: Sideb
               </ListItem>
               <ListItem>
                 <ListItemButton
-                  onClick={() => handleAction('csv-import')}
+                  data-testid="sidebar-action-csv-import" onClick={() => handleAction('csv-import')}
                   sx={{ px: 1.75, py: 1.25, borderRadius: '12px' }}
                 >
                   <ListItemDecorator sx={{ color: 'text.secondary', minInlineSize: '2.25rem' }}>
@@ -268,10 +291,11 @@ export default function Sidebar({ activeTab, setActiveTab, reportsCount }: Sideb
                     href={`/${item.id}`}
                     selected={isSelected}
                     onClick={(e: React.MouseEvent<HTMLAnchorElement>) => {
-                      if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey && e.button === 0) {
-                        e.preventDefault();
-                        setActiveTab(item.id);
-                      }
+                      if (isModifiedEvent(e)) return;
+                      e.preventDefault();
+                      onClose?.();
+                      if (isSelected) return;
+                      setActiveTab(item.id);
                     }}
                     sx={{
                       px: 1.75,
